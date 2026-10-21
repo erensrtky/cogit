@@ -1,0 +1,128 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { Readable } from "node:stream";
+import { beforeEach, describe, expect, it } from "vitest";
+import { epochAdd } from "../src/commands/epoch.js";
+import { init } from "../src/commands/init.js";
+import { readStdin, sessionWrite } from "../src/commands/session.js";
+import { redactDeep, redactText } from "../src/redact.js";
+import { loadSession } from "../src/store/stores.js";
+import { envFor, type FakeIo, fakeIo, tempDir } from "./helpers.js";
+
+describe("redactText", () => {
+  it.each([
+    ["key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123", "key [REDACTED]"],
+    ["sk-proj-abcdefghijklmnopqrstuvwx", "[REDACTED]"],
+    ["ghp_abcdefghijklmnopqrstuvwxyz0123456789", "[REDACTED]"],
+    ["github_pat_11ABCDEFG0123456789_abcdef", "[REDACTED]"],
+    ["glpat-abcdefghijklmnopqrstu", "[REDACTED]"],
+    ["AKIAABCDEFGHIJKLMNOP", "[REDACTED]"],
+    ["xoxb-1234567890-abcdef", "[REDACTED]"],
+    ["AIzaSyA-abcdefghijklmnopqrstuvwxyz01234", "[REDACTED]"],
+    ["eyJhbGciOiJI.eyJzdWIiOiIx.SflKxwRJSMeK", "[REDACTED]"],
+    ["password=hunter22!", "password=[REDACTED]"],
+    ['api_key: "abc123def456"', 'api_key: "[REDACTED]"'],
+    ["Authorization: Bearer abcdefghijklmnop1234", "Authorization: Bearer [REDACTED]"],
+    ["postgres://admin:s3cr3t@db.local/x", "postgres://admin:[REDACTED]@db.local/x"],
+    ["-----BEGIN RSA PRIVATE KEY-----\nMIIE\n-----END RSA PRIVATE KEY-----", "[REDACTED]"],
+  ])("masks %s", (input, expected) => {
+    expect(redactText(input).text).toBe(expected);
+  });
+
+  it.each([
+    "token: refresh flow",
+    "password reset is out of scope",
+    "decided to keep the secret in the OS keychain",
+    "https://example.com/path@v2",
+    "sk-short",
+  ])("leaves prose alone: %s", (input) => {
+    expect(redactText(input)).toEqual({ text: input, count: 0 });
+  });
+
+  it("walks nested values and counts hits", () => {
+    const r = redactDeep({ a: ["password=hunter22!", 3, null], b: { c: "ok", d: true } });
+    expect(r).toEqual({
+      value: { a: ["password=[REDACTED]", 3, null], b: { c: "ok", d: true } },
+      count: 1,
+    });
+  });
+});
+
+describe("session write", () => {
+  let dir: string;
+  let root: string;
+  let io: FakeIo;
+  const write = (json: unknown) =>
+    sessionWrite({ dir: root }, io, async () =>
+      typeof json === "string" ? json : JSON.stringify(json),
+    );
+
+  beforeEach(async () => {
+    dir = await tempDir();
+    root = join(dir, "proj");
+    await mkdir(root);
+    io = fakeIo(envFor(dir));
+    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    await epochAdd(root, "e2e", "E2E", fakeIo(envFor(dir)));
+  });
+
+  it("creates and then merges a session", async () => {
+    await write({
+      sessionId: "s1",
+      title: "setup",
+      epoch: "e2e",
+      nodes: [{ id: "n1", kind: "phase", title: "start" }],
+    });
+    await write({
+      sessionId: "s1",
+      nodes: [{ id: "n2", parent: "n1", kind: "decision", title: "use elk", why: "nesting" }],
+    });
+    const s = await loadSession(root, "s1");
+    expect(s).toMatchObject({ ok: true, data: { title: "setup", epoch: "e2e" } });
+    expect(s.found && s.ok && s.data.nodes.map((n) => n.id)).toEqual(["n1", "n2"]);
+    expect(io.lines).toEqual(["Saved session s1 (1 nodes)", "Saved session s1 (2 nodes)"]);
+    expect(io.warnings).toEqual([]);
+  });
+
+  it("redacts secrets before writing", async () => {
+    await write({
+      sessionId: "s1",
+      status: { goal: "rotate ghp_abcdefghijklmnopqrstuvwxyz0123456789" },
+    });
+    const s = await loadSession(root, "s1");
+    expect(s.found && s.ok && s.data.status.goal).toBe("rotate [REDACTED]");
+    expect(io.warnings).toEqual(["redacted 1 secret-looking value(s)"]);
+  });
+
+  it("warns about unknown epochs and repaired trees but still saves", async () => {
+    await write({
+      sessionId: "s1",
+      epoch: "nope",
+      nodes: [{ id: "a", parent: "ghost", kind: "step", title: "x" }],
+    });
+    expect(io.warnings[0]).toMatch(/epoch "nope" is not in project.json/);
+    expect(io.warnings[1]).toMatch(/parent ghost not found/);
+    expect(await loadSession(root, "s1")).toMatchObject({ ok: true, data: { epoch: "nope" } });
+  });
+
+  it("rejects invalid JSON and schema mismatches", async () => {
+    await expect(write("{nope")).rejects.toThrow(/not valid JSON/);
+    await expect(write({ sessionId: "../x" })).rejects.toThrow(/sessionId:/);
+    await expect(write([])).rejects.toThrow(/\(root\)/);
+  });
+
+  it("reads from a file and requires an initialized project", async () => {
+    const f = join(dir, "in.json");
+    await writeFile(f, JSON.stringify({ sessionId: "s2" }));
+    await sessionWrite({ dir: root, file: f }, io);
+    expect(io.lines).toEqual(["Saved session s2 (0 nodes)"]);
+    await expect(sessionWrite({ dir: dir, file: f }, io)).rejects.toThrow(/not initialized/);
+    await mkdir(join(dir, ".codelineage"));
+    await writeFile(join(dir, ".codelineage", "project.json"), "{}");
+    await expect(sessionWrite({ dir: dir, file: f }, io)).rejects.toThrow(/schema version/);
+  });
+
+  it("reads stdin as utf8", async () => {
+    expect(await readStdin(Readable.from([Buffer.from('{"a":'), "1}"]))).toBe('{"a":1}');
+  });
+});

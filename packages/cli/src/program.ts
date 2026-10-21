@@ -3,6 +3,7 @@ import pkg from "../package.json" with { type: "json" };
 import { configGet, configSet } from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
 import { type InitOptions, init } from "./commands/init.js";
+import { sessionWrite } from "./commands/session.js";
 import { CliError, type Io, processIo } from "./io.js";
 
 export type IoFactory = (interactive: boolean) => Io;
@@ -72,6 +73,16 @@ export function createProgram(makeIo: IoFactory = processIo): Command {
         epochAdd(opts.dir, id, title, makeIo(false)),
       ),
     );
+
+  const session = program
+    .command("session")
+    .description("session records (used by the agent skill)");
+  session
+    .command("write")
+    .description("merge session JSON from stdin into .codelineage/sessions/")
+    .option("-C, --dir <dir>", "project directory", ".")
+    .option("-f, --file <file>", "read JSON from a file instead of stdin")
+    .action(run(async (opts: { dir: string; file?: string }) => sessionWrite(opts, makeIo(false))));
 
   return program;
 }

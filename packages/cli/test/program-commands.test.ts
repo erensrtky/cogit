@@ -60,6 +60,14 @@ describe("commands through the CLI", () => {
     expect(io.lines.at(-1)).toBe("Added epoch e1: First");
   });
 
+  it("runs session write from a file", async () => {
+    await cli("init", root, "--yes", "--retention", "keep");
+    const f = join(dir, "s.json");
+    await writeFile(f, '{"sessionId":"s1"}');
+    await cli("session", "write", "-C", root, "-f", f);
+    expect(io.lines.at(-1)).toBe("Saved session s1 (0 nodes)");
+  });
+
   it("prints user errors as one line", async () => {
     expect(await cli("config", "get", "nope")).toMatch(/^error: unknown key "nope"/);
   });
