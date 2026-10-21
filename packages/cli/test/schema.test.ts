@@ -1,0 +1,173 @@
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
+import { Config } from "../src/schema/config.js";
+import { mergeSession, repairTree } from "../src/schema/merge.js";
+import { Project } from "../src/schema/project.js";
+import {
+  type LineageNode,
+  Session,
+  SessionInput,
+  sessionInputJsonSchema,
+} from "../src/schema/session.js";
+import { parseVersioned } from "../src/schema/versioned.js";
+
+const T0 = "2026-10-21T10:00:00.000Z";
+const T1 = "2026-10-21T11:00:00.000Z";
+
+const input = (v: unknown) => SessionInput.parse(v);
+const node = (id: string, parent: string | null, title = id): LineageNode => ({
+  id,
+  parent,
+  kind: "step",
+  title,
+});
+
+describe("Session schema", () => {
+  it("fills defaults for a minimal session", () => {
+    const s = Session.parse({ schema: 1, sessionId: "abc", startedAt: T0, updatedAt: T0 });
+    expect(s.agent).toBe("claude-code");
+    expect(s.epoch).toBeNull();
+    expect(s.status).toEqual({ goal: "", done: [], pending: [], next: "" });
+    expect(s.nodes).toEqual([]);
+  });
+
+  it("rejects ids that are not safe slugs", () => {
+    for (const sessionId of ["../etc", "a/b", "", ".hidden"]) {
+      expect(SessionInput.safeParse({ sessionId }).success).toBe(false);
+    }
+  });
+
+  it("rejects unknown node kinds", () => {
+    const r = SessionInput.safeParse({
+      sessionId: "a",
+      nodes: [{ id: "n1", kind: "rant", title: "x" }],
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("exports a JSON Schema for the agent input", () => {
+    const js = sessionInputJsonSchema() as { required?: string[]; properties?: object };
+    expect(js.required).toEqual(["sessionId"]);
+    expect(Object.keys(js.properties ?? {})).toContain("nodes");
+  });
+});
+
+describe("Project and Config schemas", () => {
+  it("defaults epochs and settings", () => {
+    expect(Project.parse({ schema: 1, name: "p" }).epochs).toEqual([]);
+    expect(Config.parse({ schema: 1 })).toMatchObject({
+      language: "auto",
+      updateEveryTurns: 5,
+      sessionEndCatchUp: true,
+      gitPolicy: "ignore",
+    });
+  });
+});
+
+describe("parseVersioned", () => {
+  it("rejects non-objects and missing versions", () => {
+    expect(parseVersioned([], Project, 1)).toMatchObject({ ok: false, error: "not a JSON object" });
+    expect(parseVersioned({ name: "p" }, Project, 1)).toMatchObject({ ok: false });
+  });
+
+  it("migrates older documents step by step", () => {
+    const ProjectV2 = Project.extend({ schema: z.literal(2) });
+    const r = parseVersioned({ schema: 1, title: "p" }, ProjectV2, 2, {
+      1: ({ title, ...rest }) => ({ ...rest, name: title }),
+    });
+    expect(r).toMatchObject({ ok: true, data: { schema: 2, name: "p" } });
+  });
+
+  it("fails when a migration step is missing", () => {
+    const r = parseVersioned({ schema: 1, name: "p" }, Project, 2);
+    expect(r).toMatchObject({ ok: false, error: "no migration from schema v1" });
+  });
+
+  it("reads newer documents best-effort with a warning", () => {
+    const r = parseVersioned({ schema: 9, name: "p", extra: true }, Project, 1);
+    expect(r.ok).toBe(true);
+    expect(r.warnings[0]).toMatch(/newer/);
+  });
+
+  it("reports schema issues with their path", () => {
+    const r = parseVersioned({ schema: 1, name: "" }, Project, 1);
+    expect(r).toMatchObject({ ok: false });
+    if (!r.ok) expect(r.error).toMatch(/^name:/);
+  });
+});
+
+describe("mergeSession", () => {
+  it("creates a new session owned by the CLI timestamps", () => {
+    const { session } = mergeSession(undefined, input({ sessionId: "s1", title: "x" }), T0);
+    expect(session).toMatchObject({ schema: 1, startedAt: T0, updatedAt: T0, title: "x" });
+  });
+
+  it("upserts nodes by id and never removes them", () => {
+    const first = mergeSession(
+      undefined,
+      input({
+        sessionId: "s1",
+        nodes: [
+          { id: "n1", kind: "phase", title: "a", summary: "keep" },
+          { id: "n2", parent: "n1", kind: "step", title: "b" },
+        ],
+      }),
+      T0,
+    ).session;
+    const { session } = mergeSession(
+      first,
+      input({
+        sessionId: "s1",
+        nodes: [
+          { id: "n2", kind: "step", title: "b2" },
+          { id: "n3", kind: "decision", title: "c", why: "because" },
+        ],
+      }),
+      T1,
+    );
+    expect(session.nodes.map((n) => n.id)).toEqual(["n1", "n2", "n3"]);
+    expect(session.nodes[0]?.summary).toBe("keep");
+    expect(session.nodes[1]).toMatchObject({ title: "b2", parent: "n1" });
+    expect(session.nodes[2]?.parent).toBeNull();
+    expect(session).toMatchObject({ startedAt: T0, updatedAt: T1 });
+  });
+
+  it("replaces status when sent and keeps fields that were not sent", () => {
+    const first = mergeSession(
+      undefined,
+      input({ sessionId: "s1", title: "t", epoch: "e2e", status: { goal: "g", done: ["a"] } }),
+      T0,
+    ).session;
+    const kept = mergeSession(first, input({ sessionId: "s1" }), T1).session;
+    expect(kept).toMatchObject({ title: "t", epoch: "e2e" });
+    expect(kept.status.done).toEqual(["a"]);
+
+    const replaced = mergeSession(
+      first,
+      input({ sessionId: "s1", epoch: null, status: { goal: "g2" } }),
+      T1,
+    ).session;
+    expect(replaced.epoch).toBeNull();
+    expect(replaced.status).toEqual({ goal: "g2", done: [], pending: [], next: "" });
+  });
+
+  it("refuses to merge a different session", () => {
+    const first = mergeSession(undefined, input({ sessionId: "s1" }), T0).session;
+    expect(() => mergeSession(first, input({ sessionId: "s2" }), T1)).toThrow(/mismatch/);
+  });
+});
+
+describe("repairTree", () => {
+  it("re-roots nodes with a missing parent", () => {
+    const nodes = [node("a", "ghost")];
+    expect(repairTree(nodes)).toEqual(["node a: parent ghost not found, moved to root"]);
+    expect(nodes[0]?.parent).toBeNull();
+  });
+
+  it("breaks parent cycles", () => {
+    const nodes = [node("a", "b"), node("b", "a"), node("c", "a")];
+    const warnings = repairTree(nodes);
+    expect(warnings).toHaveLength(1);
+    expect(nodes.filter((n) => n.parent === null)).toHaveLength(1);
+  });
+});
