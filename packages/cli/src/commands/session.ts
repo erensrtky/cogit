@@ -5,6 +5,7 @@ import { redactDeep } from "../redact.js";
 import { mergeSession } from "../schema/merge.js";
 import { SessionInput } from "../schema/session.js";
 import { loadProject, updateSession } from "../store/stores.js";
+import { buildProject } from "./build.js";
 
 export async function readStdin(stream: NodeJS.ReadableStream = process.stdin): Promise<string> {
   const chunks: Buffer[] = [];
@@ -64,4 +65,11 @@ export async function sessionWrite(
   });
   for (const w of warnings) io.warn(w);
   io.out(`Saved session ${saved.sessionId} (${saved.nodes.length} nodes)`);
+
+  // Keep the map fresh without making a failed render fail the write.
+  try {
+    await buildProject({ dir: root, io, quiet: true });
+  } catch (err) {
+    io.warn(`could not build lineage.html: ${(err as Error).message}`);
+  }
 }

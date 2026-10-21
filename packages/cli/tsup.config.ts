@@ -8,6 +8,8 @@ export default defineConfig({
   bundle: true,
   noExternal: [/.*/],
   clean: true,
+  // The template HTML ships inside the bundle so dist/cli.js is self-contained.
+  loader: { ".html": "text" },
   // CJS deps bundled into ESM still call require() for node builtins
   banner: {
     js: [

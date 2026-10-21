@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -66,6 +67,13 @@ describe("commands through the CLI", () => {
     await writeFile(f, '{"sessionId":"s1"}');
     await cli("session", "write", "-C", root, "-f", f);
     expect(io.lines.at(-1)).toBe("Saved session s1 (0 nodes)");
+  });
+
+  it("builds the map through the CLI", async () => {
+    await cli("init", root, "--yes", "--retention", "keep");
+    await cli("build", root);
+    expect(io.lines.at(-1)).toMatch(/^Wrote .*lineage\.html$/);
+    expect(existsSync(join(root, ".codelineage", "lineage.html"))).toBe(true);
   });
 
   it("prints user errors as one line", async () => {

@@ -1,5 +1,6 @@
 import { Command, InvalidArgumentError, Option } from "commander";
 import pkg from "../package.json" with { type: "json" };
+import { buildProject } from "./commands/build.js";
 import { configGet, configSet } from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
 import { type InitOptions, init } from "./commands/init.js";
@@ -48,6 +49,16 @@ export function createProgram(makeIo: IoFactory = processIo): Command {
       run(async (dir: string, opts: InitOptions & { yes?: boolean }) => {
         const { yes, ...rest } = opts;
         await init(dir, rest, makeIo(!yes && process.stdin.isTTY === true));
+      }),
+    );
+
+  program
+    .command("build")
+    .description("regenerate .codelineage/lineage.html")
+    .argument("[dir]", "project directory", ".")
+    .action(
+      run(async (dir: string) => {
+        await buildProject({ dir, io: makeIo(false) });
       }),
     );
 
