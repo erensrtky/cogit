@@ -8,5 +8,12 @@ export default defineConfig({
   bundle: true,
   noExternal: [/.*/],
   clean: true,
-  banner: { js: "#!/usr/bin/env node" },
+  // CJS deps bundled into ESM still call require() for node builtins
+  banner: {
+    js: [
+      "#!/usr/bin/env node",
+      'import { createRequire as __cl_createRequire } from "node:module";',
+      "const require = __cl_createRequire(import.meta.url);",
+    ].join("\n"),
+  },
 });

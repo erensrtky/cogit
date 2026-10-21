@@ -1,11 +1,12 @@
 # Changelog
 
-Bu projenin kayda değer tüm değişiklikleri burada belgelenir.
-Format [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temellidir;
-sürümleme [SemVer](https://semver.org/lang/tr/)'e uyar.
-Tek bump yolu `./release` — elle `VERSION`/tag düzenlemeyin.
+All notable changes to this project are documented here.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
 ### Added
 - `codelineage` CLI skeleton (`--version`, `--help`), MIT license.
+- `codelineage init`: creates `.codelineage/`, registers the project, asks for git policy, Claude Code transcript retention (`cleanupPeriodDays`, with backup) and summary language; `--yes` and per-question flags for non-interactive use.
+- `codelineage config get/set` and `codelineage epoch add`.

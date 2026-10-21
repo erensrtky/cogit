@@ -37,7 +37,9 @@ export async function readJson(file: string): Promise<JsonRead> {
   try {
     text = await readFile(file, "utf8");
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return { found: false };
+    // ENOTDIR: a path component is a file, so this file cannot exist either
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return { found: false };
     throw err;
   }
   try {
