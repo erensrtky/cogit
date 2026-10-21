@@ -22,7 +22,8 @@ these records into static HTML:
 - **Status card** at the top of every project: goal, done, pending (flags items
   waiting on the user), next step, last activity. With parallel sessions, goal and
   next come from the most recently updated session; `needsUser` items are merged
-  from all active sessions.
+  from all active sessions. A session is **active** while its `updatedAt` is
+  within 7 days of the build, newest first; duplicate item texts are shown once.
 - **Panel** (global): every registered project as a small status card, with quick
   switching into each project map. Settings are shown read-only.
 

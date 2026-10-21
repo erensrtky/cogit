@@ -8,7 +8,7 @@ import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
 import type { LineageNode, Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
-import { buildNodeTree, buildViewModel, embedViewModel } from "../src/view/lineage.js";
+import { buildNodeTree, buildViewModel, embedViewModel, statusCard } from "../src/view/lineage.js";
 import { DATA_ELEMENT_ID } from "../src/view/model.js";
 import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
 
@@ -159,6 +159,84 @@ describe("buildViewModel", () => {
     });
     expect(model.status).toEqual({ goal: "", done: [], pending: [], next: "", lastActivity: null });
     expect(model.unassigned).toEqual([]);
+  });
+});
+
+describe("statusCard", () => {
+  const NOW = "2026-10-21T10:00:00.000Z";
+
+  it("takes goal/done/next from the latest session and merges active needsUser items once", () => {
+    const sessions = [
+      session({
+        sessionId: "inactive",
+        updatedAt: "2026-09-01T00:00:00.000Z",
+        status: {
+          goal: "stale",
+          done: [],
+          pending: [{ text: "stale ask", needsUser: true }],
+          next: "stale",
+        },
+      }),
+      session({
+        sessionId: "latest",
+        updatedAt: "2026-10-20T09:00:00.000Z",
+        status: {
+          goal: "goal",
+          done: ["done"],
+          pending: [{ text: "mine", needsUser: true }],
+          next: "next",
+        },
+      }),
+      session({
+        sessionId: "active-new",
+        updatedAt: "2026-10-20T08:00:00.000Z",
+        status: {
+          goal: "",
+          done: [],
+          pending: [
+            { text: "mine", needsUser: true },
+            { text: "shared", needsUser: true },
+            { text: "not merged", needsUser: false },
+          ],
+          next: "",
+        },
+      }),
+      session({
+        sessionId: "active-old",
+        updatedAt: "2026-10-18T00:00:00.000Z",
+        status: {
+          goal: "",
+          done: [],
+          pending: [{ text: "older ask", needsUser: true }],
+          next: "",
+        },
+      }),
+    ];
+
+    expect(statusCard(sessions, NOW)).toEqual({
+      goal: "goal",
+      done: ["done"],
+      pending: [
+        { text: "mine", needsUser: true },
+        { text: "shared", needsUser: true },
+        { text: "older ask", needsUser: true },
+      ],
+      next: "next",
+      lastActivity: "2026-10-20T09:00:00.000Z",
+    });
+  });
+
+  it("treats unparseable timestamps as inactive instead of merging them", () => {
+    const sessions = [
+      session({ sessionId: "latest", updatedAt: "2026-10-20T00:00:00.000Z" }),
+      session({
+        sessionId: "broken",
+        updatedAt: "not-a-date",
+        status: { goal: "", done: [], pending: [{ text: "ask", needsUser: true }], next: "" },
+      }),
+    ];
+    expect(statusCard(sessions, NOW).pending).toEqual([]);
+    expect(statusCard(sessions, "also-broken").pending).toEqual([]);
   });
 });
 

@@ -53,16 +53,56 @@ export function buildNodeTree(nodes: LineageNode[]): ViewNode[] {
   return tree;
 }
 
-/** The status card comes from the most recently updated session. */
-function statusCard(sessions: Session[]): StatusCard {
+/** A session counts as active while it was updated within this window. */
+export const ACTIVE_WINDOW_DAYS = 7;
+const ACTIVE_WINDOW_MS = ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+/** Parsed timestamp, with `-Infinity` for a value the date parser rejects. */
+function timestamp(value: string): number {
+  const time = Date.parse(value);
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+}
+
+function isActive(session: Session, now: string): boolean {
+  const updated = timestamp(session.updatedAt);
+  const reference = timestamp(now);
+  if (updated === Number.NEGATIVE_INFINITY || reference === Number.NEGATIVE_INFINITY) return false;
+  return reference - updated <= ACTIVE_WINDOW_MS;
+}
+
+/** Most recently updated first; the session id keeps equal timestamps deterministic. */
+function byUpdatedAt(a: Session, b: Session): number {
+  return timestamp(b.updatedAt) - timestamp(a.updatedAt) || a.sessionId.localeCompare(b.sessionId);
+}
+
+/**
+ * The status card: goal, done, pending and next come from the most recently
+ * updated session; `needsUser` items are merged from every other session active
+ * within `ACTIVE_WINDOW_DAYS`, newest first and deduplicated by text.
+ * `now` is the build time the window is measured against.
+ */
+export function statusCard(sessions: Session[], now: string): StatusCard {
   let latest: Session | undefined;
   for (const session of sessions) {
-    if (!latest || session.updatedAt > latest.updatedAt) latest = session;
+    if (!latest || timestamp(session.updatedAt) > timestamp(latest.updatedAt)) latest = session;
   }
+
+  const pending = (latest?.status.pending ?? []).map((item) => ({ ...item }));
+  const seen = new Set(pending.map((item) => item.text));
+  const others = sessions.filter((session) => session !== latest).sort(byUpdatedAt);
+  for (const session of others) {
+    if (!isActive(session, now)) continue;
+    for (const item of session.status.pending) {
+      if (!item.needsUser || seen.has(item.text)) continue;
+      seen.add(item.text);
+      pending.push({ ...item });
+    }
+  }
+
   return {
     goal: latest?.status.goal ?? "",
     done: latest?.status.done ?? [],
-    pending: latest?.status.pending ?? [],
+    pending,
     next: latest?.status.next ?? "",
     lastActivity: latest?.updatedAt ?? null,
   };
@@ -124,7 +164,7 @@ export function buildViewModel(input: ViewModelInput): LineageViewModel {
     kind: "lineage",
     schema: VIEW_SCHEMA,
     project: { name: input.project.name, path: input.path, generatedAt: input.generatedAt },
-    status: statusCard(sessions),
+    status: statusCard(sessions, input.generatedAt),
     epochs,
     unassigned,
   };

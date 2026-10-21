@@ -111,6 +111,7 @@ ul {
   border: 1px solid var(--warn);
   border-radius: 999px;
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .epoch {
