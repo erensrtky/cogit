@@ -81,10 +81,12 @@ Session file (schema v1, sketch):
 The agent picks an existing epoch or adds one through the CLI (`codelineage epoch add`),
 which does a locked, atomic write.
 
-**Writes go through the CLI.** The agent never writes JSON files directly. It pipes
-its JSON to `codelineage session write`, which validates against the schema, runs the
-redaction pass, merges with the existing file and writes atomically, then runs
-`build` quietly.
+**Writes go through the CLI.** The agent never writes session files directly. It
+saves its JSON to `.codelineage/inbox/<session-id>.json` with the Write tool and runs
+`codelineage session write --file <inbox> --consume`, which validates against the
+schema, runs the redaction pass, merges with the existing file and writes atomically,
+deletes the inbox file, then runs `build` quietly. JSON is not piped through the shell,
+because Claude Code's command checks block heredocs that contain JSON.
 
 **Concurrency:**
 - One file per session, so parallel agents in the same project never write the same
@@ -110,9 +112,14 @@ npm-sourced plugin without one resolves to version `unknown` and never updates.
 Behavior verified against the Claude Code hooks docs (2026-10-21):
 
 - **Skill `/codelineage:lineage`:** writes or updates this session's record. The skill
-  gets its session ID from `${CLAUDE_SESSION_ID}` and injects the current session file
-  with `` !`command` ``, so the agent updates the record instead of rewriting it.
-  The user can call it at any time.
+  gets its session ID from `${CLAUDE_SESSION_ID}` and injects a compact view of the
+  record with `` !`codelineage session show` ``, so the agent sends only what is new
+  or changed instead of rewriting it. The injected command never fails (an
+  uninitialized project is reported in its JSON), because a failing injection aborts
+  the whole skill. `allowed-tools` pre-approves exactly the CLI and writes under
+  `.codelineage/inbox/`, so the skill runs without prompts. The user can call it at
+  any time. Verified end to end with Claude Code 2.1.300: first write, "up to date"
+  with no change, and the hint in an uninitialized directory.
 - **Stop hook (the main path):** counts turns per session in `state/`. Every N turns
   (`updateEveryTurns`, default 5) it asks the agent to run the skill, using
   `hookSpecificOutput.additionalContext` (shown as "Stop hook feedback", not as an
@@ -167,7 +174,8 @@ Each update costs agent tokens (the user's subscription or API usage).
 | `codelineage open [dir]` | Builds, then opens the map (or the panel if no dir is given) |
 | `codelineage epoch add <id> <title>` | Adds an epoch (locked write) |
 | `codelineage config get/set <key> [value]` | Reads or changes settings |
-| `codelineage session write` | Reads session JSON from stdin, validates, redacts, merges and writes it under the session lock, then builds. Used by the skill. |
+| `codelineage session show <id>` | Prints the compact record the skill injects (epochs, language, status, node ids/titles, inbox path) as JSON. Never fails for an uninitialized project. |
+| `codelineage session write` | Reads session JSON from stdin or `--file` (the skill uses `--file <inbox> --consume`), validates, redacts, merges and writes it under the session lock, then builds. |
 | `codelineage backfill [dir]` | Summarizes past transcripts of that project by running the agent headless, one session at a time. Estimates cost and asks first. Selection: `--pick` (default: lists sessions with date, first prompt and estimated cost), `--last <n>`, `--since <date>`, `--all`. |
 | `codelineage backfill <session-id> --tail` | Summarizes only the unrecorded turns of one session. Started by the SessionEnd hook. |
 

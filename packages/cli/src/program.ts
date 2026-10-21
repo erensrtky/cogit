@@ -5,7 +5,7 @@ import { configGet, configPrune, configSet } from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
 import { type InitOptions, init } from "./commands/init.js";
 import { openPanel, openProject } from "./commands/open.js";
-import { sessionWrite } from "./commands/session.js";
+import { sessionShow, sessionWrite } from "./commands/session.js";
 import { CliError, type Io, processIo } from "./io.js";
 
 export type IoFactory = (interactive: boolean) => Io;
@@ -124,7 +124,20 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .description("merge session JSON from stdin into .codelineage/sessions/")
     .option("-C, --dir <dir>", "project directory", ".")
     .option("-f, --file <file>", "read JSON from a file instead of stdin")
-    .action(run(async (opts: { dir: string; file?: string }) => sessionWrite(opts, makeIo(false))));
+    .option("--consume", "delete the file once the record is saved")
+    .action(
+      run(async (opts: { dir: string; file?: string; consume?: boolean }) =>
+        sessionWrite(opts, makeIo(false)),
+      ),
+    );
+  session
+    .command("show")
+    .description("print the compact record the agent skill updates, as JSON")
+    .argument("<id>", "session id")
+    .option("-C, --dir <dir>", "project directory", ".")
+    .action(
+      run(async (id: string, opts: { dir: string }) => sessionShow(opts.dir, id, makeIo(false))),
+    );
 
   return program;
 }

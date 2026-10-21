@@ -1,10 +1,12 @@
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { CliError, type Io } from "../io.js";
 import { redactDeep } from "../redact.js";
+import { Slug } from "../schema/common.js";
 import { mergeSession } from "../schema/merge.js";
 import { SessionInput } from "../schema/session.js";
-import { loadProject, updateSession } from "../store/stores.js";
+import { projectPaths } from "../store/paths.js";
+import { loadConfig, loadProject, loadSession, updateSession } from "../store/stores.js";
 import { buildProject } from "./build.js";
 
 export async function readStdin(stream: NodeJS.ReadableStream = process.stdin): Promise<string> {
@@ -17,6 +19,8 @@ export interface SessionWriteOptions {
   dir: string;
   /** Read JSON from this file instead of stdin. */
   file?: string;
+  /** Delete `file` once the record is saved; a failed write keeps it for a retry. */
+  consume?: boolean;
 }
 
 /**
@@ -64,6 +68,7 @@ export async function sessionWrite(
     return merged.session;
   });
   for (const w of warnings) io.warn(w);
+  if (opts.file && opts.consume) await rm(opts.file, { force: true });
   io.out(`Saved session ${saved.sessionId} (${saved.nodes.length} nodes)`);
 
   // Keep the map fresh without making a failed render fail the write.
@@ -72,4 +77,47 @@ export async function sessionWrite(
   } catch (err) {
     io.warn(`could not build lineage.html: ${(err as Error).message}`);
   }
+}
+
+/**
+ * What the skill injects before the agent updates its record: the project's
+ * epochs, the summary language and a compact view of this session (node ids,
+ * parents, kinds and titles, without summaries, which merging keeps anyway).
+ * Always exits 0 for an uninitialized project or an unreadable record, because a
+ * failing injected command aborts the whole skill; the JSON says what is wrong.
+ */
+export async function sessionShow(dir: string, sessionId: string, io: Io): Promise<void> {
+  if (!Slug.safeParse(sessionId).success) throw new CliError(`invalid session id: ${sessionId}`);
+  const root = resolve(dir);
+  const project = await loadProject(root);
+  if (!project.found || !project.ok) {
+    const error = project.found && !project.ok ? project.error : undefined;
+    io.out(JSON.stringify({ initialized: false, dir: root, ...(error ? { error } : {}) }));
+    return;
+  }
+
+  const config = await loadConfig(io.env);
+  const loaded = await loadSession(root, sessionId);
+  const view: Record<string, unknown> = {
+    initialized: true,
+    dir: root,
+    project: project.data.name,
+    language: config.language,
+    epochs: project.data.epochs.map(({ id, title }) => ({ id, title })),
+    session: null,
+  };
+  if (loaded.found && loaded.ok) {
+    const { title, epoch, status, nodes } = loaded.data;
+    view.session = {
+      sessionId,
+      title,
+      epoch,
+      status,
+      nodes: nodes.map(({ id, parent, kind, title }) => ({ id, parent, kind, title })),
+    };
+  } else if (loaded.found) {
+    view.sessionError = loaded.error;
+  }
+  view.inbox = projectPaths(root).inbox(sessionId);
+  io.out(JSON.stringify(view, null, 2));
 }

@@ -80,6 +80,12 @@ describe("commands through the CLI", () => {
     expect(io.lines.at(-1)).toBe("Saved session s1 (0 nodes)");
   });
 
+  it("runs session show for the skill", async () => {
+    await cli("init", root, "--yes", "--retention", "keep");
+    await cli("session", "show", "s1", "-C", root);
+    expect(JSON.parse(io.lines.at(-1) ?? "")).toMatchObject({ initialized: true, session: null });
+  });
+
   it("builds the map through the CLI", async () => {
     await cli("init", root, "--yes", "--retention", "keep");
     await cli("build", root);

@@ -9,7 +9,8 @@
   },
   "files": [
     "dist",
-    ".claude-plugin"
+    ".claude-plugin",
+    "skills"
   ],
   "engines": {
     "node": ">=22.13.0"

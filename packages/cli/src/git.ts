@@ -25,6 +25,7 @@ const ALWAYS = [
   "/.codelineage/state/",
   "/.codelineage/snapshots/",
   "/.codelineage/locks/",
+  "/.codelineage/inbox/",
   "/.codelineage/lineage.html",
 ];
 

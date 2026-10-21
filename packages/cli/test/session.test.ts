@@ -1,10 +1,11 @@
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it } from "vitest";
 import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
-import { readStdin, sessionWrite } from "../src/commands/session.js";
+import { readStdin, sessionShow, sessionWrite } from "../src/commands/session.js";
 import { redactDeep, redactText } from "../src/redact.js";
 import { loadSession } from "../src/store/stores.js";
 import { envFor, type FakeIo, fakeIo, tempDir } from "./helpers.js";
@@ -124,5 +125,87 @@ describe("session write", () => {
 
   it("reads stdin as utf8", async () => {
     expect(await readStdin(Readable.from([Buffer.from('{"a":'), "1}"]))).toBe('{"a":1}');
+  });
+});
+
+describe("session show", () => {
+  let dir: string;
+  let root: string;
+  let io: FakeIo;
+  const shown = () => JSON.parse(io.lines.at(-1) ?? "") as Record<string, unknown>;
+
+  beforeEach(async () => {
+    dir = await tempDir();
+    root = join(dir, "proj");
+    await mkdir(root);
+    io = fakeIo(envFor(dir));
+  });
+
+  it("reports an uninitialized project without failing", async () => {
+    await sessionShow(root, "s1", io);
+    expect(shown()).toEqual({ initialized: false, dir: root });
+  });
+
+  it("reports a corrupt project.json without failing", async () => {
+    await mkdir(join(root, ".codelineage"));
+    await writeFile(join(root, ".codelineage", "project.json"), "{nope");
+    await sessionShow(root, "s1", io);
+    expect(shown()).toMatchObject({ initialized: false, error: expect.stringMatching(/JSON/) });
+  });
+
+  it("shows epochs, language and a compact record without summaries", async () => {
+    await init(root, { name: "p", retention: "keep", language: "tr" }, fakeIo(envFor(dir)));
+    await epochAdd(root, "e2e", "E2E", fakeIo(envFor(dir)));
+    await sessionShow(root, "s1", io);
+    expect(shown()).toEqual({
+      initialized: true,
+      dir: root,
+      project: "p",
+      language: "tr",
+      epochs: [{ id: "e2e", title: "E2E" }],
+      session: null,
+      inbox: join(root, ".codelineage", "inbox", "s1.json"),
+    });
+
+    await sessionWrite({ dir: root }, fakeIo(envFor(dir)), async () =>
+      JSON.stringify({
+        sessionId: "s1",
+        title: "t",
+        epoch: "e2e",
+        status: { goal: "g" },
+        nodes: [{ id: "a", kind: "phase", title: "A", summary: "long text", why: "because" }],
+      }),
+    );
+    await sessionShow(root, "s1", io);
+    expect(shown().session).toEqual({
+      sessionId: "s1",
+      title: "t",
+      epoch: "e2e",
+      status: { goal: "g", done: [], pending: [], next: "" },
+      nodes: [{ id: "a", parent: null, kind: "phase", title: "A" }],
+    });
+  });
+
+  it("flags an unreadable record instead of hiding it", async () => {
+    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    await writeFile(join(root, ".codelineage", "sessions", "s1.json"), "{nope");
+    await sessionShow(root, "s1", io);
+    expect(shown()).toMatchObject({ session: null, sessionError: expect.stringMatching(/JSON/) });
+  });
+
+  it("consumes the inbox file after a successful write and keeps it after a failed one", async () => {
+    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    const file = join(root, ".codelineage", "inbox", "s1.json");
+    await mkdir(join(root, ".codelineage", "inbox"));
+    await writeFile(file, "{nope");
+    await expect(sessionWrite({ dir: root, file, consume: true }, io)).rejects.toThrow(/JSON/);
+    expect(existsSync(file)).toBe(true);
+    await writeFile(file, '{"sessionId":"s1"}');
+    await sessionWrite({ dir: root, file, consume: true }, io);
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it("rejects an id that is not a slug", async () => {
+    await expect(sessionShow(root, "../x", io)).rejects.toThrow(/invalid session id/);
   });
 });

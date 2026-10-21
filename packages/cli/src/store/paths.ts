@@ -13,6 +13,8 @@ export function projectPaths(root: string) {
     state: (id: string) => join(base, "state", `${id}.json`),
     snapshots: join(base, "snapshots"),
     locks: join(base, "locks"),
+    /** Where the skill drops session JSON for `session write --file`. */
+    inbox: (id: string) => join(base, "inbox", `${id}.json`),
     lock: (name: string) => join(base, "locks", `${name}.lock`),
     html: join(base, "lineage.html"),
   };

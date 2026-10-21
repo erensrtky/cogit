@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Claude Code plugin skeleton: the `codelineage` npm package is also the plugin (`.claude-plugin/plugin.json`, bundled `dist/cli.js`), and the repository root carries a `codelineage` marketplace that installs it from npm.
 
+- `/codelineage:lineage` skill: injects this session's compact record and the project's epochs, asks the agent for only what is new or changed, and has it save the JSON with the Write tool and run `session write --file … --consume` (JSON piped through a shell heredoc is blocked by Claude Code's command checks). It is pre-approved for exactly those two actions and answers "up to date" when nothing changed.
+- `codelineage session show <id> [-C dir]`: prints the compact record the skill updates (epochs, summary language, title, epoch, status and node ids/parents/kinds/titles, plus the inbox path) as JSON, and reports an uninitialized project or an unreadable record in that JSON instead of failing.
+- `codelineage session write --consume`: deletes the `--file` input once the record is saved and keeps it when the write fails. `gitPolicy=commit` now also ignores `.codelineage/inbox/`.
+
 ### Changed
 - `commander`, `zod` and `@inquirer/prompts` moved to `devDependencies`: they are bundled into `dist/cli.js`, so installing the package pulls in no runtime dependencies.
 
