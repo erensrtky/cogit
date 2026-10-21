@@ -1,6 +1,6 @@
 # codelineage — MVP spec
 
-Status: Draft · 2026-10-21
+Status: Draft · 2026-10-21 (rev. 2: capture verified against hooks docs)
 Tagline: *The lineage of your AI coding sessions.*
 
 ## Problem
@@ -20,7 +20,9 @@ these records into static HTML:
   phase/step/decision. Every node can be expanded to drill down. Each session node
   carries a `claude --resume <id>` copy button.
 - **Status card** at the top of every project: goal, done, pending (flags items
-  waiting on the user), next step, last activity.
+  waiting on the user), next step, last activity. With parallel sessions, goal and
+  next come from the most recently updated session; `needsUser` items are merged
+  from all active sessions.
 - **Panel** (global): every registered project as a small status card, with quick
   switching into each project map. Settings are shown read-only.
 
@@ -39,7 +41,10 @@ Sessions are not a separate view. A session is a level of the project tree.
 ```
 <project>/.codelineage/
   project.json               # project name, epochs[], schema version
-  sessions/<session-id>.json # one file per session; only that session writes it
+  sessions/<session-id>.json # one file per session (see Concurrency)
+  state/<session-id>.json    # hook state: turn counter, last recorded turn, pending tail
+  snapshots/<session-id>-<ts>.jsonl  # transcript copy taken before compaction
+  locks/                     # lock files
   lineage.html               # generated
 
 ~/.config/codelineage/
@@ -75,25 +80,72 @@ Session file (schema v1, sketch):
 The agent picks an existing epoch or adds one through the CLI (`codelineage epoch add`),
 which does a locked, atomic write.
 
-**Concurrency:** one file per session means parallel agents in the same project never
-write the same file. Only `project.json` is shared, and only the CLI writes to it.
+**Writes go through the CLI.** The agent never writes JSON files directly. It pipes
+its JSON to `codelineage session write`, which validates against the schema, runs the
+redaction pass, merges with the existing file and writes atomically, then runs
+`build` quietly.
+
+**Concurrency:**
+- One file per session, so parallel agents in the same project never write the same
+  file. A session file may also be written by a catch-up run for that session (see
+  Capture), so every session write takes a per-session lock and does
+  read → merge → write, never a blind overwrite.
+- `project.json` is shared; only the CLI writes it, under a lock.
+- All writes (JSON and HTML) go to a temp file and are renamed into place, so a
+  reader never sees a half-written file. Concurrent builds: last one wins.
+- A catch-up run that finds the session lock held exits ("already running").
 
 ## Capture (Claude Code plugin)
 
-Distributed like OpenViking: a Claude Code plugin that ships `hooks/hooks.json` plus a
-skill.
+Distributed like OpenViking: a Claude Code plugin that ships `hooks/hooks.json`, a
+skill, and a bundled build of the CLI (single file), so hooks run
+`node ${CLAUDE_PLUGIN_ROOT}/dist/…` with no global install and no `npx` startup cost.
+The npm package is published separately for standalone use.
 
-- **Skill `/lineage`:** writes or updates this session's file following the schema.
+Behavior verified against the Claude Code hooks docs (2026-10-21):
+
+- **Skill `/codelineage:lineage`:** writes or updates this session's record. The skill
+  gets its session ID from `${CLAUDE_SESSION_ID}` and injects the current session file
+  with `` !`command` ``, so the agent updates the record instead of rewriting it.
   The user can call it at any time.
-- **Stop hook:** counts turns since the last update. Every N turns (default 5,
-  configurable) it blocks the stop with a reason, so the agent runs the skill. If
-  nothing meaningful happened, the agent leaves the file unchanged.
-- **PreCompact hook:** forces an update before context compaction, so details are
-  saved before they are lost.
-- Then `codelineage build` runs quietly to refresh the HTML.
+- **Stop hook (the main path):** counts turns per session in `state/`. Every N turns
+  (`updateEveryTurns`, default 5) it asks the agent to run the skill, using
+  `hookSpecificOutput.additionalContext` (shown as "Stop hook feedback", not as an
+  error). It never asks when `stop_hook_active` is true, which also keeps us clear of
+  Claude Code's 8-consecutive-continuation cap. Stop does not fire on user interrupts,
+  so the count is approximate. If nothing meaningful happened, the agent leaves the
+  record unchanged.
+- **Compaction (safety net).** PreCompact output never reaches the model and it cannot
+  make the agent act; it can only block compaction, and blocking an auto-compact
+  triggered by a context-limit error fails the request. So:
+  - PreCompact never blocks. It copies the transcript to `snapshots/` and marks the
+    session as needing an update.
+  - PostCompact stores `compact_summary` in the session's state as a raw note.
+  - SessionStart with `source: "compact"` tells the agent (via `additionalContext`)
+    to run the skill, using the compact summary and the snapshot.
+- **Session end catch-up.** Turns after the last update are lost when the user exits,
+  runs `/clear` or switches with `/resume`. SessionEnd cannot make the agent act and
+  plugin hooks get a 1.5 s budget, so the hook only records the pending tail in
+  `state/` and spawns a detached `codelineage backfill <session-id> --tail`, then
+  returns. The catch-up summarizes only the unrecorded turns with a headless run and
+  merges them into the session file. Setting: `sessionEndCatchUp` (`on` by default,
+  `off` = no tokens spent; the tail is shown as "not recorded").
+  - Fallback: if the detached process dies, the pending tail stays in `state/`; the
+    next `build` or the next session start in that project retries it.
+  - To verify during implementation: the detached process survives the hook and
+    Claude Code exiting.
+- **Before `init`:** if `.codelineage/` does not exist, all hooks are no-ops, except
+  that SessionStart injects a one-line hint to run `codelineage init`. Projects are
+  never registered automatically.
+- **Recursion guard:** every headless run started by codelineage (`backfill`,
+  catch-up) sets `CODELINEAGE_DISABLE=1`, and our hooks do nothing when it is set.
+  Users can set it too, to turn capture off for any headless run (for example a
+  loop runner). Other plugins' hooks (memory plugins and the like) must not fire in
+  these runs either; the headless run starts Claude Code without user plugins and
+  settings. To verify during implementation: which flag does that.
 
-Each update costs agent tokens (the user's subscription or API usage). The frequency
-setting is the cost knob.
+Each update costs agent tokens (the user's subscription or API usage).
+`updateEveryTurns` and `sessionEndCatchUp` are the cost knobs.
 
 ## CLI surface
 
@@ -104,7 +156,9 @@ setting is the cost knob.
 | `codelineage open [dir]` | Builds, then opens the map (or the panel if no dir is given) |
 | `codelineage epoch add <id> <title>` | Adds an epoch (locked write) |
 | `codelineage config get/set <key> [value]` | Reads or changes settings |
-| `codelineage backfill [dir]` | Summarizes existing transcripts by running the agent headless, one session at a time. Estimates cost and asks first. |
+| `codelineage session write` | Reads session JSON from stdin, validates, redacts, merges and writes it under the session lock, then builds. Used by the skill. |
+| `codelineage backfill [dir]` | Summarizes past transcripts of that project by running the agent headless, one session at a time. Estimates cost and asks first. Selection: `--pick` (default: lists sessions with date, first prompt and estimated cost), `--last <n>`, `--since <date>`, `--all`. |
+| `codelineage backfill <session-id> --tail` | Summarizes only the unrecorded turns of one session. Started by the SessionEnd hook. |
 
 ## Install questions (`init` and first plugin run)
 
@@ -114,8 +168,11 @@ setting is the cost knob.
    (`cleanupPeriodDays`). Offer to raise it. Never change it silently. The README
    explains this too.
 3. **Language** for summaries: `auto` (the conversation's language) or a fixed language.
+4. **Past sessions:** "This project has N earlier sessions: all, pick, or none?"
+   Default: none. Picking or all runs `backfill` with a cost estimate first.
 
-Settings in `config.json`: `language`, `updateEveryTurns`, `gitPolicy`, `agents`.
+Settings in `config.json`: `language`, `updateEveryTurns`, `sessionEndCatchUp`,
+`gitPolicy`, `agents`.
 
 ## Privacy
 
@@ -134,6 +191,10 @@ Settings in `config.json`: `language`, `updateEveryTurns`, `gitPolicy`, `agents`
   trigger a warning.
 - **Project directory moved or deleted:** the panel marks it as missing.
   `codelineage config` can prune it.
+- **Exit and immediate `--resume`:** the catch-up run and the resumed agent may write
+  the same session; the session lock plus read → merge → write keeps both changes.
+- **`~/.config/codelineage` not writable** (containers, CI, read-only home): registry
+  and panel updates are skipped with a warning; project-local writes still work.
 
 ## Tech stack
 
@@ -147,11 +208,13 @@ Settings in `config.json`: `language`, `updateEveryTurns`, `gitPolicy`, `agents`
 
 ## MVP scope
 
-1. Schema, plus `init`, `build`, `open`, `epoch add`, `config`
+1. Schema, storage (locks, atomic writes), plus `init`, `session write`, `build`,
+   `open`, `epoch add`, `config`
 2. HTML template: status card, graph with drill-down, outline, resume button
 3. Panel
-4. Claude Code plugin: skill, Stop and PreCompact hooks
-5. `backfill`
+4. Claude Code plugin: skill; Stop, PreCompact, PostCompact, SessionStart and
+   SessionEnd hooks; recursion guard
+5. `backfill` (project selection and `--tail` catch-up)
 
 ## Later
 
