@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.3.0] - 2026-10-21
 ### Added
 - `codelineage open [dir]`: rebuilds the map and hands `lineage.html` to the OS opener (`xdg-open`, `open` or `start`), printing the path when no opener is found; without a directory it explains that the global panel arrives with Epic 3.
 - Experimental outline side view in the map: a collapsible epoch → session → node tree behind a "Show outline" toggle (off by default); selecting a row expands the graph groups it needs, centres that node and opens the drill-down panel, while graph clicks highlight the matching row.
