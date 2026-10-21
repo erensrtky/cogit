@@ -3,6 +3,7 @@ import {
   Controls,
   Handle,
   MiniMap,
+  type NodeMouseHandler,
   type NodeProps,
   type NodeTypes,
   Position,
@@ -22,6 +23,7 @@ import {
   layoutGraph,
   type SessionFlowNode,
 } from "./graph.js";
+import { DrillDown, type Selection } from "./SidePanel.js";
 
 /** Toggle callback reaches the group headers without threading props through React Flow. */
 const GraphActions = createContext<{ toggle: (id: string) => void }>({ toggle: () => {} });
@@ -132,6 +134,7 @@ function minimapColor(node: GraphNode): string {
 
 function Flow({ model }: { model: LineageViewModel }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => defaultExpanded(model));
+  const [selection, setSelection] = useState<Selection | null>(null);
   const [layout, setLayout] = useState<Awaited<ReturnType<typeof layoutGraph>> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { fitView } = useReactFlow();
@@ -172,6 +175,14 @@ function Flow({ model }: { model: LineageViewModel }) {
     });
   }, []);
   const actions = useMemo(() => ({ toggle }), [toggle]);
+  const closePanel = useCallback(() => setSelection(null), []);
+  const onNodeClick = useCallback<NodeMouseHandler<GraphNode>>((_event, node) => {
+    if (node.type === "lineage") {
+      setSelection({ type: "node", node: node.data });
+    } else if (node.type === "session") {
+      setSelection({ type: "session", sessionId: node.data.sessionId });
+    }
+  }, []);
 
   if (error) return <p className="error graph-status">{error}</p>;
   if (!layout) return <p className="graph-status">Laying out the map…</p>;
@@ -186,6 +197,7 @@ function Flow({ model }: { model: LineageViewModel }) {
         edges={layout.edges}
         nodeTypes={nodeTypes}
         defaultEdgeOptions={{ style: { stroke: "#4f5b74", strokeWidth: 1.5 } }}
+        onNodeClick={onNodeClick}
         fitView
         minZoom={0.05}
         maxZoom={2}
@@ -198,6 +210,7 @@ function Flow({ model }: { model: LineageViewModel }) {
         <MiniMap pannable zoomable nodeColor={minimapColor} />
         <Controls showInteractive={false} />
       </ReactFlow>
+      <DrillDown model={model} selection={selection} onClose={closePanel} />
     </GraphActions.Provider>
   );
 }

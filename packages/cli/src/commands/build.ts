@@ -10,6 +10,7 @@ import { loadProject, loadSession } from "../store/stores.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
 import type { LineageViewModel } from "../view/model.js";
 import { TEMPLATE_HTML } from "../view/template.js";
+import { collectTranscriptIds } from "../view/transcripts.js";
 
 export interface BuildOptions {
   dir: string;
@@ -68,6 +69,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
     sessions: await loadAllSessions(root, io),
     path: root,
     generatedAt: io.now(),
+    transcripts: await collectTranscriptIds(io.env),
   });
   // The skill already avoids secrets; this is the safety net before rendering.
   const redacted = redactDeep(model);

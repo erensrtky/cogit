@@ -108,7 +108,7 @@ export function statusCard(sessions: Session[], now: string): StatusCard {
   };
 }
 
-function toViewSession(session: Session): ViewSession {
+function toViewSession(session: Session, transcripts?: ReadonlySet<string>): ViewSession {
   return {
     sessionId: session.sessionId,
     agent: session.agent,
@@ -118,8 +118,9 @@ function toViewSession(session: Session): ViewSession {
     updatedAt: session.updatedAt,
     status: session.status,
     nodes: buildNodeTree(session.nodes),
-    // Story 2.5 adds the transcript lookup; a record without one still renders.
-    transcriptAvailable: true,
+    // Undefined means the caller did not ask (fixtures, unit tests); then the
+    // record is shown as resumable rather than pretending the transcript is gone.
+    transcriptAvailable: transcripts === undefined ? true : transcripts.has(session.sessionId),
   };
 }
 
@@ -134,6 +135,8 @@ export interface ViewModelInput {
   /** Absolute project path shown on the page. */
   path: string;
   generatedAt: string;
+  /** Session ids whose Claude Code transcript still exists; omit to skip the check. */
+  transcripts?: ReadonlySet<string>;
 }
 
 /**
@@ -148,7 +151,7 @@ export function buildViewModel(input: ViewModelInput): LineageViewModel {
   const sessions = [...input.sessions].sort(byStartedAt);
 
   for (const session of sessions) {
-    const view = toViewSession(session);
+    const view = toViewSession(session, input.transcripts);
     const bucket = session.epoch === null ? undefined : buckets.get(session.epoch);
     (bucket ?? unassigned).push(view);
   }

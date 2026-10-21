@@ -46,6 +46,8 @@ export type LineageData = {
   summary?: string;
   why?: string;
   at?: string;
+  /** Owning session, so the drill-down panel can show and resume it. */
+  sessionId: string;
 };
 
 export type EpochFlowNode = FlowNode<EpochData, "epoch">;
@@ -314,7 +316,7 @@ export async function layoutGraph(
         },
       });
       if (!sessionExpanded) continue;
-      collectFlowNodes(session.nodes, id, nodes, sizes);
+      collectFlowNodes(session.nodes, id, session.sessionId, nodes, sizes);
     }
   }
 
@@ -324,6 +326,7 @@ export async function layoutGraph(
 function collectFlowNodes(
   nodes: ViewNode[],
   parent: string,
+  sessionId: string,
   out: GraphNode[],
   sizes: Map<string, Sized>,
 ): void {
@@ -347,8 +350,9 @@ function collectFlowNodes(
         ...(node.summary === undefined ? {} : { summary: node.summary }),
         ...(node.why === undefined ? {} : { why: node.why }),
         ...(node.at === undefined ? {} : { at: node.at }),
+        sessionId,
       },
     });
-    collectFlowNodes(node.children, parent, out, sizes);
+    collectFlowNodes(node.children, parent, sessionId, out, sizes);
   }
 }
