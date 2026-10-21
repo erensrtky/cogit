@@ -133,8 +133,9 @@ Behavior verified against the Claude Code hooks docs (2026-10-21):
   `off` = no tokens spent; the tail is shown as "not recorded").
   - Fallback: if the detached process dies, the pending tail stays in `state/`; the
     next `build` or the next session start in that project retries it.
-  - To verify during implementation: the detached process survives the hook and
-    Claude Code exiting.
+  - Verified (Claude Code 2.1.300, Linux): a child started from SessionEnd with
+    `spawn(…, { detached: true, stdio: "ignore" }).unref()` outlives both the hook
+    and Claude Code exiting, and is reparented to the init process.
 - **Before `init`:** if `.codelineage/` does not exist, all hooks are no-ops, except
   that SessionStart injects a one-line hint to run `codelineage init`. Projects are
   never registered automatically.
@@ -142,8 +143,13 @@ Behavior verified against the Claude Code hooks docs (2026-10-21):
   catch-up) sets `CODELINEAGE_DISABLE=1`, and our hooks do nothing when it is set.
   Users can set it too, to turn capture off for any headless run (for example a
   loop runner). Other plugins' hooks (memory plugins and the like) must not fire in
-  these runs either; the headless run starts Claude Code without user plugins and
-  settings. To verify during implementation: which flag does that.
+  these runs either. Verified (Claude Code 2.1.300): headless runs use
+  `claude -p --safe-mode --no-session-persistence`. `--safe-mode` disables every
+  plugin and settings hook, MCP servers and CLAUDE.md while keeping normal auth
+  (subscription included); `--no-session-persistence` keeps the run from leaving a
+  transcript that would later show up as a past session. `--bare` is not an option:
+  it accepts only `ANTHROPIC_API_KEY`. The input goes in on stdin explicitly, since
+  `-p` otherwise waits 3 s for it.
 
 Each update costs agent tokens (the user's subscription or API usage).
 `updateEveryTurns` and `sessionEndCatchUp` are the cost knobs.
