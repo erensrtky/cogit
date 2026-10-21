@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# .start-project/browse — agent-driven browser MCP server launcher.
+# Chrome binary'sini + QA_E2E_* knob'larını çözer, sonra browse.mjs'i exec'ler.
+# Chrome'u browse.mjs KENDİSİ (node child_process) başlatır/öldürür — böylece
+# süreç sahipliği ve temizlik yarışsız. SIFIR npm bağımlılığı (cdp.mjs ortak).
+# `start-project --update --e2e` ile yenilenir.
+set -u
+
+DIR="/home/master/Desktop/www/codelineage"
+CONF="$DIR/.start-project/qa.conf"
+
+# qa.conf QA_E2E_* knob'larını çek — env zaten set'liyse env kazansın (knob'lar
+# düz atama, `${VAR:=}` değil), o yüzden mevcut değerleri saklayıp geri koyuyoruz.
+_env_base="${QA_E2E_BASE_URL:-}"; _env_hdr="${QA_E2E_EXTRA_HEADERS:-}"
+_env_ss="${QA_E2E_STORAGE_STATE:-}"; _env_chrome="${QA_E2E_CHROME:-}"
+_env_headful="${QA_E2E_HEADFUL:-}"
+if [ -f "$CONF" ]; then
+    # shellcheck source=/dev/null
+    . "$CONF"
+fi
+[ -n "$_env_base" ]    && QA_E2E_BASE_URL="$_env_base"
+[ -n "$_env_hdr" ]     && QA_E2E_EXTRA_HEADERS="$_env_hdr"
+[ -n "$_env_ss" ]      && QA_E2E_STORAGE_STATE="$_env_ss"
+[ -n "$_env_chrome" ]  && QA_E2E_CHROME="$_env_chrome"
+[ -n "$_env_headful" ] && QA_E2E_HEADFUL="$_env_headful"
+
+# ── Chrome/Chromium bul (QA_E2E_CHROME → QA_SMOKE_CHROME → PATH → cache) ─────
+CHROME=""
+for cand in "${QA_E2E_CHROME:-}" "${QA_SMOKE_CHROME:-}"; do
+    if [ -n "$cand" ] && [ -x "$cand" ]; then CHROME="$cand"; break; fi
+done
+if [ -z "$CHROME" ]; then
+    for c in google-chrome google-chrome-stable chromium-browser chromium; do
+        if command -v "$c" >/dev/null 2>&1; then CHROME="$(command -v "$c")"; break; fi
+    done
+fi
+if [ -z "$CHROME" ]; then
+    for g in "$HOME"/.cache/ms-playwright/chromium-*/chrome-linux/chrome \
+             "$HOME"/.cache/puppeteer/chrome/*/chrome-linux*/chrome; do
+        if [ -x "$g" ]; then CHROME="$g"; break; fi
+    done
+fi
+if [ -z "$CHROME" ]; then
+    echo "browse: Chrome/Chromium bulunamadı — QA_E2E_CHROME ayarla" >&2
+    exit 1
+fi
+
+export QA_E2E_CHROME_BIN="$CHROME"
+export QA_E2E_BASE_URL="${QA_E2E_BASE_URL:-}"
+export QA_E2E_EXTRA_HEADERS="${QA_E2E_EXTRA_HEADERS:-}"
+export QA_E2E_STORAGE_STATE="${QA_E2E_STORAGE_STATE:-}"
+export QA_E2E_HEADFUL="${QA_E2E_HEADFUL:-0}"
+export BROWSE_SETTLE_MS="${BROWSE_SETTLE_MS:-1200}"
+
+exec node "$DIR/.start-project/browse.mjs"

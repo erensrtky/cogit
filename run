@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# start-project stub — gerçek script .start-project/ içinde.
+d="$(cd "$(dirname "$0")" && pwd)"
+exec "$d/.start-project/run" "$@"

@@ -1,0 +1,10 @@
+_bmad/
+bmalph/
+.ralph/
+.sandbox/
+.claude/
+.graphify/
+node_modules/
+dist/
+build/
+*.lock

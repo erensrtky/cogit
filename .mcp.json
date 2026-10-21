@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "browse": {
+      "command": ".start-project/browse",
+      "args": []
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    }
+  }
+}

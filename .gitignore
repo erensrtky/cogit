@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Turborepo cache
+.turbo/
+
+# Logs
+*.log
+
+# BMAD / Ralph / Sandbox
+.ralph/
+.sandbox/
+_bmad-output/
+# bmalph init'in kurduğu bundled assets — "bmalph upgrade" ile yeniden
+# üretilir, start-project --update'in commit ettiği set bunları kapsamaz.
+_bmad/
+bmalph/
+
+# graphify outputs — hepsi koddan `graphify update` ile yeniden üretilir
+# (rapor dahil); yeniden üretilemeyen ayar .graphifyignore kökte commit'li.
+graphify-out/
+
+# Local env / misc
+*.local
+
+# start-project provider yönlendirme (secret) — .example tracked kalır
+.start-project/provider.env
+
+# Screenshots / design scratch
+ss/
+
+# Editor
+.vscode/*
+.idea
+.DS_Store
+
+# pnpm project-local store
+.pnpm-store/
+# start-project Ralph provider override (secret)
+.start-project/provider.ralph.env
+.start-project/provider.ralph.env.off
+.ralph/logs/
+# start-project provider yönlendirme (secret)

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -e
+cd "/home/master/Desktop/www/codelineage"
+graphify update
+graphify export html
+echo "Graph: /home/master/Desktop/www/codelineage/.graphify/graph.html"
+xdg-open "/home/master/Desktop/www/codelineage/.graphify/graph.html" 2>/dev/null || true

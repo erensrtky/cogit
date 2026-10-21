@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# .start-project/smoke — web smoke aşaması (yalnızca `./qa --full`).
+# Sistem Chrome/Chromium'unu headless (--headless=new) + CDP ile sürer; sıfır
+# bağımlılık (npm paketi YOK). Gerçek kontrol .start-project/smoke.mjs içinde.
+# QA_SMOKE_BASE_URL boşsa aşama sessizce atlanır (yapılandırılmamış = atla).
+# BU dosya `start-project --update` ile yeniden üretilir.
+set -u
+
+DIR="/home/master/Desktop/www/codelineage"
+CONF="$DIR/.start-project/qa.conf"
+
+# qa runner `. qa.conf` + `eval` ile çağırınca QA_SMOKE_* zaten ortamda olur.
+# Standalone (elle) çalıştırılırsa qa.conf'u kendimiz source edelim.
+if [ -z "${QA_SMOKE_BASE_URL:-}" ] && [ -f "$CONF" ]; then
+    # shellcheck source=/dev/null
+    . "$CONF"
+fi
+
+BASE_URL="${QA_SMOKE_BASE_URL:-}"
+if [ -z "$BASE_URL" ]; then
+    echo "smoke: QA_SMOKE_BASE_URL boş — atlandı (qa.conf)"
+    exit 0
+fi
+
+# ── Chrome/Chromium bul ────────────────────────────────────────────────────
+CHROME=""
+if [ -n "${QA_SMOKE_CHROME:-}" ] && [ -x "${QA_SMOKE_CHROME}" ]; then
+    CHROME="$QA_SMOKE_CHROME"
+else
+    for c in google-chrome google-chrome-stable chromium-browser chromium; do
+        if command -v "$c" >/dev/null 2>&1; then CHROME="$(command -v "$c")"; break; fi
+    done
+fi
+if [ -z "$CHROME" ]; then
+    # Playwright / Puppeteer'ın indirdiği tarayıcıyı da dene.
+    for g in "$HOME"/.cache/ms-playwright/chromium-*/chrome-linux/chrome \
+             "$HOME"/.cache/puppeteer/chrome/*/chrome-linux*/chrome; do
+        if [ -x "$g" ]; then CHROME="$g"; break; fi
+    done
+fi
+if [ -z "$CHROME" ]; then
+    echo "smoke: Chrome/Chromium bulunamadı — QA_SMOKE_CHROME ayarla"
+    exit 1
+fi
+
+# ── Boş TCP port seç ──────────────────────────────────────────────────────
+PORT=""
+if command -v python3 >/dev/null 2>&1; then
+    PORT="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()' 2>/dev/null)"
+fi
+if [ -z "$PORT" ]; then
+    p=9222
+    while [ "$p" -le 9400 ]; do
+        if ! (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; then PORT="$p"; break; fi
+        p=$((p + 1))
+    done
+fi
+if [ -z "$PORT" ]; then
+    echo "smoke: boş TCP port bulunamadı"
+    exit 1
+fi
+
+# ── Geçici user-data-dir + temizlik ──────────────────────────────────────
+UDD="$(mktemp -d "${TMPDIR:-/tmp}/sp-smoke.XXXXXX")"
+CHROME_LOG="$(mktemp "${TMPDIR:-/tmp}/sp-smoke-log.XXXXXX")"
+CHROME_PID=""
+# SC2317: trap handler'ı shellcheck "ulaşılamaz" sanır — EXIT'te çağrılıyor.
+# shellcheck disable=SC2317
+cleanup() {
+    [ -n "$CHROME_PID" ] && kill "$CHROME_PID" 2>/dev/null
+    # $CHROME bir sarmalayıcıysa (Flatpak: `exec flatpak run …`) CHROME_PID
+    # sarmalayıcı/bwrap olur; sandbox içindeki asıl Chrome ölmez, sahipsiz
+    # kalırdı (her ./qa --full'da bir headless Chrome sızıyordu). Profil dizini
+    # bu koşuya özgü → onu kullanan her süreci süpür.
+    if command -v pkill >/dev/null 2>&1; then
+        pkill -KILL -f -- "--user-data-dir=$UDD" 2>/dev/null
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+            pgrep -f -- "--user-data-dir=$UDD" >/dev/null 2>&1 || break
+            sleep 0.2
+        done
+    fi
+    rm -rf "$UDD" "$CHROME_LOG"
+}
+trap cleanup EXIT
+
+# Nested user-namespace (bwrap/CI) Chrome'un kendi sandbox'ını iç içe açamaz →
+# --no-sandbox zorunlu. /dev/shm sandbox içinde tam tmpfs olduğundan
+# --disable-dev-shm-usage GEREKMİYOR (bkz. start-project bwrap şekli).
+# TODO: extension lane — service worker CDP + --load-extension (ayrı adım)
+"$CHROME" --headless=new --no-sandbox --disable-gpu \
+    --remote-debugging-port="$PORT" --remote-allow-origins='*' \
+    --user-data-dir="$UDD" about:blank >/dev/null 2>"$CHROME_LOG" &
+CHROME_PID=$!
+
+export QA_SMOKE_BASE_URL="$BASE_URL"
+export QA_SMOKE_URLS="${QA_SMOKE_URLS:-/}"
+export SMOKE_CDP_PORT="$PORT"
+export SMOKE_SETTLE_MS="${SMOKE_SETTLE_MS:-1500}"
+
+# `exec` KULLANMIYORUZ: EXIT trap'inin Chrome'u ve tmpdir'i temizleyebilmesi
+# için node'u alt süreç olarak çalıştırıp çıkış kodunu aynen döndürüyoruz.
+node "$DIR/.start-project/smoke.mjs"
+rc=$?
+exit "$rc"

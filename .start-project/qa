@@ -1,0 +1,269 @@
+#!/usr/bin/env bash
+# .start-project/qa — stack'ten bağımsız kalite kapısı
+# Komutlar .start-project/qa.conf'tan gelir. BU dosya `start-project --update`
+# ile yeniden üretilir; komut değiştirmek için qa.conf'u düzenle.
+#
+#   ./qa                 hızlı katman: lint + typecheck + unit + audit
+#   ./qa --full          + smoke + e2e + mobile_e2e
+#   ./qa --only=lint,unit
+#   ./qa --list          hangi aşama hangi komutla, çalıştırmadan
+#
+# audit BLOKLAMAZ (⚠ basar, exit'i etkilemez). smoke/e2e/mobile_e2e sadece --full.
+# unit aşaması QA_DIFFCOV=1 iken coverage'lı koşulur + değişen-satır kapsaması
+# dayatılır (diffcov — kaplanmamış değişen satır = FAIL). qa.conf'ta QA_DIFFCOV=0.
+# Ralph gate'i her `start-project --update` .ralph/.ralphrc'ye bağlar (block):
+# TEST_COMMAND="./qa --only=unit" + QUALITY_GATES="./qa --only=lint,typecheck,audit".
+# Borçlu projede bloklamasın istiyorsan .ralphrc'de QUALITY_GATE_MODE=warn yap.
+set -u
+cd "/home/master/Desktop/www/codelineage" || exit 1
+
+CONF="/home/master/Desktop/www/codelineage/.start-project/qa.conf"
+if [ -f "$CONF" ]; then
+    . "$CONF"
+else
+    echo "! .start-project/qa.conf yok — tüm aşamalar atlanacak ('start-project --update')"
+fi
+
+# brownfield baseline (bkz. capture_qa_baseline, scaffold'da start-project
+# --update --brownfield ile bir kez üretilir). lint/typecheck/unit FAIL
+# olduğunda burada "fail" olarak kayıtlıysa zaten başlangıçta kırıktı demektir
+# — bloklamaz (⚠, bilinen borç). Kayıt "pass"ken şimdi fail ise gerçek
+# regresyondur, normal FAIL akışına düşer. Dosya yoksa (brownfield değil)
+# davranış hiç değişmez.
+# GRANÜLERLİK SINIRI: baseline aşama-bazında (tüm lint/typecheck/unit tek
+# pass/fail), satır/hata bazında DEĞİL — diffcov'un unit için yaptığı
+# değişen-satır takibi burada yok. Yani zaten "fail" kayıtlı bir aşamaya
+# sonradan eklenen YENİ bir hata da aynı ⚠'ya düşer, ayrı bir regresyon olarak
+# yakalanmaz (bkz. --help). Daha ince taneli bir çözüm (lint/typecheck için
+# diffcov benzeri değişen-satır gate'i) bilinçli olarak kapsam dışı bırakıldı.
+BASELINE_FILE="/home/master/Desktop/www/codelineage/.start-project/qa_baseline.json"
+_qa_baseline_status() {   # $1=aşama adı -> "pass"/"fail"/""
+    # Format capture_qa_baseline tarafından TAM OLARAK kontrol ediliyor (düz
+    # {"stages":{"ad":"pass"|"fail",...}}) — python3 subprocess'i gereksiz,
+    # grep/sed ile aynı sonucu interpreter açmadan verir ($name FAIL olan her
+    # aşamada çağrılıyor, ./qa'nın ana koşum yolunda).
+    [ -f "$BASELINE_FILE" ] || return 0
+    command grep -oE "\"$1\"[[:space:]]*:[[:space:]]*\"(pass|fail)\"" "$BASELINE_FILE" 2>/dev/null \
+        | command sed -E 's/.*"(pass|fail)"$/\1/' | head -1
+}
+
+FULL=0; ONLY=""; LIST=0
+for a in "$@"; do
+    case "$a" in
+        --full)   FULL=1 ;;
+        --only=*)  ONLY="${a#--only=}" ;;
+        --list)   LIST=1 ;;
+        *) echo "bilinmeyen seçenek: $a  (--full | --only=... | --list)" >&2; exit 2 ;;
+    esac
+done
+
+FAST="lint typecheck unit audit"
+FULL_ONLY="smoke e2e mobile_e2e"
+NONBLOCK=" audit "          # fail ise ⚠, gate patlamaz
+
+FORCE_FULL_STAGES=""   # epic sınırı tetiklerse "smoke,e2e" olur (asagi bkz.)
+
+_want() {
+    [ -z "$ONLY" ] && return 0
+    case ",$ONLY," in *",$1,"*) return 0 ;; esac
+    case ",$FORCE_FULL_STAGES," in *",$1,"*) return 0 ;; esac
+    return 1
+}
+
+# ── epic sınırında otomatik --full (smoke/e2e) ───────────────────────────
+# smoke/e2e her iterasyonda koşamayacak kadar ağır (sunucu/tarayıcı gerekir)
+# — ama hiç otomatik tetiklenmezlerse, tamamen otonom bir loop'ta hiç kimse
+# elle './qa --full' çalıştırmayabilir ve web/mobile bir proje onlarca
+# story'yi hiç gerçek smoke/e2e görmeden "tamam" diyebilir. Epic sınırında
+# (o epic'in son story'si kapanınca) bir kez, TEST_COMMAND'ın kendi çağrısına
+# (--only=unit) binerek smoke/e2e'yi de bu tura ekliyoruz — kırılırsa aynı
+# block gate'e düşer, Ralph orada durur. Marker (.ralph/.qa_full_epic) aynı
+# epic için tekrar tekrar tetiklemesin diye. Smoke/e2e hiç yapılandırılmamışsa
+# (çoğu CLI/non-web proje) hiç denemez — anlamsız gürültü basmaz.
+_stage_cmd() {   # $1=aşama adı -> çözülmüş komutu bas (boş/"-" olabilir)
+    local up ov dt c
+    up=$(printf '%s' "$1" | tr 'a-z' 'A-Z')
+    ov="QA_${up}_CMD"; dt="QA_DETECTED_${up}"
+    c="${!ov:-}"
+    { [ "$c" != "-" ] && [ -z "$c" ]; } && c="${!dt:-}"
+    printf '%s' "$c"
+}
+_smoke_cmd="$(_stage_cmd smoke)"; _e2e_cmd="$(_stage_cmd e2e)"; _mobile_e2e_cmd="$(_stage_cmd mobile_e2e)"
+if [ "$LIST" != 1 ] && _want unit \
+   && { { [ -n "$_smoke_cmd" ] && [ "$_smoke_cmd" != "-" ]; } || { [ -n "$_e2e_cmd" ] && [ "$_e2e_cmd" != "-" ]; } || { [ -n "$_mobile_e2e_cmd" ] && [ "$_mobile_e2e_cmd" != "-" ]; }; } \
+   && [ -f "/home/master/Desktop/www/codelineage/.ralph/@fix_plan.md" ]; then
+    _epic_boundary=$(python3 - "/home/master/Desktop/www/codelineage/.ralph/@fix_plan.md" <<'PY' 2>/dev/null
+import re, sys
+rx = re.compile(r'^\s*-\s*\[( |x|X)\]\s*Story\s+(\d+)\.(\d+)')
+st = [(m.group(1).lower() == 'x', int(m.group(2)))
+      for m in (rx.match(ln) for ln in open(sys.argv[1])) if m]
+done = [e for e in st if e[0]]
+if done:
+    last_epic = done[-1][1]
+    if not [e for e in st if e[1] == last_epic and not e[0]]:
+        print(last_epic)
+PY
+)
+    if [ -n "$_epic_boundary" ]; then
+        _full_marker="/home/master/Desktop/www/codelineage/.ralph/.qa_full_epic"
+        _full_last="$(cat "$_full_marker" 2>/dev/null || echo "")"
+        if [ "$_full_last" != "$_epic_boundary" ]; then
+            echo "$_epic_boundary" > "$_full_marker" 2>/dev/null || true
+            FORCE_FULL_STAGES="smoke,e2e,mobile_e2e"
+            echo "ℹ epic $_epic_boundary kapandı — smoke/e2e/mobile_e2e bu tura eklendi (./qa --full eşdeğeri)"
+        fi
+    fi
+fi
+
+# ── hollow-gate self-heal ───────────────────────────────────────────────
+# bmalph bu script'i HER loop iterasyonundan sonra çağırıyor. İki AYRI karar:
+#
+#  1) TARAMA — story'den BAĞIMSIZ. Talep edilen lint/typecheck/unit'in hiçbiri
+#     yapılandırılmamışsa her koşumda 'qa rescan' denenir. Stack hangi
+#     iterasyonda gelirse gelsin (story 1'de, story 4'te, ya da hiç story
+#     yokken) bir sonraki ./qa onu kendiliğinden yakalar — "ilk story stack'i
+#     kurar" varsayımına gerek kalmaz, öyle bir garanti zaten yok. Idempotent
+#     ve ucuz (make_qa_conf birkaç on ms).
+#  2) FAIL — story'ye BAĞLI. İş başlamadıysa (kapanmış story yok) boş gate
+#     BEKLENEN durumdur: ./qa FAIL etmez, doctor da bağırmaz. En az bir story
+#     kapandıktan sonra hâlâ boşsa gerçek FAIL — icat etmez, elle QA_*_CMD
+#     doldurulmalı.
+#
+# start-project'in kendisini rekürsif çağırmadan (sabit yol, PATH'e bağımlı
+# değil). ALLOW_EMPTY_QA=1 ikisini de atlar.
+_unconfigured() {
+    local s up ov dt c asked=0 configured=0
+    for s in lint typecheck unit; do
+        _want "$s" || continue
+        asked=1
+        up=$(printf '%s' "$s" | tr 'a-z' 'A-Z')
+        ov="QA_${up}_CMD"; dt="QA_DETECTED_${up}"
+        c="${!ov:-}"; { [ "$c" != "-" ] && [ -z "$c" ]; } && c="${!dt:-}"
+        { [ -n "$c" ] && [ "$c" != "-" ]; } && configured=1
+    done
+    [ "$asked" = 1 ] && [ "$configured" = 0 ]
+}
+
+_hollow() {
+    [ -n "${ALLOW_EMPTY_QA:-}" ] && return 1
+    [ -f "/home/master/Desktop/www/codelineage/.ralph/@fix_plan.md" ] || return 1
+    # grep -c eşleşme yokken "0" basıp exit 1 verir → '|| echo 0' değeri "0\n0"
+    # yapıp [ -gt ]'yi hata verdirirdi; atama+|| ile 0'a sabitlenir.
+    local done_n=0
+    done_n=$(grep -cE '^[[:space:]]*- \[[xX]\]' "/home/master/Desktop/www/codelineage/.ralph/@fix_plan.md" 2>/dev/null) || done_n=0
+    [ "$done_n" -gt 0 ] || return 1
+    _unconfigured
+}
+
+GATE_EMPTY=0
+# --list: salt-okunur introspeksiyon — self-heal çalıştırma. Aksi halde `qa
+# rescan`'in kendi trailer'ı (`.../qa --list`) bu bloğa TEKRAR girer, gate
+# hâlâ tespit edilemiyorsa `qa rescan`'i yeniden çağırır → SONSUZ REKÜRSİYON.
+if [ "$LIST" != 1 ] && [ -z "${ALLOW_EMPTY_QA:-}" ]; then
+    if _unconfigured && [ -x "/home/master/Desktop/www/start-project/start-project" ]; then
+        "/home/master/Desktop/www/start-project/start-project" qa rescan "/home/master/Desktop/www/codelineage" >/dev/null 2>&1
+        [ -f "$CONF" ] && . "$CONF"   # tazelenmiş QA_DETECTED_* değerlerini yükle
+    fi
+    _hollow && GATE_EMPTY=1
+fi
+
+declare -a OUT=()
+FAILED=""
+WARNED=""
+
+_run() {
+    local name="$1" up ov dt cmd t0 t1 out st sec dcov=0 dcmd dmin dout dst
+    _want "$name" || return 0
+    up=$(printf '%s' "$name" | tr 'a-z' 'A-Z')
+    ov="QA_${up}_CMD"; dt="QA_DETECTED_${up}"
+    cmd="${!ov:-}"
+    { [ "$cmd" != "-" ] && [ -z "$cmd" ]; } && cmd="${!dt:-}"   # boş override → tespit
+    # diffcov: unit aşaması + QA_DIFFCOV açıksa → coverage'lı komutla koş, sonra
+    # değişen-satır kapsamasını dayat (bkz. .start-project/diffcov.mjs). Ayrı
+    # `--only` aşaması DEĞİL — unit'e bağlı (coverage verisini unit üretir).
+    dmin="${QA_DIFFCOV_MIN:-100}"
+    if [ "$name" = unit ] && [ "${QA_DIFFCOV:-1}" != 0 ]; then
+        dcmd="${QA_DIFFCOV_UNIT_CMD:-}"
+        [ -z "$dcmd" ] && dcmd="${QA_DETECTED_DIFFCOV_UNIT:-}"
+        { [ -n "$dcmd" ] && [ "$dcmd" != "-" ]; } && { cmd="$dcmd"; dcov=1; }
+    fi
+    if [ "$LIST" = 1 ]; then
+        if [ "$cmd" = "-" ]; then printf '  %-10s (kapalı — override "-")\n' "$name"
+        elif [ -n "$cmd" ]; then printf '  %-10s %s\n' "$name" "$cmd"
+        else printf '  %-10s (yapılandırılmamış)\n' "$name"
+        fi
+        if [ "$name" = unit ] && [ "${QA_DIFFCOV:-1}" != 0 ]; then
+            if [ "$dcov" = 1 ]; then printf '  %-10s değişen-satır coverage gate (min %%%s)\n' diffcov "$dmin"
+            else printf '  %-10s (QA_DIFFCOV açık ama coverage komutu yok — atlanır)\n' diffcov
+            fi
+        fi
+        return 0
+    fi
+    { [ -z "$cmd" ] || [ "$cmd" = "-" ]; } && return 0          # override "-" = bilerek kapalı
+    t0=$(date +%s)
+    out=$(eval "$cmd" 2>&1); st=$?
+    t1=$(date +%s); sec=$((t1 - t0))
+    if [ "$st" -eq 0 ]; then
+        OUT+=("$(printf '\033[0;32m✓\033[0m %-10s (%ss)' "$name" "$sec")")
+        if [ "$dcov" = 1 ]; then
+            if ! command -v node >/dev/null 2>&1; then
+                WARNED="${WARNED}diffcov "
+                OUT+=("$(printf '\033[0;33m⚠\033[0m %-10s  node yok — değişen-satır gate atlandı' diffcov)")
+            else
+                dout=$(node "/home/master/Desktop/www/codelineage/.start-project/diffcov.mjs" \
+                       --min="$dmin" --lcov="${QA_DIFFCOV_LCOV:-}" \
+                       --base="${QA_DIFFCOV_DIFF_BASE:-}" --exclude="${QA_DIFFCOV_EXCLUDE:-}" 2>&1); dst=$?
+                if [ "$dst" -eq 1 ]; then
+                    FAILED="${FAILED}diffcov "
+                    OUT+=("$(printf '\033[0;31m✗\033[0m %-10s' diffcov)")
+                    OUT+=("$(printf '%s' "$dout" | tail -15 | sed 's/^/    /')")
+                elif [ "$dst" -eq 2 ]; then
+                    WARNED="${WARNED}diffcov "
+                    OUT+=("$(printf '\033[0;33m⚠\033[0m %-10s  yapılandırma — bloklamaz' diffcov)")
+                    OUT+=("$(printf '%s' "$dout" | tail -3 | sed 's/^/    /')")
+                else
+                    OUT+=("$(printf '\033[0;32m✓\033[0m %-10s  %s' diffcov "$(printf '%s' "$dout" | head -1)")")
+                fi
+            fi
+        fi
+    elif case "$NONBLOCK" in *" $name "*) true ;; *) false ;; esac; then
+        WARNED="${WARNED}${name} "
+        OUT+=("$(printf '\033[0;33m⚠\033[0m %-10s (%ss)  — bloklamaz' "$name" "$sec")")
+        OUT+=("$(printf '%s' "$out" | tail -6 | sed 's/^/    /')")
+    elif [ "$(_qa_baseline_status "$name")" = fail ]; then
+        WARNED="${WARNED}${name} "
+        OUT+=("$(printf '\033[0;33m⚠\033[0m %-10s (%ss)  — brownfield baseline: başlangıçta da kırıktı, bloklamıyor (borç)' "$name" "$sec")")
+        OUT+=("$(printf '%s' "$out" | tail -6 | sed 's/^/    /')")
+    else
+        FAILED="${FAILED}${name} "
+        OUT+=("$(printf '\033[0;31m✗\033[0m %-10s (%ss)' "$name" "$sec")")
+        OUT+=("$(printf '%s' "$out" | tail -20 | sed 's/^/    /')")
+    fi
+}
+
+[ "$LIST" = 1 ] && echo "QA aşamaları:"
+for s in $FAST; do _run "$s"; done
+if [ "$FULL" = 1 ] || [ -n "$ONLY" ] || [ "$LIST" = 1 ]; then
+    for s in $FULL_ONLY; do _run "$s"; done
+fi
+[ "$LIST" = 1 ] && exit 0
+
+# _hollow() en yukarıda kontrol edip mümkünse zaten self-heal (qa rescan)
+# denedi; hâlâ boşsa (stack gerçekten tanınmıyor) gerçek bir FAIL say.
+if [ "$GATE_EMPTY" = 1 ]; then
+    FAILED="${FAILED}gate-empty "
+    OUT+=("$(printf '\033[0;31m✗\033[0m %-10s en az 1 story kapanmış, lint/typecheck/unit hiçbiri yapılandırılamadı (rescan denendi) — .start-project/qa.conf QA_*_CMD elle doldur' gate-empty)")
+fi
+
+# Ralph'ın feedback penceresi dar (~150 char) → patlayanlar EN BAŞA
+[ -n "$FAILED" ] && printf 'QA FAIL: %s\n' "$(printf '%s' "$FAILED" | sed 's/ *$//; s/ /, /g')"
+[ -n "$WARNED" ] && printf 'QA WARN: %s\n' "$(printf '%s' "$WARNED" | sed 's/ *$//; s/ /, /g')"
+[ "${#OUT[@]}" -gt 0 ] && printf '%s\n' "${OUT[@]}"
+
+if [ -n "$FAILED" ]; then
+    echo "─────────────────────────────"
+    echo "QA: BAŞARISIZ"
+    exit 1
+fi
+echo "QA: geçti (yapılandırılmamış aşamalar atlandı)"
+exit 0
