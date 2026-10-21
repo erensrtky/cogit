@@ -6,3 +6,6 @@ sürümleme [SemVer](https://semver.org/lang/tr/)'e uyar.
 Tek bump yolu `./release` — elle `VERSION`/tag düzenlemeyin.
 
 ## [Unreleased]
+
+### Added
+- `codelineage` CLI skeleton (`--version`, `--help`), MIT license.

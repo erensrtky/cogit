@@ -1,0 +1,25 @@
+{
+  "name": "codelineage",
+  "version": "0.1.0",
+  "description": "The lineage of your AI coding sessions.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "codelineage": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "tsup"
+  },
+  "devDependencies": {
+    "tsup": "^9.0.0"
+  },
+  "dependencies": {
+    "commander": "^15.0.0"
+  }
+}
