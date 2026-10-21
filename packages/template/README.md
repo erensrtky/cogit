@@ -16,6 +16,14 @@ npm run build -w template # writes dist/index.html (embedded by the CLI build)
 and returns React Flow nodes with parent-relative positions. Only expanded groups
 send their children to ELK; the page opens with the most recent session expanded.
 
+## Outline (experimental)
+
+The map can show an outline tree (epoch → session → node) next to the graph. It is
+off by default and toggled with "Show outline". Selecting a row expands the graph
+groups the item lives in, centres it and opens the drill-down panel; clicking a
+graph node highlights the matching row. The tree keeps its own expand/collapse
+state so a wide graph can stay collapsed while the outline browses it.
+
 ## Layout budget
 
 Measured 2026-10-21 in Chromium from `file://`, 495 nodes across 15 sessions in 3

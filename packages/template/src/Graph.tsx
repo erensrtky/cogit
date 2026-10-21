@@ -12,7 +12,16 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { LineageViewModel } from "../../cli/src/view/model.js";
 import { formatTime } from "./format.js";
 import {
@@ -23,6 +32,7 @@ import {
   layoutGraph,
   type SessionFlowNode,
 } from "./graph.js";
+import { Outline, type OutlineTarget } from "./Outline.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
 
 /** Toggle callback reaches the group headers without threading props through React Flow. */
@@ -137,7 +147,34 @@ function Flow({ model }: { model: LineageViewModel }) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [layout, setLayout] = useState<Awaited<ReturnType<typeof layoutGraph>> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showOutline, setShowOutline] = useState(false);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  /** Wait for the layout that contains this node, then centre on it. */
+  const pendingFocus = useRef<string | null>(null);
+  const focusTimer = useRef<number | null>(null);
+  /** Outline selection just re-fitted the view; don't let the generic fit undo it. */
+  const lastFocusRequest = useRef(Number.NEGATIVE_INFINITY);
+  /** The first run belongs to mount; only React to the user toggling the outline. */
+  const firstOutlineToggle = useRef(true);
   const { fitView } = useReactFlow();
+
+  const scheduleFocus = useCallback(
+    (id: string) => {
+      if (focusTimer.current !== null) window.clearTimeout(focusTimer.current);
+      focusTimer.current = window.setTimeout(() => {
+        focusTimer.current = null;
+        void fitView({ nodes: [{ id }], padding: 0.6, duration: 300, maxZoom: 1.2 });
+      }, 80);
+    },
+    [fitView],
+  );
+
+  useEffect(
+    () => () => {
+      if (focusTimer.current !== null) window.clearTimeout(focusTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -148,6 +185,11 @@ function Flow({ model }: { model: LineageViewModel }) {
         setLayout(result);
         // Survives into the single-file build so a 500-node run can be measured.
         document.documentElement.dataset.layoutMs = result.layoutMs.toFixed(1);
+        const focus = pendingFocus.current;
+        if (focus && result.nodes.some((node) => node.id === focus)) {
+          pendingFocus.current = null;
+          scheduleFocus(focus);
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -156,15 +198,28 @@ function Flow({ model }: { model: LineageViewModel }) {
     return () => {
       cancelled = true;
     };
-  }, [model, expanded]);
+  }, [model, expanded, scheduleFocus]);
 
   useEffect(() => {
     if (!layout) return;
+    if (performance.now() - lastFocusRequest.current < 1000) return;
     const timer = setTimeout(() => {
       void fitView({ padding: 0.15, duration: 200 });
     }, 60);
     return () => clearTimeout(timer);
   }, [layout, fitView]);
+
+  // Opening or closing the outline changes the canvas width, so re-frame the map.
+  useEffect(() => {
+    if (firstOutlineToggle.current) {
+      firstOutlineToggle.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      void fitView({ padding: 0.15, duration: 200 });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [showOutline, fitView]);
 
   const toggle = useCallback((id: string) => {
     setExpanded((previous) => {
@@ -176,7 +231,9 @@ function Flow({ model }: { model: LineageViewModel }) {
   }, []);
   const actions = useMemo(() => ({ toggle }), [toggle]);
   const closePanel = useCallback(() => setSelection(null), []);
+  const toggleOutline = useCallback(() => setShowOutline((value) => !value), []);
   const onNodeClick = useCallback<NodeMouseHandler<GraphNode>>((_event, node) => {
+    setFocusedId(node.id);
     if (node.type === "lineage") {
       setSelection({ type: "node", node: node.data });
     } else if (node.type === "session") {
@@ -184,14 +241,41 @@ function Flow({ model }: { model: LineageViewModel }) {
     }
   }, []);
 
-  if (error) return <p className="error graph-status">{error}</p>;
-  if (!layout) return <p className="graph-status">Laying out the map…</p>;
-  if (layout.nodes.length === 0) {
-    return <p className="graph-status empty">No sessions recorded yet.</p>;
-  }
+  /**
+   * Selecting in the outline must reveal the target's group chain in the graph
+   * first: a collapsed group has no flow node at all, so its child cannot be
+   * focused until the next layout lands.
+   */
+  const selectFromOutline = useCallback(
+    (target: OutlineTarget) => {
+      const needsLayout = target.expand.some((id) => !expanded.has(id));
+      setExpanded((previous) => {
+        const next = new Set(previous);
+        for (const id of target.expand) next.add(id);
+        return next;
+      });
+      setSelection(target.selection);
+      setFocusedId(target.focusId);
+      lastFocusRequest.current = performance.now();
+      if (needsLayout) {
+        pendingFocus.current = target.focusId;
+      } else {
+        pendingFocus.current = null;
+        scheduleFocus(target.focusId);
+      }
+    },
+    [expanded, scheduleFocus],
+  );
 
-  return (
-    <GraphActions.Provider value={actions}>
+  let content: ReactNode;
+  if (error) {
+    content = <p className="error graph-status">{error}</p>;
+  } else if (!layout) {
+    content = <p className="graph-status">Laying out the map…</p>;
+  } else if (layout.nodes.length === 0) {
+    content = <p className="graph-status empty">No sessions recorded yet.</p>;
+  } else {
+    content = (
       <ReactFlow
         nodes={layout.nodes}
         edges={layout.edges}
@@ -210,7 +294,35 @@ function Flow({ model }: { model: LineageViewModel }) {
         <MiniMap pannable zoomable nodeColor={minimapColor} />
         <Controls showInteractive={false} />
       </ReactFlow>
-      <DrillDown model={model} selection={selection} onClose={closePanel} />
+    );
+  }
+
+  return (
+    <GraphActions.Provider value={actions}>
+      <div className="map-toolbar">
+        <button
+          type="button"
+          className="outline-button"
+          aria-pressed={showOutline}
+          onClick={toggleOutline}
+        >
+          {showOutline ? "Hide outline" : "Show outline"}
+        </button>
+      </div>
+      <div className="graph-wrap">
+        {showOutline ? (
+          <Outline
+            model={model}
+            activeId={focusedId}
+            onSelect={selectFromOutline}
+            onClose={toggleOutline}
+          />
+        ) : null}
+        <div className="graph-canvas">
+          {content}
+          <DrillDown model={model} selection={selection} onClose={closePanel} />
+        </div>
+      </div>
     </GraphActions.Provider>
   );
 }
@@ -218,7 +330,7 @@ function Flow({ model }: { model: LineageViewModel }) {
 /** Nested epoch → session → node map; layout runs in the page from embedded data. */
 export function Graph({ model }: { model: LineageViewModel }) {
   return (
-    <section className="graph-wrap" aria-label="Project lineage graph">
+    <section className="lineage-map" aria-label="Project lineage graph">
       <ReactFlowProvider>
         <Flow model={model} />
       </ReactFlowProvider>

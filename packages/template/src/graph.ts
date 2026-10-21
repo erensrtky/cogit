@@ -73,7 +73,11 @@ export function sessionId(id: string): string {
   return `session:${id}`;
 }
 
-function nodeId(sessionGroup: string, id: string): string {
+/**
+ * Node ids are flat per session (not per parent): the outline and the graph
+ * must agree on the same id to focus each other's items.
+ */
+export function nodeId(sessionGroup: string, id: string): string {
   return `node:${sessionGroup}:${id}`;
 }
 
@@ -208,7 +212,7 @@ function collectSizes(elk: ElkNode, out: Map<string, Sized>): void {
   }
 }
 
-function countNodes(nodes: ViewNode[]): number {
+export function countNodes(nodes: ViewNode[]): number {
   return nodes.reduce((sum, node) => sum + 1 + countNodes(node.children), 0);
 }
 
