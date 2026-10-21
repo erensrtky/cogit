@@ -1,0 +1,12 @@
+{
+  "name": "codelineage",
+  "description": "codelineage: the lineage of your AI coding sessions.",
+  "owner": { "name": "Eren Sertkaya" },
+  "plugins": [
+    {
+      "name": "codelineage",
+      "source": { "source": "npm", "package": "codelineage" },
+      "description": "Records what each session decided and why, and renders it as a static map."
+    }
+  ]
+}

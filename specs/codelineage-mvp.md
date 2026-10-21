@@ -101,7 +101,11 @@ redaction pass, merges with the existing file and writes atomically, then runs
 Distributed like OpenViking: a Claude Code plugin that ships `hooks/hooks.json`, a
 skill, and a bundled build of the CLI (single file), so hooks run
 `node ${CLAUDE_PLUGIN_ROOT}/dist/…` with no global install and no `npx` startup cost.
-The npm package is published separately for standalone use.
+The `codelineage` npm package is both the standalone CLI and the plugin: it ships
+`.claude-plugin/plugin.json` next to `dist/`, and the repository root holds a
+`codelineage` marketplace whose entry installs it with an `npm` source, so no build
+output is committed. `plugin.json` carries the package version, because an
+npm-sourced plugin without one resolves to version `unknown` and never updates.
 
 Behavior verified against the Claude Code hooks docs (2026-10-21):
 
