@@ -45,3 +45,13 @@ ss/
 .start-project/provider.ralph.env.off
 .ralph/logs/
 # start-project provider yönlendirme (secret)
+# start-project yerel araçları (public repo: takip edilmez)
+/CLAUDE.md
+/.start-project/
+/.claude/
+/.mcp.json
+/run
+/cli
+/graph
+/qa
+/release

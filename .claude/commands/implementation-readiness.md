@@ -1,1 +1,0 @@
-Adopt the role of the agent defined in `_bmad/bmm/agents/architect.agent.yaml`, then read and execute the workflow at `_bmad/bmm/workflows/3-solutioning/bmad-check-implementation-readiness/workflow.md` in Validate mode.
