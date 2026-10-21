@@ -26,7 +26,7 @@ body {
 }
 
 main {
-  max-width: 960px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 32px 24px 64px;
 }
@@ -114,75 +114,165 @@ ul {
   white-space: nowrap;
 }
 
-.epoch {
-  margin-top: 28px;
+.graph-wrap {
+  height: clamp(480px, 72vh, 900px);
+  margin-top: 24px;
+  background: #12151b;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
 }
 
-.session {
-  margin-top: 12px;
-  padding: 14px 16px;
-  background: var(--panel);
+.graph-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  margin: 0;
+  padding: 24px;
+}
+
+/* React Flow group nodes: epoch and session boxes that contain their children. */
+.flow-group {
+  width: 100%;
+  height: 100%;
+  background: rgba(23, 26, 33, 0.72);
   border: 1px solid var(--line);
   border-radius: 10px;
 }
 
-.session header {
+.epoch-group {
+  background: rgba(20, 24, 32, 0.6);
+  border-color: #333c50;
+}
+
+.group-head {
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.session code {
-  color: var(--accent);
-  font-size: 12px;
-}
-
-.session-goal {
-  color: var(--muted);
-}
-
-.nodes {
-  border-left: 1px solid var(--line);
-  padding-left: 16px;
-  list-style: none;
-}
-
-.node {
-  margin: 8px 0;
-}
-
-.node-head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+  height: 44px;
+  padding: 0 10px;
+}
+
+.group-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.group-toggle {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  line-height: 1;
+  color: var(--muted);
+  background: #1d222c;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.group-toggle:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.group-toggle.is-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+/* Edges attach here; handles stay invisible because layout decides the shape. */
+.react-flow__handle.flow-handle {
+  width: 4px;
+  height: 4px;
+  min-width: 0;
+  min-height: 0;
+  pointer-events: none;
+  opacity: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* Node cards; the left border encodes the node kind. */
+.lineage-box {
+  width: 100%;
+  height: 100%;
+  padding: 7px 10px;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+}
+
+.lineage-box.kind-phase {
+  border-left-color: var(--accent);
+}
+
+.lineage-box.kind-step {
+  border-left-color: #7dcfff;
+}
+
+.lineage-box.kind-decision {
+  border-left-color: #c0a8ff;
+}
+
+.lineage-box.kind-question {
+  border-left-color: var(--warn);
+}
+
+.lineage-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lineage-head strong {
+  overflow: hidden;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.lineage-box p {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.lineage-box time {
+  display: block;
+  margin-top: 1px;
 }
 
 .kind {
+  flex: none;
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   background: #242a36;
   color: var(--muted);
 }
 
-.kind-decision {
+.kind.kind-decision {
   background: #2b2440;
   color: #c0a8ff;
 }
 
-.kind-question {
+.kind.kind-question {
   background: #3a2f1d;
   color: var(--warn);
-}
-
-.why span {
-  color: var(--accent);
-  font-size: 11px;
-  text-transform: uppercase;
 }
 
 .empty,
