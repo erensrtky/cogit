@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createProgram } from "../src/program.js";
+import { globalPaths } from "../src/store/paths.js";
 import { loadConfig, loadProject } from "../src/store/stores.js";
 import { envFor, type FakeIo, fakeIo, tempDir } from "./helpers.js";
 
@@ -86,15 +87,16 @@ describe("commands through the CLI", () => {
     expect(existsSync(join(root, ".codelineage", "lineage.html"))).toBe(true);
   });
 
-  it("open builds then launches the map, and explains the missing panel", async () => {
+  it("open builds then launches the map, and the panel without a directory", async () => {
     await cli("init", root, "--yes", "--retention", "keep");
     await cli("open", root);
     expect(launched).toEqual([join(root, ".codelineage", "lineage.html")]);
     expect(io.lines.at(-1)).toMatch(/^Opened .*lineage\.html$/);
     expect(interactive).toEqual([false, false]);
     await cli("open");
-    expect(launched).toHaveLength(1);
-    expect(io.lines.at(-1)).toMatch(/Epic 3/);
+    expect(launched).toHaveLength(2);
+    expect(launched.at(-1)).toBe(globalPaths(io.env).panel);
+    expect(io.lines.at(-1)).toMatch(/^Opened .*panel\.html$/);
   });
 
   it("prints user errors as one line", async () => {

@@ -3,8 +3,8 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { init } from "../src/commands/init.js";
-import { launchFile, openerCommand, openProject } from "../src/commands/open.js";
-import { projectPaths } from "../src/store/paths.js";
+import { launchFile, openerCommand, openPanel, openProject } from "../src/commands/open.js";
+import { globalPaths, projectPaths } from "../src/store/paths.js";
 import { DATA_ELEMENT_ID } from "../src/view/model.js";
 import { envFor, type FakeIo, fakeIo, tempDir } from "./helpers.js";
 
@@ -91,6 +91,28 @@ describe("openProject", () => {
   it("prints the path when no opener is available", async () => {
     await openProject({ dir: root, io, templateHtml: TEMPLATE, launch: async () => false });
     expect(io.lines.at(-1)).toBe(projectPaths(root).html);
+    expect(io.warnings).toEqual(["no application opener found; open the file manually"]);
+  });
+});
+
+describe("openPanel", () => {
+  it("builds the panel and opens it with the OS opener", async () => {
+    const launched: string[] = [];
+    await openPanel({
+      io,
+      templateHtml: TEMPLATE,
+      launch: async (file) => {
+        launched.push(file);
+        return true;
+      },
+    });
+    expect(launched).toEqual([globalPaths(io.env).panel]);
+    expect(io.lines).toEqual([`Opened ${globalPaths(io.env).panel}`]);
+  });
+
+  it("prints the panel path when no opener is available", async () => {
+    await openPanel({ io, templateHtml: TEMPLATE, launch: async () => false });
+    expect(io.lines.at(-1)).toBe(globalPaths(io.env).panel);
     expect(io.warnings).toEqual(["no application opener found; open the file manually"]);
   });
 });

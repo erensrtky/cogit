@@ -1,3 +1,5 @@
+import type { Dirent } from "node:fs";
+import { readdir } from "node:fs/promises";
 import type { z } from "zod";
 import { CONFIG_SCHEMA, Config, Registry } from "../schema/config.js";
 import { PROJECT_SCHEMA, Project } from "../schema/project.js";
@@ -59,6 +61,43 @@ export const updateProject = (
 
 export const loadSession = (root: string, id: string) =>
   load(projectPaths(root).session(id), Session, SESSION_SCHEMA);
+
+/** Ids of the `.json` files in the project's sessions directory, sorted. */
+export async function listSessionIds(dir: string): Promise<string[]> {
+  let entries: Dirent[];
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw err;
+  }
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+    .map((entry) => entry.name.slice(0, -".json".length))
+    .sort();
+}
+
+/**
+ * Loads every valid session of a project. One unreadable or newer file is a
+ * warning, never a failure for the whole map or panel.
+ */
+export async function loadAllSessions(
+  root: string,
+  warn: (line: string) => void,
+): Promise<Session[]> {
+  const sessions: Session[] = [];
+  for (const id of await listSessionIds(projectPaths(root).sessions)) {
+    const loaded = await loadSession(root, id);
+    if (!loaded.found) continue;
+    if (!loaded.ok) {
+      warn(`skipping session ${id}: ${loaded.error}`);
+      continue;
+    }
+    for (const warning of loaded.warnings) warn(`session ${id}: ${warning}`);
+    sessions.push(loaded.data);
+  }
+  return sessions;
+}
 
 export const updateSession = (
   root: string,

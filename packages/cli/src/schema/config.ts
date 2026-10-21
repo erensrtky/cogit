@@ -26,4 +26,5 @@ export const Registry = z.object({
 });
 
 export type Config = z.infer<typeof Config>;
+export type RegistryEntry = z.infer<typeof RegistryEntry>;
 export type Registry = z.infer<typeof Registry>;

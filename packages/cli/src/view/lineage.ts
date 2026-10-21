@@ -3,6 +3,7 @@ import type { LineageNode, Session } from "../schema/session.js";
 import {
   DATA_ELEMENT_ID,
   type LineageViewModel,
+  type PageModel,
   type StatusCard,
   VIEW_SCHEMA,
   type ViewEpoch,
@@ -188,7 +189,7 @@ export function escapeForScript(json: string): string {
 }
 
 /** Fills the template's empty data element with the serialized model. */
-export function embedViewModel(template: string, model: LineageViewModel): string {
+export function embedViewModel(template: string, model: PageModel): string {
   if (!template.includes(EMPTY_DATA_ELEMENT)) {
     throw new Error(`the template has no empty <script id="${DATA_ELEMENT_ID}"> element`);
   }

@@ -4,7 +4,7 @@ import { buildProject } from "./commands/build.js";
 import { configGet, configSet } from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
 import { type InitOptions, init } from "./commands/init.js";
-import { openProject, PANEL_NOT_READY } from "./commands/open.js";
+import { openPanel, openProject } from "./commands/open.js";
 import { sessionWrite } from "./commands/session.js";
 import { CliError, type Io, processIo } from "./io.js";
 
@@ -70,20 +70,17 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
 
   program
     .command("open")
-    .description("build and open a project map (the global panel arrives with Epic 3)")
+    .description("build and open a project map, or the global panel without a directory")
     .argument("[dir]", "project directory; omit to open the global panel")
     .action(
       run(async (dir?: string) => {
         const io = makeIo(false);
+        const launch = deps.launch === undefined ? {} : { launch: deps.launch };
         if (dir === undefined) {
-          io.out(PANEL_NOT_READY);
+          await openPanel({ io, ...launch });
           return;
         }
-        await openProject({
-          dir,
-          io,
-          ...(deps.launch === undefined ? {} : { launch: deps.launch }),
-        });
+        await openProject({ dir, io, ...launch });
       }),
     );
 

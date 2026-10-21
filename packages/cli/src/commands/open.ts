@@ -1,19 +1,20 @@
 import { type SpawnOptions, spawn } from "node:child_process";
 import { resolve } from "node:path";
 import type { Io } from "../io.js";
-import { projectPaths } from "../store/paths.js";
+import { globalPaths, projectPaths } from "../store/paths.js";
+import { buildPanel } from "../view/panel.js";
 import { buildProject } from "./build.js";
 
-export const PANEL_NOT_READY =
-  "The global panel arrives with Epic 3. Run `codelineage open <dir>` to open a project's map.";
-
 export interface OpenOptions {
-  dir: string;
   io: Io;
   /** Tests inject a minimal page instead of the bundled template. */
   templateHtml?: string;
   /** Tests replace the OS opener; resolves false when none is available. */
   launch?: (file: string) => Promise<boolean>;
+}
+
+export interface OpenProjectOptions extends OpenOptions {
+  dir: string;
 }
 
 export interface OpenerCommand {
@@ -52,8 +53,20 @@ export function launchFile(file: string, spawnFn: SpawnLike = systemSpawn): Prom
   });
 }
 
+/** Hands a built page to the OS opener, or prints its path when none exists. */
+async function openFile(file: string, opts: OpenOptions): Promise<void> {
+  const { io } = opts;
+  const opened = await (opts.launch ?? launchFile)(file);
+  if (opened) {
+    io.out(`Opened ${file}`);
+    return;
+  }
+  io.out(file);
+  io.warn("no application opener found; open the file manually");
+}
+
 /** Rebuilds the map, then hands `lineage.html` to the OS opener. */
-export async function openProject(opts: OpenOptions): Promise<void> {
+export async function openProject(opts: OpenProjectOptions): Promise<void> {
   const { io } = opts;
   const root = resolve(opts.dir);
   await buildProject({
@@ -61,12 +74,15 @@ export async function openProject(opts: OpenOptions): Promise<void> {
     io,
     ...(opts.templateHtml === undefined ? {} : { templateHtml: opts.templateHtml }),
   });
-  const html = projectPaths(root).html;
-  const opened = await (opts.launch ?? launchFile)(html);
-  if (opened) {
-    io.out(`Opened ${html}`);
-    return;
-  }
-  io.out(html);
-  io.warn("no application opener found; open the file manually");
+  await openFile(projectPaths(root).html, opts);
+}
+
+/** Rebuilds the global panel, then hands `panel.html` to the OS opener. */
+export async function openPanel(opts: OpenOptions): Promise<void> {
+  await buildPanel({
+    env: opts.io.env,
+    io: opts.io,
+    ...(opts.templateHtml === undefined ? {} : { templateHtml: opts.templateHtml }),
+  });
+  await openFile(globalPaths(opts.io.env).panel, opts);
 }

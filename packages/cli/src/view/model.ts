@@ -75,3 +75,38 @@ export interface LineageViewModel {
   /** Sessions with no epoch, or with an epoch that no longer exists. */
   unassigned: ViewSession[];
 }
+
+/** One project card in the global panel. */
+export interface PanelProject {
+  name: string;
+  path: string;
+  /** True when the registered directory no longer exists. */
+  missing: boolean;
+  /** `updatedAt` of the project's most recently updated session. */
+  lastActivity: string | null;
+  /** Pending items flagged `needsUser` after merging active sessions. */
+  needsUserCount: number;
+  /** `file://` URL of the project's map; null when the directory is gone. */
+  lineageUrl: string | null;
+}
+
+/** Global settings, shown read-only on the panel. */
+export interface PanelSettings {
+  language: string;
+  updateEveryTurns: number;
+  sessionEndCatchUp: boolean;
+  gitPolicy: "ignore" | "commit";
+  agents: string[];
+}
+
+export interface PanelViewModel {
+  kind: "panel";
+  schema: typeof VIEW_SCHEMA;
+  generatedAt: string;
+  settings: PanelSettings;
+  /** Registry order. */
+  projects: PanelProject[];
+}
+
+/** Either page the template can render; the embedded data decides which. */
+export type PageModel = LineageViewModel | PanelViewModel;

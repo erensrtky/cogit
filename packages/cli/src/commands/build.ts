@@ -1,14 +1,12 @@
-import type { Dirent } from "node:fs";
-import { readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { CliError, type Io } from "../io.js";
 import { redactDeep } from "../redact.js";
-import type { Session } from "../schema/session.js";
 import { atomicWrite } from "../store/fs.js";
 import { projectPaths } from "../store/paths.js";
-import { loadProject, loadSession } from "../store/stores.js";
+import { loadAllSessions, loadProject } from "../store/stores.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
 import type { LineageViewModel } from "../view/model.js";
+import { buildPanel } from "../view/panel.js";
 import { TEMPLATE_HTML } from "../view/template.js";
 import { collectTranscriptIds } from "../view/transcripts.js";
 
@@ -21,38 +19,10 @@ export interface BuildOptions {
   quiet?: boolean;
 }
 
-async function listSessions(dir: string): Promise<string[]> {
-  let entries: Dirent[];
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw err;
-  }
-  return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-    .map((entry) => entry.name.slice(0, -".json".length))
-    .sort();
-}
-
-async function loadAllSessions(root: string, io: Io): Promise<Session[]> {
-  const sessions: Session[] = [];
-  for (const id of await listSessions(projectPaths(root).sessions)) {
-    const loaded = await loadSession(root, id);
-    if (!loaded.found) continue;
-    if (!loaded.ok) {
-      io.warn(`skipping session ${id}: ${loaded.error}`);
-      continue;
-    }
-    for (const warning of loaded.warnings) io.warn(`session ${id}: ${warning}`);
-    sessions.push(loaded.data);
-  }
-  return sessions;
-}
-
 /**
- * Rebuilds `.codelineage/lineage.html` from `project.json` and every session file.
- * One unreadable session is a warning, never a failed build.
+ * Rebuilds `.codelineage/lineage.html` from `project.json` and every session file,
+ * then refreshes the global panel. One unreadable session is a warning, never a
+ * failed build; an unwritable global directory only skips the panel.
  */
 export async function buildProject(opts: BuildOptions): Promise<LineageViewModel> {
   const { io } = opts;
@@ -66,7 +36,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   const paths = projectPaths(root);
   const model = buildViewModel({
     project: project.data,
-    sessions: await loadAllSessions(root, io),
+    sessions: await loadAllSessions(root, io.warn),
     path: root,
     generatedAt: io.now(),
     transcripts: await collectTranscriptIds(io.env),
@@ -78,5 +48,13 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   const template = opts.templateHtml ?? TEMPLATE_HTML;
   await atomicWrite(paths.html, embedViewModel(template, redacted.value));
   if (!opts.quiet) io.out(`Wrote ${paths.html}`);
+
+  // The panel is derived state: a read-only home or a broken registry warning
+  // must never turn a successful map build into a failure.
+  try {
+    await buildPanel({ env: io.env, io, templateHtml: template });
+  } catch (err) {
+    io.warn(`could not build panel.html: ${(err as Error).message}`);
+  }
   return redacted.value;
 }
