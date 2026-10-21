@@ -228,7 +228,11 @@ describe("statusCard", () => {
 
   it("treats unparseable timestamps as inactive instead of merging them", () => {
     const sessions = [
-      session({ sessionId: "latest", updatedAt: "2026-10-20T00:00:00.000Z" }),
+      session({
+        sessionId: "latest",
+        updatedAt: "2026-10-20T00:00:00.000Z",
+        status: { goal: "goal", done: [], pending: [], next: "" },
+      }),
       session({
         sessionId: "broken",
         updatedAt: "not-a-date",
@@ -237,6 +241,24 @@ describe("statusCard", () => {
     ];
     expect(statusCard(sessions, NOW).pending).toEqual([]);
     expect(statusCard(sessions, "also-broken").pending).toEqual([]);
+  });
+
+  it("skips a newer session without a status but keeps its time as last activity", () => {
+    const sessions = [
+      session({
+        sessionId: "with-status",
+        updatedAt: "2026-10-20T08:00:00.000Z",
+        status: { goal: "goal", done: ["done"], pending: [], next: "next" },
+      }),
+      session({ sessionId: "bare", updatedAt: "2026-10-20T09:00:00.000Z" }),
+    ];
+    expect(statusCard(sessions, NOW)).toEqual({
+      goal: "goal",
+      done: ["done"],
+      pending: [],
+      next: "next",
+      lastActivity: "2026-10-20T09:00:00.000Z",
+    });
   });
 });
 
@@ -354,6 +376,8 @@ describe("codelineage build", () => {
         "redacted 1 secret-looking value(s) in the map",
       ]),
     );
+    // The panel reads the same project again; its warnings must not repeat.
+    expect(io.warnings.filter((line) => line.startsWith("skipping session bad:"))).toHaveLength(1);
 
     expect(model.epochs[0]?.sessions.map((s) => s.sessionId)).toEqual(["s2", "s1", "newer"]);
     expect(model.unassigned.map((s) => s.sessionId)).toEqual(["s4", "s3"]);

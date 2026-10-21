@@ -52,7 +52,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   // The panel is derived state: a read-only home or a broken registry warning
   // must never turn a successful map build into a failure.
   try {
-    await buildPanel({ env: io.env, io, templateHtml: template });
+    await buildPanel({ env: io.env, io, templateHtml: template, quietPath: root });
   } catch (err) {
     io.warn(`could not build panel.html: ${(err as Error).message}`);
   }

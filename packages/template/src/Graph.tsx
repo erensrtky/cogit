@@ -23,7 +23,7 @@ import {
   useState,
 } from "react";
 import type { LineageViewModel } from "../../cli/src/view/model.js";
-import { formatTime } from "./format.js";
+import { formatDate, formatTime } from "./format.js";
 import {
   defaultExpanded,
   type EpochFlowNode,
@@ -101,8 +101,8 @@ function SessionNode({ id, data }: NodeProps<SessionFlowNode>) {
         <GroupToggle id={id} data={data} />
         <strong className="group-title">{data.title}</strong>
         <span className="muted">{data.count}</span>
-        <time className="muted" dateTime={data.updatedAt}>
-          {formatTime(data.updatedAt)}
+        <time className="muted" dateTime={data.updatedAt} title={formatTime(data.updatedAt)}>
+          {formatDate(data.updatedAt)}
         </time>
       </div>
     </div>

@@ -76,21 +76,27 @@ function byUpdatedAt(a: Session, b: Session): number {
   return timestamp(b.updatedAt) - timestamp(a.updatedAt) || a.sessionId.localeCompare(b.sessionId);
 }
 
+function hasStatus(session: Session): boolean {
+  const { goal, done, pending, next } = session.status;
+  return goal !== "" || next !== "" || done.length > 0 || pending.length > 0;
+}
+
 /**
  * The status card: goal, done, pending and next come from the most recently
- * updated session; `needsUser` items are merged from every other session active
- * within `ACTIVE_WINDOW_DAYS`, newest first and deduplicated by text.
- * `now` is the build time the window is measured against.
+ * updated session that recorded a status, so a newer session without one does not
+ * blank the card; `needsUser` items are merged from every other session active
+ * within `ACTIVE_WINDOW_DAYS`, newest first and deduplicated by text. Last
+ * activity is the newest session overall. `now` is the build time the window is
+ * measured against.
  */
 export function statusCard(sessions: Session[], now: string): StatusCard {
-  let latest: Session | undefined;
-  for (const session of sessions) {
-    if (!latest || timestamp(session.updatedAt) > timestamp(latest.updatedAt)) latest = session;
-  }
+  const ordered = [...sessions].sort(byUpdatedAt);
+  const newest = ordered[0];
+  const latest = ordered.find(hasStatus);
 
   const pending = (latest?.status.pending ?? []).map((item) => ({ ...item }));
   const seen = new Set(pending.map((item) => item.text));
-  const others = sessions.filter((session) => session !== latest).sort(byUpdatedAt);
+  const others = ordered.filter((session) => session !== latest);
   for (const session of others) {
     if (!isActive(session, now)) continue;
     for (const item of session.status.pending) {
@@ -105,7 +111,7 @@ export function statusCard(sessions: Session[], now: string): StatusCard {
     done: latest?.status.done ?? [],
     pending,
     next: latest?.status.next ?? "",
-    lastActivity: latest?.updatedAt ?? null,
+    lastActivity: newest?.updatedAt ?? null,
   };
 }
 

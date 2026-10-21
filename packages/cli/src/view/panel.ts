@@ -14,6 +14,8 @@ export interface PanelOptions {
   io: Io;
   /** Replaces the bundled template; tests inject a minimal page. */
   templateHtml?: string;
+  /** A project whose session warnings were already printed by the map build. */
+  quietPath?: string;
 }
 
 const PANEL_TITLE = "<title>codelineage — panel</title>";
@@ -26,6 +28,7 @@ export async function collectPanelProjects(
   entries: RegistryEntry[],
   generatedAt: string,
   warn: (line: string) => void,
+  quietPath?: string,
 ): Promise<PanelProject[]> {
   const projects: PanelProject[] = [];
   for (const entry of entries) {
@@ -41,7 +44,8 @@ export async function collectPanelProjects(
       continue;
     }
     try {
-      const card = statusCard(await loadAllSessions(entry.path, warn), generatedAt);
+      const sessionWarn = entry.path === quietPath ? () => {} : warn;
+      const card = statusCard(await loadAllSessions(entry.path, sessionWarn), generatedAt);
       projects.push({
         name: entry.name,
         path: entry.path,
@@ -92,7 +96,7 @@ export async function buildPanel(opts: PanelOptions): Promise<PanelViewModel> {
       gitPolicy: config.gitPolicy,
       agents: config.agents,
     },
-    projects: await collectPanelProjects(entries, generatedAt, io.warn),
+    projects: await collectPanelProjects(entries, generatedAt, io.warn, opts.quietPath),
   };
 
   // Same safety net as the map: nothing leaves this process unredacted.

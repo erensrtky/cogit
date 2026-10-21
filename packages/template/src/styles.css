@@ -313,10 +313,16 @@ ul {
 }
 
 .group-title {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.group-head .muted {
+  flex: none;
+  white-space: nowrap;
 }
 
 .group-toggle {

@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Status card: goal, done, pending and next now come from the most recently updated session that recorded a status, so a newer session without one no longer blanks the card; last activity still tracks the newest session.
+- `codelineage build` printed each skipped-session warning twice (once for the map, once for the panel); the panel now stays quiet about the project just built.
+- Collapsed session headers in the map show a short date (full time on hover), so the session title is no longer cut off after a few characters.
 
 ## [0.4.0] - 2026-10-21
 ### Added
