@@ -4,10 +4,16 @@ import { buildProject } from "./commands/build.js";
 import { configGet, configSet } from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
 import { type InitOptions, init } from "./commands/init.js";
+import { openProject, PANEL_NOT_READY } from "./commands/open.js";
 import { sessionWrite } from "./commands/session.js";
 import { CliError, type Io, processIo } from "./io.js";
 
 export type IoFactory = (interactive: boolean) => Io;
+
+/** Test seams for effects that would leave this process (opening a browser). */
+export interface ProgramDeps {
+  launch?: (file: string) => Promise<boolean>;
+}
 
 function retention(value: string): number | "keep" {
   if (value === "keep") return value;
@@ -16,7 +22,7 @@ function retention(value: string): number | "keep" {
   return days;
 }
 
-export function createProgram(makeIo: IoFactory = processIo): Command {
+export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps = {}): Command {
   const program = new Command()
     .name("codelineage")
     .description(pkg.description)
@@ -59,6 +65,25 @@ export function createProgram(makeIo: IoFactory = processIo): Command {
     .action(
       run(async (dir: string) => {
         await buildProject({ dir, io: makeIo(false) });
+      }),
+    );
+
+  program
+    .command("open")
+    .description("build and open a project map (the global panel arrives with Epic 3)")
+    .argument("[dir]", "project directory; omit to open the global panel")
+    .action(
+      run(async (dir?: string) => {
+        const io = makeIo(false);
+        if (dir === undefined) {
+          io.out(PANEL_NOT_READY);
+          return;
+        }
+        await openProject({
+          dir,
+          io,
+          ...(deps.launch === undefined ? {} : { launch: deps.launch }),
+        });
       }),
     );
 

@@ -10,6 +10,7 @@ let dir: string;
 let root: string;
 let io: FakeIo;
 let interactive: boolean[];
+let launched: string[];
 
 beforeEach(async () => {
   dir = await tempDir();
@@ -17,14 +18,23 @@ beforeEach(async () => {
   await mkdir(root);
   io = fakeIo(envFor(dir));
   interactive = [];
+  launched = [];
 });
 
 async function cli(...args: string[]): Promise<string> {
   let err = "";
-  const program = createProgram((i) => {
-    interactive.push(i);
-    return io;
-  });
+  const program = createProgram(
+    (i) => {
+      interactive.push(i);
+      return io;
+    },
+    {
+      launch: async (file) => {
+        launched.push(file);
+        return true;
+      },
+    },
+  );
   program.exitOverride().configureOutput({ writeErr: (s) => (err += s), writeOut: () => {} });
   for (const c of program.commands)
     c.exitOverride().configureOutput({ writeErr: (s) => (err += s) });
@@ -74,6 +84,17 @@ describe("commands through the CLI", () => {
     await cli("build", root);
     expect(io.lines.at(-1)).toMatch(/^Wrote .*lineage\.html$/);
     expect(existsSync(join(root, ".codelineage", "lineage.html"))).toBe(true);
+  });
+
+  it("open builds then launches the map, and explains the missing panel", async () => {
+    await cli("init", root, "--yes", "--retention", "keep");
+    await cli("open", root);
+    expect(launched).toEqual([join(root, ".codelineage", "lineage.html")]);
+    expect(io.lines.at(-1)).toMatch(/^Opened .*lineage\.html$/);
+    expect(interactive).toEqual([false, false]);
+    await cli("open");
+    expect(launched).toHaveLength(1);
+    expect(io.lines.at(-1)).toMatch(/Epic 3/);
   });
 
   it("prints user errors as one line", async () => {
