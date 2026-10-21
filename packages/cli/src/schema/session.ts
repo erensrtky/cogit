@@ -4,6 +4,7 @@ import { IsoDate, Slug } from "./common.js";
 export const SESSION_SCHEMA = 1;
 
 export const NodeKind = z.enum(["phase", "step", "decision", "question"]);
+export type NodeKind = z.infer<typeof NodeKind>;
 
 export const LineageNode = z.object({
   id: Slug,
