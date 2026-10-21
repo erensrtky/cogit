@@ -1,6 +1,15 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
+import { mkdir, open, readFile, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+
+/** True only for an existing directory; any error (missing, file, permissions) is false. */
+export async function isDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
 
 /** Writes via a temp file in the same directory and renames it into place. */
 export async function atomicWrite(file: string, data: string): Promise<void> {

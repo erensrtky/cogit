@@ -1,6 +1,7 @@
 import { CliError, type Io } from "../io.js";
-import { Config } from "../schema/config.js";
-import { loadConfig, updateConfig } from "../store/stores.js";
+import { Config, type RegistryEntry } from "../schema/config.js";
+import { isDirectory } from "../store/fs.js";
+import { loadConfig, loadRegistry, updateConfig, updateRegistry } from "../store/stores.js";
 
 export const CONFIG_KEYS = Object.keys(Config.shape).filter((k) => k !== "schema") as Exclude<
   keyof Config,
@@ -47,4 +48,37 @@ export async function configSet(key: string, raw: string, io: Io): Promise<void>
   }
   await updateConfig((c) => ({ ...c, [key]: next.data[key] }), io.env);
   io.out(`${key} = ${JSON.stringify(next.data[key])}`);
+}
+
+export interface PruneOptions {
+  /** Lists the entries but leaves `projects.json` untouched. */
+  dryRun?: boolean;
+}
+
+/**
+ * Drops registry entries whose directory is gone. A corrupt registry is an error
+ * rather than an empty list, so a typo never wipes every project.
+ */
+export async function configPrune(opts: PruneOptions, io: Io): Promise<void> {
+  const loaded = await loadRegistry(io.env);
+  if (loaded.found && !loaded.ok) throw new CliError(`registry: ${loaded.error}`);
+  const entries = loaded.found && loaded.ok ? loaded.data.projects : [];
+
+  const missing: RegistryEntry[] = [];
+  for (const entry of entries) {
+    if (!(await isDirectory(entry.path))) missing.push(entry);
+  }
+
+  if (missing.length === 0) {
+    io.out("No missing projects");
+    return;
+  }
+  for (const entry of missing) {
+    io.out(`${opts.dryRun === true ? "Would remove" : "Removed"} ${entry.name} (${entry.path})`);
+  }
+  if (opts.dryRun === true) return;
+  await updateRegistry(
+    (r) => ({ ...r, projects: r.projects.filter((p) => !missing.some((m) => m.path === p.path)) }),
+    io.env,
+  );
 }

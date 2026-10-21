@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- `codelineage config prune [--dry-run]`: removes registry entries whose project directory no longer exists, lists every removed entry and leaves the registry untouched with `--dry-run` (a corrupt registry is refused, never treated as empty).
 - Global panel: `codelineage build` also refreshes `~/.config/codelineage/panel.html` (honouring `CODELINEAGE_HOME` / `XDG_CONFIG_HOME`) with one card per registered project — last activity, pending `needsUser` count, a `file://` link to its map, a "missing" mark when the directory is gone and read-only settings from `config.json`; `codelineage open` without a directory builds and opens it.
 
 ## [0.3.0] - 2026-10-21

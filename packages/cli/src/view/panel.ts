@@ -1,9 +1,8 @@
-import { stat } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import type { Io } from "../io.js";
 import { redactDeep } from "../redact.js";
 import type { RegistryEntry } from "../schema/config.js";
-import { atomicWrite } from "../store/fs.js";
+import { atomicWrite, isDirectory } from "../store/fs.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
 import { loadAllSessions, loadConfig, loadRegistry } from "../store/stores.js";
 import { embedViewModel, statusCard } from "./lineage.js";
@@ -18,14 +17,6 @@ export interface PanelOptions {
 }
 
 const PANEL_TITLE = "<title>codelineage — panel</title>";
-
-async function isDirectory(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isDirectory();
-  } catch {
-    return false;
-  }
-}
 
 /**
  * One card per registry entry. A directory that is gone is marked missing

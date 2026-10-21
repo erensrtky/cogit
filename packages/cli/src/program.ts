@@ -1,7 +1,7 @@
 import { Command, InvalidArgumentError, Option } from "commander";
 import pkg from "../package.json" with { type: "json" };
 import { buildProject } from "./commands/build.js";
-import { configGet, configSet } from "./commands/config.js";
+import { configGet, configPrune, configSet } from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
 import { type InitOptions, init } from "./commands/init.js";
 import { openPanel, openProject } from "./commands/open.js";
@@ -94,6 +94,15 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .argument("<key>")
     .argument("<value>")
     .action(run(async (key: string, value: string) => configSet(key, value, makeIo(false))));
+  config
+    .command("prune")
+    .description("remove registered projects whose directory no longer exists")
+    .option("--dry-run", "list what would be removed without changing the registry")
+    .action(
+      run(async (opts: { dryRun?: boolean }) =>
+        configPrune({ dryRun: opts.dryRun === true }, makeIo(false)),
+      ),
+    );
 
   const epoch = program.command("epoch").description("manage epochs (features, epics)");
   epoch

@@ -1,12 +1,13 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { configGet, configSet } from "../src/commands/config.js";
+import { configGet, configPrune, configSet } from "../src/commands/config.js";
 import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import { CliError } from "../src/io.js";
-import { loadConfig, loadProject } from "../src/store/stores.js";
-import { envFor, fakeIo, tempDir } from "./helpers.js";
+import { globalPaths } from "../src/store/paths.js";
+import { loadConfig, loadProject, loadRegistry, updateRegistry } from "../src/store/stores.js";
+import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
 let dir: string;
 let env: NodeJS.ProcessEnv;
@@ -45,6 +46,69 @@ describe("config", () => {
     await expect(configGet("nope", fakeIo(env))).rejects.toBeInstanceOf(CliError);
     await expect(configSet("updateEveryTurns", "0", fakeIo(env))).rejects.toThrow(/invalid value/);
     await expect(configSet("gitPolicy", "maybe", fakeIo(env))).rejects.toThrow(/invalid value/);
+  });
+});
+
+describe("config prune", () => {
+  let alive: string;
+  let gone: string;
+
+  async function registerBoth(): Promise<void> {
+    await updateRegistry(
+      (r) => ({
+        ...r,
+        projects: [
+          { path: alive, name: "alive", addedAt: T0 },
+          { path: gone, name: "gone", addedAt: T0 },
+        ],
+      }),
+      env,
+    );
+  }
+
+  beforeEach(async () => {
+    alive = join(dir, "alive");
+    gone = join(dir, "gone");
+    await mkdir(alive);
+    await registerBoth();
+  });
+
+  it("removes entries whose directory is gone and keeps the rest", async () => {
+    const io = fakeIo(env);
+    await configPrune({}, io);
+    expect(io.lines).toEqual([`Removed gone (${gone})`]);
+    expect(await loadRegistry(env)).toMatchObject({
+      ok: true,
+      data: { projects: [{ path: alive, name: "alive" }] },
+    });
+  });
+
+  it("--dry-run lists the entries without touching the registry", async () => {
+    const io = fakeIo(env);
+    await configPrune({ dryRun: true }, io);
+    expect(io.lines).toEqual([`Would remove gone (${gone})`]);
+    expect(await loadRegistry(env)).toMatchObject({
+      ok: true,
+      data: { projects: [{ path: alive }, { path: gone }] },
+    });
+  });
+
+  it("prints a friendly line when nothing is missing or no registry exists", async () => {
+    const io = fakeIo(env);
+    await configPrune({}, io);
+    await configPrune({}, io);
+    expect(io.lines).toEqual([`Removed gone (${gone})`, "No missing projects"]);
+
+    const fresh = fakeIo(envFor(await tempDir()));
+    await configPrune({ dryRun: true }, fresh);
+    expect(fresh.lines).toEqual(["No missing projects"]);
+  });
+
+  it("refuses to prune a corrupt registry", async () => {
+    await mkdir(globalPaths(env).base, { recursive: true });
+    await writeFile(globalPaths(env).registry, "{not json");
+    await expect(configPrune({}, fakeIo(env))).rejects.toBeInstanceOf(CliError);
+    await expect(configPrune({}, fakeIo(env))).rejects.toThrow(/registry: invalid JSON/);
   });
 });
 

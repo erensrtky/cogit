@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createProgram } from "../src/program.js";
@@ -97,6 +97,19 @@ describe("commands through the CLI", () => {
     expect(launched).toHaveLength(2);
     expect(launched.at(-1)).toBe(globalPaths(io.env).panel);
     expect(io.lines.at(-1)).toMatch(/^Opened .*panel\.html$/);
+  });
+
+  it("prunes projects whose directory is gone, honouring --dry-run", async () => {
+    await cli("init", root, "--yes", "--retention", "keep");
+    const gone = join(dir, "gone");
+    await mkdir(gone);
+    await cli("init", gone, "--yes", "--retention", "keep");
+    await rm(gone, { recursive: true });
+
+    await cli("config", "prune", "--dry-run");
+    expect(io.lines.at(-1)).toMatch(new RegExp(`^Would remove .+ \\(${gone}\\)$`));
+    await cli("config", "prune");
+    expect(io.lines.at(-1)).toMatch(new RegExp(`^Removed .+ \\(${gone}\\)$`));
   });
 
   it("prints user errors as one line", async () => {
