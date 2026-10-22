@@ -1,7 +1,13 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { readRetention, setRetention } from "../src/claude-settings.js";
+import {
+  allowSkill,
+  readRetention,
+  readSkillAllowed,
+  SKILL_RULE,
+  setRetention,
+} from "../src/claude-settings.js";
 import { init } from "../src/commands/init.js";
 import { ensureGitignore, findGitRoot } from "../src/git.js";
 import { loadConfig, loadProject, loadRegistry } from "../src/store/stores.js";
@@ -31,15 +37,20 @@ describe("init", () => {
       data: { projects: [{ path: root, name: "proj" }] },
     });
     expect((await loadConfig(env)).language).toBe("auto");
-    // not a git repo: name, retention and language were asked
-    expect(io.asked).toHaveLength(3);
+    // not a git repo: name, retention, skill permission and language were asked
+    expect(io.asked).toHaveLength(4);
+    expect(await readSkillAllowed(env)).toBe(true);
     expect(io.lines.at(-2)).toMatch(/^Initialized proj/);
   });
 
   it("asks nothing when every answer is given as an option", async () => {
     await mkdir(join(root, ".git"));
     const io = fakeIo(env, [], true);
-    await init(root, { name: "P", git: "commit", retention: "keep", language: "Turkish" }, io);
+    await init(
+      root,
+      { name: "P", git: "commit", retention: "keep", allowSkill: false, language: "Turkish" },
+      io,
+    );
     expect((await loadConfig(env)).language).toBe("Turkish");
     expect(await readText(join(root, ".gitignore"))).toContain("/.codelineage/snapshots/");
   });
@@ -60,9 +71,16 @@ describe("init", () => {
     expect(JSON.parse(await readText(settingsFile()))).toEqual({
       model: "x",
       cleanupPeriodDays: 365,
+      permissions: { allow: [SKILL_RULE] },
     });
-    const files = await readdir(join(dir, "claude"));
-    expect(files.some((f) => f.startsWith("settings.json.codelineage-bak-"))).toBe(true);
+    // two changes in one run keep a single backup holding the original
+    const backups = (await readdir(join(dir, "claude"))).filter((f) =>
+      f.startsWith("settings.json.codelineage-bak-"),
+    );
+    expect(backups).toHaveLength(1);
+    expect(JSON.parse(await readText(join(dir, "claude", backups[0] as string)))).toEqual({
+      model: "x",
+    });
     expect(io.lines.some((l) => l.includes("Set cleanupPeriodDays to 365"))).toBe(true);
   });
 
@@ -72,16 +90,20 @@ describe("init", () => {
     const io = fakeIo(env);
     await init(root, {}, io);
     expect(io.lines).toContain("Claude Code keeps transcripts for 365 days.");
-    expect(io.asked).toHaveLength(2);
+    expect(io.asked).toHaveLength(3);
   });
 
   it("applies a retention option without asking, and skips an unchanged one", async () => {
-    await init(root, { name: "p", retention: 90, language: "auto" }, fakeIo(env, [], true));
+    await init(
+      root,
+      { name: "p", retention: 90, allowSkill: false, language: "auto" },
+      fakeIo(env, [], true),
+    );
     expect(await readRetention(env)).toBe(90);
     const again = join(dir, "other");
     await mkdir(again);
     const io = fakeIo(env, [], true);
-    await init(again, { name: "o", retention: 90 }, io);
+    await init(again, { name: "o", retention: 90, allowSkill: false }, io);
     expect(io.lines.some((l) => l.includes("cleanupPeriodDays"))).toBe(false);
   });
 
@@ -91,17 +113,66 @@ describe("init", () => {
     const io = fakeIo(env);
     await init(root, {}, io);
     expect(io.warnings[0]).toMatch(/retention left unchanged/);
+    expect(io.warnings[1]).toMatch(
+      /add Skill\(codelineage:lineage\) to permissions.allow yourself/,
+    );
     expect(await readText(settingsFile())).toBe("{oops");
   });
 
   it("asks which fixed language on the first run only", async () => {
-    await init(root, {}, fakeIo(env, ["proj", "keep", "fixed", "Turkish"]));
+    await init(root, {}, fakeIo(env, ["proj", "keep", "yes", "fixed", "Turkish"]));
     expect((await loadConfig(env)).language).toBe("Turkish");
     const second = join(dir, "second");
     await mkdir(second);
     const io = fakeIo(env);
     await init(second, {}, io);
     expect(io.asked.some((q) => q.startsWith("Language"))).toBe(false);
+  });
+
+  it("adds the skill rule to existing permissions, and only once", async () => {
+    await mkdir(join(dir, "claude"));
+    await writeFile(
+      settingsFile(),
+      JSON.stringify({ permissions: { allow: ["Bash(ls)"], deny: [] } }),
+    );
+    const io = fakeIo(env, ["proj", "keep", "yes"]);
+    await init(root, {}, io);
+    expect(JSON.parse(await readText(settingsFile())).permissions).toEqual({
+      allow: ["Bash(ls)", SKILL_RULE],
+      deny: [],
+    });
+    expect(io.lines.some((l) => l.startsWith(`Allowed ${SKILL_RULE} in`))).toBe(true);
+    const second = join(dir, "second");
+    await mkdir(second);
+    const again = fakeIo(env);
+    await init(second, {}, again);
+    expect(again.asked.some((q) => q.startsWith("Let the agent"))).toBe(false);
+  });
+
+  it("leaves permissions alone when declined", async () => {
+    const io = fakeIo(env, ["proj", "keep", "no"]);
+    await init(root, {}, io);
+    expect(await readSkillAllowed(env)).toBe(false);
+    expect(io.lines).toContain(
+      `Claude Code will ask before each lineage update; allow ${SKILL_RULE} to stop that.`,
+    );
+  });
+
+  it("warns when permissions.allow has an unexpected shape", async () => {
+    await mkdir(join(dir, "claude"));
+    await writeFile(settingsFile(), JSON.stringify({ permissions: { allow: "all" } }));
+    const io = fakeIo(env);
+    await init(root, {}, io);
+    expect(io.warnings[0]).toMatch(/could not read Claude Code permissions/);
+    expect(JSON.parse(await readText(settingsFile()))).toEqual({ permissions: { allow: "all" } });
+  });
+
+  it("can allow the skill for an already initialized project", async () => {
+    await init(root, { allowSkill: false }, fakeIo(env));
+    const io = fakeIo(env, [], true);
+    await init(root, { allowSkill: true }, io);
+    expect(await readSkillAllowed(env)).toBe(true);
+    expect(io.lines.at(-1)).toBe(`Already initialized: proj (${root})`);
   });
 
   it("is idempotent for an initialized project", async () => {
@@ -165,5 +236,22 @@ describe("setRetention", () => {
   it("creates the settings file without a backup when there was none", async () => {
     expect(await setRetention(90, env, T0)).toEqual({ file: settingsFile() });
     expect(await readRetention(env)).toBe(90);
+  });
+});
+
+describe("allowSkill", () => {
+  it("treats a non-object permissions value as unreadable and refuses to change it", async () => {
+    await mkdir(join(dir, "claude"));
+    await writeFile(settingsFile(), JSON.stringify({ permissions: ["x"] }));
+    expect(await readSkillAllowed(env)).toBeUndefined();
+    await expect(allowSkill(env, T0)).rejects.toThrow(/unexpected permissions.allow/);
+  });
+
+  it("keeps the file as it is when the rule is already there", async () => {
+    await allowSkill(env, T0);
+    await allowSkill(env, T0);
+    expect(JSON.parse(await readText(settingsFile()))).toEqual({
+      permissions: { allow: [SKILL_RULE] },
+    });
   });
 });

@@ -53,6 +53,8 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     )
     .option("--language <lang>", 'summary language: "auto" or a language')
     .option("--retention <days>", 'Claude Code transcript retention, or "keep"', retention)
+    .option("--allow-skill", "let the agent run the lineage skill without asking")
+    .option("--no-allow-skill", "leave Claude Code's permissions unchanged")
     .option("-y, --yes", "accept defaults for every question")
     .action(
       run(async (dir: string, opts: InitOptions & { yes?: boolean }) => {

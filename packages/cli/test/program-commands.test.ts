@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
+import { readSkillAllowed } from "../src/claude-settings.js";
 import { createProgram } from "../src/program.js";
 import { globalPaths } from "../src/store/paths.js";
 import { loadConfig, loadProject } from "../src/store/stores.js";
@@ -57,6 +58,13 @@ describe("commands through the CLI", () => {
     await cli("init", root, "--yes", "--name", "P", "--retention", "keep", "--language", "auto");
     expect(interactive).toEqual([false]);
     expect(await loadProject(root)).toMatchObject({ ok: true, data: { name: "P" } });
+  });
+
+  it("init --no-allow-skill and --allow-skill set the skill permission", async () => {
+    await cli("init", root, "--yes", "--retention", "keep", "--no-allow-skill");
+    expect(await readSkillAllowed(io.env)).toBe(false);
+    await cli("init", root, "--allow-skill");
+    expect(await readSkillAllowed(io.env)).toBe(true);
   });
 
   it("rejects a bad --retention value", async () => {

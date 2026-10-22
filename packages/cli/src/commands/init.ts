@@ -1,6 +1,13 @@
 import { mkdir } from "node:fs/promises";
 import { basename, resolve } from "node:path";
-import { CLAUDE_DEFAULT_RETENTION, readRetention, setRetention } from "../claude-settings.js";
+import {
+  allowSkill,
+  CLAUDE_DEFAULT_RETENTION,
+  readRetention,
+  readSkillAllowed,
+  SKILL_RULE,
+  setRetention,
+} from "../claude-settings.js";
 import { ensureGitignore, findGitRoot, type GitPolicy } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import { readJson } from "../store/fs.js";
@@ -19,6 +26,8 @@ export interface InitOptions {
   language?: string;
   /** Days, or "keep" to leave Claude Code's setting alone. */
   retention?: number | "keep";
+  /** Allow the lineage skill in Claude Code's user settings; undefined asks. */
+  allowSkill?: boolean;
 }
 
 /** Below this, init offers to raise Claude Code's transcript retention. */
@@ -64,6 +73,30 @@ async function askRetention(io: Io, opts: InitOptions): Promise<void> {
   io.out(`Set cleanupPeriodDays to ${choice} in ${file}${backup ? ` (backup: ${backup})` : ""}.`);
 }
 
+async function askSkillPermission(io: Io, opts: InitOptions): Promise<void> {
+  const allowed = await readSkillAllowed(io.env);
+  if (allowed === undefined) {
+    io.warn(
+      `could not read Claude Code permissions; add ${SKILL_RULE} to permissions.allow yourself`,
+    );
+    return;
+  }
+  if (allowed) return;
+  const allow =
+    opts.allowSkill ??
+    (await io.prompt.confirm(
+      "Let the agent update the lineage record without asking each time? " +
+        `(adds ${SKILL_RULE} to your Claude Code permissions)`,
+      true,
+    ));
+  if (!allow) {
+    io.out(`Claude Code will ask before each lineage update; allow ${SKILL_RULE} to stop that.`);
+    return;
+  }
+  const { file, backup } = await allowSkill(io.env, io.now());
+  io.out(`Allowed ${SKILL_RULE} in ${file}${backup ? ` (backup: ${backup})` : ""}.`);
+}
+
 async function askLanguage(io: Io, opts: InitOptions): Promise<void> {
   const firstRun = !(await readJson(globalPaths(io.env).config)).found;
   if (!firstRun && opts.language === undefined) return;
@@ -103,6 +136,7 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
   if (existing.found) {
     if (!existing.ok) throw new CliError(`${projectPaths(root).project}: ${existing.error}`);
     await register(io, root, existing.data.name);
+    if (opts.allowSkill !== undefined) await askSkillPermission(io, opts);
     io.out(`Already initialized: ${existing.data.name} (${root})`);
     return;
   }
@@ -127,6 +161,7 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
   }
 
   await askRetention(io, opts);
+  await askSkillPermission(io, opts);
   await askLanguage(io, opts);
 
   await updateProject(root, (cur) => cur ?? { schema: 1, name, epochs: [] });

@@ -132,7 +132,8 @@ Behavior verified against the Claude Code hooks docs (2026-10-21):
   with Claude Code 2.1.300: a request after N turns, the agent runs the skill, the
   record is written. A model-invoked skill that has `allowed-tools` needs permission
   (`Skill(codelineage:lineage)` in `permissions.allow`); without it the request is
-  denied in `-p` runs and prompts in interactive ones.
+  denied in `-p` runs and prompts in interactive ones. A plugin cannot grant it to
+  itself, so `init` offers to add it to the user settings (install question 3).
 - **Compaction (safety net).** PreCompact output never reaches the model and it cannot
   make the agent act; it can only block compaction, and blocking an auto-compact
   triggered by a context-limit error fails the request. So:
@@ -192,8 +193,15 @@ Each update costs agent tokens (the user's subscription or API usage).
 2. **Transcript retention:** Claude Code deletes sessions after 30 days by default
    (`cleanupPeriodDays`). Offer to raise it. Never change it silently. The README
    explains this too.
-3. **Language** for summaries: `auto` (the conversation's language) or a fixed language.
-4. **Past sessions:** "This project has N earlier sessions: all, pick, or none?"
+3. **Skill permission:** add `Skill(codelineage:lineage)` to `permissions.allow` in
+   `~/.claude/settings.json` so automatic updates do not prompt every N turns? Default:
+   yes. Asked only when the rule is missing; backs the file up first (one backup per
+   run, holding the original), refuses a file it cannot parse and prints what it
+   changed. `--allow-skill` / `--no-allow-skill` answer it; `--allow-skill` also works
+   on an already initialized project. A user-level rule is harmless in projects
+   without `init`, where the skill only prints the setup hint.
+4. **Language** for summaries: `auto` (the conversation's language) or a fixed language.
+5. **Past sessions:** "This project has N earlier sessions: all, pick, or none?"
    Default: none. Picking or all runs `backfill` with a cost estimate first.
 
 Settings in `config.json`: `language`, `updateEveryTurns`, `sessionEndCatchUp`,
