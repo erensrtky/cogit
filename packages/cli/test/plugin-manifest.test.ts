@@ -11,7 +11,9 @@ describe("plugin packaging", () => {
     // An npm-sourced plugin without a version resolves to "unknown" and never updates.
     expect(plugin.version).toBe(pkg.version);
     expect(plugin.name).toBe(pkg.name);
-    expect(pkg.files).toEqual(expect.arrayContaining(["dist", ".claude-plugin", "skills"]));
+    expect(pkg.files).toEqual(
+      expect.arrayContaining(["dist", ".claude-plugin", "skills", "hooks"]),
+    );
   });
 
   it("lists the plugin in the marketplace under its manifest name, from npm", async () => {

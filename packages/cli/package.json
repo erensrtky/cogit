@@ -10,7 +10,8 @@
   "files": [
     "dist",
     ".claude-plugin",
-    "skills"
+    "skills",
+    "hooks"
   ],
   "engines": {
     "node": ">=22.13.0"

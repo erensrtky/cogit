@@ -5,7 +5,8 @@ import { configGet, configPrune, configSet } from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
 import { type InitOptions, init } from "./commands/init.js";
 import { openPanel, openProject } from "./commands/open.js";
-import { sessionShow, sessionWrite } from "./commands/session.js";
+import { readStdin, sessionShow, sessionWrite } from "./commands/session.js";
+import { runHook } from "./hooks/run.js";
 import { CliError, type Io, processIo } from "./io.js";
 
 export type IoFactory = (interactive: boolean) => Io;
@@ -13,6 +14,8 @@ export type IoFactory = (interactive: boolean) => Io;
 /** Test seams for effects that would leave this process (opening a browser). */
 export interface ProgramDeps {
   launch?: (file: string) => Promise<boolean>;
+  /** Reads a hook's JSON input; tests pass it directly. */
+  stdin?: () => Promise<string>;
 }
 
 function retention(value: string): number | "keep" {
@@ -138,6 +141,17 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .action(
       run(async (id: string, opts: { dir: string }) => sessionShow(opts.dir, id, makeIo(false))),
     );
+
+  // Called by the plugin's hooks.json with the hook input on stdin. Never fails.
+  program
+    .command("hook", { hidden: true })
+    .argument("<event>", "hook event, e.g. stop")
+    .action(async (event: string) => {
+      const io = makeIo(false);
+      const input = await (deps.stdin ?? readStdin)();
+      const out = await runHook(event, input, io.env, io.now(), io.warn);
+      if (out !== undefined) io.out(out);
+    });
 
   return program;
 }

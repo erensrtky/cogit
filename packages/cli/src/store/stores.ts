@@ -4,6 +4,7 @@ import type { z } from "zod";
 import { CONFIG_SCHEMA, Config, Registry } from "../schema/config.js";
 import { PROJECT_SCHEMA, Project } from "../schema/project.js";
 import { SESSION_SCHEMA, Session } from "../schema/session.js";
+import { HookState, STATE_SCHEMA } from "../schema/state.js";
 import { type Parsed, parseVersioned } from "../schema/versioned.js";
 import { atomicWriteJson, readJson } from "./fs.js";
 import { type LockOptions, withLock } from "./lock.js";
@@ -25,7 +26,7 @@ async function load<S extends z.ZodType>(
 /**
  * Locked read → update → atomic write. `fn` gets the current value (undefined if
  * the file is missing) and returns the new one. An unreadable file is an error,
- * never silently overwritten.
+ * never silently overwritten, unless `resetUnreadable` says the data is derived.
  */
 async function update<S extends z.ZodType, R extends z.infer<S>>(
   file: string,
@@ -34,12 +35,13 @@ async function update<S extends z.ZodType, R extends z.infer<S>>(
   version: number,
   fn: (current: z.infer<S> | undefined) => R | Promise<R>,
   opts?: LockOptions,
+  resetUnreadable = false,
 ): Promise<R> {
   return withLock(
     lockPath,
     async () => {
       const cur = await load(file, schema, version);
-      if (cur.found && !cur.ok) throw new Error(`${file}: ${cur.error}`);
+      if (cur.found && !cur.ok && !resetUnreadable) throw new Error(`${file}: ${cur.error}`);
       const next = await fn(cur.found && cur.ok ? cur.data : undefined);
       await atomicWriteJson(file, schema.parse(next));
       return next;
@@ -129,4 +131,15 @@ export const updateRegistry = (fn: (cur: Registry) => Registry, env?: NodeJS.Pro
   return update(g.registry, g.lock, Registry, CONFIG_SCHEMA, (cur) =>
     fn(cur ?? Registry.parse({ schema: CONFIG_SCHEMA })),
   );
+};
+
+/** Hook state is derived, so an unreadable file is replaced instead of blocking hooks. */
+export const updateState = (
+  root: string,
+  id: string,
+  fn: (cur: HookState | undefined) => HookState | Promise<HookState>,
+  opts?: LockOptions,
+) => {
+  const p = projectPaths(root);
+  return update(p.state(id), p.lock(`state-${id}`), HookState, STATE_SCHEMA, fn, opts, true);
 };

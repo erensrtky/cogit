@@ -12,6 +12,7 @@ let root: string;
 let io: FakeIo;
 let interactive: boolean[];
 let launched: string[];
+let stdin = "";
 
 beforeEach(async () => {
   dir = await tempDir();
@@ -34,6 +35,7 @@ async function cli(...args: string[]): Promise<string> {
         launched.push(file);
         return true;
       },
+      stdin: async () => stdin,
     },
   );
   program.exitOverride().configureOutput({ writeErr: (s) => (err += s), writeOut: () => {} });
@@ -84,6 +86,14 @@ describe("commands through the CLI", () => {
     await cli("init", root, "--yes", "--retention", "keep");
     await cli("session", "show", "s1", "-C", root);
     expect(JSON.parse(io.lines.at(-1) ?? "")).toMatchObject({ initialized: true, session: null });
+  });
+
+  it("runs a hook from stdin and prints its output", async () => {
+    await cli("init", root, "--yes", "--retention", "keep");
+    await cli("config", "set", "updateEveryTurns", "1");
+    stdin = JSON.stringify({ session_id: "s1", cwd: root });
+    await cli("hook", "stop");
+    expect(JSON.parse(io.lines.at(-1) ?? "")).toHaveProperty("hookSpecificOutput");
   });
 
   it("builds the map through the CLI", async () => {

@@ -126,7 +126,13 @@ Behavior verified against the Claude Code hooks docs (2026-10-21):
   error). It never asks when `stop_hook_active` is true, which also keeps us clear of
   Claude Code's 8-consecutive-continuation cap. Stop does not fire on user interrupts,
   so the count is approximate. If nothing meaningful happened, the agent leaves the
-  record unchanged.
+  record unchanged. The count restarts whenever the record's `updatedAt` changed
+  since the previous Stop (the skill ran, asked or not) and after each request, so
+  an "up to date" answer is not asked again on the next turn. Verified end to end
+  with Claude Code 2.1.300: a request after N turns, the agent runs the skill, the
+  record is written. A model-invoked skill that has `allowed-tools` needs permission
+  (`Skill(codelineage:lineage)` in `permissions.allow`); without it the request is
+  denied in `-p` runs and prompts in interactive ones.
 - **Compaction (safety net).** PreCompact output never reaches the model and it cannot
   make the agent act; it can only block compaction, and blocking an auto-compact
   triggered by a context-limit error fails the request. So:
