@@ -49,6 +49,22 @@ function session(over: Partial<Session> & { sessionId: string }): Session {
 }
 
 describe("buildNodeTree", () => {
+  it("orders siblings by when their thread began, keeping unstamped ones first and in order", () => {
+    const t = (h: number) => `2026-10-23T${String(h).padStart(2, "0")}:00:00.000Z`;
+    const tree = buildNodeTree([
+      node("late", "phase", "Late topic", null, { addedAt: t(1) }),
+      node("old", "phase", "Unstamped topic"),
+      node("early", "phase", "Renamed topic", null, { addedAt: t(9) }),
+      node("x", "step", "Old item moved in", "early", { addedAt: t(0) }),
+      node("y", "step", "Second", "late", { addedAt: t(5) }),
+      node("z", "step", "First", "late", { addedAt: t(2) }),
+      node("old2", "phase", "Another unstamped"),
+    ]);
+    expect(tree.map((n) => n.id)).toEqual(["old", "old2", "early", "late"]);
+    expect(tree[3]?.children.map((n) => n.id)).toEqual(["z", "y"]);
+    expect(tree[2]?.addedAt).toBe(t(9));
+  });
+
   it("nests children in order and keeps optional fields only when present", () => {
     const tree = buildNodeTree([
       node("a", "phase", "A", null, { summary: "phase one", at: T0 }),

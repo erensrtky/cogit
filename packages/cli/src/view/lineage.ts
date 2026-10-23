@@ -12,8 +12,8 @@ import {
 } from "./model.js";
 
 /**
- * Turns a session's flat node list into the nested tree the graph draws. Order is
- * preserved. A missing parent, a self-reference or a cycle becomes a root, so no
+ * Turns a session's flat node list into the nested tree the graph draws, siblings
+ * in the order their threads began (stored order for unstamped nodes). A missing parent, a self-reference or a cycle becomes a root, so no
  * recorded node is ever dropped.
  */
 export function buildNodeTree(nodes: LineageNode[]): ViewNode[] {
@@ -44,6 +44,8 @@ export function buildNodeTree(nodes: LineageNode[]): ViewNode[] {
       ...(node.summary === undefined ? {} : { summary: node.summary }),
       ...(node.why === undefined ? {} : { why: node.why }),
       ...(node.at === undefined ? {} : { at: node.at }),
+      ...(node.addedAt === undefined ? {} : { addedAt: node.addedAt }),
+      ...(node.touchedAt === undefined ? {} : { touchedAt: node.touchedAt }),
       children,
     };
   };
@@ -51,7 +53,32 @@ export function buildNodeTree(nodes: LineageNode[]): ViewNode[] {
   const tree = roots.filter((root) => !visited.has(root.id)).map(build);
   // A pure cycle has no root, so break it at the first node not yet emitted.
   for (const node of nodes) if (!visited.has(node.id)) tree.push(build(node));
-  return tree;
+  return byStart(tree);
+}
+
+/**
+ * When a node's thread began: its own or any descendant's addedAt, whichever is
+ * earliest. Unstamped nodes predate the stamps, so they count as earliest of all.
+ */
+function startOf(node: ViewNode): string {
+  let start = node.addedAt ?? "";
+  for (const child of node.children) {
+    const childStart = startOf(child);
+    if (childStart < start) start = childStart;
+  }
+  return start;
+}
+
+/**
+ * Orders siblings by when their thread began, at every level, so topics read left
+ * to right and items top to bottom in time order even after the agent renames or
+ * moves them. The sort is stable: ties keep their stored order.
+ */
+function byStart(nodes: ViewNode[]): ViewNode[] {
+  for (const node of nodes) node.children = byStart(node.children);
+  const keyed = nodes.map((node) => ({ node, start: startOf(node) }));
+  keyed.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+  return keyed.map((entry) => entry.node);
 }
 
 /** A session counts as active while it was updated within this window. */

@@ -455,6 +455,22 @@ body:has(.map-shell.is-expanded) {
   overflow-wrap: anywhere;
 }
 
+.lineage-box.is-last {
+  border-color: var(--warn);
+  box-shadow: 0 0 0 2px rgba(240, 180, 90, 0.35);
+}
+
+.left-off {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 6px;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 14px;
+}
+
 .lineage-box p.lineage-count {
   color: var(--accent);
 }

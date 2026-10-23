@@ -5,7 +5,7 @@ import { formatTime, kindLabel } from "./format.js";
 import type { LineageData } from "./graph.js";
 
 /** What the drill-down shows of a node; the expand state stays in the graph. */
-export type NodeDetail = Omit<LineageData, "count" | "expanded" | "hasChildren">;
+export type NodeDetail = Omit<LineageData, "count" | "expanded" | "hasChildren" | "isLast">;
 
 /** What the drill-down shows: a graph node or a whole session. */
 export type Selection = { type: "node"; node: NodeDetail } | { type: "session"; sessionId: string };

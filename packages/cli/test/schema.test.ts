@@ -97,6 +97,30 @@ describe("parseVersioned", () => {
 });
 
 describe("mergeSession", () => {
+  it("stamps nodes when they are added or changed, never from agent input", () => {
+    const node = { id: "a", kind: "step", title: "A", touchedAt: "2000-01-01T00:00:00.000Z" };
+    const first = mergeSession(undefined, input({ sessionId: "s1", nodes: [node] }), T0).session;
+    expect(first.nodes[0]?.touchedAt).toBe(T0);
+    expect(first.nodes[0]?.addedAt).toBe(T0);
+    const same = mergeSession(first, input({ sessionId: "s1", nodes: [node] }), T1).session;
+    expect(same.nodes[0]?.touchedAt).toBe(T0);
+    const moved = mergeSession(
+      first,
+      input({ sessionId: "s1", nodes: [{ ...node, title: "A2" }] }),
+      T1,
+    ).session;
+    expect(moved.nodes[0]?.touchedAt).toBe(T1);
+    expect(moved.nodes[0]?.addedAt).toBe(T0);
+    // a node stored before the stamps existed never gets a made-up addedAt
+    const legacy = {
+      ...first,
+      nodes: [{ id: "a", parent: null, kind: "step" as const, title: "A" }],
+    };
+    expect(
+      mergeSession(legacy, input({ sessionId: "s1", nodes: [node] }), T1).session.nodes[0],
+    ).not.toHaveProperty("addedAt");
+  });
+
   it("creates a new session owned by the CLI timestamps", () => {
     const { session } = mergeSession(undefined, input({ sessionId: "s1", title: "x" }), T0);
     expect(session).toMatchObject({ schema: 1, startedAt: T0, updatedAt: T0, title: "x" });

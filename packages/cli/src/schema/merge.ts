@@ -32,10 +32,17 @@ export function mergeSession(
   const nodes = new Map<string, LineageNode>(base.nodes.map((n) => [n.id, n]));
   for (const { parent, ...n } of input.nodes ?? []) {
     const prev = nodes.get(n.id);
-    nodes.set(n.id, {
+    const next: LineageNode = {
       ...prev,
       ...n,
       parent: parent === undefined ? (prev?.parent ?? null) : parent,
+    };
+    // Nodes recorded before these stamps existed keep no addedAt: their order stays as stored.
+    const addedAt = prev ? prev.addedAt : now;
+    nodes.set(n.id, {
+      ...next,
+      ...(addedAt === undefined ? {} : { addedAt }),
+      touchedAt: prev && sameNode(prev, next) ? prev.touchedAt : now,
     });
   }
 
@@ -50,6 +57,13 @@ export function mergeSession(
   };
   const warnings = repairTree(merged.nodes);
   return { session: merged, warnings };
+}
+
+const NODE_FIELDS = ["parent", "kind", "title", "summary", "why", "at"] as const;
+
+/** A resent node that changed nothing keeps its touch time. */
+function sameNode(a: LineageNode, b: LineageNode): boolean {
+  return NODE_FIELDS.every((field) => a[field] === b[field]);
 }
 
 /** Re-roots nodes whose parent is missing or that sit on a cycle. Mutates in place. */

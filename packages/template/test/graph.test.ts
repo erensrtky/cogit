@@ -46,4 +46,9 @@ describe("placeSessionNodes", () => {
   it("gives an empty session a minimal box", () => {
     expect(placeSessionNodes([], "s").boxes.size).toBe(0);
   });
+
+  it("makes room for the left-off badge on the last touched card", () => {
+    const marked = placeSessionNodes(tree, "s", undefined, new Set(["node:s:a1"]));
+    expect(marked.boxes.get("node:s:a1")?.height).toBeGreaterThan(box("a1")?.height ?? 0);
+  });
 });

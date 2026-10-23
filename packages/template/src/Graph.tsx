@@ -30,6 +30,7 @@ import {
   type EpochFlowNode,
   type GraphNode,
   type LineageFlowNode,
+  lastTouched,
   layoutGraph,
   type SessionFlowNode,
   TREE_LEFT,
@@ -136,13 +137,14 @@ function SessionNode({ id, data }: NodeProps<SessionFlowNode>) {
 
 function LineageBox({ id, data }: NodeProps<LineageFlowNode>) {
   return (
-    <div className={`lineage-box kind-${data.kind}`}>
+    <div className={`lineage-box kind-${data.kind}${data.isLast ? " is-last" : ""}`}>
       <TreeHandles />
       <div className="lineage-head">
         {data.hasChildren ? <GroupToggle id={id} data={data} /> : null}
         <span className={`kind kind-${data.kind}`}>{kindLabel(data.kind)}</span>
         <strong title={data.title}>{data.title}</strong>
       </div>
+      {data.isLast ? <span className="left-off">left off here</span> : null}
       {data.hasChildren && !data.expanded ? (
         <p className="lineage-count">{itemsInside(data.count)}</p>
       ) : data.at ? (
@@ -179,10 +181,13 @@ function Flow({ model }: { model: LineageViewModel }) {
   const { expanded: fullscreen, toggle: toggleFullscreen } = useFullscreen();
   const [focusedId, setFocusedId] = useState<string | null>(null);
   /** Wait for the layout that contains this node, then centre on it. */
-  const pendingFocus = useRef<string | null>(null);
+  // Open on the session where the work left off, framed around it.
+  const pendingFocus = useRef<string | null>(lastTouched(model)?.sessionKey ?? null);
   const focusTimer = useRef<number | null>(null);
   /** Outline selection just re-fitted the view; don't let the generic fit undo it. */
-  const lastFocusRequest = useRef(Number.NEGATIVE_INFINITY);
+  const lastFocusRequest = useRef(
+    pendingFocus.current ? performance.now() : Number.NEGATIVE_INFINITY,
+  );
   /** The first run belongs to mount; only React to the user toggling the outline. */
   const firstOutlineToggle = useRef(true);
   const { fitView } = useReactFlow();

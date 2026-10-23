@@ -20,6 +20,10 @@ export interface ViewNode {
   summary?: string;
   why?: string;
   at?: string;
+  /** When the node was first added. */
+  addedAt?: string;
+  /** When the node was last added or changed; marks where the work left off. */
+  touchedAt?: string;
   /** Nested children, already ordered as the graph should draw them. */
   children: ViewNode[];
 }

@@ -14,6 +14,10 @@ export const LineageNode = z.object({
   summary: z.string().max(2000).optional(),
   why: z.string().max(2000).optional(),
   at: IsoDate.optional(),
+  /** When `session write` first added this node; set by the CLI, never by the agent. */
+  addedAt: IsoDate.optional(),
+  /** When `session write` last added or changed this node; set by the CLI, never by the agent. */
+  touchedAt: IsoDate.optional(),
 });
 
 export const PendingItem = z.object({
@@ -41,7 +45,9 @@ export const Session = z.object({
 });
 
 /** In input, a missing parent keeps the stored one (null for a new node). */
-export const LineageNodeInput = LineageNode.extend({ parent: Slug.nullable().optional() });
+export const LineageNodeInput = LineageNode.omit({ addedAt: true, touchedAt: true }).extend({
+  parent: Slug.nullable().optional(),
+});
 
 /**
  * What the agent sends to `session write`. Everything but the id is optional;
