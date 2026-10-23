@@ -51,6 +51,13 @@ describe("segments", () => {
     expect(segments.map((segment) => segment.ids)).toEqual([["m1"], ["m2"]]);
     expect(segments.every((segment) => segment.parentId === null)).toBe(true);
   });
+
+  it("draws a cross-session parent as a root of this session (Story 8.6)", () => {
+    const messages = [message("m1", null), message("m2", "first:h9")];
+    const { segments } = layoutGitGraph(messages);
+    expect(segments.map((segment) => segment.ids)).toEqual([["m1"], ["m2"]]);
+    expect(segments[1]?.parentId).toBeNull();
+  });
 });
 
 describe("lanes", () => {

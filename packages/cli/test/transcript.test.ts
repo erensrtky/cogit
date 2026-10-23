@@ -8,6 +8,7 @@ import {
   findTranscript,
   messageText,
   readConversation,
+  readsHandoff,
   readUserMessages,
 } from "../src/transcript.js";
 import { envFor, tempDir } from "./helpers.js";
@@ -173,6 +174,32 @@ describe("findTranscript", () => {
     await writeFile(join(folder, "s1.jsonl"), "");
     expect(await findTranscript("s1", env)).toBe(join(folder, "s1.jsonl"));
     expect(await findTranscript("s2", env)).toBeNull();
+  });
+});
+
+describe("readsHandoff", () => {
+  const tool = (name: string, input: Record<string, unknown>) =>
+    JSON.stringify({
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "tool_use", name, input }] },
+    });
+
+  it("notices a handoff file read with Read or shown with Bash", async () => {
+    const dir = await tempDir();
+    const read = join(dir, "read.jsonl");
+    await writeFile(read, `${tool("Read", { file_path: "/p/handoff-2026-10-24.md" })}\n`);
+    expect(await readsHandoff(read)).toBe(true);
+
+    const bash = join(dir, "bash.jsonl");
+    await writeFile(bash, `${tool("Bash", { command: "sed -n 1,40p handoff-2026-10-24.md" })}\n`);
+    expect(await readsHandoff(bash)).toBe(true);
+  });
+
+  it("ignores a transcript without a handoff read", async () => {
+    const dir = await tempDir();
+    const file = join(dir, "other.jsonl");
+    await writeFile(file, `${tool("Read", { file_path: "/p/README.md" })}\n`);
+    expect(await readsHandoff(file)).toBe(false);
   });
 });
 

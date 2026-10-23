@@ -47,11 +47,14 @@ import { DrillDown, type Selection } from "./SidePanel.js";
 const GraphActions = createContext<{
   toggle: (id: string) => void;
   openRow: (sessionId: string, messageId: string, segmentId: string) => void;
+  /** Opens another session at one of its messages (a "continues" mark, 8.6). */
+  openContinue: (sessionId: string, messageId: string) => void;
   unfold: (segmentId: string) => void;
   selection: Selection | null;
 }>({
   toggle: () => {},
   openRow: () => {},
+  openContinue: () => {},
   unfold: () => {},
   selection: null,
 });
@@ -112,7 +115,7 @@ function EpochNode({ id, data }: NodeProps<EpochFlowNode>) {
 }
 
 function SessionNode({ id, data }: NodeProps<SessionFlowNode>) {
-  const { selection, openRow, unfold } = useContext(GraphActions);
+  const { selection, openRow, openContinue, unfold } = useContext(GraphActions);
   const selectedId =
     selection?.type === "node" && selection.sessionId === data.sessionId ? selection.nodeId : null;
   const activeSegmentId =
@@ -142,6 +145,7 @@ function SessionNode({ id, data }: NodeProps<SessionFlowNode>) {
           activeSegmentId={activeSegmentId}
           onSelect={(row: GitMessageRow) => openRow(data.sessionId, row.message.id, row.segmentId)}
           onUnfold={unfold}
+          onContinue={(target) => openContinue(target.sessionId, target.id)}
         />
       ) : null}
     </div>
@@ -365,10 +369,6 @@ function Flow({ model }: { model: LineageViewModel }) {
     setOpenAll((value) => !value);
     setUnfolded(new Set());
   }, []);
-  const actions = useMemo(
-    () => ({ toggle, openRow, unfold, selection }),
-    [toggle, openRow, unfold, selection],
-  );
   const closePanel = useCallback(() => setSelection(null), []);
   const toggleOutline = useCallback(() => setShowOutline((value) => !value), []);
   const onNodeClick = useCallback<NodeMouseHandler<GraphNode>>((_event, node) => {
@@ -419,6 +419,24 @@ function Flow({ model }: { model: LineageViewModel }) {
       }
     },
     [centerRow, expanded, layout, model, scheduleFocus],
+  );
+
+  /** A "↑ continues …" mark opens the earlier session, revealed and centred. */
+  const openContinue = useCallback(
+    (targetSessionId: string, messageId: string) => {
+      const focus = nodeId(sessionKey(targetSessionId), messageId);
+      selectFromOutline({
+        focusId: focus,
+        expand: outlinePath(model, focus) ?? [sessionKey(targetSessionId)],
+        selection: { type: "node", sessionId: targetSessionId, nodeId: messageId },
+      });
+    },
+    [model, selectFromOutline],
+  );
+
+  const actions = useMemo(
+    () => ({ toggle, openRow, openContinue, unfold, selection }),
+    [toggle, openRow, openContinue, unfold, selection],
   );
 
   let content: ReactNode;

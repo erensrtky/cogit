@@ -258,6 +258,31 @@ describe("mergeSession", () => {
   });
 });
 
+describe("cross-session references (Story 8.6)", () => {
+  it("accepts <sessionId>:<id> in a parent or link and refuses a malformed one", () => {
+    const parsed = input({
+      sessionId: "s1",
+      nodes: [{ id: "h1", kind: "message", title: "M", parent: "other:h0", links: ["other:h2"] }],
+    });
+    expect(parsed.nodes?.[0]?.parent).toBe("other:h0");
+    expect(parsed.nodes?.[0]?.links).toEqual(["other:h2"]);
+    for (const parent of ["a:b:c", ":h1", "a:", "other:h 1"]) {
+      expect(
+        SessionInput.safeParse({
+          sessionId: "s1",
+          nodes: [{ id: "h1", kind: "message", title: "M", parent }],
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it("leaves a cross-session parent out of the local tree repair", () => {
+    const nodes = [node("a", "other:h1")];
+    expect(repairTree(nodes)).toEqual([]);
+    expect(nodes[0]?.parent).toBe("other:h1");
+  });
+});
+
 describe("repairTree", () => {
   it("re-roots nodes with a missing parent", () => {
     const nodes = [node("a", "ghost")];

@@ -173,7 +173,9 @@ export function rowHeight(
     (row.first ? BRANCH_MAX + 8 : 0) +
     row.returns * 44 +
     (row.head ? 92 : 0) +
-    (message.unsummarized ? 116 : 0);
+    (message.unsummarized ? 116 : 0) +
+    // The "↑ continues <session> · m67" mark sits in the row, next to the title.
+    (message.continues ? 150 + message.continues.sessionTitle.length * 6.4 : 0);
   const room = Math.max(120, ROW_WIDTH - fixed);
   const titleLines = Math.max(1, Math.ceil((message.title.length * TITLE_CHAR) / room));
   const branchLines = row.first

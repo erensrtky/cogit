@@ -87,6 +87,12 @@ earlier one, and a thread that starts something new is a root.
   a new chat and does not rely on the previous answer.
 - An explicit return to an older thread ("back to the representation question"):
   set `parent` to that thread's message and put the previous message in `links`.
+- The FIRST message of a session that continues earlier work hangs from the
+  message it continues: write `parent` as `<sessionId>:<stable id>`. `candidates`
+  in the record lists the last messages of the most recent other sessions for
+  this. Usually that is the last message of the previous session, or the one that
+  asked for a prompt for the next chat. A first message that starts something new
+  is a root. The target must be a message of an earlier session of this project.
 - When unsure, use the previous message. A wrong "continue" only hides a branch;
   a wrong branch breaks the chain.
 - `links`: up to 5 earlier messages of this session that this one returns to or
@@ -100,6 +106,10 @@ earlier one, and a thread that starts something new is a root.
   between), `commitBetween` (this session committed between them). The wording
   decides. `lastMessages` lists the last recorded messages with their stable
   `id`, `label` and parent.
+- For a session's first message, `candidates` names the message it may continue
+  (with its session and stable `id`) and `continuesHint` is set when the message
+  says so ("devam", "kaldığımız yerden", "continue") or the transcript read a
+  handoff file. A hint only: an unrelated first message stays a root.
 
 ## Summarize each branch
 

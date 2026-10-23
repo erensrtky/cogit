@@ -76,12 +76,19 @@ export function buildMessages(
       continue;
     }
     const node = row.node;
+    // A `<sessionId>:<id>` parent points into another session's graph (8.6): it
+    // stays on the node for the map to resolve, and the local layout sees no
+    // parent (the message reads as a root of this session).
+    const parentRef = node.parent ?? null;
+    const cross = parentRef !== null && parentRef.includes(":");
     const parent =
-      node.parent === null
+      parentRef === null
         ? null
-        : node.parent !== undefined && known.has(node.parent) && earlier(node.parent, node.id)
-          ? node.parent
-          : previous;
+        : cross
+          ? parentRef
+          : known.has(parentRef) && earlier(parentRef, node.id)
+            ? parentRef
+            : previous;
     const links = (node.links ?? []).filter((link) => known.has(link) && earlier(link, node.id));
     push(
       {
@@ -220,6 +227,35 @@ export interface ViewModelInput {
 }
 
 /**
+ * Turns a `<sessionId>:<id>` parent into the `continues` mark the map draws and
+ * leaves the message a root of its own session, so one session's graph never
+ * leaks into another's (8.6). Runs once every session's labels are known.
+ * A target the map no longer holds still gets the mark, with the raw id.
+ */
+export function resolveContinues(sessions: ViewSession[]): void {
+  const byId = new Map(sessions.map((session) => [session.sessionId, session]));
+  for (const session of sessions) {
+    for (const message of session.messages) {
+      const parent = message.parent;
+      if (typeof parent !== "string") continue;
+      const at = parent.indexOf(":");
+      if (at === -1) continue;
+      const otherId = parent.slice(0, at);
+      const id = parent.slice(at + 1);
+      const other = byId.get(otherId);
+      const target = other?.messages.find((candidate) => candidate.id === id);
+      message.parent = null;
+      message.continues = {
+        sessionId: otherId,
+        sessionTitle: other?.title || otherId,
+        id,
+        ...(target?.label === undefined ? {} : { label: target.label }),
+      };
+    }
+  }
+}
+
+/**
  * Builds the page model: epochs in project order, sessions by `startedAt`, and
  * every session whose epoch is null or unknown in the `unassigned` group.
  */
@@ -229,6 +265,7 @@ export function buildViewModel(input: ViewModelInput): LineageViewModel {
   );
   const unassigned: ViewSession[] = [];
   const sessions = [...input.sessions].sort(byStartedAt);
+  const views: ViewSession[] = [];
 
   for (const session of sessions) {
     const view = toViewSession(
@@ -240,7 +277,9 @@ export function buildViewModel(input: ViewModelInput): LineageViewModel {
     );
     const bucket = session.epoch === null ? undefined : buckets.get(session.epoch);
     (bucket ?? unassigned).push(view);
+    views.push(view);
   }
+  resolveContinues(views);
 
   const epochs: ViewEpoch[] = input.project.epochs.map((epoch) => ({
     id: epoch.id,

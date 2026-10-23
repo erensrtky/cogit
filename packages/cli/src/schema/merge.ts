@@ -1,3 +1,4 @@
+import { parseMessageRef } from "./common.js";
 import {
   type LineageNode,
   MESSAGE_ID,
@@ -19,6 +20,12 @@ export interface MergeOptions {
   order?: ReadonlyMap<string, number>;
   /** Stable id → display label, for warnings the agent reads. */
   labels?: ReadonlyMap<string, string>;
+  /**
+   * Cross-session references (`<sessionId>:<id>`) that were checked against the
+   * project's records: the other session exists, holds that message, and started
+   * earlier (Story 8.6). Anything else is refused like an unknown parent.
+   */
+  crossTargets?: ReadonlySet<string>;
 }
 
 /**
@@ -67,13 +74,13 @@ export function mergeSession(
     const own = n.kind === "message" ? (recorded.get(n.id) ?? null) : null;
     const nextParent =
       parent !== undefined && own !== null
-        ? checkParent(n.id, parent, own, recorded, messageWarnings, label)
+        ? checkParent(n.id, parent, own, recorded, messageWarnings, label, opts.crossTargets)
         : parent === undefined
           ? (prev?.parent ?? null)
           : parent;
     const nextLinks =
       links !== undefined && own !== null
-        ? checkLinks(n.id, links, own, recorded, messageWarnings, label)
+        ? checkLinks(n.id, links, own, recorded, messageWarnings, label, opts.crossTargets)
         : links;
     const next: LineageNode = {
       ...prev,
@@ -140,15 +147,23 @@ function checkParent(
   numbers: Map<string, number>,
   warnings: string[],
   label: (id: string) => string,
+  crossTargets: ReadonlySet<string> | undefined,
 ): string | null {
   if (parent === null || isEarlierMessage(numbers, parent, own)) return parent;
+  if (isCrossTarget(parent, crossTargets)) return parent;
   const fallback = previousMessage(numbers, own);
+  const cross = parseMessageRef(parent).sessionId !== null;
   warnings.push(
     fallback === null
-      ? `message ${label(id)}: parent ${label(parent)} is not an earlier message of this session, moved to root`
-      : `message ${label(id)}: parent ${label(parent)} is not an earlier message of this session, using ${label(fallback)}`,
+      ? `message ${label(id)}: parent ${label(parent)} is not ${cross ? "a message of an earlier session in this project" : "an earlier message of this session"}, moved to root`
+      : `message ${label(id)}: parent ${label(parent)} is not ${cross ? "a message of an earlier session in this project" : "an earlier message of this session"}, using ${label(fallback)}`,
   );
   return fallback;
+}
+
+/** A `<sessionId>:<id>` reference that was checked against the other record. */
+function isCrossTarget(ref: string, crossTargets: ReadonlySet<string> | undefined): boolean {
+  return parseMessageRef(ref).sessionId !== null && (crossTargets?.has(ref) ?? false);
 }
 
 /** Links point at earlier messages too; a forward or unknown one is dropped. */
@@ -159,11 +174,13 @@ function checkLinks(
   numbers: Map<string, number>,
   warnings: string[],
   label: (id: string) => string,
+  crossTargets: ReadonlySet<string> | undefined,
 ): string[] {
   return links.filter((link) => {
-    if (isEarlierMessage(numbers, link, own)) return true;
+    if (isEarlierMessage(numbers, link, own) || isCrossTarget(link, crossTargets)) return true;
+    const cross = parseMessageRef(link).sessionId !== null;
     warnings.push(
-      `message ${label(id)}: link ${label(link)} is not an earlier message of this session, dropped`,
+      `message ${label(id)}: link ${label(link)} is not ${cross ? "a message of an earlier session in this project" : "an earlier message of this session"}, dropped`,
     );
     return false;
   });
@@ -191,12 +208,16 @@ function sameNode(a: LineageNode, b: LineageNode): boolean {
   return NODE_FIELDS.every((field) => JSON.stringify(a[field]) === JSON.stringify(b[field]));
 }
 
-/** Re-roots nodes whose parent is missing or that sit on a cycle. Mutates in place. */
+/**
+ * Re-roots nodes whose parent is missing or that sit on a cycle. Mutates in
+ * place. A `<sessionId>:<id>` parent (Story 8.6) belongs to another session's
+ * graph, so it is not looked up here and never re-rooted.
+ */
 export function repairTree(nodes: LineageNode[]): string[] {
   const warnings: string[] = [];
   const byId = new Map(nodes.map((n) => [n.id, n]));
   for (const n of nodes) {
-    if (n.parent !== null && !byId.has(n.parent)) {
+    if (n.parent !== null && parseMessageRef(n.parent).sessionId === null && !byId.has(n.parent)) {
       warnings.push(`node ${n.id}: parent ${n.parent} not found, moved to root`);
       n.parent = null;
     }

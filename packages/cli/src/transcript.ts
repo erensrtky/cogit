@@ -254,6 +254,22 @@ function hasCommit(line: Record<string, unknown>): boolean {
   );
 }
 
+/**
+ * Whether the transcript shows the agent reading a handoff file (Story 8.6): a
+ * cheap hint that this session continues earlier work. A tool-use line names the
+ * tool before its input, so `Read` and `file_path` share the line.
+ */
+export async function readsHandoff(file: string): Promise<boolean> {
+  const lines = createInterface({ input: createReadStream(file, "utf8"), crlfDelay: Infinity });
+  for await (const raw of lines) {
+    if (!raw.includes("handoff")) continue;
+    if (/"name":"(?:Read|Bash)"/.test(raw) && /"file_path":"[^"]*handoff[^"]*"/i.test(raw))
+      return true;
+    if (/"name":"Bash"[^}]*"command":"[^"]*handoff/i.test(raw)) return true;
+  }
+  return false;
+}
+
 /** Reads the user's messages from a transcript, in order. */
 export async function readUserMessages(file: string): Promise<UserMessage[]> {
   return (await readConversation(file)).map(({ id, at, text, resumed, commitBetween }) => ({

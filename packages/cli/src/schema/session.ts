@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { IsoDate, Slug } from "./common.js";
+import { IsoDate, MessageRef, Slug } from "./common.js";
 
 export const SESSION_SCHEMA = 1;
 
@@ -46,9 +46,10 @@ export const LineageNode = z.object({
   id: Slug,
   /**
    * For a message: the id of the earlier message it reacts to (`m3` for `m7`),
-   * or null for a new root. For other kinds: the node it belongs to.
+   * `<sessionId>:<id>` for a message of an earlier session (Story 8.6), or null
+   * for a new root. For other kinds: the node it belongs to.
    */
-  parent: Slug.nullable().default(null),
+  parent: MessageRef.nullable().default(null),
   kind: NodeKind,
   title: z.string().min(1).max(200),
   summary: z.string().max(2000).optional(),
@@ -65,7 +66,7 @@ export const LineageNode = z.object({
   /** Files this work touched, relative to the project. */
   files: z.array(z.string().min(1).max(300)).max(30).optional(),
   /** For a message: earlier messages it returns to or builds on besides its parent. */
-  links: z.array(Slug).max(5).optional(),
+  links: z.array(MessageRef).max(5).optional(),
   /** For the first message of a branch: the summary of that thread. */
   branch: BranchSummary.optional(),
   /** For a message: what the agent did about it, in short items. */
@@ -106,7 +107,7 @@ export const Session = z.object({
 
 /** In input, a missing parent keeps the stored one (null for a new node). */
 export const LineageNodeInput = LineageNode.omit({ addedAt: true, touchedAt: true }).extend({
-  parent: Slug.nullable().optional(),
+  parent: MessageRef.nullable().optional(),
 });
 
 /**

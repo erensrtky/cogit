@@ -1,4 +1,5 @@
 import { type MouseEvent, type ReactElement, useMemo } from "react";
+import type { ViewNode } from "../../cli/src/view/model.js";
 import { formatStamp } from "./format.js";
 import {
   branchPath,
@@ -45,6 +46,7 @@ function Row({
   branchSelected,
   onSelect,
   onUnfold,
+  onContinue,
 }: {
   row: GitRow;
   branchTitle: string;
@@ -52,6 +54,7 @@ function Row({
   branchSelected: boolean;
   onSelect: (row: GitMessageRow) => void;
   onUnfold: (segmentId: string) => void;
+  onContinue: (continues: NonNullable<ViewNode["continues"]>) => void;
 }) {
   const style = {
     top: row.y - row.height / 2,
@@ -100,6 +103,19 @@ function Row({
       ) : null}
       <span className="git-id">{message.label ?? message.id}</span>
       <span className="git-title">{message.title}</span>
+      {message.continues ? (
+        <span
+          className="git-continues"
+          title={`Open ${message.continues.sessionTitle} at ${message.continues.label ?? message.continues.id}`}
+          onClick={(event: MouseEvent) => {
+            event.stopPropagation();
+            onContinue(message.continues as NonNullable<ViewNode["continues"]>);
+          }}
+        >
+          ↑ continues {message.continues.sessionTitle} ·{" "}
+          {message.continues.label ?? message.continues.id}
+        </span>
+      ) : null}
       {returnMark(row)}
       {row.head ? <span className="left-off">left off here</span> : null}
       {message.unsummarized ? <span className="unsummarized">not summarized yet</span> : null}
@@ -113,6 +129,7 @@ export function GitGraph({
   activeSegmentId,
   onSelect,
   onUnfold,
+  onContinue,
 }: {
   git: GitLayout;
   /** Message id of the open drill-down, if it belongs to this session. */
@@ -121,6 +138,8 @@ export function GitGraph({
   activeSegmentId: string | null;
   onSelect: (row: GitMessageRow) => void;
   onUnfold: (segmentId: string) => void;
+  /** Opens the earlier session this message continues, at that message. */
+  onContinue: (continues: NonNullable<ViewNode["continues"]>) => void;
 }) {
   const branches = useMemo(
     () => new Map(git.segments.map((segment) => [segment.id, segment])),
@@ -208,6 +227,7 @@ export function GitGraph({
               branchSelected={activeSegmentId !== null && row.segmentId === activeSegmentId}
               onSelect={onSelect}
               onUnfold={onUnfold}
+              onContinue={onContinue}
             />
           );
         })}

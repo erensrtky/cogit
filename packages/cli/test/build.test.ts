@@ -105,6 +105,15 @@ describe("buildMessages", () => {
     expect(forward.map((m) => m.parent)).toEqual([null, null]);
   });
 
+  it("keeps a cross-session parent for the map to resolve", () => {
+    const t = (h: number) => `2026-10-23T${String(h).padStart(2, "0")}:00:00.000Z`;
+    const messages = buildMessages([
+      node("h1", "message", "One", null, { at: t(1) }),
+      node("h2", "message", "Continues the last chat", "first:h9", { at: t(2) }),
+    ]);
+    expect(messages.map((m) => m.parent)).toEqual([null, "first:h9"]);
+  });
+
   it("keeps only links to earlier messages and a branch summary where it belongs", () => {
     const t = (h: number) => `2026-10-23T${String(h).padStart(2, "0")}:00:00.000Z`;
     const branch = { title: "Thread", asked: "What?", outcome: "This.", open: "" };
@@ -222,6 +231,35 @@ describe("buildViewModel", () => {
       unsummarized: true,
       parent: "m2",
     });
+  });
+
+  it("turns a cross-session parent into a continues mark and a root", () => {
+    const model = buildViewModel({
+      project: { schema: 1, name: "p", epochs: [] },
+      sessions: [
+        session({
+          sessionId: "first",
+          title: "Earlier chat",
+          startedAt: "2026-10-21T09:00:00.000Z",
+          nodes: [node("h1", "message", "Ask for the prompt", null, { at: T0 })],
+        }),
+        session({
+          sessionId: "second",
+          title: "Next chat",
+          startedAt: "2026-10-21T10:00:00.000Z",
+          nodes: [node("h2", "message", "Continue", "first:h1", { at: T0 })],
+        }),
+      ],
+      path: "/tmp/p",
+      generatedAt: T0,
+    });
+    const second = model.unassigned.find((s) => s.sessionId === "second");
+    expect(second?.messages[0]).toMatchObject({
+      parent: null,
+      continues: { sessionId: "first", sessionTitle: "Earlier chat", id: "h1", label: "m1" },
+    });
+    // The other session is untouched: its own message stays a root.
+    expect(model.unassigned[0]?.messages[0]?.continues).toBeUndefined();
   });
 
   it("has an empty status card without sessions", () => {

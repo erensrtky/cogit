@@ -9,7 +9,7 @@ import { readStdin, sessionShow, sessionWrite } from "../src/commands/session.js
 import { messageHash } from "../src/messages.js";
 import { redactDeep, redactText } from "../src/redact.js";
 import { loadSession } from "../src/store/stores.js";
-import { envFor, type FakeIo, fakeIo, tempDir } from "./helpers.js";
+import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
 
 describe("redactText", () => {
   it.each([
@@ -129,6 +129,68 @@ describe("session write", () => {
       expect.stringMatching(/m3: parent m3 is not an earlier message of this session, using m2/),
       expect.stringMatching(/m3: link m9 is not an earlier message of this session, dropped/),
     ]);
+  });
+
+  it("hangs a message from an earlier session and refuses an unknown target", async () => {
+    await write({ sessionId: "first", nodes: [{ id: "m1", kind: "message", title: "Ask" }] });
+    const crossIo = fakeIo(envFor(dir));
+    await sessionWrite({ dir: root }, crossIo, async () =>
+      JSON.stringify({
+        sessionId: "second",
+        nodes: [
+          {
+            id: "m1",
+            kind: "message",
+            title: "Continue",
+            parent: "first:m1",
+            links: ["first:m1", "ghost:m1"],
+          },
+          // The session's own prefix is stored as the bare id.
+          { id: "m2", kind: "message", title: "Next", parent: "second:m1" },
+        ],
+      }),
+    );
+    const s = await loadSession(root, "second");
+    const nodes = s.found && s.ok ? s.data.nodes : [];
+    expect(nodes.map((n) => [n.id, n.parent])).toEqual([
+      ["m1", "first:m1"],
+      ["m2", "m1"],
+    ]);
+    expect(nodes[0]?.links).toEqual(["first:m1"]);
+    expect(crossIo.warnings).toEqual([
+      expect.stringMatching(
+        /link ghost:m1 is not a message of an earlier session in this project, dropped/,
+      ),
+    ]);
+  });
+
+  it("refuses a message of a session that started later", async () => {
+    await mkdir(join(root, ".codelineage", "sessions"), { recursive: true });
+    await writeFile(
+      join(root, ".codelineage", "sessions", "late.json"),
+      JSON.stringify({
+        schema: 1,
+        sessionId: "late",
+        agent: "claude-code",
+        title: "",
+        epoch: null,
+        startedAt: "2026-10-22T00:00:00.000Z",
+        updatedAt: "2026-10-22T00:00:00.000Z",
+        status: { goal: "", done: [], pending: [], next: "" },
+        nodes: [{ id: "m1", parent: null, kind: "message", title: "Later" }],
+      }),
+    );
+    await write({
+      sessionId: "second",
+      nodes: [{ id: "m1", kind: "message", title: "C", parent: "late:m1" }],
+    });
+    expect(io.warnings).toContainEqual(
+      expect.stringMatching(
+        /parent late:m1 is not a message of an earlier session in this project, moved to root/,
+      ),
+    );
+    const s = await loadSession(root, "second");
+    expect(s.found && s.ok && s.data.nodes[0]?.parent).toBeNull();
   });
 
   it("rejects invalid JSON and schema mismatches", async () => {
@@ -370,6 +432,95 @@ ${line("second", 2)}
       messageCount: 0,
       newMessages: [],
       transcriptWarning: expect.stringMatching(/format may have changed/),
+    });
+  });
+
+  it("offers the last messages of recent sessions when the first message may continue one", async () => {
+    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    await sessionWrite({ dir: root }, fakeIo(envFor(dir)), async () =>
+      JSON.stringify({
+        sessionId: "first",
+        title: "Epic 8 work",
+        nodes: [
+          { id: "m1", kind: "message", title: "One", at: "2026-10-22T09:00:00.000Z" },
+          { id: "m2", kind: "message", title: "Two", parent: "m1", at: "2026-10-22T09:10:00.000Z" },
+          {
+            id: "m3",
+            kind: "message",
+            title: "Three",
+            parent: "m2",
+            at: "2026-10-22T09:20:00.000Z",
+          },
+          {
+            id: "m4",
+            kind: "message",
+            title: "Four",
+            parent: "m3",
+            at: "2026-10-22T09:30:00.000Z",
+          },
+        ],
+      }),
+    );
+    const folder = join(dir, "claude", "projects", "-p");
+    await mkdir(folder, { recursive: true });
+    const at = "2026-10-22T10:00:00.000Z";
+    const text = "Kaldığımız yerden devam edelim";
+    await writeFile(
+      join(folder, "second.jsonl"),
+      JSON.stringify({ type: "user", timestamp: at, message: { role: "user", content: text } }),
+    );
+
+    await sessionShow(root, "second", io);
+    expect(shown().candidates).toEqual({
+      forMessage: { id: messageHash("second", { at, text }), label: "m1" },
+      continuesHint: true,
+      sessions: [
+        {
+          sessionId: "first",
+          title: "Epic 8 work",
+          updatedAt: T0,
+          // The last three messages, oldest first: enough to pick the parent.
+          messages: [
+            { id: "m2", title: "Two", at: "2026-10-22T09:10:00.000Z" },
+            { id: "m3", title: "Three", at: "2026-10-22T09:20:00.000Z" },
+            { id: "m4", title: "Four", at: "2026-10-22T09:30:00.000Z" },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("sets the continues hint when the transcript read a handoff file", async () => {
+    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    const folder = join(dir, "claude", "projects", "-p");
+    await mkdir(folder, { recursive: true });
+    const at = "2026-10-22T10:00:00.000Z";
+    const user = JSON.stringify({
+      type: "user",
+      timestamp: at,
+      message: { role: "user", content: "Start here" },
+    });
+    const read = JSON.stringify({
+      type: "assistant",
+      timestamp: at,
+      message: {
+        role: "assistant",
+        content: [
+          { type: "tool_use", name: "Read", input: { file_path: "/p/handoff-2026-10-24.md" } },
+          { type: "text", text: "Reading the handoff." },
+        ],
+      },
+    });
+    await writeFile(join(folder, "second.jsonl"), `${user}\n${read}\n`);
+
+    await sessionShow(root, "second", io);
+    expect(shown().candidates).toEqual({
+      forMessage: {
+        id: messageHash("second", { at, text: "Start here" }),
+        label: "m1",
+      },
+      continuesHint: true,
+      sessions: [],
     });
   });
 

@@ -11,7 +11,7 @@ import {
   upgradeSessionIds,
 } from "../messages.js";
 import { redactDeep } from "../redact.js";
-import { Slug } from "../schema/common.js";
+import { parseMessageRef, Slug } from "../schema/common.js";
 import type { SessionEvent } from "../schema/events.js";
 import { mergeSession } from "../schema/merge.js";
 import { MESSAGE_ID, type Session, SessionInput } from "../schema/session.js";
@@ -20,12 +20,13 @@ import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import {
   type Loaded,
+  listSessionIds,
   loadConfig,
   loadProject,
   loadSession,
   updateSession,
 } from "../store/stores.js";
-import { countUserLines, excerpt, findTranscript } from "../transcript.js";
+import { countUserLines, excerpt, findTranscript, readsHandoff } from "../transcript.js";
 import { buildProject } from "./build.js";
 
 export async function readStdin(stream: NodeJS.ReadableStream = process.stdin): Promise<string> {
@@ -84,6 +85,11 @@ export async function sessionWrite(
     );
   }
 
+  // Cross-session parents (8.6) are checked against the other records before the
+  // merge; `startedAt` is the current session's own start.
+  const current = await loadSession(root, input.sessionId);
+  const startedAt = current.found && current.ok ? current.data.startedAt : io.now();
+  const crossTargets = await crossSessionTargets(root, input.sessionId, startedAt, input, io.env);
   let warnings: string[] = [];
   const saved = await updateSession(root, input.sessionId, async (cur) => {
     // A record written before 8.5 still names messages `m1`, `m2`, …; the file is
@@ -94,6 +100,7 @@ export async function sessionWrite(
     const merged = mergeSession(base, input, io.now(), {
       ...(messages ? { order: messageOrder(messages) } : {}),
       labels: hashesToLabels(messages),
+      crossTargets,
     });
     warnings = merged.warnings;
     const changes = structureChanges(merged.session, base, io.now());
@@ -136,6 +143,11 @@ function nameMessages(
   const byLabel = labelsToHashes(messages);
   const byHash = new Map((messages ?? []).map((message) => [message.hash, message]));
   const rename = (id: string): string => byLabel.get(id) ?? id;
+  /** `thisSession:h…` names this session's own message; store it as a bare id. */
+  const ref = (id: string): string => {
+    const own = parseMessageRef(id);
+    return rename(own.sessionId === input.sessionId ? own.id : id);
+  };
   return {
     ...input,
     nodes: nodes.map((node) => {
@@ -151,13 +163,45 @@ function nameMessages(
         ...node,
         id: rename(node.id),
         ...(at === undefined ? {} : { at }),
-        ...(node.parent === undefined || node.parent === null
-          ? {}
-          : { parent: rename(node.parent) }),
-        ...(node.links === undefined ? {} : { links: node.links.map(rename) }),
+        ...(node.parent === undefined || node.parent === null ? {} : { parent: ref(node.parent) }),
+        ...(node.links === undefined ? {} : { links: node.links.map(ref) }),
       };
     }),
   };
+}
+
+/**
+ * The `<sessionId>:<id>` parents and links the input sends, kept only when the
+ * other session belongs to this project, started no later than this one and holds
+ * that message (Story 8.6). The rest reach the merge as unknown references and
+ * are warned about there; nothing is dropped silently.
+ */
+export async function crossSessionTargets(
+  root: string,
+  sessionId: string,
+  startedAt: string,
+  input: SessionInput,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<Set<string>> {
+  const refs = new Set<string>();
+  for (const node of input.nodes ?? []) {
+    for (const value of [node.parent, ...(node.links ?? [])]) {
+      if (typeof value === "string" && parseMessageRef(value).sessionId !== null) refs.add(value);
+    }
+  }
+  const valid = new Set<string>();
+  for (const value of refs) {
+    const { sessionId: otherId, id } = parseMessageRef(value);
+    if (otherId === null || otherId === sessionId) continue;
+    const loaded = await loadSession(root, otherId);
+    if (!loaded.found || !loaded.ok) continue;
+    const otherStart = Date.parse(loaded.data.startedAt);
+    if (Number.isNaN(otherStart) || otherStart > Date.parse(startedAt)) continue;
+    const messages = await readSessionMessages(root, otherId, env);
+    const record = await effectiveRecord(root, otherId, loaded, messages);
+    if (record?.nodes.some((node) => node.kind === "message" && node.id === id)) valid.add(value);
+  }
+  return valid;
 }
 
 /**
@@ -252,9 +296,16 @@ export async function sessionShow(dir: string, sessionId: string, io: Io): Promi
   } else if (loaded.found && !loaded.ok) {
     view.sessionError = loaded.error;
   }
+  const recorded = recordedIdsOf(effective);
   if (messages) {
     view.messageCount = messages.length;
-    view.newMessages = newMessages(messages, recordedIdsOf(effective), labels);
+    view.newMessages = newMessages(messages, recorded, labels);
+    // Only the session's first message can continue an earlier session (8.6).
+    const candidates =
+      messages.length > 0 && !isRecorded(recorded, messages[0] as SessionMessage)
+        ? await parentCandidates(root, sessionId, messages[0] as SessionMessage, io)
+        : null;
+    if (candidates) view.candidates = candidates;
   } else {
     view.newMessages = null;
   }
@@ -324,6 +375,78 @@ function newMessages(
       ...(message.resumed ? { resumed: true } : {}),
       ...(message.commitBetween ? { commitBetween: true } : {}),
     }));
+}
+
+/** How many earlier sessions and messages `session show` offers for a parent. */
+const CANDIDATE_SESSIONS = 3;
+const CANDIDATE_MESSAGES = 3;
+
+/** A first message that says, in the user's words, that it continues earlier work. */
+const CONTINUES = /\b(devam|kaldığımız yerden|continue)\b/i;
+
+/**
+ * The candidates for hanging a session's first message from an earlier session
+ * (8.6): the last messages of the most recently updated other sessions, with a
+ * hint when the transcript shows a handoff file being read or the message itself
+ * says it continues. Cheap hints from records and the transcript, no model call.
+ */
+async function parentCandidates(
+  root: string,
+  sessionId: string,
+  first: SessionMessage,
+  io: Io,
+): Promise<Record<string, unknown>> {
+  // Newest records first, and only the three that keep a message need their
+  // transcript read (old ids become stable ones there).
+  const recent: Session[] = [];
+  for (const id of await listSessionIds(projectPaths(root).sessions)) {
+    if (id === sessionId) continue;
+    const loaded = await loadSession(root, id);
+    if (loaded.found && loaded.ok) recent.push(loaded.data);
+  }
+  recent.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const others: {
+    sessionId: string;
+    title: string;
+    updatedAt: string;
+    messages: { id: string; title: string; at?: string }[];
+  }[] = [];
+  for (const candidate of recent) {
+    const nodes = [...candidate.nodes]
+      .filter((node) => node.kind === "message")
+      .sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+    if (nodes.length === 0) continue;
+    // Only a legacy record needs its transcript (for stable ids); the rest are
+    // already keyed by them, so most sessions cost one file read.
+    const messages = await readSessionMessages(root, candidate.sessionId, io.env);
+    const record = await effectiveRecord(
+      root,
+      candidate.sessionId,
+      { found: true, ok: true, data: candidate, warnings: [] },
+      messages,
+    );
+    const effective = (record?.nodes ?? nodes)
+      .filter((node) => node.kind === "message")
+      .sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+    others.push({
+      sessionId: candidate.sessionId,
+      title: candidate.title,
+      updatedAt: candidate.updatedAt,
+      messages: effective.slice(-CANDIDATE_MESSAGES).map(({ id: messageId, title, at }) => ({
+        id: messageId,
+        title,
+        ...(at === undefined ? {} : { at }),
+      })),
+    });
+    if (others.length === CANDIDATE_SESSIONS) break;
+  }
+  const file = await findTranscript(sessionId, io.env);
+  const handoff = file ? await readsHandoff(file).catch(() => false) : false;
+  return {
+    forMessage: { id: first.hash, label: first.label },
+    ...(handoff || CONTINUES.test(first.text) ? { continuesHint: true } : {}),
+    sessions: others,
+  };
 }
 
 /** The last few recorded messages (stable id, label, title, parent) for a parent pick. */

@@ -36,6 +36,12 @@ export interface ViewNode {
    * message when a record points elsewhere).
    */
   parent?: string | null;
+  /**
+   * Set when the message hangs from a message of an earlier session (Story
+   * 8.6): the map then draws a "continues …" mark and a root for the layout,
+   * because the other session has its own graph.
+   */
+  continues?: ViewContinue;
   /** Earlier messages this one returns to or builds on besides its parent. */
   links?: string[];
   /** On a branch's first message: what that thread asked and what came of it. */
@@ -58,6 +64,17 @@ export interface ViewNode {
   touchedAt?: string;
   /** A user message the record does not hold yet: the row is not summarized. */
   unsummarized?: true;
+}
+
+/** The earlier session's message a first message continues (Story 8.6). */
+export interface ViewContinue {
+  sessionId: string;
+  /** The other session's title, or its id when the record is gone. */
+  sessionTitle: string;
+  /** The id of the message in the other session. */
+  id: string;
+  /** Its `m67` label from that session, when the message is still there. */
+  label?: string;
 }
 
 export interface ViewPendingItem {
