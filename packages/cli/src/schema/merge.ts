@@ -59,11 +59,22 @@ export function mergeSession(
   return { session: merged, warnings };
 }
 
-const NODE_FIELDS = ["parent", "kind", "title", "summary", "why", "at"] as const;
+const NODE_FIELDS = [
+  "parent",
+  "kind",
+  "title",
+  "summary",
+  "why",
+  "at",
+  "decidedBy",
+  "alternatives",
+  "commits",
+  "files",
+] as const;
 
 /** A resent node that changed nothing keeps its touch time. */
 function sameNode(a: LineageNode, b: LineageNode): boolean {
-  return NODE_FIELDS.every((field) => a[field] === b[field]);
+  return NODE_FIELDS.every((field) => JSON.stringify(a[field]) === JSON.stringify(b[field]));
 }
 
 /** Re-roots nodes whose parent is missing or that sit on a cycle. Mutates in place. */

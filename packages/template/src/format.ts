@@ -23,3 +23,29 @@ export function kindLabel(kind: string): string {
 export function itemsInside(count: number): string {
   return `${count} item${count === 1 ? "" : "s"} inside`;
 }
+
+const DECIDED_BY = { user: "you decided", agent: "agent decided", agreed: "agreed" } as const;
+
+/** Who decided, and what more the drill-down holds; empty when there is nothing to say. */
+export function cardMeta(node: {
+  decidedBy?: keyof typeof DECIDED_BY | undefined;
+  commits?: string[] | undefined;
+  alternatives?: unknown[] | undefined;
+}): string {
+  const parts: string[] = [];
+  if (node.decidedBy) parts.push(DECIDED_BY[node.decidedBy]);
+  const commits = node.commits?.length ?? 0;
+  if (commits > 0) parts.push(`${commits} commit${commits === 1 ? "" : "s"}`);
+  const rejected = node.alternatives?.length ?? 0;
+  if (rejected > 0) parts.push(`${rejected} option${rejected === 1 ? "" : "s"} rejected`);
+  return parts.join(" · ");
+}
+
+/** A card's second line: for decisions the reason, otherwise the summary. */
+export function cardText(node: {
+  kind: string;
+  summary?: string | undefined;
+  why?: string | undefined;
+}) {
+  return node.kind === "decision" && node.why ? node.why : node.summary;
+}

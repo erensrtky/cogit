@@ -35,6 +35,12 @@ describe("cardHeight", () => {
     );
   });
 
+  it("adds room for the meta line", () => {
+    expect(cardHeight({ ...card, meta: "agreed · 1 commit" }, 240, fixed)).toBeGreaterThan(
+      cardHeight(card, 240, fixed),
+    );
+  });
+
   it("falls back to an estimate without a canvas", () => {
     expect(cardHeight(card, 240)).toBeGreaterThan(30);
   });

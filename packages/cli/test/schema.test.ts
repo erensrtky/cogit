@@ -97,6 +97,32 @@ describe("parseVersioned", () => {
 });
 
 describe("mergeSession", () => {
+  it("keeps decision detail and re-stamps only when it changes", () => {
+    const node = {
+      id: "d",
+      kind: "decision",
+      title: "D",
+      decidedBy: "agreed",
+      alternatives: [{ option: "drag to resize", why: "user wanted auto size" }],
+      commits: ["322259a"],
+      files: ["packages/template/src/cardHeight.ts"],
+    };
+    const first = mergeSession(undefined, input({ sessionId: "s1", nodes: [node] }), T0).session;
+    expect(first.nodes[0]).toMatchObject({ decidedBy: "agreed", commits: ["322259a"] });
+    expect(
+      mergeSession(first, input({ sessionId: "s1", nodes: [node] }), T1).session.nodes[0]
+        ?.touchedAt,
+    ).toBe(T0);
+    const more = { ...node, commits: ["322259a", "61d2873"] };
+    expect(
+      mergeSession(first, input({ sessionId: "s1", nodes: [more] }), T1).session.nodes[0]
+        ?.touchedAt,
+    ).toBe(T1);
+    expect(() =>
+      input({ sessionId: "s1", nodes: [{ ...node, commits: ["not-a-hash"] }] }),
+    ).toThrow();
+  });
+
   it("stamps nodes when they are added or changed, never from agent input", () => {
     const node = { id: "a", kind: "step", title: "A", touchedAt: "2000-01-01T00:00:00.000Z" };
     const first = mergeSession(undefined, input({ sessionId: "s1", nodes: [node] }), T0).session;

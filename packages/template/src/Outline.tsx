@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LineageViewModel, ViewNode, ViewSession } from "../../cli/src/view/model.js";
 import { kindLabel } from "./format.js";
-import { countNodes, epochId, nodeId, sessionId, UNASSIGNED_EPOCH_ID } from "./graph.js";
+import {
+  countNodes,
+  epochId,
+  nodeId,
+  sessionId,
+  toNodeDetail,
+  UNASSIGNED_EPOCH_ID,
+} from "./graph.js";
 import type { Selection } from "./SidePanel.js";
 
 /**
@@ -135,14 +142,7 @@ function NodeRows({
                     expand: [epoch, sessionKey],
                     selection: {
                       type: "node",
-                      node: {
-                        kind: node.kind,
-                        title: node.title,
-                        ...(node.summary === undefined ? {} : { summary: node.summary }),
-                        ...(node.why === undefined ? {} : { why: node.why }),
-                        ...(node.at === undefined ? {} : { at: node.at }),
-                        sessionId: rawSessionId,
-                      },
+                      node: toNodeDetail(node, rawSessionId),
                     },
                   })
                 }

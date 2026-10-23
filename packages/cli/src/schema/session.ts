@@ -6,6 +6,15 @@ export const SESSION_SCHEMA = 1;
 export const NodeKind = z.enum(["phase", "step", "decision", "question"]);
 export type NodeKind = z.infer<typeof NodeKind>;
 
+/** Who made a decision: the user, the agent alone, or the user approving the agent's proposal. */
+export const DecidedBy = z.enum(["user", "agent", "agreed"]);
+
+/** An option that was considered and not taken, with the reason. */
+export const Alternative = z.object({
+  option: z.string().min(1).max(200),
+  why: z.string().max(500).default(""),
+});
+
 export const LineageNode = z.object({
   id: Slug,
   parent: Slug.nullable().default(null),
@@ -14,6 +23,16 @@ export const LineageNode = z.object({
   summary: z.string().max(2000).optional(),
   why: z.string().max(2000).optional(),
   at: IsoDate.optional(),
+  decidedBy: DecidedBy.optional(),
+  /** Options considered and rejected, mostly for decisions. */
+  alternatives: z.array(Alternative).max(10).optional(),
+  /** Commits that carry this work out, as short or full hashes. */
+  commits: z
+    .array(z.string().regex(/^[0-9a-f]{7,40}$/, "a commit hash"))
+    .max(20)
+    .optional(),
+  /** Files this work touched, relative to the project. */
+  files: z.array(z.string().min(1).max(300)).max(30).optional(),
   /** When `session write` first added this node; set by the CLI, never by the agent. */
   addedAt: IsoDate.optional(),
   /** When `session write` last added or changed this node; set by the CLI, never by the agent. */

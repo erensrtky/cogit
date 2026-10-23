@@ -49,6 +49,20 @@ function session(over: Partial<Session> & { sessionId: string }): Session {
 }
 
 describe("buildNodeTree", () => {
+  it("carries decision detail into the view and drops empty lists", () => {
+    const [d] = buildNodeTree([
+      node("d", "decision", "D", null, {
+        decidedBy: "user",
+        alternatives: [{ option: "x", why: "y" }],
+        commits: ["abc1234"],
+        files: [],
+      }),
+    ]);
+    expect(d).toMatchObject({ decidedBy: "user", commits: ["abc1234"] });
+    expect(d?.alternatives).toHaveLength(1);
+    expect(d).not.toHaveProperty("files");
+  });
+
   it("orders siblings by when their thread began, keeping unstamped ones first and in order", () => {
     const t = (h: number) => `2026-10-23T${String(h).padStart(2, "0")}:00:00.000Z`;
     const tree = buildNodeTree([

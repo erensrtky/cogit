@@ -20,6 +20,10 @@ export interface ViewNode {
   summary?: string;
   why?: string;
   at?: string;
+  decidedBy?: "user" | "agent" | "agreed";
+  alternatives?: { option: string; why: string }[];
+  commits?: string[];
+  files?: string[];
   /** When the node was first added. */
   addedAt?: string;
   /** When the node was last added or changed; marks where the work left off. */

@@ -43,7 +43,20 @@ Build one JSON object:
     that was made, with the reason in `why`) or `question` (an open question).
   - `parent`: the id of the topic the node belongs to, or `null` for a
     top-level topic.
-  - `title`: up to about ten words. `summary` and `why`: one or two sentences.
+  - `title`: up to about ten words. `summary` and `why`: one or two sentences
+    each; enough that someone returning days later understands it without the
+    conversation.
+  - For a `decision`, also send when known:
+    - `decidedBy`: `"user"` (the user asked for it or picked it), `"agent"`
+      (you decided on your own) or `"agreed"` (you proposed it and the user
+      approved).
+    - `alternatives`: options that were considered and not taken, each as
+      `{ "option": "…", "why": "…" }` with the reason it was rejected, including
+      an approach that was tried and then reverted.
+  - For any node, when the work reached the code:
+    - `commits`: short hashes of the commits that carry it out.
+    - `files`: the main files it touched, relative to the project (a few, not
+      every file).
 
 ## Organize the nodes by topic, not by time
 

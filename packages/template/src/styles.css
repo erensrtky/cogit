@@ -471,6 +471,12 @@ body:has(.map-shell.is-expanded) {
   line-height: 14px;
 }
 
+.lineage-box p.card-meta {
+  font-size: 10px;
+  color: var(--accent);
+  opacity: 0.85;
+}
+
 .lineage-box p.lineage-count {
   color: var(--accent);
 }
@@ -579,6 +585,21 @@ body:has(.map-shell.is-expanded) {
 
 .drilldown-body p {
   overflow-wrap: anywhere;
+}
+
+.drilldown-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.drilldown-list li + li {
+  margin-top: 4px;
+}
+
+.drilldown-code {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .drilldown-meta {

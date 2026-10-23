@@ -6,7 +6,7 @@ import ELK, {
 } from "elkjs/lib/elk.bundled.js";
 import type { LineageViewModel, ViewNode, ViewSession } from "../../cli/src/view/model.js";
 import { cardHeight } from "./cardHeight.js";
-import { formatTime, itemsInside, kindLabel } from "./format.js";
+import { cardMeta, cardText, formatTime, itemsInside, kindLabel } from "./format.js";
 
 /**
  * Builds the nested React Flow graph (epoch → session → node) and lays it out
@@ -56,19 +56,34 @@ export type SessionData = {
   hasChildren: boolean;
 };
 
-export type LineageData = {
+/** Everything the drill-down panel shows about a node. */
+export type NodeDetail = {
   kind: ViewNode["kind"];
   title: string;
   summary?: string;
   why?: string;
   at?: string;
+  decidedBy?: ViewNode["decidedBy"];
+  alternatives?: ViewNode["alternatives"];
+  commits?: string[];
+  files?: string[];
+  addedAt?: string;
+  touchedAt?: string;
   /** Owning session, so the drill-down panel can show and resume it. */
   sessionId: string;
+};
+
+export function toNodeDetail(node: ViewNode, sessionId: string): NodeDetail {
+  const { id: _id, children: _children, ...detail } = node;
+  return { ...detail, sessionId };
+}
+
+export type LineageData = NodeDetail & {
   /** Nodes nested below this one, at any depth. */
   count: number;
   expanded: boolean;
   hasChildren: boolean;
-  /** The most recently added or changed node: where the work left off. */
+  /** One of the nodes the last write added or changed: where the work left off. */
   isLast: boolean;
 };
 
@@ -225,7 +240,8 @@ function nodeHeight(node: ViewNode, open: boolean): number {
       ? itemsInside(countNodes(node.children))
       : node.at
         ? formatTime(node.at)
-        : node.summary;
+        : cardText(node);
+  const meta = cardMeta(node);
   return Math.max(
     NODE_HEIGHT,
     cardHeight(
@@ -234,6 +250,7 @@ function nodeHeight(node: ViewNode, open: boolean): number {
         title: node.title,
         hasToggle: hasChildren,
         ...(body ? { body } : {}),
+        ...(meta ? { meta } : {}),
       },
       NODE_WIDTH,
     ),
@@ -499,12 +516,7 @@ function collectFlowNodes(
       connectable: false,
       selectable: false,
       data: {
-        kind: node.kind,
-        title: node.title,
-        ...(node.summary === undefined ? {} : { summary: node.summary }),
-        ...(node.why === undefined ? {} : { why: node.why }),
-        ...(node.at === undefined ? {} : { at: node.at }),
-        sessionId,
+        ...toNodeDetail(node, sessionId),
         count: countNodes(node.children),
         expanded: open,
         hasChildren: node.children.length > 0,

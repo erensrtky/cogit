@@ -10,6 +10,7 @@ const FONT_FAMILY = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-s
 const TITLE_FONT = `700 13px ${FONT_FAMILY}`;
 const BODY_FONT = `400 11px ${FONT_FAMILY}`;
 const KIND_FONT = `400 10px ${FONT_FAMILY}`;
+const META_FONT = `400 10px ${FONT_FAMILY}`;
 const TITLE_LINE = 17;
 const BODY_LINE = 15;
 /** Padding, borders and the gap above the body line. */
@@ -81,6 +82,8 @@ export interface CardText {
   /** The line under the title: a summary, a time or an "N items inside" count. */
   body?: string;
   hasToggle: boolean;
+  /** A small line at the bottom: who decided, commits, rejected options. */
+  meta?: string;
 }
 
 export function cardHeight(
@@ -94,5 +97,7 @@ export function cardHeight(
   const head = Math.max(HEAD_MIN, titleLines * TITLE_LINE);
   const bodyLines = card.body ? countLines(card.body, width - INSET, BODY_FONT, measure) : 0;
   const body = bodyLines > 0 ? BODY_GAP + bodyLines * BODY_LINE : 0;
-  return Math.ceil(CHROME + head + body + SLACK);
+  const metaLines = card.meta ? countLines(card.meta, width - INSET, META_FONT, measure) : 0;
+  const meta = metaLines > 0 ? BODY_GAP + metaLines * BODY_LINE : 0;
+  return Math.ceil(CHROME + head + body + meta + SLACK);
 }

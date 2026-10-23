@@ -23,7 +23,7 @@ import {
   useState,
 } from "react";
 import type { LineageViewModel } from "../../cli/src/view/model.js";
-import { formatDate, formatTime, itemsInside, kindLabel } from "./format.js";
+import { cardMeta, cardText, formatDate, formatTime, itemsInside, kindLabel } from "./format.js";
 import { useFullscreen } from "./fullscreen.js";
 import {
   defaultExpanded,
@@ -149,9 +149,10 @@ function LineageBox({ id, data }: NodeProps<LineageFlowNode>) {
         <p className="lineage-count">{itemsInside(data.count)}</p>
       ) : data.at ? (
         <time dateTime={data.at}>{formatTime(data.at)}</time>
-      ) : data.summary ? (
-        <p title={data.summary}>{data.summary}</p>
+      ) : cardText(data) ? (
+        <p>{cardText(data)}</p>
       ) : null}
+      {cardMeta(data) ? <p className="card-meta">{cardMeta(data)}</p> : null}
     </div>
   );
 }

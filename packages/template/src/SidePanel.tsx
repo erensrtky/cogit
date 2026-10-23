@@ -2,10 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { resumeCommand } from "../../cli/src/view/resume.js";
 import { formatTime, kindLabel } from "./format.js";
-import type { LineageData } from "./graph.js";
-
-/** What the drill-down shows of a node; the expand state stays in the graph. */
-export type NodeDetail = Omit<LineageData, "count" | "expanded" | "hasChildren" | "isLast">;
+import type { NodeDetail } from "./graph.js";
 
 /** What the drill-down shows: a graph node or a whole session. */
 export type Selection = { type: "node"; node: NodeDetail } | { type: "session"; sessionId: string };
@@ -130,6 +127,12 @@ function SessionSummary({ model, session }: { model: LineageViewModel; session: 
   );
 }
 
+const DECIDED_LABEL = {
+  user: "You",
+  agent: "The agent, on its own",
+  agreed: "You, approving the agent's proposal",
+} as const;
+
 function NodeDetails({ model, node }: { model: LineageViewModel; node: NodeDetail }) {
   const session = findSession(model, node.sessionId);
   return (
@@ -146,8 +149,46 @@ function NodeDetails({ model, node }: { model: LineageViewModel; node: NodeDetai
           <p>{node.why}</p>
         </section>
       ) : null}
+      {node.alternatives?.length ? (
+        <section>
+          <h3>Considered and rejected</h3>
+          <ul className="drilldown-list">
+            {node.alternatives.map((alt) => (
+              <li key={alt.option}>
+                <strong>{alt.option}</strong>
+                {alt.why ? <> — {alt.why}</> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {node.commits?.length || node.files?.length ? (
+        <section>
+          <h3>In the code</h3>
+          {node.commits?.length ? (
+            <p className="drilldown-code">
+              {node.commits.map((commit) => (
+                <code key={commit}>{commit}</code>
+              ))}
+            </p>
+          ) : null}
+          {node.files?.length ? (
+            <ul className="drilldown-list">
+              {node.files.map((file) => (
+                <li key={file}>
+                  <code>{file}</code>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
       <dl className="drilldown-meta">
-        <Field label="Recorded">{formatTime(node.at ?? null)}</Field>
+        {node.decidedBy ? <Field label="Decided by">{DECIDED_LABEL[node.decidedBy]}</Field> : null}
+        <Field label="Recorded">{formatTime(node.at ?? node.addedAt ?? null)}</Field>
+        {node.touchedAt && node.touchedAt !== node.addedAt ? (
+          <Field label="Last changed">{formatTime(node.touchedAt)}</Field>
+        ) : null}
         <Field label="Session">
           {session ? (
             <>
