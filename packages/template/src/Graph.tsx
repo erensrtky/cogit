@@ -24,6 +24,7 @@ import {
 } from "react";
 import type { LineageViewModel } from "../../cli/src/view/model.js";
 import { formatDate, formatTime } from "./format.js";
+import { useFullscreen } from "./fullscreen.js";
 import {
   defaultExpanded,
   type EpochFlowNode,
@@ -31,6 +32,9 @@ import {
   type LineageFlowNode,
   layoutGraph,
   type SessionFlowNode,
+  TREE_LEFT,
+  TREE_OUT,
+  TREE_TOP,
 } from "./graph.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
@@ -60,6 +64,35 @@ function GroupToggle({
     >
       {data.expanded ? "▾" : "▸"}
     </button>
+  );
+}
+
+/** Spine handles for the top-to-bottom outline inside a session (see placeSessionNodes). */
+function TreeHandles() {
+  return (
+    <>
+      <Handle
+        id={TREE_TOP}
+        type="target"
+        position={Position.Top}
+        className="flow-handle tree-handle"
+        isConnectable={false}
+      />
+      <Handle
+        id={TREE_LEFT}
+        type="target"
+        position={Position.Left}
+        className="flow-handle"
+        isConnectable={false}
+      />
+      <Handle
+        id={TREE_OUT}
+        type="source"
+        position={Position.Bottom}
+        className="flow-handle tree-handle"
+        isConnectable={false}
+      />
+    </>
   );
 }
 
@@ -112,7 +145,7 @@ function SessionNode({ id, data }: NodeProps<SessionFlowNode>) {
 function LineageBox({ data }: NodeProps<LineageFlowNode>) {
   return (
     <div className={`lineage-box kind-${data.kind}`}>
-      <AnchorHandles />
+      <TreeHandles />
       <div className="lineage-head">
         <span className={`kind kind-${data.kind}`}>{data.kind}</span>
         <strong title={data.title}>{data.title}</strong>
@@ -148,6 +181,7 @@ function Flow({ model }: { model: LineageViewModel }) {
   const [layout, setLayout] = useState<Awaited<ReturnType<typeof layoutGraph>> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showOutline, setShowOutline] = useState(false);
+  const { expanded: fullscreen, toggle: toggleFullscreen } = useFullscreen();
   const [focusedId, setFocusedId] = useState<string | null>(null);
   /** Wait for the layout that contains this node, then centre on it. */
   const pendingFocus = useRef<string | null>(null);
@@ -299,28 +333,38 @@ function Flow({ model }: { model: LineageViewModel }) {
 
   return (
     <GraphActions.Provider value={actions}>
-      <div className="map-toolbar">
-        <button
-          type="button"
-          className="outline-button"
-          aria-pressed={showOutline}
-          onClick={toggleOutline}
-        >
-          {showOutline ? "Hide outline" : "Show outline"}
-        </button>
-      </div>
-      <div className="graph-wrap">
-        {showOutline ? (
-          <Outline
-            model={model}
-            activeId={focusedId}
-            onSelect={selectFromOutline}
-            onClose={toggleOutline}
-          />
-        ) : null}
-        <div className="graph-canvas">
-          {content}
-          <DrillDown model={model} selection={selection} onClose={closePanel} />
+      <div className={fullscreen ? "map-shell is-expanded" : "map-shell"}>
+        <div className="map-toolbar">
+          <button
+            type="button"
+            className="outline-button"
+            aria-pressed={fullscreen}
+            onClick={toggleFullscreen}
+          >
+            {fullscreen ? "Exit full screen" : "Full screen"}
+          </button>
+          <button
+            type="button"
+            className="outline-button"
+            aria-pressed={showOutline}
+            onClick={toggleOutline}
+          >
+            {showOutline ? "Hide outline" : "Show outline"}
+          </button>
+        </div>
+        <div className="graph-wrap">
+          {showOutline ? (
+            <Outline
+              model={model}
+              activeId={focusedId}
+              onSelect={selectFromOutline}
+              onClose={toggleOutline}
+            />
+          ) : null}
+          <div className="graph-canvas">
+            {content}
+            <DrillDown model={model} selection={selection} onClose={closePanel} />
+          </div>
         </div>
       </div>
     </GraphActions.Provider>

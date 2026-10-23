@@ -52,20 +52,22 @@ export function App({ model }: { model: LineageViewModel }) {
 
   return (
     <main>
-      <header className="project">
-        <div>
-          <h1>{model.project.name}</h1>
-          <p className="muted">{model.project.path}</p>
-        </div>
-        <div className="meta">
-          <span>
-            {model.epochs.length} epochs · {sessionCount} sessions
-          </span>
-          <span className="muted">generated {formatTime(model.project.generatedAt)}</span>
-        </div>
-      </header>
+      <div className="page-head">
+        <header className="project">
+          <div>
+            <h1>{model.project.name}</h1>
+            <p className="muted">{model.project.path}</p>
+          </div>
+          <div className="meta">
+            <span>
+              {model.epochs.length} epochs · {sessionCount} sessions
+            </span>
+            <span className="muted">generated {formatTime(model.project.generatedAt)}</span>
+          </div>
+        </header>
 
-      <StatusPanel status={model.status} />
+        <StatusPanel status={model.status} />
+      </div>
 
       <Graph model={model} />
     </main>

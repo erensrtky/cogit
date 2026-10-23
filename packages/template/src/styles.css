@@ -26,9 +26,13 @@ body {
 }
 
 main {
+  padding: 32px 24px 64px;
+}
+
+/* Text stays readable at 1200px; the map below uses the full window width. */
+.page-head {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 24px 64px;
 }
 
 h1,
@@ -117,7 +121,31 @@ ul {
 .map-toolbar {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   margin-top: 24px;
+}
+
+body:has(.map-shell.is-expanded) {
+  overflow: hidden;
+}
+
+.map-shell.is-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  background: var(--bg);
+}
+
+.map-shell.is-expanded .map-toolbar {
+  margin-top: 0;
+}
+
+.map-shell.is-expanded .graph-wrap {
+  flex: 1;
+  height: auto;
 }
 
 .outline-button {
@@ -140,7 +168,7 @@ ul {
 .graph-wrap {
   position: relative;
   display: flex;
-  height: clamp(480px, 72vh, 900px);
+  height: max(480px, calc(100vh - 96px));
   margin-top: 8px;
   background: #12151b;
   border: 1px solid var(--line);
@@ -351,6 +379,11 @@ ul {
 }
 
 /* Edges attach here; handles stay invisible because layout decides the shape. */
+/* The outline spine runs down the left edge of each card, clear of indented items. */
+.react-flow__handle.tree-handle {
+  left: 16px;
+}
+
 .react-flow__handle.flow-handle {
   width: 4px;
   height: 4px;

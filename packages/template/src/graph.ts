@@ -23,6 +23,15 @@ const GROUP_HEADER = 44;
 
 const ROOT_PADDING = 48;
 
+/** Inside a session nodes read top to bottom: phases in order, their items indented below. */
+const INDENT = 32;
+const ROW_GAP = 16;
+
+/** Handle ids on lineage cards: the spine leaves at the bottom left, enters at the top left or the left side. */
+export const TREE_OUT = "tree-out";
+export const TREE_TOP = "tree-top";
+export const TREE_LEFT = "tree-left";
+
 export type EpochData = {
   title: string;
   count: number;
@@ -143,23 +152,59 @@ function chainEdges(ids: string[]): ElkExtendedEdge[] {
   return edges;
 }
 
-function collectNodeBoxes(
-  nodes: ViewNode[],
-  parent: string | null,
-  sessionGroup: string,
-  out: ElkNode[],
-  edges: ElkExtendedEdge[],
-  meta: Map<string, string | null>,
-): void {
-  for (const node of nodes) {
-    const id = nodeId(sessionGroup, node.id);
-    out.push({ id, width: NODE_WIDTH, height: NODE_HEIGHT });
-    meta.set(id, sessionGroup);
-    if (parent !== null) {
-      edges.push({ id: `edge:${parent}->${id}`, sources: [parent], targets: [id] });
+interface Placement {
+  boxes: Map<string, Sized>;
+  edges: FlowEdge[];
+  width: number;
+  height: number;
+}
+
+function treeEdge(source: string, target: string, targetHandle: string): FlowEdge {
+  return {
+    id: `edge:${source}->${target}`,
+    source,
+    target,
+    sourceHandle: TREE_OUT,
+    targetHandle,
+    type: "smoothstep",
+  };
+}
+
+/**
+ * Places a session's nodes as an indented, top-to-bottom outline: one row per node
+ * in recorded order. Phases are chained along the left spine and each item hangs
+ * off its parent's spine, so the map grows downwards, never sideways.
+ */
+export function placeSessionNodes(nodes: ViewNode[], sessionGroup: string): Placement {
+  const boxes = new Map<string, Sized>();
+  const edges: FlowEdge[] = [];
+  let row = 0;
+  let maxDepth = 0;
+  const visit = (list: ViewNode[], parent: string | null, depth: number): void => {
+    let previous: string | null = null;
+    for (const node of list) {
+      const id = nodeId(sessionGroup, node.id);
+      boxes.set(id, {
+        x: GROUP_PADDING + depth * INDENT,
+        y: GROUP_HEADER + 8 + row * (NODE_HEIGHT + ROW_GAP),
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+      });
+      row += 1;
+      maxDepth = Math.max(maxDepth, depth);
+      if (parent !== null) edges.push(treeEdge(parent, id, TREE_LEFT));
+      else if (previous !== null) edges.push(treeEdge(previous, id, TREE_TOP));
+      previous = id;
+      visit(node.children, id, depth + 1);
     }
-    collectNodeBoxes(node.children, id, sessionGroup, out, edges, meta);
-  }
+  };
+  visit(nodes, null, 0);
+  return {
+    boxes,
+    edges,
+    width: GROUP_PADDING * 2 + maxDepth * INDENT + NODE_WIDTH,
+    height: GROUP_HEADER + 8 + row * (NODE_HEIGHT + ROW_GAP) - ROW_GAP + GROUP_PADDING,
+  };
 }
 
 function buildSession(
@@ -167,28 +212,32 @@ function buildSession(
   expanded: ReadonlySet<string>,
   parentId: string,
   meta: Map<string, string | null>,
+  placements: Map<string, Placement>,
 ): ElkNode {
   const id = sessionId(session.sessionId);
   meta.set(id, parentId);
   const showChildren = expanded.has(id) && session.nodes.length > 0;
   if (!showChildren) return { id, width: GROUP_WIDTH, height: GROUP_HEIGHT };
 
-  const children: ElkNode[] = [];
-  const edges: ElkExtendedEdge[] = [];
-  collectNodeBoxes(session.nodes, null, id, children, edges, meta);
-  return { id, children, edges, layoutOptions: groupOptions() };
+  // ELK sizes the session box; its contents are placed by hand.
+  const placement = placeSessionNodes(session.nodes, id);
+  placements.set(id, placement);
+  return { id, width: Math.max(GROUP_WIDTH, placement.width), height: placement.height };
 }
 
 function buildEpoch(
   group: Group,
   expanded: ReadonlySet<string>,
   meta: Map<string, string | null>,
+  placements: Map<string, Placement>,
 ): ElkNode {
   meta.set(group.id, null);
   const showChildren = expanded.has(group.id) && group.sessions.length > 0;
   if (!showChildren) return { id: group.id, width: GROUP_WIDTH, height: GROUP_HEIGHT };
 
-  const children = group.sessions.map((session) => buildSession(session, expanded, group.id, meta));
+  const children = group.sessions.map((session) =>
+    buildSession(session, expanded, group.id, meta, placements),
+  );
   const edges = chainEdges(children.map((child) => child.id));
   return { id: group.id, children, edges, layoutOptions: groupOptions() };
 }
@@ -235,7 +284,8 @@ export async function layoutGraph(
   }
 
   const parents = new Map<string, string | null>();
-  const rootChildren = groups.map((group) => buildEpoch(group, expanded, parents));
+  const placements = new Map<string, Placement>();
+  const rootChildren = groups.map((group) => buildEpoch(group, expanded, parents, placements));
   const rootEdges = chainEdges(rootChildren.map((child) => child.id));
 
   const graph: ElkNode = {
@@ -254,6 +304,9 @@ export async function layoutGraph(
 
   const sizes = new Map<string, Sized>();
   collectSizes(result, sizes);
+  for (const placement of placements.values()) {
+    for (const [id, box] of placement.boxes) sizes.set(id, box);
+  }
   const seenEdges = new Set<string>();
   const edges: FlowEdge[] = [];
   const addEdge = (edge: ElkExtendedEdge): void => {
@@ -263,10 +316,8 @@ export async function layoutGraph(
   for (const edge of rootEdges) addEdge(edge);
   for (const child of rootChildren) {
     for (const edge of child.edges ?? []) addEdge(edge);
-    for (const session of child.children ?? []) {
-      for (const edge of session.edges ?? []) addEdge(edge);
-    }
   }
+  for (const placement of placements.values()) edges.push(...placement.edges);
 
   const nodes: GraphNode[] = [];
   const box = (id: string): Sized =>

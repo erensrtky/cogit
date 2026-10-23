@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `codelineage session write --consume`: deletes the `--file` input once the record is saved and keeps it when the write fails. `gitPolicy=commit` now also ignores `.codelineage/inbox/`.
 
 ### Changed
+- Map: inside a session the nodes now read top to bottom, as an indented outline (phases in order along a left spine, their steps, decisions and questions indented below), so the map grows downwards instead of sideways.
+- Map: the graph now spans the full window width and nearly its full height (the header and status card stay at a readable width), and a "Full screen" button expands it over the whole window, entering browser full screen when allowed; Esc or the button closes it.
 - `commander`, `zod` and `@inquirer/prompts` moved to `devDependencies`: they are bundled into `dist/cli.js`, so installing the package pulls in no runtime dependencies.
 
 ### Fixed
