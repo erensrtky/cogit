@@ -26,6 +26,7 @@ import type { LineageViewModel } from "../../cli/src/view/model.js";
 import { cardMeta, cardText, formatDate, formatTime, itemsInside, kindLabel } from "./format.js";
 import { useFullscreen } from "./fullscreen.js";
 import {
+  absolutePosition,
   defaultExpanded,
   type EpochFlowNode,
   type GraphNode,
@@ -147,7 +148,7 @@ function LineageBox({ id, data }: NodeProps<LineageFlowNode>) {
       {data.isLast ? <span className="left-off">left off here</span> : null}
       {data.hasChildren && !data.expanded ? (
         <p className="lineage-count">{itemsInside(data.count)}</p>
-      ) : data.at ? (
+      ) : data.at && data.kind !== "message" ? (
         <time dateTime={data.at}>{formatTime(data.at)}</time>
       ) : cardText(data) ? (
         <p>{cardText(data)}</p>
@@ -170,6 +171,7 @@ function minimapColor(node: GraphNode): string {
   const kind = node.data.kind;
   if (kind === "decision") return "#4b3a72";
   if (kind === "question") return "#5a4526";
+  if (kind === "message") return "#1f3a4a";
   return "#1f2a3d";
 }
 
@@ -191,7 +193,11 @@ function Flow({ model }: { model: LineageViewModel }) {
   );
   /** The first run belongs to mount; only React to the user toggling the outline. */
   const firstOutlineToggle = useRef(true);
-  const { fitView } = useReactFlow();
+  const { fitView, getViewport, setViewport } = useReactFlow();
+  /** The box the user just opened or closed, and where it was, so it stays put on screen. */
+  const anchor = useRef<{ id: string; at: { x: number; y: number } } | null>(null);
+  /** Only the first layout frames the whole map; later ones keep the user's zoom. */
+  const framed = useRef(false);
 
   const scheduleFocus = useCallback(
     (id: string) => {
@@ -218,6 +224,18 @@ function Flow({ model }: { model: LineageViewModel }) {
       .then((result) => {
         if (cancelled) return;
         setLayout(result);
+        const held = anchor.current;
+        anchor.current = null;
+        const now = held ? absolutePosition(result.nodes, held.id) : null;
+        if (held && now) {
+          // Shift the view by as much as the box moved, so content opens below it.
+          const { x, y, zoom } = getViewport();
+          void setViewport({
+            x: x - (now.x - held.at.x) * zoom,
+            y: y - (now.y - held.at.y) * zoom,
+            zoom,
+          });
+        }
         // Survives into the single-file build so a 500-node run can be measured.
         document.documentElement.dataset.layoutMs = result.layoutMs.toFixed(1);
         const focus = pendingFocus.current;
@@ -233,10 +251,11 @@ function Flow({ model }: { model: LineageViewModel }) {
     return () => {
       cancelled = true;
     };
-  }, [model, expanded, scheduleFocus]);
+  }, [model, expanded, scheduleFocus, getViewport, setViewport]);
 
   useEffect(() => {
-    if (!layout) return;
+    if (!layout || framed.current) return;
+    framed.current = true;
     if (performance.now() - lastFocusRequest.current < 1000) return;
     const timer = setTimeout(() => {
       void fitView({ padding: 0.15, duration: 200 });
@@ -256,14 +275,19 @@ function Flow({ model }: { model: LineageViewModel }) {
     return () => clearTimeout(timer);
   }, [showOutline, fitView]);
 
-  const toggle = useCallback((id: string) => {
-    setExpanded((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const toggle = useCallback(
+    (id: string) => {
+      const at = layout ? absolutePosition(layout.nodes, id) : null;
+      anchor.current = at ? { id, at } : null;
+      setExpanded((previous) => {
+        const next = new Set(previous);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    },
+    [layout],
+  );
   const actions = useMemo(() => ({ toggle }), [toggle]);
   const closePanel = useCallback(() => setSelection(null), []);
   const toggleOutline = useCallback(() => setShowOutline((value) => !value), []);
@@ -320,6 +344,7 @@ function Flow({ model }: { model: LineageViewModel }) {
         defaultEdgeOptions={{ style: { stroke: "#4f5b74", strokeWidth: 1.5 } }}
         onNodeClick={onNodeClick}
         fitView
+        panOnScroll
         minZoom={0.05}
         maxZoom={2}
         nodesDraggable={false}
@@ -366,7 +391,12 @@ function Flow({ model }: { model: LineageViewModel }) {
           ) : null}
           <div className="graph-canvas">
             {content}
-            <DrillDown model={model} selection={selection} onClose={closePanel} />
+            <DrillDown
+              model={model}
+              selection={selection}
+              onClose={closePanel}
+              onNavigate={selectFromOutline}
+            />
           </div>
         </div>
       </div>

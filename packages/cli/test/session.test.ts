@@ -164,6 +164,7 @@ describe("session show", () => {
       language: "tr",
       epochs: [{ id: "e2e", title: "E2E" }],
       session: null,
+      newMessages: null,
       inbox: join(root, ".codelineage", "inbox", "s1.json"),
     });
 
@@ -184,6 +185,71 @@ describe("session show", () => {
       status: { goal: "g", done: [], pending: [], next: "" },
       nodes: [{ id: "a", parent: null, kind: "phase", title: "A" }],
     });
+  });
+
+  it("lists the user's messages that have no node yet, and stamps their time on write", async () => {
+    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    const folder = join(dir, "claude", "projects", "-p");
+    await mkdir(folder, { recursive: true });
+    const line = (text: string, m: number) =>
+      JSON.stringify({
+        type: "user",
+        timestamp: `2026-10-23T10:0${m}:00.000Z`,
+        message: { role: "user", content: text },
+      });
+    await writeFile(
+      join(folder, "s1.jsonl"),
+      `${line("first", 1)}
+${line("second", 2)}
+`,
+    );
+
+    await sessionShow(root, "s1", io);
+    expect(shown()).toMatchObject({
+      messageCount: 2,
+      newMessages: [
+        { id: "m1", at: "2026-10-23T10:01:00.000Z", text: "first" },
+        { id: "m2", at: "2026-10-23T10:02:00.000Z", text: "second" },
+      ],
+    });
+
+    const writeIo = fakeIo(envFor(dir));
+    await sessionWrite({ dir: root }, writeIo, async () =>
+      JSON.stringify({
+        sessionId: "s1",
+        nodes: [
+          { id: "m1", kind: "message", title: "First", at: "2020-01-01T00:00:00.000Z" },
+          { id: "m9", kind: "message", title: "Made up" },
+        ],
+      }),
+    );
+    expect(writeIo.warnings).toEqual([expect.stringMatching(/m9: no such message/)]);
+    const saved = await loadSession(root, "s1");
+    expect(saved.found && saved.ok && saved.data.nodes[0]?.at).toBe("2026-10-23T10:01:00.000Z");
+
+    io.lines.length = 0;
+    await sessionShow(root, "s1", io);
+    expect(shown().newMessages).toEqual([
+      { id: "m2", at: "2026-10-23T10:02:00.000Z", text: "second" },
+    ]);
+  });
+
+  it("treats an unreadable transcript as none and warns about a message id it cannot use", async () => {
+    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    // A directory where the transcript should be: found, but reading it fails.
+    await mkdir(join(dir, "claude", "projects", "-p", "s1.jsonl"), { recursive: true });
+    await sessionShow(root, "s1", io);
+    expect(shown().newMessages).toBeNull();
+
+    const writeIo = fakeIo(envFor(dir));
+    await sessionWrite({ dir: root }, writeIo, async () =>
+      JSON.stringify({ sessionId: "s1", nodes: [{ id: "first", kind: "message", title: "F" }] }),
+    );
+    expect(writeIo.warnings).toEqual([
+      expect.stringMatching(/first: expected an id like m1/),
+      // The map build that follows the write cannot read it either.
+      expect.stringMatching(/could not read the conversation of s1/),
+    ]);
   });
 
   it("flags an unreadable record instead of hiding it", async () => {

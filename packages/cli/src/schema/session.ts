@@ -3,7 +3,12 @@ import { IsoDate, Slug } from "./common.js";
 
 export const SESSION_SCHEMA = 1;
 
-export const NodeKind = z.enum(["phase", "step", "decision", "question"]);
+/**
+ * `message` is one user message, numbered from the transcript (`m1`, `m2`, …);
+ * `phase` is a topic. `step`, `decision` and `question` are the agent's own
+ * items from records written before messages became the nodes.
+ */
+export const NodeKind = z.enum(["phase", "message", "step", "decision", "question"]);
 export type NodeKind = z.infer<typeof NodeKind>;
 
 /** Who made a decision: the user, the agent alone, or the user approving the agent's proposal. */
@@ -14,6 +19,16 @@ export const Alternative = z.object({
   option: z.string().min(1).max(200),
   why: z.string().max(500).default(""),
 });
+
+/** A choice the agent made on its own while working on a message. */
+export const AgentDecision = z.object({
+  title: z.string().min(1).max(200),
+  why: z.string().max(500).default(""),
+  alternatives: z.array(Alternative).max(10).optional(),
+});
+
+/** Message node ids follow the order of the user's messages in the transcript. */
+export const MESSAGE_ID = /^m[1-9][0-9]*$/;
 
 export const LineageNode = z.object({
   id: Slug,
@@ -33,6 +48,10 @@ export const LineageNode = z.object({
     .optional(),
   /** Files this work touched, relative to the project. */
   files: z.array(z.string().min(1).max(300)).max(30).optional(),
+  /** For a message: what the agent did about it, in short items. */
+  work: z.array(z.string().min(1).max(300)).max(20).optional(),
+  /** For a message: choices the agent made on its own along the way. */
+  agentDecisions: z.array(AgentDecision).max(10).optional(),
   /** When `session write` first added this node; set by the CLI, never by the agent. */
   addedAt: IsoDate.optional(),
   /** When `session write` last added or changed this node; set by the CLI, never by the agent. */
@@ -84,6 +103,7 @@ export const SessionInput = z.object({
 });
 
 export type LineageNode = z.infer<typeof LineageNode>;
+export type AgentDecision = z.infer<typeof AgentDecision>;
 export type Status = z.infer<typeof Status>;
 export type Session = z.infer<typeof Session>;
 export type SessionInput = z.infer<typeof SessionInput>;

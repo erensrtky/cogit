@@ -4,10 +4,11 @@ import { CliError, type Io } from "../io.js";
 import { redactDeep } from "../redact.js";
 import { Slug } from "../schema/common.js";
 import { mergeSession } from "../schema/merge.js";
-import { SessionInput } from "../schema/session.js";
+import { MESSAGE_ID, SessionInput } from "../schema/session.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadConfig, loadProject, loadSession, updateSession } from "../store/stores.js";
+import { excerpt, findTranscript, readUserMessages, type UserMessage } from "../transcript.js";
 import { buildProject } from "./build.js";
 
 export async function readStdin(stream: NodeJS.ReadableStream = process.stdin): Promise<string> {
@@ -54,7 +55,8 @@ export async function sessionWrite(
     throw new CliError(`input does not match the session schema: ${issues.join("; ")}`);
   }
 
-  const { value: input, count } = redactDeep(parsed.data);
+  const { value: redacted, count } = redactDeep(parsed.data);
+  const input = await stampMessageTimes(redacted, io);
   if (count > 0) io.warn(`redacted ${count} secret-looking value(s)`);
   if (input.epoch && !project.data.epochs.some((e) => e.id === input.epoch)) {
     io.warn(
@@ -81,10 +83,54 @@ export async function sessionWrite(
   }
 }
 
+/** The session's user messages, or null when its transcript cannot be read. */
+async function userMessages(
+  sessionId: string,
+  env: NodeJS.ProcessEnv,
+): Promise<UserMessage[] | null> {
+  const file = await findTranscript(sessionId, env);
+  if (!file) return null;
+  try {
+    return await readUserMessages(file);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Message nodes take their time from the transcript, so their order on the map
+ * is the order the user wrote them, whatever the agent sent. Without a
+ * transcript the agent's `at` stays.
+ */
+async function stampMessageTimes(input: SessionInput, io: Io): Promise<SessionInput> {
+  const ids = (input.nodes ?? []).filter((n) => n.kind === "message").map((n) => n.id);
+  if (ids.length === 0) return input;
+  for (const id of ids) {
+    if (!MESSAGE_ID.test(id))
+      io.warn(`message node ${id}: expected an id like m1 from \`session show\``);
+  }
+  const messages = await userMessages(input.sessionId, io.env);
+  if (!messages) return input;
+  const times = new Map(messages.map((m) => [m.id, m.at]));
+  for (const id of ids) {
+    if (MESSAGE_ID.test(id) && !times.has(id))
+      io.warn(`message node ${id}: no such message in the transcript`);
+  }
+  return {
+    ...input,
+    nodes: input.nodes?.map((n) => {
+      const at = n.kind === "message" ? times.get(n.id) : undefined;
+      return at ? { ...n, at } : n;
+    }),
+  };
+}
+
 /**
  * What the skill injects before the agent updates its record: the project's
- * epochs, the summary language and a compact view of this session (node ids,
- * parents, kinds and titles, without summaries, which merging keeps anyway).
+ * epochs, the summary language, a compact view of this session (node ids,
+ * parents, kinds and titles, without summaries, which merging keeps anyway) and
+ * the user's messages from the transcript that have no node yet, so the agent
+ * cannot skip or reorder one.
  * Always exits 0 for an uninitialized project or an unreadable record, because a
  * failing injected command aborts the whole skill; the JSON says what is wrong.
  *
@@ -129,6 +175,16 @@ export async function sessionShow(dir: string, sessionId: string, io: Io): Promi
     };
   } else if (loaded.found) {
     view.sessionError = loaded.error;
+  }
+  const messages = await userMessages(sessionId, io.env);
+  if (messages) {
+    const recorded = new Set(loaded.found && loaded.ok ? loaded.data.nodes.map((n) => n.id) : []);
+    view.messageCount = messages.length;
+    view.newMessages = messages
+      .filter((m) => !recorded.has(m.id))
+      .map(({ id, at, text }) => ({ id, at, text: excerpt(text) }));
+  } else {
+    view.newMessages = null;
   }
   view.inbox = projectPaths(given).inbox(sessionId);
   io.out(JSON.stringify(view, null, 2));

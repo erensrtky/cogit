@@ -79,6 +79,27 @@ describe("buildNodeTree", () => {
     expect(tree[2]?.addedAt).toBe(t(9));
   });
 
+  it("orders messages by when the user sent them and carries the agent's work", () => {
+    const t = (h: number) => `2026-10-23T${String(h).padStart(2, "0")}:00:00.000Z`;
+    const [topic] = buildNodeTree([
+      node("topic", "phase", "Topic", null, { addedAt: t(1) }),
+      // Written in one go, so the add time cannot tell their order.
+      node("m2", "message", "Second", "topic", { at: t(3), addedAt: t(5) }),
+      node("m1", "message", "First", "topic", {
+        at: t(2),
+        addedAt: t(5),
+        work: ["did a thing"],
+        agentDecisions: [{ title: "Chose x", why: "simpler" }],
+      }),
+    ]);
+    expect(topic?.children.map((n) => n.id)).toEqual(["m1", "m2"]);
+    expect(topic?.children[0]).toMatchObject({
+      work: ["did a thing"],
+      agentDecisions: [{ title: "Chose x", why: "simpler" }],
+    });
+    expect(topic?.children[1]).not.toHaveProperty("work");
+  });
+
   it("nests children in order and keeps optional fields only when present", () => {
     const tree = buildNodeTree([
       node("a", "phase", "A", null, { summary: "phase one", at: T0 }),
@@ -416,6 +437,52 @@ describe("codelineage build", () => {
 
     const html = await readFile(paths().html, "utf8");
     expect(embedded(html)).toEqual(model);
+  });
+
+  it("puts the conversation of message sessions into the map, never into the record", async () => {
+    const folder = join(dir, "claude", "projects", "-proj");
+    await mkdir(folder, { recursive: true });
+    const lines = [
+      {
+        type: "user",
+        timestamp: T0,
+        message: { content: "Fix the card <system-reminder>x</system-reminder>" },
+      },
+      {
+        type: "assistant",
+        message: {
+          content: [
+            { type: "text", text: "Done, key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123" },
+            { type: "tool_use", name: "Edit", input: { file_path: join(root, "src/a.ts") } },
+          ],
+        },
+      },
+    ];
+    const transcript = lines.map((line) => JSON.stringify(line)).join("\n");
+    await writeFile(join(folder, "s1.jsonl"), transcript);
+    await writeFile(join(folder, "s2.jsonl"), transcript);
+    await saveSession(
+      "s1",
+      session({ sessionId: "s1", epoch: "e1", nodes: [node("m1", "message", "Fix it")] }),
+    );
+    await saveSession(
+      "s2",
+      session({ sessionId: "s2", epoch: "e1", nodes: [node("a", "step", "Old record")] }),
+    );
+
+    const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    const [s1, s2] = model.epochs[0]?.sessions ?? [];
+    expect(s1?.chat).toEqual([
+      {
+        id: "m1",
+        at: T0,
+        text: "Fix the card",
+        replies: ["Done, key [REDACTED]"],
+        tools: { commands: 0, files: ["src/a.ts"], other: 0 },
+      },
+    ]);
+    expect(s2).not.toHaveProperty("chat");
+    expect(await readFile(paths().session("s1"), "utf8")).not.toContain("Fix the card");
   });
 
   it("builds without printing when quiet and survives a missing sessions directory", async () => {

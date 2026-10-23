@@ -70,6 +70,8 @@ const NODE_FIELDS = [
   "alternatives",
   "commits",
   "files",
+  "work",
+  "agentDecisions",
 ] as const;
 
 /** A resent node that changed nothing keeps its touch time. */

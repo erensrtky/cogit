@@ -1,6 +1,6 @@
 ---
 name: lineage
-description: Record or update this session's lineage for codelineage, covering the goal, the decisions and their reasons, the steps, open questions and what comes next. Use it when the user asks to record the session or its lineage, or when a codelineage hook asks for an update.
+description: Record or update this session's lineage for codelineage, one node per user message with what came of it, grouped by topic, plus the goal, open items and what comes next. Use it when the user asks to record the session or its lineage, or when a codelineage hook asks for an update.
 allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" *) Edit(/${CLAUDE_PROJECT_DIR}/.codelineage/inbox/**)
 ---
 
@@ -16,8 +16,8 @@ This is the current record for this session (the output of `codelineage session 
   "codelineage is not set up in this project yet; run `npx codelineage init` here first."
 - If `sessionError` is set, tell the user the session record is unreadable and
   quote the error. Then stop. Never write over it.
-- If nothing meaningful happened since the record was last updated, reply
-  "Lineage is up to date." and stop.
+- If `newMessages` is empty and nothing else changed since the record was last
+  updated, reply "Lineage is up to date." and stop.
 
 ## Then send only what is new or changed
 
@@ -36,43 +36,60 @@ Build one JSON object:
   - `pending`: `{ "text": "…", "needsUser": true }` for anything waiting on the
     user, and `needsUser: false` for work that is simply not done yet.
   - `next`: the next concrete step.
-- `nodes`: only new nodes, or existing ones whose title, summary, reason or
-  parent changed. Nodes you leave out are kept, and so are fields you leave out.
-  - `id`: a short, stable slug. Reuse an existing id to change that node.
-  - `kind`: `phase` (a topic), `step` (a concrete action), `decision` (a choice
-    that was made, with the reason in `why`) or `question` (an open question).
-  - `parent`: the id of the topic the node belongs to, or `null` for a
-    top-level topic.
-  - `title`: up to about ten words. `summary` and `why`: one or two sentences
-    each; enough that someone returning days later understands it without the
-    conversation.
-  - For a `decision`, also send when known:
-    - `decidedBy`: `"user"` (the user asked for it or picked it), `"agent"`
-      (you decided on your own) or `"agreed"` (you proposed it and the user
-      approved).
-    - `alternatives`: options that were considered and not taken, each as
-      `{ "option": "…", "why": "…" }` with the reason it was rejected, including
-      an approach that was tried and then reverted.
-  - For any node, when the work reached the code:
-    - `commits`: short hashes of the commits that carry it out.
-    - `files`: the main files it touched, relative to the project (a few, not
-      every file).
+- `nodes`: only new nodes, or existing ones whose fields changed. Nodes you
+  leave out are kept, and so are fields you leave out.
 
-## Organize the nodes by topic, not by time
+## The map is the user's messages
 
-The map opens like layers of an onion: first the session's top-level topics,
-then a click reveals what is inside each one. Order within a layer is the order
-in which things were added, so time is kept inside every topic.
+Each message the user wrote is one node on the map. `newMessages` in the record
+lists the user's messages that have no node yet, in order, with their id (`m1`,
+`m2`, …), time and the start of their text. Send one `message` node for every
+one of them; skip none, even a short "ok" or "go on".
 
-- A topic (`phase`) names what the work is about, such as "Permissions" or "Map
-  layout", never when it happened ("First part", "Open decisions").
-- Put each new step, decision or question under the topic it belongs to. Open
-  a sub-topic (a `phase` whose parent is a topic) once a topic holds several
-  distinct threads; nest as deep as the work needs.
+- `id`: exactly the message's id from `newMessages`. The CLI takes the time from
+  the transcript, so do not send `at`.
+- `kind`: `"message"`.
+- `parent`: the id of the topic it belongs to (see below).
+- `title`: the message in a few words, in the user's own wording where possible
+  ("Continue with Epic 4", "Why does auto mode keep stopping?"). Never copy a
+  long paste; name what it is.
+- `summary`: one or two sentences on what came of it: the answer, the result or
+  the state it left. Someone returning days later should understand it without
+  the conversation.
+- When the message itself made a decision (the user asked for something, picked
+  an option or approved a proposal): `decidedBy` (`"user"` or `"agreed"`), the
+  reason in `why`, and the options not taken in `alternatives`, each as
+  `{ "option": "…", "why": "…" }`.
+- Your own work goes inside the message node that caused it, never in nodes of
+  its own:
+  - `work`: short items for what you did (looked up, changed, tested).
+  - `agentDecisions`: choices you made on your own while doing it, each as
+    `{ "title": "…", "why": "…", "alternatives": [ … ] }`.
+  - `commits`: short hashes of the commits that carry it out; `files`: the main
+    files it touched, relative to the project (a few, not every file).
+- Work that continued over several messages belongs to the message where it
+  ended up; update an earlier message node only to correct it.
+
+If `newMessages` is `null`, the transcript could not be read. Then record only
+`status` and leave the nodes alone.
+
+## Group the messages by topic
+
+The map opens like layers of an onion: first the session's topics, then a click
+reveals the messages inside each one, in the order they were written.
+
+- A topic is a node with `kind: "phase"`, an `id` of your choice (a short slug,
+  never `m` followed by a number), a `title` naming what the work is about, such
+  as "Permissions" or "Map layout", never when it happened, and `parent: null`
+  for a top-level topic.
+- Put each message under the topic it belongs to. Open a sub-topic (a `phase`
+  whose parent is a topic) once a topic holds several distinct threads.
 - Reuse an existing topic before creating a new one. If an earlier node sits
   under the wrong topic, send it again (with its `kind` and `title`) and the
   right `parent`.
 - Keep the top level short: a handful of topics per session.
+- Records from before messages became the nodes also hold `step`, `decision`
+  and `question` nodes. Leave them as they are and do not add new ones.
 
 Write titles and text in the conversation's language when `language` is `"auto"`,
 and in that language otherwise. JSON keys stay in English.

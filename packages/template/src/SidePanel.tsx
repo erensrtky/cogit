@@ -1,8 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import type { LineageViewModel, ViewChatTurn, ViewSession } from "../../cli/src/view/model.js";
 import { resumeCommand } from "../../cli/src/view/resume.js";
 import { formatTime, kindLabel } from "./format.js";
-import type { NodeDetail } from "./graph.js";
+import {
+  messageNeighbors,
+  type NodeDetail,
+  nodeId,
+  sessionId as sessionKey,
+  toNodeDetail,
+} from "./graph.js";
+import type { OutlineTarget } from "./Outline.js";
 
 /** What the drill-down shows: a graph node or a whole session. */
 export type Selection = { type: "node"; node: NodeDetail } | { type: "session"; sessionId: string };
@@ -145,10 +152,126 @@ const DECIDED_LABEL = {
   agreed: "You, approving the agent's proposal",
 } as const;
 
-function NodeDetails({ model, node }: { model: LineageViewModel; node: NodeDetail }) {
+/** Above this length a chat entry opens folded, with a button to show the rest. */
+const FOLD_AT = 1200;
+
+function LongText({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  if (text.length <= FOLD_AT || open) return <p className="chat-text">{text}</p>;
+  return (
+    <>
+      <p className="chat-text">{text.slice(0, FOLD_AT)}…</p>
+      <button type="button" className="chat-more" onClick={() => setOpen(true)}>
+        Show all ({text.length.toLocaleString()} characters)
+      </button>
+    </>
+  );
+}
+
+function toolLine(tools: ViewChatTurn["tools"]): string {
+  const parts: string[] = [];
+  if (tools.commands > 0)
+    parts.push(`ran ${tools.commands} command${tools.commands === 1 ? "" : "s"}`);
+  const files = tools.files.length;
+  if (files > 0) parts.push(`edited ${files} file${files === 1 ? "" : "s"}`);
+  if (tools.other > 0) parts.push(`${tools.other} other tool call${tools.other === 1 ? "" : "s"}`);
+  return parts.join(", ");
+}
+
+/** The message as the user wrote it and the agent's written answer, from the transcript. */
+function Conversation({ session, id }: { session: ViewSession | undefined; id: string }) {
+  if (!session) return null;
+  const turn = session.chat?.find((entry) => entry.id === id);
+  let body: ReactNode;
+  if (turn) {
+    const tools = toolLine(turn.tools);
+    body = (
+      <>
+        <div className="chat-entry chat-user">
+          <div className="chat-who">You · {formatTime(turn.at)}</div>
+          <LongText text={turn.text} />
+        </div>
+        <div className="chat-entry chat-agent">
+          <div className="chat-who">Agent</div>
+          {turn.replies.length === 0 ? (
+            <p className="muted">No written reply.</p>
+          ) : (
+            turn.replies.map((reply, index) => (
+              <LongText key={`${turn.id}-${index}`} text={reply} />
+            ))
+          )}
+          {tools ? (
+            <p className="chat-tools" title={turn.tools.files.join("\n")}>
+              {tools}
+            </p>
+          ) : null}
+        </div>
+      </>
+    );
+  } else if (!session.transcriptAvailable) {
+    body = (
+      <p className="muted">
+        The conversation is gone: Claude Code has deleted this session's transcript. The summary
+        above is what remains.
+      </p>
+    );
+  } else {
+    body = <p className="muted">This message was not found in the transcript.</p>;
+  }
+  return (
+    <section className="chat">
+      <h3>Conversation</h3>
+      {body}
+    </section>
+  );
+}
+
+/** Previous and next message of the session, so the chat can be read in order. */
+function MessageNav({
+  session,
+  node,
+  onNavigate,
+}: {
+  session: ViewSession | undefined;
+  node: NodeDetail;
+  onNavigate: ((target: OutlineTarget) => void) | undefined;
+}) {
+  if (!session || !onNavigate || node.kind !== "message") return null;
+  const { previous, next } = messageNeighbors(session.nodes, node.nodeId);
+  const go = (target: typeof previous) =>
+    target
+      ? () =>
+          onNavigate({
+            focusId: nodeId(sessionKey(session.sessionId), target.id),
+            expand: [],
+            selection: { type: "node", node: toNodeDetail(target, session.sessionId) },
+          })
+      : undefined;
+  return (
+    <nav className="message-nav" aria-label="Messages">
+      <button type="button" disabled={!previous} onClick={go(previous)} title={previous?.title}>
+        ← Previous message
+      </button>
+      <button type="button" disabled={!next} onClick={go(next)} title={next?.title}>
+        Next message →
+      </button>
+    </nav>
+  );
+}
+
+function NodeDetails({
+  model,
+  node,
+  onNavigate,
+}: {
+  model: LineageViewModel;
+  node: NodeDetail;
+  onNavigate: ((target: OutlineTarget) => void) | undefined;
+}) {
   const session = findSession(model, node.sessionId);
   return (
     <>
+      <MessageNav session={session} node={node} onNavigate={onNavigate} />
       {node.summary ? (
         <section>
           <h3>Summary</h3>
@@ -159,6 +282,39 @@ function NodeDetails({ model, node }: { model: LineageViewModel; node: NodeDetai
         <section>
           <h3>Why</h3>
           <p>{node.why}</p>
+        </section>
+      ) : null}
+      {node.work?.length ? (
+        <section>
+          <h3>What the agent did</h3>
+          <ul className="drilldown-list">
+            {node.work.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {node.agentDecisions?.length ? (
+        <section>
+          <h3>Decided by the agent on its own</h3>
+          <ul className="drilldown-list">
+            {node.agentDecisions.map((decision) => (
+              <li key={decision.title}>
+                <strong>{decision.title}</strong>
+                {decision.why ? <> — {decision.why}</> : null}
+                {decision.alternatives?.length ? (
+                  <ul>
+                    {decision.alternatives.map((alt) => (
+                      <li key={alt.option}>
+                        Not: {alt.option}
+                        {alt.why ? <> — {alt.why}</> : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
       {node.alternatives?.length ? (
@@ -195,9 +351,12 @@ function NodeDetails({ model, node }: { model: LineageViewModel; node: NodeDetai
           ) : null}
         </section>
       ) : null}
+      {node.kind === "message" ? <Conversation session={session} id={node.nodeId} /> : null}
       <dl className="drilldown-meta">
         {node.decidedBy ? <Field label="Decided by">{DECIDED_LABEL[node.decidedBy]}</Field> : null}
-        <Field label="Recorded">{formatTime(node.at ?? node.addedAt ?? null)}</Field>
+        <Field label={node.kind === "message" ? "Sent" : "Recorded"}>
+          {formatTime(node.at ?? node.addedAt ?? null)}
+        </Field>
         {node.touchedAt && node.touchedAt !== node.addedAt ? (
           <Field label="Last changed">{formatTime(node.touchedAt)}</Field>
         ) : null}
@@ -244,10 +403,13 @@ export function DrillDown({
   model,
   selection,
   onClose,
+  onNavigate,
 }: {
   model: LineageViewModel;
   selection: Selection | null;
   onClose: () => void;
+  /** Moves the selection to another node and reveals it on the map. */
+  onNavigate?: (target: OutlineTarget) => void;
 }) {
   useEffect(() => {
     if (!selection) return;
@@ -294,7 +456,7 @@ export function DrillDown({
         </button>
       </header>
       <div className="drilldown-body">
-        <NodeDetails model={model} node={node} />
+        <NodeDetails model={model} node={node} onNavigate={onNavigate} />
       </div>
     </aside>
   );

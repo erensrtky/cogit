@@ -17,15 +17,25 @@ The agent itself records a structured summary of its session as it works. A CLI 
 these records into static HTML:
 
 - **Project map** (one per project): project → epoch (feature/epic) → session →
-  topic → sub-topics (any depth) → step/decision/question. It opens like layers of
-  an onion: time runs down the page (sessions in order), a session's top-level
-  topics sit side by side as columns ordered by when they began, and an opened
-  topic lists its items down its column in the order they were added. Every node
-  with children expands and collapses; the latest session opens with its topics
-  closed except the branches to the nodes its last write added or changed, which
-  are marked "left off here". Cards size themselves to their text. A click opens
-  a drill-down panel with the full text, who decided, the options considered and
-  rejected, the commits and files, and a `claude --resume <id>` copy button.
+  topic → sub-topics (any depth) → the user's messages. The map is a minimap of
+  the chat: one node per message the user wrote, titled in the user's words and
+  saying what came of it; the agent's work on it (steps, its own decisions with
+  their reasons, commits, files) lives in that node's detail, not in nodes of its
+  own. It opens like layers of an onion: time runs down the page (sessions in
+  order), a session's top-level topics sit side by side as columns ordered by when
+  they began, and an opened topic lists its messages down its column in the order
+  the user sent them. Every node with children expands and collapses; the latest
+  session opens with its topics closed except the branch to its last message,
+  which is marked "left off here". Cards size themselves to their text. A click
+  opens a drill-down panel with the full text, who decided, the options considered
+  and rejected, what the agent did and decided on its own, the commits and files,
+  the conversation itself (the message as written and the agent's written
+  replies, tool output left out and tool use counted), previous/next message
+  buttons, and a `claude --resume <id>` copy button. `build` reads the
+  conversation from the transcript into `lineage.html` only (never committed, see
+  Privacy); session files never hold raw text. Records from before messages became
+  the nodes keep their step/decision/question nodes and their old "left off"
+  mark (the nodes of the last write).
 - **Status card** at the top of every project: goal, done, pending (flags items
   waiting on the user), next step, last activity. With parallel sessions, goal and
   next come from the most recently updated session; `needsUser` items are merged
@@ -42,7 +52,7 @@ Sessions are not a separate view. A session is a level of the project tree.
 - No server. Every output is a self-contained HTML file opened over `file://`.
 - Not a code/architecture visualizer (that is the job of omm, Archify and similar tools).
 - Not an agent monitor ("who is running, who is waiting" belongs to tools like Herdr).
-- No live updates. The view refreshes on rebuild.
+- No editing from the map. It is read-only; the local server only serves it and refreshes open pages on rebuild.
 
 ## Data model
 
@@ -50,8 +60,7 @@ Sessions are not a separate view. A session is a level of the project tree.
 <project>/.codelineage/
   project.json               # project name, epochs[], schema version
   sessions/<session-id>.json # one file per session (see Concurrency)
-  state/<session-id>.json    # hook state: turn counter, last recorded turn, pending tail
-  snapshots/<session-id>-<ts>.jsonl  # transcript copy taken before compaction
+  state/<session-id>.json    # hook state: turn counter
   locks/                     # lock files
   lineage.html               # generated
 
@@ -80,21 +89,32 @@ Session file (schema v1, sketch):
   "nodes": [
     { "id": "n1", "parent": null, "kind": "phase", "title": "…", "summary": "…",
       "addedAt": "…", "touchedAt": "…" },
-    { "id": "n2", "parent": "n1", "kind": "decision", "title": "…", "why": "…",
-      "decidedBy": "agreed",
+    { "id": "m3", "parent": "n1", "kind": "message", "title": "…", "summary": "…",
+      "at": "…", "why": "…", "decidedBy": "agreed",
       "alternatives": [{ "option": "…", "why": "rejected because …" }],
+      "work": ["…"],
+      "agentDecisions": [{ "title": "…", "why": "…", "alternatives": [] }],
       "commits": ["322259a"], "files": ["src/…"],
       "addedAt": "…", "touchedAt": "…" }
   ]
 }
 ```
 
-`kind` is one of `phase | step | decision | question`; a `phase` is a topic and is
-shown as one. Nodes are grouped by topic, not by time, and nest to any depth through
+`kind` is one of `phase | message | step | decision | question`; a `phase` is a topic
+and is shown as one, a `message` is one user message. Message ids are `m1`, `m2`, …
+in the order of the user's messages in the Claude Code transcript; `session show`
+reads the transcript and lists the messages that have no node yet (id, time and an
+excerpt; pastes are named, not copied), so the agent cannot skip or reorder one,
+and `session write` sets a message's `at` from the transcript. Tool results,
+injected skill text, compaction summaries, subagent turns, `!` shell lines and
+slash commands without arguments are not messages. Raw message text never enters
+the record, only the agent's title and summary. `step`, `decision` and `question`
+are kept for records written before messages became the nodes. Nodes are grouped by topic, not by time, and nest to any depth through
 `parent`. `decidedBy` is `user | agent | agreed`. `addedAt` (first write) and
 `touchedAt` (last change) are stamped by `session write` and never taken from agent
 input; a resent node that changed nothing keeps its `touchedAt`. Siblings are
-ordered by when their thread began (the earliest `addedAt` in their subtree);
+ordered by when their thread began (the earliest start in their subtree: a
+message's `at`, any other node's `addedAt`);
 nodes recorded before the stamps existed keep their stored order, first. Epochs live in `project.json`.
 The agent picks an existing epoch or adds one through the CLI (`codelineage epoch add`),
 which does a locked, atomic write.
@@ -154,21 +174,24 @@ Behavior verified against the Claude Code hooks docs (2026-10-21):
   itself, so `init` offers to add it to the user settings (install question 3).
 - **Compaction (safety net).** PreCompact output never reaches the model and it cannot
   make the agent act; it can only block compaction, and blocking an auto-compact
-  triggered by a context-limit error fails the request. So:
-  - PreCompact never blocks. It copies the transcript to `snapshots/` and marks the
-    session as needing an update.
-  - PostCompact stores `compact_summary` in the session's state as a raw note.
-  - SessionStart with `source: "compact"` tells the agent (via `additionalContext`)
-    to run the skill, using the compact summary and the snapshot.
-- **Session end catch-up.** Turns after the last update are lost when the user exits,
-  runs `/clear` or switches with `/resume`. SessionEnd cannot make the agent act and
-  plugin hooks get a 1.5 s budget, so the hook only records the pending tail in
-  `state/` and spawns a detached `codelineage backfill <session-id> --tail`, then
-  returns. The catch-up summarizes only the unrecorded turns with a headless run and
-  merges them into the session file. Setting: `sessionEndCatchUp` (`on` by default,
-  `off` = no tokens spent; the tail is shown as "not recorded").
-  - Fallback: if the detached process dies, the pending tail stays in `state/`; the
-    next `build` or the next session start in that project retries it.
+  triggered by a context-limit error fails the request. Compaction does not shorten
+  the transcript (verified 2026-10-23: it appends a `compact_boundary` line and the
+  summary, every earlier line stays), and message nodes are read from the
+  transcript, so no message is lost and no snapshot is taken. Only SessionStart
+  with `source: "compact"` acts: when user messages have no node yet, it asks the
+  agent (via `additionalContext`) to run the skill, which works from the compact
+  summary already in its context. No PreCompact or PostCompact hook.
+- **Session end catch-up.** Messages after the last update have no node when the
+  user exits, runs `/clear` or switches with `/resume`. SessionEnd cannot make the
+  agent act and plugin hooks get a 1.5 s budget, so the hook only spawns a detached
+  `codelineage backfill <session-id> --tail` and returns. The catch-up reads the
+  transcript, takes the user messages with no node together with the agent's replies
+  and actions after each, summarizes them with a headless run by the skill's rules
+  and writes them through `session write`. Setting: `sessionEndCatchUp` (`on` by
+  default; `off` = no tokens spent, and the map shows "N messages not recorded").
+  - Fallback: the tail is not stored anywhere; it is whatever messages still have no
+    node, so if the detached process dies, the next session start in that project
+    finds them again and retries.
   - Verified (Claude Code 2.1.300, Linux): a child started from SessionEnd with
     `spawn(…, { detached: true, stdio: "ignore" }).unref()` outlives both the hook
     and Claude Code exiting, and is reparented to the init process.
@@ -196,13 +219,13 @@ Each update costs agent tokens (the user's subscription or API usage).
 |---|---|
 | `codelineage init` | Creates `.codelineage/`, registers the project, asks the install questions |
 | `codelineage build [dir]` | Regenerates `lineage.html` and `panel.html` |
-| `codelineage open [dir]` | Builds, then opens the map (or the panel if no dir is given) |
+| `codelineage open [dir]` | Builds, then opens the map (or the panel if no dir is given) through the local map server, starting it in the background if it is not running. The open page refreshes itself whenever the map is rebuilt, keeping open topics, selection and zoom. Falls back to opening the file when the server cannot start. |
 | `codelineage epoch add <id> <title>` | Adds an epoch (locked write) |
 | `codelineage config get/set <key> [value]` | Reads or changes settings |
 | `codelineage session show <id>` | Prints the compact record the skill injects (epochs, language, status, node ids/titles, inbox path) as JSON. Never fails for an uninitialized project. |
 | `codelineage session write` | Reads session JSON from stdin or `--file` (the skill uses `--file <inbox> --consume`), validates, redacts, merges and writes it under the session lock, then builds. |
 | `codelineage backfill [dir]` | Summarizes past transcripts of that project by running the agent headless, one session at a time. Estimates cost and asks first. Selection: `--pick` (default: lists sessions with date, first prompt and estimated cost), `--last <n>`, `--since <date>`, `--all`. |
-| `codelineage backfill <session-id> --tail` | Summarizes only the unrecorded turns of one session. Started by the SessionEnd hook. |
+| `codelineage backfill <session-id> --tail` | Summarizes only the user messages of one session that have no node yet. Started by the SessionEnd hook. |
 
 ## Install questions (`init` and first plugin run)
 
@@ -223,6 +246,8 @@ Each update costs agent tokens (the user's subscription or API usage).
    Default: none. Picking or all runs `backfill` with a cost estimate first.
 
 Settings in `config.json`: `language`, `updateEveryTurns`, `sessionEndCatchUp`,
+`catchUpModel` (model for the headless catch-up and backfill, default `haiku`),
+`serverPort` (local map server, default 4747),
 `gitPolicy`, `agents`.
 
 ## Privacy
@@ -230,6 +255,9 @@ Settings in `config.json`: `language`, `updateEveryTurns`, `sessionEndCatchUp`,
 - The skill tells the agent never to record secrets, credentials, tokens or personal
   data. It records decisions and rationale, not raw content.
 - `build` runs a redaction pass (common key and token patterns) before writing HTML.
+- The map (`lineage.html`) shows the conversation read from the local transcript. It
+  is never committed under any `gitPolicy`, so raw chat stays on the machine that
+  already holds the transcript; session files keep only titles and summaries.
 - Default `gitPolicy` is `ignore`, because sharing has to be a deliberate choice.
 
 ## Edge cases
@@ -275,13 +303,18 @@ Settings in `config.json`: `language`, `updateEveryTurns`, `sessionEndCatchUp`,
    `open`, `epoch add`, `config`
 2. HTML template: status card, graph with drill-down, outline, resume button
 3. Panel
-4. Claude Code plugin: skill; Stop, PreCompact, PostCompact, SessionStart and
-   SessionEnd hooks; recursion guard
+4. Claude Code plugin: skill; Stop, SessionStart and SessionEnd hooks; recursion
+   guard
 5. `backfill` (project selection and `--tail` catch-up)
+6. Live map: rebuild after every turn (messages not summarized yet shown at once)
+   and a local map server as the default way `open` shows a map: one background
+   server per user on `127.0.0.1`, serving only registered projects' maps and the
+   panel, refreshing open pages on change, exiting after 30 idle minutes; opening
+   the file directly is only the fallback when it cannot start.
 
 ## Later
 
 - Codex adapter (its hooks and session retention still need research)
-- Optional local server for live refresh and editing settings from the panel
+- Editing settings from the panel (needs writes through the local server)
 - A Herdr usage section in the README
 - Video or other "explainer" outputs

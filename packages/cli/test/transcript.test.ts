@@ -1,0 +1,171 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+  CHAT_TEXT_LIMIT,
+  displayTurn,
+  excerpt,
+  findTranscript,
+  messageText,
+  readConversation,
+  readUserMessages,
+} from "../src/transcript.js";
+import { envFor, tempDir } from "./helpers.js";
+
+const at = (m: number) => `2026-10-23T10:${String(m).padStart(2, "0")}:00.000Z`;
+
+/** A user line as Claude Code writes it. */
+function user(content: unknown, extra: Record<string, unknown> = {}, m = 0) {
+  return { type: "user", timestamp: at(m), message: { role: "user", content }, ...extra };
+}
+
+describe("messageText", () => {
+  it.each([
+    [
+      "typed text",
+      user("Continue with Epic 4", { origin: { kind: "human" } }),
+      "Continue with Epic 4",
+    ],
+    ["text and image blocks", user([{ type: "text", text: "look" }, { type: "image" }]), "look"],
+    ["an image alone", user([{ type: "image" }]), "[image]"],
+    [
+      "a slash command with arguments",
+      user("<command-name>/create-story</command-name><command-args>4.5</command-args>"),
+      "/create-story 4.5",
+    ],
+  ])("keeps %s", (_, line, text) => {
+    expect(messageText(line)).toBe(text);
+  });
+
+  it.each([
+    ["an assistant line", { type: "assistant", message: { content: "x" } }],
+    ["a tool result", user([{ type: "tool_result", content: "out" }])],
+    ["injected skill text", user([{ type: "text", text: "Base directory" }], { isMeta: true })],
+    ["a compaction summary", user("This session is being continued", { isCompactSummary: true })],
+    ["a subagent turn", user("task", { isSidechain: true })],
+    ["a non-human origin", user("note", { origin: { kind: "task-notification" } })],
+    ["shell input", user("<bash-input>ls</bash-input>")],
+    ["shell output", user("<bash-stdout>x</bash-stdout><bash-stderr></bash-stderr>")],
+    ["local command output", user("<local-command-stdout>Bye</local-command-stdout>")],
+    ["a slash command without arguments", user("<command-name>/exit</command-name>")],
+    ["empty text", user("   ")],
+    ["content of another shape", user({ text: "x" })],
+  ])("drops %s", (_, line) => {
+    expect(messageText(line)).toBeNull();
+  });
+});
+
+describe("readUserMessages", () => {
+  it("numbers the typed messages in order and skips broken lines", async () => {
+    const dir = await tempDir();
+    const file = join(dir, "s1.jsonl");
+    const lines = [
+      JSON.stringify(user("first", {}, 1)),
+      JSON.stringify({ type: "assistant", timestamp: at(2), message: { content: [] } }),
+      JSON.stringify(user([{ type: "tool_result", content: "x" }], {}, 3)),
+      '{"type":"user", broken',
+      JSON.stringify(user("second", {}, 4)),
+    ];
+    await writeFile(file, `${lines.join("\n")}\n`);
+    expect(await readUserMessages(file)).toEqual([
+      { id: "m1", at: at(1), text: "first" },
+      { id: "m2", at: at(4), text: "second" },
+    ]);
+  });
+});
+
+describe("readConversation", () => {
+  it("gives each message the agent's written replies and counts its tools", async () => {
+    const dir = await tempDir();
+    const file = join(dir, "s1.jsonl");
+    const agent = (content: unknown[], extra: Record<string, unknown> = {}) => ({
+      type: "assistant",
+      message: { content },
+      ...extra,
+    });
+    const lines = [
+      agent([{ type: "text", text: "before any message" }]),
+      user("first", {}, 1),
+      agent([{ type: "text", text: "Looking." }]),
+      agent([{ type: "tool_use", name: "Bash", input: { command: "ls" } }]),
+      agent([{ type: "tool_use", name: "Edit", input: { file_path: "/p/a.ts" } }]),
+      agent([{ type: "tool_use", name: "Write", input: { file_path: "/p/a.ts" } }]),
+      agent([{ type: "tool_use", name: "Edit", input: {} }]),
+      agent([{ type: "tool_use", name: "Read", input: { file_path: "/p/b.ts" } }]),
+      agent([{ type: "text", text: "from a subagent" }], { isSidechain: true }),
+      agent([{ type: "text", text: "   " }]),
+      { type: "assistant", message: { content: "not a list" } },
+      user([{ type: "tool_result", content: "x" }], {}, 2),
+      agent([{ type: "text", text: "Done." }]),
+      user("second", {}, 3),
+    ];
+    await writeFile(file, lines.map((line) => JSON.stringify(line)).join("\n"));
+    const turns = await readConversation(file);
+    expect(turns.map((t) => [t.id, t.text, t.replies])).toEqual([
+      ["m1", "first", ["Looking.", "Done."]],
+      ["m2", "second", []],
+    ]);
+    expect(turns[0]?.tools).toEqual({ commands: 1, files: ["/p/a.ts"], other: 2 });
+  });
+});
+
+describe("displayTurn", () => {
+  const turn = (text: string, replies: string[] = []) => ({
+    id: "m1",
+    at: at(1),
+    text,
+    replies,
+    tools: { commands: 0, files: ["/p/w/x.ts", "/p/y.ts", "/elsewhere/z.ts"], other: 0 },
+  });
+
+  it("drops reminders, labels pastes and shows files relative to the project", () => {
+    const shown = displayTurn(
+      turn(
+        '<system-reminder>hidden</system-reminder>see <pasted_content id="a">log</pasted_content id="a">',
+      ),
+      ["/p/w", "/p"],
+    );
+    expect(shown.text).toBe("see \n[Pasted]\nlog\n[/Pasted]");
+    expect(shown.tools.files).toEqual(["x.ts", "y.ts", "/elsewhere/z.ts"]);
+  });
+
+  it("cuts very long text with a note", () => {
+    const long = "x".repeat(CHAT_TEXT_LIMIT + 5);
+    const shown = displayTurn(turn(long, [long]), []);
+    expect(shown.text).toMatch(/\[… 5 more characters not shown\]$/);
+    expect(shown.replies[0]).toMatch(/5 more characters/);
+  });
+});
+
+describe("findTranscript", () => {
+  it("finds the session under any project folder, or returns null", async () => {
+    const dir = await tempDir();
+    const env = envFor(dir);
+    expect(await findTranscript("s1", env)).toBeNull();
+    const folder = join(dir, "claude", "projects", "-some-project");
+    await mkdir(folder, { recursive: true });
+    await writeFile(join(folder, "s1.jsonl"), "");
+    expect(await findTranscript("s1", env)).toBe(join(folder, "s1.jsonl"));
+    expect(await findTranscript("s2", env)).toBeNull();
+  });
+});
+
+describe("excerpt", () => {
+  it("collapses whitespace, names pastes and drops reminders", () => {
+    const text =
+      'see\n\n<pasted_content id="a">\nError: boom\nat line 2\n</pasted_content>' +
+      "<system-reminder>secret context</system-reminder> please";
+    expect(excerpt(text)).toBe("see [pasted: Error: boom at line 2…] please");
+  });
+
+  it("shows a message that is only a paste as the pasted text", () => {
+    const text =
+      '\n\n<pasted_content id="a">\n  Continue with\n  Epic 4\n</pasted_content id="a">\n';
+    expect(excerpt(text)).toBe("[pasted] Continue with Epic 4");
+  });
+
+  it("cuts long text with an ellipsis", () => {
+    expect(excerpt("x".repeat(400))).toHaveLength(300);
+    expect(excerpt("x".repeat(400)).endsWith("…")).toBe(true);
+  });
+});

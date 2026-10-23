@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ViewNode } from "../../cli/src/view/model.js";
-import { placeSessionNodes, TREE_LEFT } from "../src/graph.js";
+import {
+  absolutePosition,
+  messageNeighbors,
+  placeSessionNodes,
+  TREE_LEFT,
+  toNodeDetail,
+} from "../src/graph.js";
 
 function node(id: string, children: ViewNode[] = []): ViewNode {
   return { id, kind: "phase", title: id, children };
@@ -50,5 +56,57 @@ describe("placeSessionNodes", () => {
   it("makes room for the left-off badge on the last touched card", () => {
     const marked = placeSessionNodes(tree, "s", undefined, new Set(["node:s:a1"]));
     expect(marked.boxes.get("node:s:a1")?.height).toBeGreaterThan(box("a1")?.height ?? 0);
+  });
+});
+
+describe("absolutePosition", () => {
+  const nodes = [
+    { id: "epoch", position: { x: 10, y: 20 } },
+    { id: "session", position: { x: 5, y: 40 }, parentId: "epoch" },
+    { id: "card", position: { x: 1, y: 2 }, parentId: "session" },
+    { id: "loop", position: { x: 1, y: 1 }, parentId: "loop" },
+  ];
+
+  it("adds up the positions of every parent", () => {
+    expect(absolutePosition(nodes, "card")).toEqual({ x: 16, y: 62 });
+    expect(absolutePosition(nodes, "epoch")).toEqual({ x: 10, y: 20 });
+  });
+
+  it("is null for a node the layout does not hold, and survives a parent loop", () => {
+    expect(absolutePosition(nodes, "gone")).toBeNull();
+    expect(absolutePosition(nodes, "loop")).toEqual({ x: 1, y: 1 });
+  });
+});
+
+describe("messageNeighbors", () => {
+  const message = (id: string, at?: string): ViewNode => ({
+    id,
+    kind: "message",
+    title: id,
+    children: [],
+    ...(at ? { at } : {}),
+  });
+  const tree: ViewNode[] = [
+    {
+      ...node("a"),
+      children: [message("m3", "2026-01-01T03:00:00Z"), message("m1", "2026-01-01T01:00:00Z")],
+    },
+    { ...node("b"), children: [message("m2", "2026-01-01T02:00:00Z"), message("mx")] },
+  ];
+
+  it("finds the messages before and after, by send time across topics", () => {
+    const { previous, next } = messageNeighbors(tree, "m2");
+    expect([previous?.id, next?.id]).toEqual(["m1", "m3"]);
+    expect(messageNeighbors(tree, "m3").next).toBeNull();
+  });
+
+  it("returns nothing for a node that is not a message", () => {
+    expect(messageNeighbors(tree, "a")).toEqual({ previous: null, next: null });
+  });
+});
+
+describe("toNodeDetail", () => {
+  it("keeps the node's own id next to its session", () => {
+    expect(toNodeDetail(node("x"), "s1")).toMatchObject({ nodeId: "x", sessionId: "s1" });
   });
 });

@@ -104,6 +104,16 @@ describe("lastTouched", () => {
     expect(lastTouched(tie)?.nodeKeys).toEqual(["node:session:s1:n2", "node:session:s1:n3"]);
   });
 
+  it("marks only the last user message once the session has messages", () => {
+    const withMessages = structuredClone(withTouches);
+    const s1 = withMessages.epochs[0]?.sessions[0];
+    s1?.nodes[0]?.children.push(
+      { ...node("m1", "First"), kind: "message", at: "2026-10-21T10:30:00.000Z", touchedAt: AT },
+      { ...node("m2", "Second"), kind: "message", at: "2026-10-21T10:40:00.000Z", touchedAt: AT },
+    );
+    expect(lastTouched(withMessages)?.nodeKeys).toEqual(["node:session:s1:m2"]);
+  });
+
   it("is empty when nothing has a touch time yet", () => {
     expect(lastTouched(model)).toBeNull();
     expect(lastTouched({ ...model, epochs: [], unassigned: [] })).toBeNull();

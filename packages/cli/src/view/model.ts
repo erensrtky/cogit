@@ -24,6 +24,14 @@ export interface ViewNode {
   alternatives?: { option: string; why: string }[];
   commits?: string[];
   files?: string[];
+  /** For a message: what the agent did about it. */
+  work?: string[];
+  /** For a message: choices the agent made on its own. */
+  agentDecisions?: {
+    title: string;
+    why: string;
+    alternatives?: { option: string; why: string }[] | undefined;
+  }[];
   /** When the node was first added. */
   addedAt?: string;
   /** When the node was last added or changed; marks where the work left off. */
@@ -50,6 +58,19 @@ export interface StatusCard extends ViewStatus {
   lastActivity: string | null;
 }
 
+/** One user message and the agent's written answer, read from the transcript at build time. */
+export interface ViewChatTurn {
+  /** Same id as the message node it belongs to (`m1`, `m2`, …). */
+  id: string;
+  at: string;
+  /** The user's message as written, without injected reminders. */
+  text: string;
+  /** The agent's written replies until the next message; tool output is never included. */
+  replies: string[];
+  /** What the agent did with tools in that turn, counted, not shown. */
+  tools: { commands: number; files: string[]; other: number };
+}
+
 export interface ViewSession {
   sessionId: string;
   agent: string;
@@ -63,6 +84,11 @@ export interface ViewSession {
   transcriptAvailable: boolean;
   /** The linked git worktree the session ran in, if any. */
   worktree?: { path: string; branch: string | null };
+  /**
+   * The conversation, for sessions that record messages and still have their
+   * transcript. It lives only in the generated page, never in the session file.
+   */
+  chat?: ViewChatTurn[];
 }
 
 export interface ViewEpoch {

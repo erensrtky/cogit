@@ -67,15 +67,19 @@ export type NodeDetail = {
   alternatives?: ViewNode["alternatives"];
   commits?: string[];
   files?: string[];
+  work?: ViewNode["work"];
+  agentDecisions?: ViewNode["agentDecisions"];
   addedAt?: string;
   touchedAt?: string;
   /** Owning session, so the drill-down panel can show and resume it. */
   sessionId: string;
+  /** The node's id in its session, which for a message is also its chat turn's id. */
+  nodeId: string;
 };
 
 export function toNodeDetail(node: ViewNode, sessionId: string): NodeDetail {
-  const { id: _id, children: _children, ...detail } = node;
-  return { ...detail, sessionId };
+  const { id, children: _children, ...detail } = node;
+  return { ...detail, sessionId, nodeId: id };
 }
 
 export type LineageData = NodeDetail & {
@@ -143,9 +147,10 @@ export interface LastTouched {
 }
 
 /**
- * Where the work left off: the nodes touched by the last write of the most recently
- * updated session. One write stamps all its nodes at once, so they are all marked
- * rather than guessing which of them came last.
+ * Where the work left off, in the most recently updated session: its last user
+ * message when it has messages, else the nodes touched by its last write (one
+ * write stamps all its nodes at once, so they are all marked rather than
+ * guessing which of them came last).
  */
 export function lastTouched(model: LineageViewModel): LastTouched | null {
   const latest = latestSession(model);
@@ -156,19 +161,25 @@ export function lastTouched(model: LineageViewModel): LastTouched | null {
   const visit = (nodes: ViewNode[], ancestors: string[]): void => {
     for (const node of nodes) {
       const key = nodeId(sessionKey, node.id);
-      if (node.touchedAt) {
-        found.push({ key, ancestors, at: node.touchedAt });
-        if (node.touchedAt > newest) newest = node.touchedAt;
+      const at = byMessage ? (node.kind === "message" ? node.at : undefined) : node.touchedAt;
+      if (at) {
+        found.push({ key, ancestors, at });
+        if (at > newest) newest = at;
       }
       visit(node.children, [...ancestors, key]);
     }
   };
+  const byMessage = hasMessage(latest.session.nodes);
   visit(latest.session.nodes, []);
   const last = found.filter((entry) => entry.at === newest);
   if (last.length === 0) return null;
   const ancestors = new Set([latest.group, sessionKey]);
   for (const entry of last) for (const key of entry.ancestors) ancestors.add(key);
   return { sessionKey, nodeKeys: last.map((entry) => entry.key), ancestors: [...ancestors] };
+}
+
+function hasMessage(nodes: ViewNode[]): boolean {
+  return nodes.some((node) => (node.kind === "message" && node.at) || hasMessage(node.children));
 }
 
 function latestSession(
@@ -238,7 +249,7 @@ function nodeHeight(node: ViewNode, open: boolean): number {
   const body =
     hasChildren && !open
       ? itemsInside(countNodes(node.children))
-      : node.at
+      : node.at && node.kind !== "message"
         ? formatTime(node.at)
         : cardText(node);
   const meta = cardMeta(node);
@@ -525,4 +536,47 @@ function collectFlowNodes(
     });
     if (open) collectFlowNodes(node.children, parent, sessionId, out, sizes, expanded, lastKeys);
   }
+}
+
+/**
+ * Where a node sits on the canvas: its own position plus every parent's, since
+ * React Flow positions children relative to their `parentId`. Null when the
+ * layout does not contain it.
+ */
+export function absolutePosition(
+  nodes: { id: string; position: { x: number; y: number }; parentId?: string }[],
+  id: string,
+): { x: number; y: number } | null {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  let node = byId.get(id);
+  if (!node) return null;
+  let x = 0;
+  let y = 0;
+  const seen = new Set<string>();
+  while (node && !seen.has(node.id)) {
+    seen.add(node.id);
+    x += node.position.x;
+    y += node.position.y;
+    node = node.parentId ? byId.get(node.parentId) : undefined;
+  }
+  return { x, y };
+}
+
+/** The messages just before and after a message in its session, by when they were sent. */
+export function messageNeighbors(
+  nodes: ViewNode[],
+  id: string,
+): { previous: ViewNode | null; next: ViewNode | null } {
+  const messages: ViewNode[] = [];
+  const visit = (list: ViewNode[]): void => {
+    for (const node of list) {
+      if (node.kind === "message") messages.push(node);
+      visit(node.children);
+    }
+  };
+  visit(nodes);
+  messages.sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+  const index = messages.findIndex((node) => node.id === id);
+  if (index < 0) return { previous: null, next: null };
+  return { previous: messages[index - 1] ?? null, next: messages[index + 1] ?? null };
 }

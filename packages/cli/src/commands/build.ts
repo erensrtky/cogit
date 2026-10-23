@@ -1,14 +1,16 @@
 import { CliError, type Io } from "../io.js";
 import { redactDeep } from "../redact.js";
+import type { Session } from "../schema/session.js";
 import { atomicWrite } from "../store/fs.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadProject } from "../store/stores.js";
+import { type ChatTurn, displayTurn, readConversation } from "../transcript.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
 import type { LineageViewModel } from "../view/model.js";
 import { buildPanel } from "../view/panel.js";
 import { TEMPLATE_HTML } from "../view/template.js";
-import { collectTranscriptIds } from "../view/transcripts.js";
+import { collectTranscripts } from "../view/transcripts.js";
 
 export interface BuildOptions {
   dir: string;
@@ -17,6 +19,35 @@ export interface BuildOptions {
   templateHtml?: string;
   /** `session write` rebuilds without printing a success line. */
   quiet?: boolean;
+}
+
+/**
+ * The conversation of every session that records messages and still has its
+ * transcript. It goes into the page only, never into a session file. A transcript
+ * that cannot be read leaves that session without a chat, with a warning.
+ */
+async function readChats(
+  sessions: Session[],
+  transcripts: ReadonlyMap<string, string>,
+  root: string,
+  io: Io,
+): Promise<Map<string, ChatTurn[]>> {
+  const chats = new Map<string, ChatTurn[]>();
+  for (const session of sessions) {
+    const file = transcripts.get(session.sessionId);
+    if (!file || !session.nodes.some((node) => node.kind === "message")) continue;
+    try {
+      const roots = [session.worktree?.path, root].filter((r): r is string => Boolean(r));
+      const turns = await readConversation(file);
+      chats.set(
+        session.sessionId,
+        turns.map((turn) => displayTurn(turn, roots)),
+      );
+    } catch (err) {
+      io.warn(`could not read the conversation of ${session.sessionId}: ${(err as Error).message}`);
+    }
+  }
+  return chats;
 }
 
 /**
@@ -34,12 +65,15 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   for (const warning of project.warnings) io.warn(warning);
 
   const paths = projectPaths(root);
+  const sessions = await loadAllSessions(root, io.warn);
+  const transcripts = await collectTranscripts(io.env);
   const model = buildViewModel({
     project: project.data,
-    sessions: await loadAllSessions(root, io.warn),
+    sessions,
     path: root,
     generatedAt: io.now(),
-    transcripts: await collectTranscriptIds(io.env),
+    transcripts: new Set(transcripts.keys()),
+    chats: await readChats(sessions, transcripts, root, io),
   });
   // The skill already avoids secrets; this is the safety net before rendering.
   const redacted = redactDeep(model);

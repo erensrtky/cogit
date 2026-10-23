@@ -14,9 +14,9 @@ export function formatDate(iso: string | null): string {
     : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-/** Phases are shown as topics: the map groups a session by what the work is about. */
+/** Phases are shown as topics, messages as what the user said. */
 export function kindLabel(kind: string): string {
-  return kind === "phase" ? "topic" : kind;
+  return kind === "phase" ? "topic" : kind === "message" ? "you" : kind;
 }
 
 /** The line a collapsed topic shows in place of its summary. */
@@ -31,9 +31,12 @@ export function cardMeta(node: {
   decidedBy?: keyof typeof DECIDED_BY | undefined;
   commits?: string[] | undefined;
   alternatives?: unknown[] | undefined;
+  agentDecisions?: unknown[] | undefined;
 }): string {
   const parts: string[] = [];
   if (node.decidedBy) parts.push(DECIDED_BY[node.decidedBy]);
+  const own = node.agentDecisions?.length ?? 0;
+  if (own > 0) parts.push(`${own} agent decision${own === 1 ? "" : "s"}`);
   const commits = node.commits?.length ?? 0;
   if (commits > 0) parts.push(`${commits} commit${commits === 1 ? "" : "s"}`);
   const rejected = node.alternatives?.length ?? 0;

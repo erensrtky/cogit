@@ -6,6 +6,7 @@ import {
   type PageModel,
   type StatusCard,
   VIEW_SCHEMA,
+  type ViewChatTurn,
   type ViewEpoch,
   type ViewNode,
   type ViewSession,
@@ -48,6 +49,8 @@ export function buildNodeTree(nodes: LineageNode[]): ViewNode[] {
       ...(node.alternatives?.length ? { alternatives: node.alternatives } : {}),
       ...(node.commits?.length ? { commits: node.commits } : {}),
       ...(node.files?.length ? { files: node.files } : {}),
+      ...(node.work?.length ? { work: node.work } : {}),
+      ...(node.agentDecisions?.length ? { agentDecisions: node.agentDecisions } : {}),
       ...(node.addedAt === undefined ? {} : { addedAt: node.addedAt }),
       ...(node.touchedAt === undefined ? {} : { touchedAt: node.touchedAt }),
       children,
@@ -61,11 +64,12 @@ export function buildNodeTree(nodes: LineageNode[]): ViewNode[] {
 }
 
 /**
- * When a node's thread began: its own or any descendant's addedAt, whichever is
- * earliest. Unstamped nodes predate the stamps, so they count as earliest of all.
+ * When a node's thread began: its own or any descendant's start, whichever is
+ * earliest. A message starts when the user sent it, other nodes when they were
+ * added. Unstamped nodes predate the stamps, so they count as earliest of all.
  */
 function startOf(node: ViewNode): string {
-  let start = node.addedAt ?? "";
+  let start = (node.kind === "message" ? node.at : undefined) ?? node.addedAt ?? "";
   for (const child of node.children) {
     const childStart = startOf(child);
     if (childStart < start) start = childStart;
@@ -146,7 +150,11 @@ export function statusCard(sessions: Session[], now: string): StatusCard {
   };
 }
 
-function toViewSession(session: Session, transcripts?: ReadonlySet<string>): ViewSession {
+function toViewSession(
+  session: Session,
+  transcripts?: ReadonlySet<string>,
+  chat?: ViewChatTurn[],
+): ViewSession {
   return {
     sessionId: session.sessionId,
     agent: session.agent,
@@ -160,6 +168,7 @@ function toViewSession(session: Session, transcripts?: ReadonlySet<string>): Vie
     // record is shown as resumable rather than pretending the transcript is gone.
     transcriptAvailable: transcripts === undefined ? true : transcripts.has(session.sessionId),
     ...(session.worktree ? { worktree: session.worktree } : {}),
+    ...(chat ? { chat } : {}),
   };
 }
 
@@ -176,6 +185,8 @@ export interface ViewModelInput {
   generatedAt: string;
   /** Session ids whose Claude Code transcript still exists; omit to skip the check. */
   transcripts?: ReadonlySet<string>;
+  /** Each session's conversation from its transcript, shown in the drill-down. */
+  chats?: ReadonlyMap<string, ViewChatTurn[]>;
 }
 
 /**
@@ -190,7 +201,7 @@ export function buildViewModel(input: ViewModelInput): LineageViewModel {
   const sessions = [...input.sessions].sort(byStartedAt);
 
   for (const session of sessions) {
-    const view = toViewSession(session, input.transcripts);
+    const view = toViewSession(session, input.transcripts, input.chats?.get(session.sessionId));
     const bucket = session.epoch === null ? undefined : buckets.get(session.epoch);
     (bucket ?? unassigned).push(view);
   }
