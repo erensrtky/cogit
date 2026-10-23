@@ -585,7 +585,11 @@ describe("codelineage build", () => {
         nodes: [{ id: "m2", kind: "message", title: "Second message", parent: "topic" }],
       }),
     );
-    expect(io.warnings).toEqual([]);
+    // A message no longer hangs from a topic: the parent falls back to the
+    // previous message, with a warning (8.1).
+    expect(io.warnings).toEqual([
+      expect.stringMatching(/m2: parent topic is not an earlier message of this session, using m1/),
+    ]);
     const after = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
     expect(after.epochs[0]?.sessions[0]?.nodes.map((n) => n.title)).toEqual(["Topic"]);
   });

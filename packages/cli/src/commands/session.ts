@@ -4,10 +4,16 @@ import { CliError, type Io } from "../io.js";
 import { redactDeep } from "../redact.js";
 import { Slug } from "../schema/common.js";
 import { mergeSession } from "../schema/merge.js";
-import { MESSAGE_ID, SessionInput } from "../schema/session.js";
+import { MESSAGE_ID, type Session, SessionInput } from "../schema/session.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
-import { loadConfig, loadProject, loadSession, updateSession } from "../store/stores.js";
+import {
+  type Loaded,
+  loadConfig,
+  loadProject,
+  loadSession,
+  updateSession,
+} from "../store/stores.js";
 import {
   countUserLines,
   excerpt,
@@ -195,12 +201,11 @@ export async function sessionShow(dir: string, sessionId: string, io: Io): Promi
   if (messages) {
     const recorded = new Set(loaded.found && loaded.ok ? loaded.data.nodes.map((n) => n.id) : []);
     view.messageCount = messages.length;
-    view.newMessages = messages
-      .filter((m) => !recorded.has(m.id))
-      .map(({ id, at, text }) => ({ id, at, text: excerpt(text) }));
+    view.newMessages = newMessages(messages, recorded);
   } else {
     view.newMessages = null;
   }
+  view.lastMessages = lastMessages(loaded);
   // A format change would otherwise look like "nothing written yet" forever.
   if (transcript && transcript.messages.length === 0) {
     const userLines = await countUserLines(transcript.file).catch(() => 0);
@@ -211,4 +216,44 @@ export async function sessionShow(dir: string, sessionId: string, io: Io): Promi
   }
   view.inbox = projectPaths(given).inbox(sessionId);
   io.out(JSON.stringify(view, null, 2));
+}
+
+/** How many recorded messages `session show` repeats for picking a parent. */
+const LAST_MESSAGES = 5;
+
+/**
+ * The user's messages with no node yet, with the cheap hints the agent uses to
+ * decide a parent: the gap since the previous message, a `/clear` or resume in
+ * between, and a commit this session made between them. Hints, not rules.
+ */
+function newMessages(messages: UserMessage[], recorded: Set<string>): Record<string, unknown>[] {
+  return messages
+    .map((message, i) => {
+      const previous = i > 0 ? messages[i - 1] : undefined;
+      const gapMinutes = previous
+        ? Math.max(0, Math.round((Date.parse(message.at) - Date.parse(previous.at)) / 60_000))
+        : undefined;
+      return { message, gapMinutes };
+    })
+    .filter(({ message }) => !recorded.has(message.id))
+    .map(({ message, gapMinutes }) => ({
+      id: message.id,
+      at: message.at,
+      text: excerpt(message.text),
+      ...(gapMinutes === undefined ? {} : { gapMinutes }),
+      ...(message.resumed ? { resumed: true } : {}),
+      ...(message.commitBetween ? { commitBetween: true } : {}),
+    }));
+}
+
+/** The last few recorded messages (id, title, parent) so the agent can pick a parent. */
+function lastMessages(
+  loaded: Loaded<Session>,
+): { id: string; title: string; parent: string | null }[] {
+  if (!loaded.found || !loaded.ok) return [];
+  return loaded.data.nodes
+    .filter((n) => n.kind === "message" && MESSAGE_ID.test(n.id))
+    .sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)))
+    .slice(-LAST_MESSAGES)
+    .map(({ id, title, parent }) => ({ id, title, parent }));
 }

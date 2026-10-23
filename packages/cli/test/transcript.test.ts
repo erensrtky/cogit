@@ -107,6 +107,26 @@ describe("readConversation", () => {
     ]);
     expect(turns[0]?.tools).toEqual({ commands: 1, files: ["/p/a.ts"], other: 2 });
   });
+
+  it("marks the message after a broken uuid chain as resumed", async () => {
+    const file = join(await tempDir(), "s1.jsonl");
+    const lines = [
+      { ...user("first", { uuid: "u1", parentUuid: null }, 1) },
+      {
+        type: "assistant",
+        uuid: "a1",
+        parentUuid: "u1",
+        timestamp: at(2),
+        message: { content: [] },
+      },
+      // A resumed process appends a message whose parent is not in this file.
+      { ...user("second", { uuid: "u2", parentUuid: "elsewhere" }, 3) },
+    ];
+    await writeFile(file, lines.map((line) => JSON.stringify(line)).join("\n"));
+    const turns = await readConversation(file);
+    expect(turns[0]?.resumed).toBeUndefined();
+    expect(turns[1]?.resumed).toBe(true);
+  });
 });
 
 describe("displayTurn", () => {

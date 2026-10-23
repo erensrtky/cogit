@@ -30,8 +30,24 @@ export const AgentDecision = z.object({
 /** Message node ids follow the order of the user's messages in the transcript. */
 export const MESSAGE_ID = /^m[1-9][0-9]*$/;
 
+/**
+ * The summary a branch carries on its first message: what the thread asked,
+ * what came of it and what is still open.
+ */
+export const BranchSummary = z.object({
+  title: z.string().min(1).max(80),
+  asked: z.string().min(1).max(300),
+  outcome: z.string().min(1).max(600),
+  /** May be empty: a thread can leave nothing open. */
+  open: z.string().max(300).default(""),
+});
+
 export const LineageNode = z.object({
   id: Slug,
+  /**
+   * For a message: the id of the earlier message it reacts to (`m3` for `m7`),
+   * or null for a new root. For other kinds: the node it belongs to.
+   */
   parent: Slug.nullable().default(null),
   kind: NodeKind,
   title: z.string().min(1).max(200),
@@ -48,6 +64,10 @@ export const LineageNode = z.object({
     .optional(),
   /** Files this work touched, relative to the project. */
   files: z.array(z.string().min(1).max(300)).max(30).optional(),
+  /** For a message: earlier messages it returns to or builds on besides its parent. */
+  links: z.array(Slug).max(5).optional(),
+  /** For the first message of a branch: the summary of that thread. */
+  branch: BranchSummary.optional(),
   /** For a message: what the agent did about it, in short items. */
   work: z.array(z.string().min(1).max(300)).max(20).optional(),
   /** For a message: choices the agent made on its own along the way. */
@@ -103,6 +123,7 @@ export const SessionInput = z.object({
 });
 
 export type LineageNode = z.infer<typeof LineageNode>;
+export type BranchSummary = z.infer<typeof BranchSummary>;
 export type AgentDecision = z.infer<typeof AgentDecision>;
 export type Status = z.infer<typeof Status>;
 export type Session = z.infer<typeof Session>;

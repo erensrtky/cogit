@@ -106,6 +106,30 @@ describe("session write", () => {
     expect(await loadSession(root, "s1")).toMatchObject({ ok: true, data: { epoch: "nope" } });
   });
 
+  it("repairs a message parent to the previous message and drops bad links", async () => {
+    await write({
+      sessionId: "s1",
+      nodes: [
+        { id: "m1", kind: "message", title: "One" },
+        { id: "m2", kind: "message", title: "Two", parent: "m9" },
+        { id: "m3", kind: "message", title: "Three", parent: "m3", links: ["m9", "m1", "m2"] },
+      ],
+    });
+    const s = await loadSession(root, "s1");
+    const nodes = s.found && s.ok ? s.data.nodes : [];
+    expect(nodes.map((n) => [n.id, n.parent])).toEqual([
+      ["m1", null],
+      ["m2", "m1"],
+      ["m3", "m2"],
+    ]);
+    expect(nodes[2]?.links).toEqual(["m1", "m2"]);
+    expect(io.warnings).toEqual([
+      expect.stringMatching(/m2: parent m9 is not an earlier message of this session, using m1/),
+      expect.stringMatching(/m3: parent m3 is not an earlier message of this session, using m2/),
+      expect.stringMatching(/m3: link m9 is not an earlier message of this session, dropped/),
+    ]);
+  });
+
   it("rejects invalid JSON and schema mismatches", async () => {
     await expect(write("{nope")).rejects.toThrow(/not valid JSON/);
     await expect(write({ sessionId: "../x" })).rejects.toThrow(/sessionId:/);
@@ -165,6 +189,7 @@ describe("session show", () => {
       epochs: [{ id: "e2e", title: "E2E" }],
       session: null,
       newMessages: null,
+      lastMessages: [],
       inbox: join(root, ".codelineage", "inbox", "s1.json"),
     });
 
@@ -209,7 +234,7 @@ ${line("second", 2)}
       messageCount: 2,
       newMessages: [
         { id: "m1", at: "2026-10-23T10:01:00.000Z", text: "first" },
-        { id: "m2", at: "2026-10-23T10:02:00.000Z", text: "second" },
+        { id: "m2", at: "2026-10-23T10:02:00.000Z", text: "second", gapMinutes: 1 },
       ],
     });
 
@@ -230,7 +255,54 @@ ${line("second", 2)}
     io.lines.length = 0;
     await sessionShow(root, "s1", io);
     expect(shown().newMessages).toEqual([
-      { id: "m2", at: "2026-10-23T10:02:00.000Z", text: "second" },
+      { id: "m2", at: "2026-10-23T10:02:00.000Z", text: "second", gapMinutes: 1 },
+    ]);
+    expect(shown().lastMessages).toEqual([
+      { id: "m1", title: "First", parent: null },
+      { id: "m9", title: "Made up", parent: null },
+    ]);
+  });
+
+  it("hints the gap, a /clear and this session's commits for each new message", async () => {
+    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    const folder = join(dir, "claude", "projects", "-p");
+    await mkdir(folder, { recursive: true });
+    const user = (text: string, at: string) =>
+      JSON.stringify({
+        type: "user",
+        timestamp: at,
+        message: { role: "user", content: text },
+      });
+    const commit = JSON.stringify({
+      type: "assistant",
+      timestamp: "2026-10-23T10:05:00.000Z",
+      message: {
+        role: "assistant",
+        content: [{ type: "tool_use", name: "Bash", input: { command: "git commit -m x" } }],
+      },
+    });
+    await writeFile(
+      join(folder, "s1.jsonl"),
+      [
+        user("first", "2026-10-23T10:00:00.000Z"),
+        commit,
+        user("second", "2026-10-23T10:30:00.000Z"),
+        user("<command-name>/clear</command-name>", "2026-10-23T10:40:00.000Z"),
+        user("third", "2026-10-23T11:00:00.000Z"),
+      ].join("\n"),
+    );
+
+    await sessionShow(root, "s1", io);
+    expect(shown().newMessages).toEqual([
+      { id: "m1", at: "2026-10-23T10:00:00.000Z", text: "first" },
+      {
+        id: "m2",
+        at: "2026-10-23T10:30:00.000Z",
+        text: "second",
+        gapMinutes: 30,
+        commitBetween: true,
+      },
+      { id: "m3", at: "2026-10-23T11:00:00.000Z", text: "third", gapMinutes: 30, resumed: true },
     ]);
   });
 

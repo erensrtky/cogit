@@ -45,6 +45,57 @@ describe("Session schema", () => {
     expect(r.success).toBe(false);
   });
 
+  it("keeps message links and a branch summary, and old records still parse", () => {
+    const s = Session.parse({
+      schema: 1,
+      sessionId: "abc",
+      startedAt: T0,
+      updatedAt: T0,
+      nodes: [
+        {
+          id: "m1",
+          parent: null,
+          kind: "message",
+          title: "Start",
+          branch: { title: "Setup", asked: "set it up", outcome: "done" },
+        },
+        { id: "m2", parent: "m1", kind: "message", title: "Next", links: ["m1"] },
+        // An old record: a phase topic and a message whose parent is that phase.
+        { id: "topic", parent: null, kind: "phase", title: "Old topic" },
+        { id: "m3", parent: "topic", kind: "message", title: "Old message" },
+      ],
+    });
+    expect(s.nodes[0]?.branch).toEqual({
+      title: "Setup",
+      asked: "set it up",
+      outcome: "done",
+      open: "",
+    });
+    expect(s.nodes[1]?.links).toEqual(["m1"]);
+    expect(s.nodes[3]?.parent).toBe("topic");
+  });
+
+  it("limits links to five and branch texts to their lengths", () => {
+    const message = (extra: object) => ({
+      sessionId: "abc",
+      nodes: [{ id: "m1", kind: "message", title: "x", ...extra }],
+    });
+    expect(input(message({ links: ["a", "b", "c", "d", "e"] })).nodes?.[0]?.links).toHaveLength(5);
+    expect(SessionInput.safeParse(message({ links: ["a", "b", "c", "d", "e", "f"] })).success).toBe(
+      false,
+    );
+    expect(
+      SessionInput.safeParse(
+        message({ branch: { title: "t".repeat(81), asked: "a", outcome: "o" } }),
+      ).success,
+    ).toBe(false);
+    expect(
+      SessionInput.safeParse(
+        message({ branch: { title: "t", asked: "a", outcome: "o", open: "" } }),
+      ).success,
+    ).toBe(true);
+  });
+
   it("exports a JSON Schema for the agent input", () => {
     const js = sessionInputJsonSchema() as { required?: string[]; properties?: object };
     expect(js.required).toEqual(["sessionId"]);

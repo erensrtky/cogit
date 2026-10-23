@@ -1,4 +1,10 @@
-import { type LineageNode, SESSION_SCHEMA, type Session, type SessionInput } from "./session.js";
+import {
+  type LineageNode,
+  MESSAGE_ID,
+  SESSION_SCHEMA,
+  type Session,
+  type SessionInput,
+} from "./session.js";
 
 export interface MergeResult {
   session: Session;
@@ -30,12 +36,30 @@ export function mergeSession(
   };
 
   const nodes = new Map<string, LineageNode>(base.nodes.map((n) => [n.id, n]));
-  for (const { parent, ...n } of input.nodes ?? []) {
+  const messageNumbers = new Map<string, number>();
+  for (const n of [...base.nodes, ...(input.nodes ?? [])]) {
+    const number = messageNumber(n);
+    if (number !== null) messageNumbers.set(n.id, number);
+  }
+  const messageWarnings: string[] = [];
+  for (const { parent, links, ...n } of input.nodes ?? []) {
     const prev = nodes.get(n.id);
+    const own = n.kind === "message" ? messageNumber(n) : null;
+    const nextParent =
+      parent !== undefined && own !== null
+        ? checkParent(n.id, parent, own, messageNumbers, messageWarnings)
+        : parent === undefined
+          ? (prev?.parent ?? null)
+          : parent;
+    const nextLinks =
+      links !== undefined && own !== null
+        ? checkLinks(n.id, links, own, messageNumbers, messageWarnings)
+        : links;
     const next: LineageNode = {
       ...prev,
       ...n,
-      parent: parent === undefined ? (prev?.parent ?? null) : parent,
+      parent: nextParent,
+      ...(nextLinks === undefined ? {} : { links: nextLinks }),
     };
     // Nodes recorded before these stamps existed keep no addedAt: their order stays as stored.
     const addedAt = prev ? prev.addedAt : now;
@@ -55,8 +79,70 @@ export function mergeSession(
     nodes: [...nodes.values()],
     updatedAt: now,
   };
-  const warnings = repairTree(merged.nodes);
+  const warnings = [...messageWarnings, ...repairTree(merged.nodes)];
   return { session: merged, warnings };
+}
+
+/** The number in a message node's id (`m7` → 7), or null for any other node. */
+function messageNumber(node: { id: string; kind: string }): number | null {
+  if (node.kind !== "message" || !MESSAGE_ID.test(node.id)) return null;
+  return Number(node.id.slice(1));
+}
+
+function isEarlierMessage(numbers: Map<string, number>, id: string, own: number): boolean {
+  const number = numbers.get(id);
+  return number !== undefined && number < own;
+}
+
+/** The recorded message just before `own` by number, or null when there is none. */
+function previousMessage(numbers: Map<string, number>, own: number): string | null {
+  let best: string | null = null;
+  let bestNumber = 0;
+  for (const [id, number] of numbers) {
+    if (number < own && number > bestNumber) {
+      best = id;
+      bestNumber = number;
+    }
+  }
+  return best;
+}
+
+/**
+ * A message's parent is the earlier message it reacts to; anything else (a
+ * forward reference, a self-parent, a removed message id) falls back to the
+ * previous message so the chain stays in time order. Old records whose message
+ * parents are phase ids are left alone: this only checks what the agent sends now.
+ */
+function checkParent(
+  id: string,
+  parent: string | null,
+  own: number,
+  numbers: Map<string, number>,
+  warnings: string[],
+): string | null {
+  if (parent === null || isEarlierMessage(numbers, parent, own)) return parent;
+  const fallback = previousMessage(numbers, own);
+  warnings.push(
+    fallback === null
+      ? `message ${id}: parent ${parent} is not an earlier message of this session, moved to root`
+      : `message ${id}: parent ${parent} is not an earlier message of this session, using ${fallback}`,
+  );
+  return fallback;
+}
+
+/** Links point at earlier messages too; a forward or unknown one is dropped. */
+function checkLinks(
+  id: string,
+  links: string[],
+  own: number,
+  numbers: Map<string, number>,
+  warnings: string[],
+): string[] {
+  return links.filter((link) => {
+    if (isEarlierMessage(numbers, link, own)) return true;
+    warnings.push(`message ${id}: link ${link} is not an earlier message of this session, dropped`);
+    return false;
+  });
 }
 
 const NODE_FIELDS = [
@@ -70,6 +156,8 @@ const NODE_FIELDS = [
   "alternatives",
   "commits",
   "files",
+  "links",
+  "branch",
   "work",
   "agentDecisions",
 ] as const;

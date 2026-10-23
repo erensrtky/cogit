@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Lineage records: each message node now hangs from the earlier message it reacts to (or is a new root), with up to five `links` back to other messages and a `branch` summary (title, asked, outcome, open) on the first message of each branch. `session write` moves a parent that is not an earlier message to the previous message and drops links that are not earlier messages, with a warning; `session show` hints each unrecorded message with `gapMinutes`, `resumed` (a `/clear` or a resume in between) and `commitBetween` (a commit this session made), and lists the last recorded messages with their parent.
+
 ### Fixed
 - `open` adds an initialized project that is missing from the global registry (for example one set up inside a sandbox with its own home) back before serving it; the local map server only shows registered projects, so such a map returned "not found". When the registry cannot be written, `open` opens the file instead.
 

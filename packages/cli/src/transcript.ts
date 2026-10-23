@@ -11,6 +11,10 @@ export interface UserMessage {
   /** When the user sent it, from the transcript. */
   at: string;
   text: string;
+  /** A `/clear`, a resume or a new process came between this message and the previous one. */
+  resumed?: boolean;
+  /** The agent ran `git commit` between the previous message and this one. */
+  commitBetween?: boolean;
 }
 
 /**
@@ -132,6 +136,19 @@ export function displayTurn(turn: ChatTurn, roots: string[]): ChatTurn {
 
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
+/**
+ * `git commit`, also behind options like `-C dir`. A hint, not a decision: a
+ * command that merely mentions a commit (`git log --grep commit`) may match.
+ */
+const GIT_COMMIT = /(?:^|[\s;&|])git(?:\s+[^\s;&|]+)*\s+commit\b/;
+
+/** A `/clear` written by the user or by the CLI as a local command. */
+const CLEAR = /<command-name>\s*\/clear\s*<\/command-name>/;
+
+/** The uuid chain fields, read from every line without parsing it. */
+const LINE_UUID = /"uuid":"([^"]+)"/;
+const LINE_PARENT = /"parentUuid":"([^"]+)"/;
+
 /** Records the agent's text and tool calls of one assistant line on the current turn. */
 function addAssistant(turn: ChatTurn, line: Record<string, unknown>): void {
   if (line.isSidechain) return;
@@ -157,8 +174,27 @@ function addAssistant(turn: ChatTurn, line: Record<string, unknown>): void {
  */
 export async function readConversation(file: string): Promise<ChatTurn[]> {
   const turns: ChatTurn[] = [];
+  /** Uuids already read, to notice a chain that starts again (a resumed process). */
+  const seen = new Set<string>();
+  let pendingResume = false;
+  let pendingCommit = false;
   const lines = createInterface({ input: createReadStream(file, "utf8"), crlfDelay: Infinity });
   for await (const raw of lines) {
+    // A /clear line is a local command, not a message, but it breaks the thread.
+    if (raw.includes("<command-name>") && CLEAR.test(raw)) pendingResume = true;
+    // A resume or a new process can append a chain whose parent is not in this
+    // file (system lines sit in the chain too, so every line counts). A resume
+    // that continues the chain cannot be told apart.
+    const uuid = LINE_UUID.exec(raw)?.[1];
+    const parent = LINE_PARENT.exec(raw)?.[1];
+    if (
+      seen.size > 0 &&
+      parent !== undefined &&
+      !seen.has(parent) &&
+      !raw.includes('"isSidechain":true')
+    )
+      pendingResume = true;
+    if (uuid !== undefined) seen.add(uuid);
     // Most lines are tool output, attachments or API records; skip them unparsed.
     const user = raw.includes('"type":"user"');
     if (!user && !raw.includes('"type":"assistant"')) continue;
@@ -168,27 +204,55 @@ export async function readConversation(file: string): Promise<ChatTurn[]> {
     } catch {
       continue;
     }
+    // Another line type may still carry `"type":"user"` in nested text.
+    if (line.type !== "user" && line.type !== "assistant") continue;
     const current = turns.at(-1);
     if (line.type === "assistant") {
       if (current) addAssistant(current, line);
+      if (current && hasCommit(line)) pendingCommit = true;
       continue;
     }
     const text = messageText(line);
     if (text === null || typeof line.timestamp !== "string") continue;
+    const first = turns.length === 0;
     turns.push({
       id: `m${turns.length + 1}`,
       at: line.timestamp,
       text,
       replies: [],
       tools: { commands: 0, files: [], other: 0 },
+      ...(!first && pendingResume ? { resumed: true } : {}),
+      ...(!first && pendingCommit ? { commitBetween: true } : {}),
     });
+    pendingResume = false;
+    pendingCommit = false;
   }
   return turns;
 }
 
+/** Whether an assistant line ran a `git commit`. */
+function hasCommit(line: Record<string, unknown>): boolean {
+  if (line.isSidechain) return false;
+  const content = (line.message as { content?: unknown } | undefined)?.content;
+  if (!Array.isArray(content)) return false;
+  return content.some(
+    (block) =>
+      block?.type === "tool_use" &&
+      block.name === "Bash" &&
+      typeof block.input?.command === "string" &&
+      GIT_COMMIT.test(block.input.command),
+  );
+}
+
 /** Reads the user's messages from a transcript, in order. */
 export async function readUserMessages(file: string): Promise<UserMessage[]> {
-  return (await readConversation(file)).map(({ id, at, text }) => ({ id, at, text }));
+  return (await readConversation(file)).map(({ id, at, text, resumed, commitBetween }) => ({
+    id,
+    at,
+    text,
+    ...(resumed ? { resumed: true } : {}),
+    ...(commitBetween ? { commitBetween: true } : {}),
+  }));
 }
 
 /**

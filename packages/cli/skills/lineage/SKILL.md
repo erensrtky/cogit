@@ -1,6 +1,6 @@
 ---
 name: lineage
-description: Record or update this session's lineage for codelineage, one node per user message with what came of it, grouped by topic, plus the goal, open items and what comes next. Use it when the user asks to record the session or its lineage, or when a codelineage hook asks for an update.
+description: Record or update this session's lineage for codelineage, one node per user message with what came of it, each hanging from the earlier message it reacts to, with a summary at each branch start, plus the goal, open items and what comes next. Use it when the user asks to record the session or its lineage, or when a codelineage hook asks for an update.
 allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" *) Edit(/${CLAUDE_PROJECT_DIR}/.codelineage/inbox/**)
 ---
 
@@ -49,7 +49,8 @@ one of them; skip none, even a short "ok" or "go on".
 - `id`: exactly the message's id from `newMessages`. The CLI takes the time from
   the transcript, so do not send `at`.
 - `kind`: `"message"`.
-- `parent`: the id of the topic it belongs to (see below).
+- `parent`: the id of the earlier message it reacts to (see below), or `null`
+  for a new root.
 - `title`: the message in a few words, in the user's own wording where possible
   ("Continue with Epic 4", "Why does auto mode keep stopping?"). Never copy a
   long paste; name what it is.
@@ -73,23 +74,49 @@ one of them; skip none, even a short "ok" or "go on".
 If `newMessages` is `null`, the transcript could not be read. Then record only
 `status` and leave the nodes alone.
 
-## Group the messages by topic
+## Hang each message from the one it reacts to
 
-The map opens like layers of an onion: first the session's topics, then a click
-reveals the messages inside each one, in the order they were written.
+The map is a git-like graph of the user's messages: every message grows from an
+earlier one, and a thread that starts something new is a root.
 
-- A topic is a node with `kind: "phase"`, an `id` of your choice (a short slug,
-  never `m` followed by a number), a `title` naming what the work is about, such
-  as "Permissions" or "Map layout", never when it happened, and `parent: null`
-  for a top-level topic.
-- Put each message under the topic it belongs to. Open a sub-topic (a `phase`
-  whose parent is a topic) once a topic holds several distinct threads.
-- Reuse an existing topic before creating a new one. If an earlier node sits
-  under the wrong topic, send it again (with its `kind` and `title`) and the
-  right `parent`.
-- Keep the top level short: a handful of topics per session.
-- Records from before messages became the nodes also hold `step`, `decision`
-  and `question` nodes. Leave them as they are and do not add new ones.
+- Default: `parent` is the previous message. Most messages react to the last
+  answer.
+- `parent: null` only when the message would make sense as the first message of
+  a new chat and does not rely on the previous answer.
+- An explicit return to an older thread ("back to the representation question"):
+  set `parent` to that thread's message and put the previous message in `links`.
+- When unsure, use the previous message. A wrong "continue" only hides a branch;
+  a wrong branch breaks the chain.
+- `links`: up to 5 earlier messages of this session that this one returns to or
+  builds on besides its parent. They show as dashed arrows. The CLI drops a
+  link or parent that is not an earlier message, so a mistyped one is not fatal.
+- `newMessages` hints help, but are hints, not rules: `gapMinutes` since the
+  previous message, `resumed` (a `/clear`, a resume or a new process came in
+  between), `commitBetween` (this session committed between them). The wording
+  decides. `lastMessages` lists the last recorded messages with their parent.
+
+## Summarize each branch
+
+A branch starts at a root or where a message gets a second child. Its first
+message carries a `branch` object, short, in the conversation's language:
+
+```json
+{
+  "title": "What this thread is about, in a few words",
+  "asked": "What the user set out to do in this thread",
+  "outcome": "What came of it, so far",
+  "open": "What is still open; may be empty"
+}
+```
+
+- Write or update it when the branch ends (a new branch or root starts, or a
+  message returns to an older thread) or when you update the session status at
+  the end — not on every turn, to keep the update cheap.
+- Only the first message of a branch carries a `branch`.
+
+New records send no `phase` nodes: topics are no longer the skeleton. Old
+records that still have `phase`, `step`, `decision` and `question` nodes keep
+rendering; leave them as they are and do not add new ones.
 
 Write titles and text in the conversation's language when `language` is `"auto"`,
 and in that language otherwise. JSON keys stay in English.
