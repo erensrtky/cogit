@@ -56,3 +56,5 @@ ss/
 /qa
 /release
 coverage/
+# codelineage
+/.codelineage/

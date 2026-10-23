@@ -197,8 +197,8 @@ Each update costs agent tokens (the user's subscription or API usage).
    `~/.claude/settings.json` so automatic updates do not prompt every N turns? Default:
    yes. Asked only when the rule is missing; backs the file up first (one backup per
    run, holding the original), refuses a file it cannot parse and prints what it
-   changed. `--allow-skill` / `--no-allow-skill` answer it; `--allow-skill` also works
-   on an already initialized project. A user-level rule is harmless in projects
+   changed. `--allow-skill` / `--no-allow-skill` answer it; `--yes` alone never adds it;
+   `--allow-skill` also works on an already initialized project. A user-level rule is harmless in projects
    without `init`, where the skill only prints the setup hint.
 4. **Language** for summaries: `auto` (the conversation's language) or a fixed language.
 5. **Past sessions:** "This project has N earlier sessions: all, pick, or none?"

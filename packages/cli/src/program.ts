@@ -59,6 +59,8 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .action(
       run(async (dir: string, opts: InitOptions & { yes?: boolean }) => {
         const { yes, ...rest } = opts;
+        // --yes never changes Claude Code's permissions on its own
+        if (yes) rest.allowSkill ??= false;
         await init(dir, rest, makeIo(!yes && process.stdin.isTTY === true));
       }),
     );

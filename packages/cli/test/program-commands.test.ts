@@ -60,8 +60,8 @@ describe("commands through the CLI", () => {
     expect(await loadProject(root)).toMatchObject({ ok: true, data: { name: "P" } });
   });
 
-  it("init --no-allow-skill and --allow-skill set the skill permission", async () => {
-    await cli("init", root, "--yes", "--retention", "keep", "--no-allow-skill");
+  it("init --yes leaves the skill permission alone; --allow-skill adds it", async () => {
+    await cli("init", root, "--yes", "--retention", "keep");
     expect(await readSkillAllowed(io.env)).toBe(false);
     await cli("init", root, "--allow-skill");
     expect(await readSkillAllowed(io.env)).toBe(true);
