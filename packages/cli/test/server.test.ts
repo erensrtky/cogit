@@ -217,11 +217,13 @@ describe("map server", () => {
   });
 
   it("stays up while a page is connected and exits after it leaves", async () => {
-    const server = await start(300);
+    // Generous idle: the connection must be registered before it can fire, and
+    // coverage instrumentation can delay the first request.
+    const server = await start(1000);
     const events = openEvents(`${server.url}/events?dir=${encodeURIComponent(root)}`);
     try {
       expect(await events.waitFor("retry: 1000")).toBe(true);
-      await delay(500);
+      await delay(1300);
       const state = await Promise.race([
         server.closed.then(() => "closed"),
         delay(50).then(() => "open"),
