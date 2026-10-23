@@ -11,6 +11,8 @@ export const Config = z.object({
   sessionEndCatchUp: z.boolean().default(true),
   /** Model for the headless catch-up (SessionEnd) and, later, backfill. */
   catchUpModel: z.string().trim().min(1).max(64).default("haiku"),
+  /** Port the local map server binds on `127.0.0.1`. */
+  serverPort: z.int().min(1).max(65535).default(4747),
   /** Default for new projects; `init` asks per repo. */
   gitPolicy: z.enum(["ignore", "commit"]).default("ignore"),
   agents: z.array(z.string().min(1)).default(["claude-code"]),

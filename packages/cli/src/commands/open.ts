@@ -1,5 +1,6 @@
 import { type SpawnOptions, spawn } from "node:child_process";
 import type { Io } from "../io.js";
+import { ensureServer, mapPageUrl } from "../server.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { buildPanel } from "../view/panel.js";
@@ -10,7 +11,18 @@ export interface OpenOptions {
   /** Tests inject a minimal page instead of the bundled template. */
   templateHtml?: string;
   /** Tests replace the OS opener; resolves false when none is available. */
-  launch?: (file: string) => Promise<boolean>;
+  launch?: (target: string) => Promise<boolean>;
+  /** Tests replace the local map server; resolves the URL base or null. */
+  server?: (env: NodeJS.ProcessEnv) => Promise<string | null>;
+}
+
+/** Any failure here means "no server", never a failed `open`. */
+export async function defaultServer(env: NodeJS.ProcessEnv): Promise<string | null> {
+  try {
+    return await ensureServer(env);
+  } catch {
+    return null;
+  }
 }
 
 export interface OpenProjectOptions extends OpenOptions {
@@ -53,19 +65,23 @@ export function launchFile(file: string, spawnFn: SpawnLike = systemSpawn): Prom
   });
 }
 
-/** Hands a built page to the OS opener, or prints its path when none exists. */
-async function openFile(file: string, opts: OpenOptions): Promise<void> {
+/** Hands a page URL or file to the OS opener, or prints it when none exists. */
+async function openTarget(target: string, opts: OpenOptions): Promise<void> {
   const { io } = opts;
-  const opened = await (opts.launch ?? launchFile)(file);
+  const opened = await (opts.launch ?? launchFile)(target);
   if (opened) {
-    io.out(`Opened ${file}`);
+    io.out(`Opened ${target}`);
     return;
   }
-  io.out(file);
-  io.warn("no application opener found; open the file manually");
+  io.out(target);
+  io.warn("no application opener found; open it manually");
 }
 
-/** Rebuilds the map, then hands `lineage.html` to the OS opener. */
+/**
+ * Rebuilds the map, then opens it through the local map server so the page can
+ * refresh itself. The file remains the fallback: when no server can run (port
+ * taken, spawn failed) `open` still shows the map, just without live updates.
+ */
 export async function openProject(opts: OpenProjectOptions): Promise<void> {
   const { io } = opts;
   const { root } = await resolveProjectRoot(opts.dir);
@@ -74,15 +90,27 @@ export async function openProject(opts: OpenProjectOptions): Promise<void> {
     io,
     ...(opts.templateHtml === undefined ? {} : { templateHtml: opts.templateHtml }),
   });
-  await openFile(projectPaths(root).html, opts);
+  const base = await (opts.server ?? defaultServer)(io.env);
+  if (base) {
+    await openTarget(mapPageUrl(base, root), opts);
+    return;
+  }
+  io.warn("could not start the local map server; opened the file instead");
+  await openTarget(projectPaths(root).html, opts);
 }
 
-/** Rebuilds the global panel, then hands `panel.html` to the OS opener. */
+/** Rebuilds the global panel, then opens it through the local map server. */
 export async function openPanel(opts: OpenOptions): Promise<void> {
   await buildPanel({
     env: opts.io.env,
     io: opts.io,
     ...(opts.templateHtml === undefined ? {} : { templateHtml: opts.templateHtml }),
   });
-  await openFile(globalPaths(opts.io.env).panel, opts);
+  const base = await (opts.server ?? defaultServer)(opts.io.env);
+  if (base) {
+    await openTarget(`${base}/`, opts);
+    return;
+  }
+  opts.io.warn("could not start the local map server; opened the file instead");
+  await openTarget(globalPaths(opts.io.env).panel, opts);
 }

@@ -10,6 +10,13 @@ import type { NodeKind } from "../schema/session.js";
 /** Id of the `<script type="application/json">` that carries the model. */
 export const DATA_ELEMENT_ID = "codelineage-data";
 
+/**
+ * Meta tag the local map server injects into the pages it serves. The page
+ * subscribes to rebuild events only when it is present, so a `file://` page or
+ * the Vite dev server never tries to reach a server that is not there.
+ */
+export const LIVE_META_NAME = "codelineage-live";
+
 /** Version of the serialized view model (not the session schema). */
 export const VIEW_SCHEMA = 1;
 

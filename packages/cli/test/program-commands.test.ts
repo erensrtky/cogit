@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
+import { type AddressInfo, createServer as createNetServer } from "node:net";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { readSkillAllowed } from "../src/claude-settings.js";
@@ -13,6 +14,7 @@ let root: string;
 let io: FakeIo;
 let interactive: boolean[];
 let launched: string[];
+let serverUrl: string | null = null;
 let stdin = "";
 
 beforeEach(async () => {
@@ -22,6 +24,7 @@ beforeEach(async () => {
   io = fakeIo(envFor(dir));
   interactive = [];
   launched = [];
+  serverUrl = null;
 });
 
 async function cli(...args: string[]): Promise<string> {
@@ -36,6 +39,7 @@ async function cli(...args: string[]): Promise<string> {
         launched.push(file);
         return true;
       },
+      server: async () => serverUrl,
       stdin: async () => stdin,
     },
   );
@@ -137,6 +141,27 @@ describe("commands through the CLI", () => {
     expect(launched).toHaveLength(2);
     expect(launched.at(-1)).toBe(globalPaths(io.env).panel);
     expect(io.lines.at(-1)).toMatch(/^Opened .*panel\.html$/);
+  });
+
+  it("open uses the local server when one is running", async () => {
+    await cli("init", root, "--yes", "--retention", "keep");
+    serverUrl = "http://127.0.0.1:4747";
+    await cli("open", root);
+    expect(launched.at(-1)).toBe(`http://127.0.0.1:4747/map?dir=${encodeURIComponent(root)}`);
+  });
+
+  it("serve refuses an invalid port and reports a taken one", async () => {
+    expect(await cli("serve", "--port", "0")).toMatch(/invalid port: 0/);
+    const taken = createNetServer();
+    await new Promise<void>((done) => taken.listen(0, "127.0.0.1", done));
+    const port = (taken.address() as AddressInfo).port;
+    try {
+      expect(await cli("serve", "--port", String(port))).toMatch(
+        /could not start the map server: .*EADDRINUSE/,
+      );
+    } finally {
+      await new Promise<void>((done) => taken.close(() => done()));
+    }
   });
 
   it("prunes projects whose directory is gone, honouring --dry-run", async () => {

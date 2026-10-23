@@ -1,9 +1,15 @@
 import { EventEmitter } from "node:events";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { init } from "../src/commands/init.js";
-import { launchFile, openerCommand, openPanel, openProject } from "../src/commands/open.js";
+import {
+  defaultServer,
+  launchFile,
+  openerCommand,
+  openPanel,
+  openProject,
+} from "../src/commands/open.js";
 import { globalPaths, projectPaths } from "../src/store/paths.js";
 import { DATA_ELEMENT_ID } from "../src/view/model.js";
 import { envFor, type FakeIo, fakeIo, tempDir } from "./helpers.js";
@@ -69,15 +75,45 @@ describe("launchFile", () => {
   });
 });
 
+const NO_SERVER = async () => null;
+
+describe("defaultServer", () => {
+  it("turns a broken config into 'no server' instead of failing open", async () => {
+    // A directory where config.json should be makes the config read throw.
+    await rm(globalPaths(io.env).config, { force: true });
+    await mkdir(globalPaths(io.env).config, { recursive: true });
+    expect(await defaultServer(io.env)).toBeNull();
+  });
+});
+
 describe("openProject", () => {
-  it("builds the map and opens it with the OS opener", async () => {
+  it("builds the map and opens it through the local server", async () => {
     const launched: string[] = [];
     await openProject({
       dir: root,
       io,
       templateHtml: TEMPLATE,
-      launch: async (file) => {
-        launched.push(file);
+      server: async () => "http://127.0.0.1:4747",
+      launch: async (target) => {
+        launched.push(target);
+        return true;
+      },
+    });
+    const url = `http://127.0.0.1:4747/map?dir=${encodeURIComponent(root)}`;
+    expect(launched).toEqual([url]);
+    expect(io.lines).toEqual([`Wrote ${projectPaths(root).html}`, `Opened ${url}`]);
+    expect(io.warnings).toEqual([]);
+  });
+
+  it("falls back to the file when no server can start", async () => {
+    const launched: string[] = [];
+    await openProject({
+      dir: root,
+      io,
+      templateHtml: TEMPLATE,
+      server: NO_SERVER,
+      launch: async (target) => {
+        launched.push(target);
         return true;
       },
     });
@@ -86,33 +122,63 @@ describe("openProject", () => {
       `Wrote ${projectPaths(root).html}`,
       `Opened ${projectPaths(root).html}`,
     ]);
+    expect(io.warnings).toEqual(["could not start the local map server; opened the file instead"]);
   });
 
   it("prints the path when no opener is available", async () => {
-    await openProject({ dir: root, io, templateHtml: TEMPLATE, launch: async () => false });
+    await openProject({
+      dir: root,
+      io,
+      templateHtml: TEMPLATE,
+      server: NO_SERVER,
+      launch: async () => false,
+    });
     expect(io.lines.at(-1)).toBe(projectPaths(root).html);
-    expect(io.warnings).toEqual(["no application opener found; open the file manually"]);
+    expect(io.warnings).toEqual([
+      "could not start the local map server; opened the file instead",
+      "no application opener found; open it manually",
+    ]);
   });
 });
 
 describe("openPanel", () => {
-  it("builds the panel and opens it with the OS opener", async () => {
+  it("builds the panel and opens it through the local server", async () => {
     const launched: string[] = [];
     await openPanel({
       io,
       templateHtml: TEMPLATE,
-      launch: async (file) => {
-        launched.push(file);
+      server: async () => "http://127.0.0.1:4747",
+      launch: async (target) => {
+        launched.push(target);
+        return true;
+      },
+    });
+    expect(launched).toEqual(["http://127.0.0.1:4747/"]);
+    expect(io.lines).toEqual(["Opened http://127.0.0.1:4747/"]);
+  });
+
+  it("falls back to the panel file when no server can start", async () => {
+    const launched: string[] = [];
+    await openPanel({
+      io,
+      templateHtml: TEMPLATE,
+      server: NO_SERVER,
+      launch: async (target) => {
+        launched.push(target);
         return true;
       },
     });
     expect(launched).toEqual([globalPaths(io.env).panel]);
     expect(io.lines).toEqual([`Opened ${globalPaths(io.env).panel}`]);
+    expect(io.warnings).toEqual(["could not start the local map server; opened the file instead"]);
   });
 
   it("prints the panel path when no opener is available", async () => {
-    await openPanel({ io, templateHtml: TEMPLATE, launch: async () => false });
+    await openPanel({ io, templateHtml: TEMPLATE, server: NO_SERVER, launch: async () => false });
     expect(io.lines.at(-1)).toBe(globalPaths(io.env).panel);
-    expect(io.warnings).toEqual(["no application opener found; open the file manually"]);
+    expect(io.warnings).toEqual([
+      "could not start the local map server; opened the file instead",
+      "no application opener found; open it manually",
+    ]);
   });
 });

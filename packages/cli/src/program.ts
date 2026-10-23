@@ -15,12 +15,16 @@ import { openPanel, openProject } from "./commands/open.js";
 import { readStdin, sessionShow, sessionWrite } from "./commands/session.js";
 import { runHook } from "./hooks/run.js";
 import { CliError, type Io, processIo } from "./io.js";
+import { startMapServer } from "./server.js";
+import { loadConfig } from "./store/stores.js";
 
 export type IoFactory = (interactive: boolean) => Io;
 
 /** Test seams for effects that would leave this process (opening a browser). */
 export interface ProgramDeps {
-  launch?: (file: string) => Promise<boolean>;
+  launch?: (target: string) => Promise<boolean>;
+  /** Replaces the local map server; resolves its base URL, or null. */
+  server?: (env: NodeJS.ProcessEnv) => Promise<string | null>;
   /** Reads a hook's JSON input; tests pass it directly. */
   stdin?: () => Promise<string>;
 }
@@ -91,11 +95,32 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       run(async (dir?: string) => {
         const io = makeIo(false);
         const launch = deps.launch === undefined ? {} : { launch: deps.launch };
+        const server = deps.server === undefined ? {} : { server: deps.server };
         if (dir === undefined) {
-          await openPanel({ io, ...launch });
+          await openPanel({ io, ...launch, ...server });
           return;
         }
-        await openProject({ dir, io, ...launch });
+        await openProject({ dir, io, ...launch, ...server });
+      }),
+    );
+
+  // Started detached by `open`; also useful on its own when the port is known.
+  program
+    .command("serve", { hidden: true })
+    .description("run the local map server that `open` uses")
+    .option("--port <port>", "port to bind (default: serverPort from config)")
+    .action(
+      run(async (opts: { port?: string }) => {
+        const io = makeIo(false);
+        const port =
+          opts.port === undefined ? (await loadConfig(io.env)).serverPort : Number(opts.port);
+        if (!Number.isInteger(port) || port < 1 || port > 65535)
+          throw new CliError(`invalid port: ${String(opts.port)}`);
+        try {
+          await startMapServer({ env: io.env, port });
+        } catch (err) {
+          throw new CliError(`could not start the map server: ${(err as Error).message}`);
+        }
       }),
     );
 
