@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Map: long message titles and branch labels in the git graph wrap onto more lines (the row grows) instead of being cut with an ellipsis; a not-yet-summarized message shows up to 200 characters of its text instead of 80.
+
 ## [0.7.0] - 2026-10-23
 ### Added
 - Lineage records: each message node now hangs from the earlier message it reacts to (or is a new root), with up to five `links` back to other messages and a `branch` summary (title, asked, outcome, open) on the first message of each branch. `session write` moves a parent that is not an earlier message to the previous message and drops links that are not earlier messages, with a warning; `session show` hints each unrecorded message with `gapMinutes`, `resumed` (a `/clear` or a resume in between) and `commitBetween` (a commit this session made), and lists the last recorded messages with their parent.

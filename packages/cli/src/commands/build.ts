@@ -29,7 +29,7 @@ export interface BuildOptions {
 }
 
 /** How many characters of a not-yet-summarized message become its card title. */
-export const PENDING_TITLE_LENGTH = 80;
+export const PENDING_TITLE_LENGTH = 200;
 
 export interface TranscriptViews {
   /**

@@ -135,6 +135,29 @@ describe("rows", () => {
     expect(between).toBe(ROW_HEIGHT + ROOT_GAP);
   });
 
+  it("gives a long title a taller row instead of cutting it, and keeps rows from overlapping", () => {
+    const long =
+      "Kutular genişletilebilir olsun, yazılar kesiliyor ve devamını okuyamıyorum ".repeat(3);
+    const { messageRows, layout } = rowsOf([
+      message("m1", null, {
+        branch: {
+          title: "A branch title long enough to wrap twice",
+          asked: "",
+          outcome: "",
+          open: "",
+        },
+      }),
+      message("m2", "m1", { title: long }),
+      message("m3", "m2", { unsummarized: true }),
+    ]);
+    const [first, second, third] = messageRows;
+    expect(first!.height).toBeGreaterThan(ROW_HEIGHT);
+    expect(second!.height).toBeGreaterThanOrEqual(ROW_HEIGHT + 2 * 16);
+    expect(third!.height).toBe(ROW_HEIGHT);
+    expect(second!.y - second!.height / 2).toBe(first!.y + first!.height / 2);
+    expect(layout.height).toBe(ROW_HEIGHT / 2 + first!.height + second!.height + third!.height);
+  });
+
   it("marks the newest message as HEAD unless told otherwise", () => {
     const messages = [message("m1", null), message("m2", "m1"), message("m3", "m2")];
     const rows = layoutGitGraph(messages).rows.filter(

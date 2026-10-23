@@ -8,7 +8,6 @@ import {
   LANE_COLORS,
   linkArrow,
   linkPath,
-  ROW_HEIGHT,
 } from "./gitLayout.js";
 
 /**
@@ -55,8 +54,8 @@ function Row({
   onUnfold: (segmentId: string) => void;
 }) {
   const style = {
-    top: row.y - ROW_HEIGHT / 2,
-    height: ROW_HEIGHT,
+    top: row.y - row.height / 2,
+    height: row.height,
     borderColor: branchSelected ? color(row.colorIndex) : undefined,
   };
 

@@ -81,6 +81,8 @@ export interface GitMessageRow {
   returns: GitReturn[];
   /** "left off here": the newest message of the newest session. */
   head: boolean;
+  /** Row height: titles wrap instead of being cut, so long ones get taller rows. */
+  height: number;
 }
 
 export interface GitMoreRow {
@@ -88,6 +90,7 @@ export interface GitMoreRow {
   segmentId: string;
   colorIndex: number;
   y: number;
+  height: number;
   /** The messages the fold hides. */
   hidden: string[];
 }
@@ -137,7 +140,41 @@ interface RawRow {
   id?: string;
   hidden?: string[];
   y: number;
+  height: number;
   gap: boolean;
+}
+
+/** Average glyph widths at the row's font sizes; a rough estimate is enough. */
+const TITLE_CHAR = 6.4;
+const TITLE_LINE = 16;
+const BRANCH_CHAR = 6;
+const BRANCH_LINE = 14;
+const BRANCH_MAX = 150;
+/** Padding, the time column and the gaps around it. */
+const ROW_FIXED = 106;
+
+/**
+ * Height of a message row whose title (and branch label) wrap instead of being
+ * cut with an ellipsis: the width left for the title after the fixed parts of
+ * the row decides how many lines it needs.
+ */
+export function rowHeight(
+  message: ViewNode,
+  row: { first: boolean; branchTitle: string; returns: number; head: boolean },
+): number {
+  const fixed =
+    ROW_FIXED +
+    message.id.length * 7 +
+    (row.first ? BRANCH_MAX + 8 : 0) +
+    row.returns * 44 +
+    (row.head ? 92 : 0) +
+    (message.unsummarized ? 116 : 0);
+  const room = Math.max(120, ROW_WIDTH - fixed);
+  const titleLines = Math.max(1, Math.ceil((message.title.length * TITLE_CHAR) / room));
+  const branchLines = row.first
+    ? Math.max(1, Math.ceil((row.branchTitle.length * BRANCH_CHAR) / (BRANCH_MAX - 12)))
+    : 1;
+  return Math.max(ROW_HEIGHT, 12 + Math.max(titleLines * TITLE_LINE, branchLines * BRANCH_LINE));
 }
 
 /** Parent ids that point forward, at themselves or outside the session become roots. */
@@ -235,6 +272,7 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
         segment,
         id: first,
         y: 0,
+        height: ROW_HEIGHT,
         gap: false,
       });
       raw.push({
@@ -243,6 +281,7 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
         segment,
         hidden,
         y: 0,
+        height: ROW_HEIGHT,
         gap: false,
       });
       raw.push({
@@ -251,6 +290,7 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
         segment,
         id: last,
         y: 0,
+        height: ROW_HEIGHT,
         gap: false,
       });
     } else {
@@ -261,6 +301,7 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
           segment,
           id,
           y: 0,
+          height: ROW_HEIGHT,
           gap: false,
         });
       }
@@ -278,8 +319,17 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
       row.segment.parentId === null &&
       row.segment.ids[0] === row.id;
     if (row.gap) cursor += ROOT_GAP;
-    row.y = cursor + ROW_HEIGHT / 2;
-    cursor += ROW_HEIGHT;
+    const message = row.kind === "message" ? byId.get(row.id ?? "") : undefined;
+    row.height = message
+      ? rowHeight(message, {
+          first: row.segment.ids[0] === message.id,
+          branchTitle: row.segment.branch.title,
+          returns: (message.links ?? []).filter((id) => segOf.has(id)).length,
+          head: message.id === headId,
+        })
+      : ROW_HEIGHT;
+    row.y = cursor + row.height / 2;
+    cursor += row.height;
     if (row.kind === "message" && row.id) rowOf.set(row.id, row);
     for (const hidden of row.hidden ?? []) rowOf.set(hidden, row);
   });
@@ -342,6 +392,7 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
         segmentId: row.segment.id,
         colorIndex: row.segment.colorIndex,
         y: row.y,
+        height: row.height,
         hidden: row.hidden ?? [],
       };
     }
@@ -362,6 +413,7 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
       gap: row.gap,
       returns,
       head: message.id === headId,
+      height: row.height,
     };
   });
 
