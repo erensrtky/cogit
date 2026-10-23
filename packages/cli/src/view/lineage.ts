@@ -9,6 +9,7 @@ import {
   type ViewChatTurn,
   type ViewEpoch,
   type ViewNode,
+  type ViewPendingMessage,
   type ViewSession,
 } from "./model.js";
 
@@ -150,11 +151,42 @@ export function statusCard(sessions: Session[], now: string): StatusCard {
   };
 }
 
+/** Title of the last group of a session: messages the record does not hold yet. */
+export const PENDING_GROUP_TITLE = "New";
+
+/**
+ * The messages the record does not hold yet, as cards under one "New" group at
+ * the end of the session, so the newest message is on the map before the agent
+ * summarizes it. The group id never collides with a recorded node's.
+ */
+function pendingGroup(session: Session, pending: ViewPendingMessage[] | undefined): ViewNode[] {
+  if (!pending?.length) return [];
+  const used = new Set(session.nodes.map((node) => node.id));
+  let id = "pending";
+  for (let n = 2; used.has(id); n += 1) id = `pending-${n}`;
+  return [
+    {
+      id,
+      kind: "phase",
+      title: PENDING_GROUP_TITLE,
+      children: pending.map((message) => ({
+        id: message.id,
+        kind: "message" as const,
+        title: message.title,
+        at: message.at,
+        unsummarized: true as const,
+        children: [],
+      })),
+    },
+  ];
+}
+
 function toViewSession(
   session: Session,
   transcripts?: ReadonlySet<string>,
   chat?: ViewChatTurn[],
   unrecorded?: number,
+  pending?: ViewPendingMessage[],
 ): ViewSession {
   return {
     sessionId: session.sessionId,
@@ -164,7 +196,7 @@ function toViewSession(
     startedAt: session.startedAt,
     updatedAt: session.updatedAt,
     status: session.status,
-    nodes: buildNodeTree(session.nodes),
+    nodes: [...buildNodeTree(session.nodes), ...pendingGroup(session, pending)],
     // Undefined means the caller did not ask (fixtures, unit tests); then the
     // record is shown as resumable rather than pretending the transcript is gone.
     transcriptAvailable: transcripts === undefined ? true : transcripts.has(session.sessionId),
@@ -191,6 +223,8 @@ export interface ViewModelInput {
   chats?: ReadonlyMap<string, ViewChatTurn[]>;
   /** Unrecorded message counts, shown while the catch-up is off. */
   unrecorded?: ReadonlyMap<string, number> | undefined;
+  /** User messages with no node yet, drawn as not-yet-summarized cards. */
+  pending?: ReadonlyMap<string, ViewPendingMessage[]> | undefined;
 }
 
 /**
@@ -210,6 +244,7 @@ export function buildViewModel(input: ViewModelInput): LineageViewModel {
       input.transcripts,
       input.chats?.get(session.sessionId),
       input.unrecorded?.get(session.sessionId),
+      input.pending?.get(session.sessionId),
     );
     const bucket = session.epoch === null ? undefined : buckets.get(session.epoch);
     (bucket ?? unassigned).push(view);

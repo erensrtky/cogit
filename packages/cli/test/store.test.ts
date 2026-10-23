@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { atomicWrite, atomicWriteJson, readJson } from "../src/store/fs.js";
-import { LockBusyError, withLock } from "../src/store/lock.js";
+import { isLockHeld, LockBusyError, withLock } from "../src/store/lock.js";
 import { globalPaths, projectPaths } from "../src/store/paths.js";
 import {
   loadConfig,
@@ -129,6 +129,18 @@ describe("withLock", () => {
     await expect(withLock(lock, async () => 1, { timeoutMs: 0 })).rejects.toBeInstanceOf(
       LockBusyError,
     );
+  });
+
+  it("reports a held lock without taking it, and ignores a dead or stale one", async () => {
+    const lock = join(dir, "held.lock");
+    expect(await isLockHeld(lock)).toBe(false);
+    await mkdir(lock);
+    await writeFile(join(lock, "owner"), "1");
+    expect(await isLockHeld(lock)).toBe(true);
+    // The hook may ask and still take the lock afterwards.
+    expect(await isLockHeld(lock)).toBe(true);
+    await writeFile(join(lock, "owner"), "999999999");
+    expect(await isLockHeld(lock)).toBe(false);
   });
 
   it("rethrows unexpected mkdir errors", async () => {

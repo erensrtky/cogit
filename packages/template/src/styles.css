@@ -475,6 +475,18 @@ body:has(.map-shell.is-expanded) {
   line-height: 14px;
 }
 
+/* A card built from the transcript before the record summarizes it. */
+.lineage-box.kind-message .unsummarized {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 6px;
+  color: var(--muted);
+  border: 1px dashed var(--muted);
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 14px;
+}
+
 .lineage-box p.card-meta {
   font-size: 10px;
   color: var(--accent);

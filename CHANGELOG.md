@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Live map: the `Stop` hook rebuilds `lineage.html` after every turn, detached like the SessionEnd catch-up and skipped while a build or the session's write holds its lock (a new `build` lock in `build`, `codelineage build --quiet` for the child). The build draws the user messages the record does not hold yet as cards titled with their first words, marked "not summarized yet" and sitting in a "New" topic at the end of the session, so the newest message is on the map before the agent summarizes it; "left off here" marks the newest of them and their drill-down shows the conversation from the transcript.
+
 ## [0.5.0] - 2026-10-23
 ### Added
 - SessionEnd catch-up: when a session ends with user messages that have no node yet, the `SessionEnd` hook starts a detached `codelineage backfill <session-id> --tail` and returns at once; the child reads those messages with the agent's replies, runs `claude -p --safe-mode --no-session-persistence` with the skill's record rules on `catchUpModel` (default `haiku`) and passes the answer through `session write` (validation, redaction, transcript times, rebuild). The tail is not stored, so a dead child is retried from the transcript next time. With `sessionEndCatchUp` off no tokens are spent, and the map shows "N messages not recorded" on that session.

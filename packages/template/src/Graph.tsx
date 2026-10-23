@@ -146,6 +146,7 @@ function LineageBox({ id, data }: NodeProps<LineageFlowNode>) {
         <strong title={data.title}>{data.title}</strong>
       </div>
       {data.isLast ? <span className="left-off">left off here</span> : null}
+      {data.unsummarized ? <span className="unsummarized">not summarized yet</span> : null}
       {data.hasChildren && !data.expanded ? (
         <p className="lineage-count">{itemsInside(data.count)}</p>
       ) : data.at && data.kind !== "message" ? (

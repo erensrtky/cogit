@@ -2,12 +2,19 @@ import { CliError, type Io } from "../io.js";
 import { redactDeep } from "../redact.js";
 import type { Session } from "../schema/session.js";
 import { atomicWrite } from "../store/fs.js";
+import { withLock } from "../store/lock.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
-import { type ChatTurn, displayTurn, readConversation, readUserMessages } from "../transcript.js";
+import {
+  type ChatTurn,
+  displayTurn,
+  excerpt,
+  readConversation,
+  readUserMessages,
+} from "../transcript.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
-import type { LineageViewModel } from "../view/model.js";
+import type { LineageViewModel, ViewPendingMessage } from "../view/model.js";
 import { buildPanel } from "../view/panel.js";
 import { TEMPLATE_HTML } from "../view/template.js";
 import { collectTranscripts } from "../view/transcripts.js";
@@ -21,33 +28,62 @@ export interface BuildOptions {
   quiet?: boolean;
 }
 
+/** How many characters of a not-yet-summarized message become its card title. */
+export const PENDING_TITLE_LENGTH = 80;
+
+export interface TranscriptViews {
+  /**
+   * The conversation of every session that shows messages, recorded or not. It
+   * goes into the page only, never into a session file.
+   */
+  chats: Map<string, ChatTurn[]>;
+  /** User messages with no node yet, per session, titled for the map. */
+  pending: Map<string, ViewPendingMessage[]>;
+}
+
 /**
- * The conversation of every session that records messages and still has its
- * transcript. It goes into the page only, never into a session file. A transcript
- * that cannot be read leaves that session without a chat, with a warning.
+ * Reads each session's transcript once. A transcript that cannot be read leaves
+ * that session without a chat, with a warning (only when it had one to show).
  */
-async function readChats(
+async function readTranscriptViews(
   sessions: Session[],
   transcripts: ReadonlyMap<string, string>,
   root: string,
   io: Io,
-): Promise<Map<string, ChatTurn[]>> {
+): Promise<TranscriptViews> {
   const chats = new Map<string, ChatTurn[]>();
+  const pending = new Map<string, ViewPendingMessage[]>();
   for (const session of sessions) {
     const file = transcripts.get(session.sessionId);
-    if (!file || !session.nodes.some((node) => node.kind === "message")) continue;
+    if (!file) continue;
+    const recordsMessages = session.nodes.some((node) => node.kind === "message");
+    let turns: ChatTurn[];
     try {
-      const roots = [session.worktree?.path, root].filter((r): r is string => Boolean(r));
-      const turns = await readConversation(file);
-      chats.set(
-        session.sessionId,
-        turns.map((turn) => displayTurn(turn, roots)),
-      );
+      turns = await readConversation(file);
     } catch (err) {
-      io.warn(`could not read the conversation of ${session.sessionId}: ${(err as Error).message}`);
+      if (recordsMessages)
+        io.warn(
+          `could not read the conversation of ${session.sessionId}: ${(err as Error).message}`,
+        );
+      continue;
     }
+    const roots = [session.worktree?.path, root].filter((r): r is string => Boolean(r));
+    const displayed = turns.map((turn) => displayTurn(turn, roots));
+    const recorded = new Set(session.nodes.map((node) => node.id));
+    const missing = displayed.filter((turn) => !recorded.has(turn.id));
+    if (missing.length > 0) {
+      pending.set(
+        session.sessionId,
+        missing.map((turn) => ({
+          id: turn.id,
+          at: turn.at,
+          title: excerpt(turn.text, PENDING_TITLE_LENGTH) || "(blank message)",
+        })),
+      );
+    }
+    if (recordsMessages || missing.length > 0) chats.set(session.sessionId, displayed);
   }
-  return chats;
+  return { chats, pending };
 }
 
 /**
@@ -91,34 +127,53 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   for (const warning of project.warnings) io.warn(warning);
 
   const paths = projectPaths(root);
-  const sessions = await loadAllSessions(root, io.warn);
-  const transcripts = await collectTranscripts(io.env);
-  const config = await loadConfig(io.env);
-  const model = buildViewModel({
-    project: project.data,
-    sessions,
-    path: root,
-    generatedAt: io.now(),
-    transcripts: new Set(transcripts.keys()),
-    chats: await readChats(sessions, transcripts, root, io),
-    // With the catch-up on, the hook records the tail at session end, so the
-    // count would only be a stale warning about work already scheduled.
-    unrecorded: config.sessionEndCatchUp ? undefined : await countUnrecorded(sessions, transcripts),
-  });
-  // The skill already avoids secrets; this is the safety net before rendering.
-  const redacted = redactDeep(model);
-  if (redacted.count > 0) io.warn(`redacted ${redacted.count} secret-looking value(s) in the map`);
+  // The Stop hook skips a turn while this lock is held, and a second build waits
+  // for the first instead of interleaving reads and writes of the same files.
+  const model = await withLock(
+    paths.lock("build"),
+    async () => {
+      const sessions = await loadAllSessions(root, io.warn);
+      const transcripts = await collectTranscripts(io.env);
+      const config = await loadConfig(io.env);
+      const views = await readTranscriptViews(sessions, transcripts, root, io);
+      const built = buildViewModel({
+        project: project.data,
+        sessions,
+        path: root,
+        generatedAt: io.now(),
+        transcripts: new Set(transcripts.keys()),
+        chats: views.chats,
+        pending: views.pending,
+        // With the catch-up on, the hook records the tail at session end, so the
+        // count would only be a stale warning about work already scheduled.
+        unrecorded: config.sessionEndCatchUp
+          ? undefined
+          : await countUnrecorded(sessions, transcripts),
+      });
+      // The skill already avoids secrets; this is the safety net before rendering.
+      const redacted = redactDeep(built);
+      if (redacted.count > 0)
+        io.warn(`redacted ${redacted.count} secret-looking value(s) in the map`);
 
-  const template = opts.templateHtml ?? TEMPLATE_HTML;
-  await atomicWrite(paths.html, embedViewModel(template, redacted.value));
-  if (!opts.quiet) io.out(`Wrote ${paths.html}`);
+      const template = opts.templateHtml ?? TEMPLATE_HTML;
+      await atomicWrite(paths.html, embedViewModel(template, redacted.value));
+      if (!opts.quiet) io.out(`Wrote ${paths.html}`);
+      return redacted.value;
+    },
+    { timeoutMs: 30_000 },
+  );
 
   // The panel is derived state: a read-only home or a broken registry warning
   // must never turn a successful map build into a failure.
   try {
-    await buildPanel({ env: io.env, io, templateHtml: template, quietPath: root });
+    await buildPanel({
+      env: io.env,
+      io,
+      templateHtml: opts.templateHtml ?? TEMPLATE_HTML,
+      quietPath: root,
+    });
   } catch (err) {
     io.warn(`could not build panel.html: ${(err as Error).message}`);
   }
-  return redacted.value;
+  return model;
 }

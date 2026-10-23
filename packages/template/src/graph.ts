@@ -30,8 +30,9 @@ const ROOT_PADDING = 48;
 const INDENT = 32;
 const ROW_GAP = 16;
 const COLUMN_GAP = 24;
-/** The "left off here" badge under the last touched card's title. */
+/** Room for the "left off here" or "not summarized yet" badge under the title. */
 const LEFT_OFF_BADGE = 20;
+const PENDING_BADGE = 20;
 /** Wide enough that a collapsed session shows a readable title. */
 const SESSION_WIDTH = 380;
 
@@ -71,6 +72,8 @@ export type NodeDetail = {
   agentDecisions?: ViewNode["agentDecisions"];
   addedAt?: string;
   touchedAt?: string;
+  /** A user message the record does not hold yet. */
+  unsummarized?: true;
   /** Owning session, so the drill-down panel can show and resume it. */
   sessionId: string;
   /** The node's id in its session, which for a message is also its chat turn's id. */
@@ -302,7 +305,10 @@ export function placeSessionNodes(
     const visit = (node: ViewNode, parent: string | null, depth: number): void => {
       const id = nodeId(sessionGroup, node.id);
       const open = isOpen(id);
-      const height = nodeHeight(node, open) + (lastKeys.has(id) ? LEFT_OFF_BADGE : 0);
+      const height =
+        nodeHeight(node, open) +
+        (lastKeys.has(id) ? LEFT_OFF_BADGE : 0) +
+        (node.unsummarized ? PENDING_BADGE : 0);
       boxes.set(id, { x: columnX + depth * INDENT, y, width: NODE_WIDTH, height });
       y += height + ROW_GAP;
       columnWidth = Math.max(columnWidth, depth * INDENT + NODE_WIDTH);

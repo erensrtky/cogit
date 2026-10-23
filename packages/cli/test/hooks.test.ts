@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { configHintOff, configHintOn, configSet } from "../src/commands/config.js";
@@ -45,8 +45,16 @@ describe("runHook", () => {
   let spawned: string[][];
 
   const stop = (extra: Record<string, unknown> = {}, e = env) =>
-    runHook("stop", JSON.stringify({ session_id: "s1", cwd: root, ...extra }), e, T0, (l) =>
-      debug.push(l),
+    runHook(
+      "stop",
+      JSON.stringify({ session_id: "s1", cwd: root, ...extra }),
+      e,
+      T0,
+      (l) => debug.push(l),
+      {
+        cli: "/plugin/dist/cli.js",
+        spawnDetached: (cli, args) => spawned.push([cli, ...args]),
+      },
     );
 
   const sessionStart = (source: string, e = env) =>
@@ -148,6 +156,23 @@ describe("runHook", () => {
       hookSpecificOutput: { hookEventName: "Stop", additionalContext: UPDATE_REQUEST },
     });
     expect(await stop()).toBeUndefined();
+  });
+
+  it("rebuilds the map after every turn, detached", async () => {
+    await initialized(10);
+    expect(await stop()).toBeUndefined();
+    expect(spawned).toEqual([["/plugin/dist/cli.js", "build", root, "--quiet"]]);
+  });
+
+  it("skips the rebuild while a build or the session write holds the lock", async () => {
+    await initialized(10);
+    const paths = projectPaths(root);
+    await mkdir(paths.lock("build"), { recursive: true });
+    await stop();
+    await rm(paths.lock("build"), { recursive: true });
+    await mkdir(paths.lock("session-s1"), { recursive: true });
+    await stop();
+    expect(spawned).toEqual([]);
   });
 
   it("ignores turns a stop hook continued", async () => {

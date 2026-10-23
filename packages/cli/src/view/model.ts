@@ -36,6 +36,8 @@ export interface ViewNode {
   addedAt?: string;
   /** When the node was last added or changed; marks where the work left off. */
   touchedAt?: string;
+  /** A user message the record does not hold yet: the card is not summarized. */
+  unsummarized?: true;
   /** Nested children, already ordered as the graph should draw them. */
   children: ViewNode[];
 }
@@ -56,6 +58,15 @@ export interface ViewStatus {
 export interface StatusCard extends ViewStatus {
   /** `updatedAt` of the most recently updated session, or null with no sessions. */
   lastActivity: string | null;
+}
+
+/** A user message the record does not hold yet, read from the transcript at build time. */
+export interface ViewPendingMessage {
+  /** Same id the message will get as a node (`m1`, `m2`, …). */
+  id: string;
+  at: string;
+  /** The first words of the message, used as the card title. */
+  title: string;
 }
 
 /** One user message and the agent's written answer, read from the transcript at build time. */

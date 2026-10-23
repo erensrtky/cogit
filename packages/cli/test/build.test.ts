@@ -202,6 +202,52 @@ describe("buildViewModel", () => {
     expect(model.project).toEqual({ name: "p", path: "/tmp/p", generatedAt: T0 });
   });
 
+  it("puts unrecorded messages in one New group at the end, with a free id", () => {
+    const model = buildViewModel({
+      project: { schema: 1, name: "p", epochs: [] },
+      sessions: [
+        session({ sessionId: "s", nodes: [node("pending", "phase", "A recorded topic")] }),
+      ],
+      path: "/tmp/p",
+      generatedAt: T0,
+      pending: new Map([
+        [
+          "s",
+          [
+            { id: "m2", at: "2026-10-21T10:02:00.000Z", title: "Second message" },
+            { id: "m3", at: "2026-10-21T10:03:00.000Z", title: "Third message" },
+          ],
+        ],
+      ]),
+    });
+    const nodes = model.unassigned[0]?.nodes ?? [];
+    expect(nodes.map((n) => n.title)).toEqual(["A recorded topic", "New"]);
+    // The recorded node already owns the id "pending".
+    expect(nodes[1]).toEqual({
+      id: "pending-2",
+      kind: "phase",
+      title: "New",
+      children: [
+        {
+          id: "m2",
+          kind: "message",
+          title: "Second message",
+          at: "2026-10-21T10:02:00.000Z",
+          unsummarized: true,
+          children: [],
+        },
+        {
+          id: "m3",
+          kind: "message",
+          title: "Third message",
+          at: "2026-10-21T10:03:00.000Z",
+          unsummarized: true,
+          children: [],
+        },
+      ],
+    });
+  });
+
   it("has an empty status card without sessions", () => {
     const model = buildViewModel({
       project: { schema: 1, name: "p", epochs: [] },
@@ -473,17 +519,75 @@ describe("codelineage build", () => {
 
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
     const [s1, s2] = model.epochs[0]?.sessions ?? [];
-    expect(s1?.chat).toEqual([
-      {
-        id: "m1",
-        at: T0,
-        text: "Fix the card",
-        replies: ["Done, key [REDACTED]"],
-        tools: { commands: 0, files: ["src/a.ts"], other: 0 },
-      },
-    ]);
-    expect(s2).not.toHaveProperty("chat");
+    const turn = {
+      id: "m1",
+      at: T0,
+      text: "Fix the card",
+      replies: ["Done, key [REDACTED]"],
+      tools: { commands: 0, files: ["src/a.ts"], other: 0 },
+    };
+    expect(s1?.chat).toEqual([turn]);
+    // s2 records no message, so its unrecorded turn is shown as a pending card
+    // and needs the same conversation for its drill-down.
+    expect(s2?.chat).toEqual([turn]);
+    expect(s2?.nodes.at(-1)).toMatchObject({
+      kind: "phase",
+      title: "New",
+      children: [{ id: "m1", kind: "message", title: "Fix the card", unsummarized: true }],
+    });
     expect(await readFile(paths().session("s1"), "utf8")).not.toContain("Fix the card");
+  });
+
+  it("shows unrecorded messages as pending cards until the skill writes them", async () => {
+    const folder = join(dir, "claude", "projects", "-proj");
+    await mkdir(folder, { recursive: true });
+    const lines = [
+      { type: "user", timestamp: T0, message: { content: "First message" } },
+      {
+        type: "user",
+        timestamp: "2026-10-21T10:05:00.000Z",
+        message: {
+          content: "Second message, with the card <system-reminder>noise</system-reminder>",
+        },
+      },
+    ];
+    await writeFile(join(folder, "s1.jsonl"), lines.map((l) => JSON.stringify(l)).join("\n"));
+    await saveSession(
+      "s1",
+      session({
+        sessionId: "s1",
+        epoch: "e1",
+        nodes: [
+          node("topic", "phase", "Topic"),
+          node("m1", "message", "First", "topic", { at: T0 }),
+        ],
+      }),
+    );
+
+    const before = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    const nodes = before.epochs[0]?.sessions[0]?.nodes ?? [];
+    expect(nodes.map((n) => n.title)).toEqual(["Topic", "New"]);
+    expect(nodes[1]).toMatchObject({
+      children: [
+        {
+          id: "m2",
+          kind: "message",
+          title: "Second message, with the card",
+          at: "2026-10-21T10:05:00.000Z",
+          unsummarized: true,
+        },
+      ],
+    });
+
+    await sessionWrite({ dir: root }, io, async () =>
+      JSON.stringify({
+        sessionId: "s1",
+        nodes: [{ id: "m2", kind: "message", title: "Second message", parent: "topic" }],
+      }),
+    );
+    expect(io.warnings).toEqual([]);
+    const after = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(after.epochs[0]?.sessions[0]?.nodes.map((n) => n.title)).toEqual(["Topic"]);
   });
 
   it("counts unrecorded messages only while the catch-up is off", async () => {

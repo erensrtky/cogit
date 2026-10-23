@@ -76,9 +76,10 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .command("build")
     .description("regenerate .codelineage/lineage.html")
     .argument("[dir]", "project directory", ".")
+    .option("--quiet", "write the map without printing a success line")
     .action(
-      run(async (dir: string) => {
-        await buildProject({ dir, io: makeIo(false) });
+      run(async (dir: string, opts: { quiet?: boolean }) => {
+        await buildProject({ dir, io: makeIo(false), quiet: opts.quiet === true });
       }),
     );
 

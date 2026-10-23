@@ -1,5 +1,7 @@
 import type { HookState } from "../schema/state.js";
 import { STATE_SCHEMA } from "../schema/state.js";
+import { isLockHeld } from "../store/lock.js";
+import { projectPaths } from "../store/paths.js";
 import { loadConfig, loadSession, updateState } from "../store/stores.js";
 import type { HookContext, HookOutput } from "./run.js";
 
@@ -36,14 +38,23 @@ export function countTurn(
   };
 }
 
+/** True while a build or this session's write is running; the next turn rebuilds. */
+async function mapBusy(root: string, sessionId: string): Promise<boolean> {
+  const paths = projectPaths(root);
+  if (await isLockHeld(paths.lock("build"))) return true;
+  return isLockHeld(paths.lock(`session-${sessionId}`));
+}
+
 /**
- * Stop hook: every `updateEveryTurns` completed turns, asks the agent to run the
+ * Stop hook: rebuilds the map after every turn, detached so the hook returns at
+ * once, and every `updateEveryTurns` completed turns asks the agent to run the
  * skill through `additionalContext` ("Stop hook feedback", not an error). Turns
  * that a stop hook itself continued are not counted and never asked again.
  */
 export async function onStop(ctx: HookContext): Promise<HookOutput | undefined> {
   if (ctx.input.stop_hook_active) return undefined;
   const { root, sessionId } = ctx;
+  if (!(await mapBusy(root, sessionId))) ctx.spawnDetached(["build", root, "--quiet"]);
   const config = await loadConfig(ctx.env);
   const record = await loadSession(root, sessionId);
   const recordUpdatedAt = record.found && record.ok ? record.data.updatedAt : null;

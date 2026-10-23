@@ -57,6 +57,16 @@ describe("placeSessionNodes", () => {
     const marked = placeSessionNodes(tree, "s", undefined, new Set(["node:s:a1"]));
     expect(marked.boxes.get("node:s:a1")?.height).toBeGreaterThan(box("a1")?.height ?? 0);
   });
+
+  it("makes room for the not-summarized badge, even on the last touched card", () => {
+    const card: ViewNode = { id: "m1", kind: "message", title: "Hi", children: [] };
+    const pending: ViewNode = { ...card, unsummarized: true, at: "2026-10-23T10:00:00.000Z" };
+    const plainHeight = placeSessionNodes([card], "s").boxes.get("node:s:m1")?.height ?? 0;
+    const pendingHeight = placeSessionNodes([pending], "s").boxes.get("node:s:m1")?.height ?? 0;
+    expect(pendingHeight).toBeGreaterThan(plainHeight);
+    const both = placeSessionNodes([pending], "s", undefined, new Set(["node:s:m1"]));
+    expect(both.boxes.get("node:s:m1")?.height).toBeGreaterThan(pendingHeight);
+  });
 });
 
 describe("absolutePosition", () => {

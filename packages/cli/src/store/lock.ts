@@ -57,6 +57,17 @@ async function acquire(lockPath: string, opts: LockOptions): Promise<void> {
   }
 }
 
+/**
+ * Whether a lock is held right now, without taking it: the directory exists and
+ * its owner is alive (or it was touched within `staleMs`). Used by hooks that
+ * would otherwise queue work behind a lock they cannot wait for.
+ */
+export async function isLockHeld(lockPath: string, staleMs = 60_000): Promise<boolean> {
+  const info = await stat(lockPath).catch(() => undefined);
+  if (info === undefined) return false;
+  return !(await isStale(lockPath, staleMs));
+}
+
 /** Runs `fn` while holding a directory lock (mkdir is atomic on every platform). */
 export async function withLock<T>(
   lockPath: string,
