@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-10-23
 ### Added
 - SessionEnd catch-up: when a session ends with user messages that have no node yet, the `SessionEnd` hook starts a detached `codelineage backfill <session-id> --tail` and returns at once; the child reads those messages with the agent's replies, runs `claude -p --safe-mode --no-session-persistence` with the skill's record rules on `catchUpModel` (default `haiku`) and passes the answer through `session write` (validation, redaction, transcript times, rebuild). The tail is not stored, so a dead child is retried from the transcript next time. With `sessionEndCatchUp` off no tokens are spent, and the map shows "N messages not recorded" on that session.
 - SessionStart setup hint: on `startup` or `resume` in a project without `.codelineage/`, the plugin offers setup to the agent (it says codelineage is not set up and sets it up only when the user asks, running the bundled `init` with the answers), and the hint notes that a plugin update reaches a running session only after `/reload-plugins` or a new chat. `codelineage config hint-off [dir]` silences the hint in that project ("don't ask again", kept in the global `setupHintOff` list, keyed by the main checkout so a worktree is covered) and `codelineage config hint-on [dir] [--all]` turns it back on. `CODELINEAGE_DISABLE=1` still silences every hook.
