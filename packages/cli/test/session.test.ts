@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import { readStdin, sessionShow, sessionWrite } from "../src/commands/session.js";
+import { messageHash } from "../src/messages.js";
 import { redactDeep, redactText } from "../src/redact.js";
 import { loadSession } from "../src/store/stores.js";
 import { envFor, type FakeIo, fakeIo, tempDir } from "./helpers.js";
@@ -229,12 +230,20 @@ ${line("second", 2)}
 `,
     );
 
+    const first = messageHash("s1", { at: "2026-10-23T10:01:00.000Z", text: "first" });
+    const second = messageHash("s1", { at: "2026-10-23T10:02:00.000Z", text: "second" });
     await sessionShow(root, "s1", io);
     expect(shown()).toMatchObject({
       messageCount: 2,
       newMessages: [
-        { id: "m1", at: "2026-10-23T10:01:00.000Z", text: "first" },
-        { id: "m2", at: "2026-10-23T10:02:00.000Z", text: "second", gapMinutes: 1 },
+        { id: first, label: "m1", at: "2026-10-23T10:01:00.000Z", text: "first" },
+        {
+          id: second,
+          label: "m2",
+          at: "2026-10-23T10:02:00.000Z",
+          text: "second",
+          gapMinutes: 1,
+        },
       ],
     });
 
@@ -255,10 +264,16 @@ ${line("second", 2)}
     io.lines.length = 0;
     await sessionShow(root, "s1", io);
     expect(shown().newMessages).toEqual([
-      { id: "m2", at: "2026-10-23T10:02:00.000Z", text: "second", gapMinutes: 1 },
+      {
+        id: second,
+        label: "m2",
+        at: "2026-10-23T10:02:00.000Z",
+        text: "second",
+        gapMinutes: 1,
+      },
     ]);
     expect(shown().lastMessages).toEqual([
-      { id: "m1", title: "First", parent: null },
+      { id: first, label: "m1", title: "First", parent: null },
       { id: "m9", title: "Made up", parent: null },
     ]);
   });
@@ -292,17 +307,31 @@ ${line("second", 2)}
       ].join("\n"),
     );
 
+    const hash = (at: string, text: string) => messageHash("s1", { at, text });
     await sessionShow(root, "s1", io);
     expect(shown().newMessages).toEqual([
-      { id: "m1", at: "2026-10-23T10:00:00.000Z", text: "first" },
       {
-        id: "m2",
+        id: hash("2026-10-23T10:00:00.000Z", "first"),
+        label: "m1",
+        at: "2026-10-23T10:00:00.000Z",
+        text: "first",
+      },
+      {
+        id: hash("2026-10-23T10:30:00.000Z", "second"),
+        label: "m2",
         at: "2026-10-23T10:30:00.000Z",
         text: "second",
         gapMinutes: 30,
         commitBetween: true,
       },
-      { id: "m3", at: "2026-10-23T11:00:00.000Z", text: "third", gapMinutes: 30, resumed: true },
+      {
+        id: hash("2026-10-23T11:00:00.000Z", "third"),
+        label: "m3",
+        at: "2026-10-23T11:00:00.000Z",
+        text: "third",
+        gapMinutes: 30,
+        resumed: true,
+      },
     ]);
   });
 

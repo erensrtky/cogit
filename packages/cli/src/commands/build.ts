@@ -1,20 +1,26 @@
 import { ensureConversationGitignore } from "../git.js";
 import { CliError, type Io } from "../io.js";
+import {
+  hashTurns,
+  isRecorded,
+  type SessionMessage,
+  storedMessages,
+  upgradeSessionIds,
+} from "../messages.js";
 import { redactDeep } from "../redact.js";
 import type { Session } from "../schema/session.js";
-import { appendConversationTurns, readConversationStore } from "../store/conversations.js";
+import {
+  appendConversationHashes,
+  appendConversationTurns,
+  readConversationStore,
+} from "../store/conversations.js";
+import { applyEvents, readEvents } from "../store/events.js";
 import { atomicWrite } from "../store/fs.js";
 import { withLock } from "../store/lock.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
-import {
-  type ChatTurn,
-  displayTurn,
-  excerpt,
-  readConversation,
-  readUserMessages,
-} from "../transcript.js";
+import { type ChatTurn, displayTurn, excerpt, readConversation } from "../transcript.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
 import type { LineageViewModel, ViewChatTurn, ViewPendingMessage } from "../view/model.js";
 import { buildPanel } from "../view/panel.js";
@@ -41,12 +47,17 @@ export interface TranscriptViews {
   chats: Map<string, ViewChatTurn[]>;
   /** User messages with no node yet, per session, titled for the map. */
   pending: Map<string, ViewPendingMessage[]>;
+  /** The record as the map sees it: stable ids and the replayed structure. */
+  sessions: Session[];
+  /** User messages with no node yet, per session, counted from the transcripts. */
+  unrecorded: Map<string, number>;
 }
 
 /** Drops the fields only the drill-down needs (uuid, hints) and keeps the contract. */
-function toViewTurn(turn: ChatTurn, id = turn.id): ViewChatTurn {
+function toViewTurn(turn: ChatTurn): ViewChatTurn {
   return {
-    id,
+    id: turn.hash ?? turn.id,
+    ...(turn.label === undefined ? {} : { label: turn.label }),
     at: turn.at,
     text: turn.text,
     replies: turn.replies,
@@ -69,6 +80,8 @@ async function readTranscriptViews(
 ): Promise<TranscriptViews> {
   const chats = new Map<string, ViewChatTurn[]>();
   const pending = new Map<string, ViewPendingMessage[]>();
+  const prepared: Session[] = [];
+  const unrecorded = new Map<string, number>();
   for (const session of sessions) {
     const file = transcripts.get(session.sessionId);
     const recordsMessages = session.nodes.some((node) => node.kind === "message");
@@ -86,75 +99,90 @@ async function readTranscriptViews(
           );
       }
     }
-    let turns: ViewChatTurn[];
-    if (transcript && transcript.length > 0) {
-      const fresh = transcript.filter(
+    const fromTranscript =
+      transcript && transcript.length > 0 ? hashTurns(session.sessionId, transcript) : null;
+    if (fromTranscript) {
+      const fresh = fromTranscript.filter(
         (turn) => turn.uuid !== undefined && !storedByUuid.has(turn.uuid),
       );
-      if (fresh.length > 0) {
-        const displayed = fresh.map((turn) => displayTurn(turn, roots));
-        try {
-          await appendConversationTurns(root, session.sessionId, displayed);
-        } catch (err) {
-          // Losing the transcript is a real risk, but a failed append must never
-          // fail the map: the page still shows this build's conversation.
-          io.warn(
-            `could not store the conversation of ${session.sessionId}: ${(err as Error).message}`,
+      const hashes = new Map(
+        fromTranscript.flatMap((turn) =>
+          turn.uuid === undefined ? [] : [[turn.uuid, turn.hash] as [string, string]],
+        ),
+      );
+      try {
+        if (fresh.length > 0)
+          await appendConversationTurns(
+            root,
+            session.sessionId,
+            fresh.map((turn) => displayTurn(turn, roots)),
           );
-        }
+        // Turns stored before ids were stable get theirs now, before Claude Code
+        // deletes the transcript this hash comes from.
+        await appendConversationHashes(root, session.sessionId, hashes);
+      } catch (err) {
+        // Losing the transcript is a real risk, but a failed append must never
+        // fail the map: the page still shows this build's conversation.
+        io.warn(
+          `could not store the conversation of ${session.sessionId}: ${(err as Error).message}`,
+        );
       }
-      turns = transcript.map((turn) => {
+    }
+    const messages: SessionMessage[] | null = fromTranscript
+      ? fromTranscript
+      : stored.length > 0
+        ? storedMessages(session.sessionId, stored)
+        : transcript
+          ? []
+          : null;
+
+    // Stable ids for old `m1` nodes, then the structure from the facts file.
+    const upgraded = messages ? upgradeSessionIds(session, messages) : session;
+    const events = await readEvents(root, session.sessionId);
+    const effective: Session = {
+      ...upgraded,
+      nodes: applyEvents(upgraded.nodes, events),
+    };
+    prepared.push(effective);
+
+    let turns: ViewChatTurn[];
+    if (fromTranscript) {
+      turns = fromTranscript.map((turn) => {
         const kept = turn.uuid === undefined ? undefined : storedByUuid.get(turn.uuid);
         return kept
-          ? { id: turn.id, at: kept.at, text: kept.text, replies: kept.replies, tools: kept.tools }
+          ? toViewTurn({
+              ...turn,
+              at: kept.at,
+              text: kept.text,
+              replies: kept.replies,
+              tools: kept.tools,
+            })
           : toViewTurn(displayTurn(turn, roots));
       });
-    } else {
+    } else if (stored.length > 0) {
       // No readable transcript: the store is all that is left. Its append-only
-      // order is the transcript order, so `m1`, `m2`, … still line up.
-      turns = stored.map((turn, index) => toViewTurn({ ...turn, id: `m${index + 1}` }));
+      // order is the transcript order, so labels still line up.
+      turns = (messages ?? []).map((message) => toViewTurn(message));
+    } else {
+      turns = [];
     }
-    const recorded = new Set(session.nodes.map((node) => node.id));
-    const missing = turns.filter((turn) => !recorded.has(turn.id));
+    const recorded = new Set(effective.nodes.map((node) => node.id));
+    const missing = (messages ?? []).filter((message) => !isRecorded(recorded, message));
     if (missing.length > 0) {
       pending.set(
         session.sessionId,
-        missing.map((turn) => ({
-          id: turn.id,
-          at: turn.at,
-          title: excerpt(turn.text, PENDING_TITLE_LENGTH) || "(blank message)",
+        missing.map((message) => ({
+          id: message.hash,
+          label: message.label,
+          at: message.at,
+          title: excerpt(message.text, PENDING_TITLE_LENGTH) || "(blank message)",
         })),
       );
+      unrecorded.set(session.sessionId, missing.length);
     }
     if (recordsMessages || missing.length > 0) chats.set(session.sessionId, turns);
   }
-  return { chats, pending };
-}
-
-/**
- * User messages with no node, per session, counted from the transcripts. The
- * SessionEnd hook normally records them; while the catch-up is off this count is
- * the only sign. An unreadable transcript is skipped, never failing the build.
- */
-export async function countUnrecorded(
-  sessions: Session[],
-  transcripts: ReadonlyMap<string, string>,
-): Promise<Map<string, number>> {
-  const counts = new Map<string, number>();
-  for (const session of sessions) {
-    const file = transcripts.get(session.sessionId);
-    if (!file) continue;
-    let messages;
-    try {
-      messages = await readUserMessages(file);
-    } catch {
-      continue;
-    }
-    const recorded = new Set(session.nodes.map((node) => node.id));
-    const missing = messages.filter((message) => !recorded.has(message.id)).length;
-    if (missing > 0) counts.set(session.sessionId, missing);
-  }
-  return counts;
+  return { chats, pending, sessions: prepared, unrecorded };
 }
 
 /**
@@ -190,7 +218,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       const views = await readTranscriptViews(sessions, transcripts, root, io);
       const built = buildViewModel({
         project: project.data,
-        sessions,
+        sessions: views.sessions,
         path: root,
         generatedAt: io.now(),
         transcripts: new Set(transcripts.keys()),
@@ -198,9 +226,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         pending: views.pending,
         // With the catch-up on, the hook records the tail at session end, so the
         // count would only be a stale warning about work already scheduled.
-        unrecorded: config.sessionEndCatchUp
-          ? undefined
-          : await countUnrecorded(sessions, transcripts),
+        unrecorded: config.sessionEndCatchUp ? undefined : views.unrecorded,
       });
       // The skill already avoids secrets; this is the safety net before rendering.
       const redacted = redactDeep(built);

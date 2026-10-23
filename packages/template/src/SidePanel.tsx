@@ -278,8 +278,8 @@ function BranchDetails({
     <section className="branch-detail">
       <h3 style={{ color: `var(--l${segment.colorIndex})` }}>{branch.title}</h3>
       <p className="branch-range">
-        {branch.count > 1 ? `${branch.fromId}–${branch.toId}` : branch.fromId} · {branch.count}{" "}
-        message{branch.count === 1 ? "" : "s"}
+        {branch.count > 1 ? `${branch.fromLabel}–${branch.toLabel}` : branch.fromLabel} ·{" "}
+        {branch.count} message{branch.count === 1 ? "" : "s"}
         {span}
       </p>
       {branch.asked ? (

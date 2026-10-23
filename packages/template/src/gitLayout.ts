@@ -39,6 +39,9 @@ export interface GitBranch {
   /** First and last message of the branch, for the "m33–m36" range. */
   fromId: string;
   toId: string;
+  /** The labels `m33` / `m36` the user reads; the ids are stable keys. */
+  fromLabel: string;
+  toLabel: string;
   count: number;
   firstAt?: string;
   lastAt?: string;
@@ -64,6 +67,8 @@ export interface GitSegment {
 export interface GitReturn {
   /** The older message this row returns to. */
   id: string;
+  /** Its `m22` label, which the row shows instead of the stable id. */
+  label: string;
   colorIndex: number;
 }
 
@@ -164,7 +169,7 @@ export function rowHeight(
 ): number {
   const fixed =
     ROW_FIXED +
-    message.id.length * 7 +
+    (message.label ?? message.id).length * 7 +
     (row.first ? BRANCH_MAX + 8 : 0) +
     row.returns * 44 +
     (row.head ? 92 : 0) +
@@ -196,6 +201,8 @@ function branchOf(ids: string[], byId: Map<string, ViewNode>): GitBranch {
     open: first?.branch?.open ?? "",
     fromId: ids[0] ?? "",
     toId: ids[ids.length - 1] ?? "",
+    fromLabel: first?.label ?? ids[0] ?? "",
+    toLabel: last?.label ?? ids[ids.length - 1] ?? "",
     count: ids.length,
     ...(first?.at === undefined ? {} : { firstAt: first.at }),
     ...(last?.at === undefined ? {} : { lastAt: last.at }),
@@ -401,7 +408,11 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
     const returns: GitReturn[] = [];
     for (const target of message.links ?? []) {
       if (!rowOf.has(target)) continue;
-      returns.push({ id: target, colorIndex: segOf.get(target)?.colorIndex ?? 0 });
+      returns.push({
+        id: target,
+        label: byId.get(target)?.label ?? target,
+        colorIndex: segOf.get(target)?.colorIndex ?? 0,
+      });
     }
     return {
       kind: "message",

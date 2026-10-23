@@ -1,10 +1,21 @@
 import { readFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { CliError, type Io } from "../io.js";
+import {
+  hashesToLabels,
+  isRecorded,
+  labelsToHashes,
+  messageOrder,
+  readSessionMessages,
+  type SessionMessage,
+  upgradeSessionIds,
+} from "../messages.js";
 import { redactDeep } from "../redact.js";
 import { Slug } from "../schema/common.js";
+import type { SessionEvent } from "../schema/events.js";
 import { mergeSession } from "../schema/merge.js";
 import { MESSAGE_ID, type Session, SessionInput } from "../schema/session.js";
+import { appendEvents, applyEvents, readEvents, seedEvents } from "../store/events.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import {
@@ -14,13 +25,7 @@ import {
   loadSession,
   updateSession,
 } from "../store/stores.js";
-import {
-  countUserLines,
-  excerpt,
-  findTranscript,
-  readUserMessages,
-  type UserMessage,
-} from "../transcript.js";
+import { countUserLines, excerpt, findTranscript } from "../transcript.js";
 import { buildProject } from "./build.js";
 
 export async function readStdin(stream: NodeJS.ReadableStream = process.stdin): Promise<string> {
@@ -68,7 +73,10 @@ export async function sessionWrite(
   }
 
   const { value: redacted, count } = redactDeep(parsed.data);
-  const input = await stampMessageTimes(redacted, io);
+  // Both ids work: the agent may send the stable `h…` id, or the `m1` label it
+  // reads in `session show`; the CLI maps the label to the stable id.
+  const messages = await readSessionMessages(root, redacted.sessionId, io.env);
+  const input = nameMessages(redacted, messages, io);
   if (count > 0) io.warn(`redacted ${count} secret-looking value(s)`);
   if (input.epoch && !project.data.epochs.some((e) => e.id === input.epoch)) {
     io.warn(
@@ -77,9 +85,25 @@ export async function sessionWrite(
   }
 
   let warnings: string[] = [];
-  const saved = await updateSession(root, input.sessionId, (cur) => {
-    const merged = mergeSession(cur, input, io.now());
+  const saved = await updateSession(root, input.sessionId, async (cur) => {
+    // A record written before 8.5 still names messages `m1`, `m2`, …; the file is
+    // rewritten with stable ids and the structure seeds the events file below.
+    const upgraded = cur && messages ? upgradeSessionIds(cur, messages) : cur;
+    const events = await readEvents(root, input.sessionId);
+    const base = upgraded ? { ...upgraded, nodes: applyEvents(upgraded.nodes, events) } : undefined;
+    const merged = mergeSession(base, input, io.now(), {
+      ...(messages ? { order: messageOrder(messages) } : {}),
+      labels: hashesToLabels(messages),
+    });
     warnings = merged.warnings;
+    const changes = structureChanges(merged.session, base, io.now());
+    // The first structural change on an old record seeds the facts it already
+    // holds, so replaying the file from then on gives the same graph.
+    const seed =
+      events.length === 0 && changes.length > 0 && base?.nodes.some((n) => n.kind === "message")
+        ? seedEvents(base.nodes, io.now())
+        : [];
+    await appendEvents(root, input.sessionId, [...seed, ...changes]);
     // A write from the main checkout (e.g. after a resume) keeps the stored worktree.
     return worktree ? { ...merged.session, worktree } : merged.session;
   });
@@ -95,54 +119,80 @@ export async function sessionWrite(
   }
 }
 
-/** The session's transcript file and user messages, or null when it cannot be read. */
-async function transcriptMessages(
-  sessionId: string,
-  env: NodeJS.ProcessEnv,
-): Promise<{ file: string; messages: UserMessage[] } | null> {
-  const file = await findTranscript(sessionId, env);
-  if (!file) return null;
-  try {
-    return { file, messages: await readUserMessages(file) };
-  } catch {
-    return null;
-  }
-}
-
-/** The session's user messages, or null when its transcript cannot be read. */
-async function userMessages(
-  sessionId: string,
-  env: NodeJS.ProcessEnv,
-): Promise<UserMessage[] | null> {
-  return (await transcriptMessages(sessionId, env))?.messages ?? null;
+/**
+ * Turns the agent's message ids into stable ids and takes each message's time
+ * from the transcript, so the map's order is the order the user wrote them,
+ * whatever the agent sent. A label (`m3`) and a stable id (`h…`) are both
+ * accepted; a node the session does not know keeps its id with a warning.
+ * Without a transcript (or a stored conversation) the agent's fields stay.
+ */
+function nameMessages(
+  input: SessionInput,
+  messages: SessionMessage[] | null,
+  io: Io,
+): SessionInput {
+  const nodes = input.nodes ?? [];
+  if (!nodes.some((n) => n.kind === "message")) return input;
+  const byLabel = labelsToHashes(messages);
+  const byHash = new Map((messages ?? []).map((message) => [message.hash, message]));
+  const rename = (id: string): string => byLabel.get(id) ?? id;
+  return {
+    ...input,
+    nodes: nodes.map((node) => {
+      if (node.kind !== "message") return node;
+      const at = byHash.get(rename(node.id))?.at;
+      if (!messages) {
+        if (!MESSAGE_ID.test(node.id))
+          io.warn(`message node ${node.id}: expected an id like m1 from \`session show\``);
+      } else if (at === undefined) {
+        io.warn(`message node ${node.id}: no such message in the transcript`);
+      }
+      return {
+        ...node,
+        id: rename(node.id),
+        ...(at === undefined ? {} : { at }),
+        ...(node.parent === undefined || node.parent === null
+          ? {}
+          : { parent: rename(node.parent) }),
+        ...(node.links === undefined ? {} : { links: node.links.map(rename) }),
+      };
+    }),
+  };
 }
 
 /**
- * Message nodes take their time from the transcript, so their order on the map
- * is the order the user wrote them, whatever the agent sent. Without a
- * transcript the agent's `at` stays.
+ * The parent/link events a merged record needs on top of the structure it had:
+ * a changed parent (including a correction back to root) and added or removed
+ * links. Unchanged input writes no event.
  */
-async function stampMessageTimes(input: SessionInput, io: Io): Promise<SessionInput> {
-  const ids = (input.nodes ?? []).filter((n) => n.kind === "message").map((n) => n.id);
-  if (ids.length === 0) return input;
-  for (const id of ids) {
-    if (!MESSAGE_ID.test(id))
-      io.warn(`message node ${id}: expected an id like m1 from \`session show\``);
+function structureChanges(
+  merged: Session,
+  before: Session | undefined,
+  at: string,
+): SessionEvent[] {
+  const previous = new Map(
+    (before?.nodes ?? [])
+      .filter((node) => node.kind === "message")
+      .map((node) => [node.id, { parent: node.parent ?? null, links: node.links ?? [] }]),
+  );
+  const events: SessionEvent[] = [];
+  for (const node of merged.nodes) {
+    if (node.kind !== "message") continue;
+    const old = previous.get(node.id) ?? { parent: null, links: [] };
+    const parent = node.parent ?? null;
+    if (parent !== old.parent)
+      events.push({ at, type: "parent", msg: node.id, target: parent, by: "agent" });
+    const links = node.links ?? [];
+    for (const link of links) {
+      if (!old.links.includes(link))
+        events.push({ at, type: "link", msg: node.id, target: link, by: "agent" });
+    }
+    for (const link of old.links) {
+      if (!links.includes(link))
+        events.push({ at, type: "unlink", msg: node.id, target: link, by: "agent" });
+    }
   }
-  const messages = await userMessages(input.sessionId, io.env);
-  if (!messages) return input;
-  const times = new Map(messages.map((m) => [m.id, m.at]));
-  for (const id of ids) {
-    if (MESSAGE_ID.test(id) && !times.has(id))
-      io.warn(`message node ${id}: no such message in the transcript`);
-  }
-  return {
-    ...input,
-    nodes: input.nodes?.map((n) => {
-      const at = n.kind === "message" ? times.get(n.id) : undefined;
-      return at ? { ...n, at } : n;
-    }),
-  };
+  return events;
 }
 
 /**
@@ -184,31 +234,35 @@ export async function sessionShow(dir: string, sessionId: string, io: Io): Promi
     epochs: project.data.epochs.map(({ id, title }) => ({ id, title })),
     session: null,
   };
-  if (loaded.found && loaded.ok) {
-    const { title, epoch, status, nodes } = loaded.data;
+  const messages = await readSessionMessages(root, sessionId, io.env);
+  const labels = hashesToLabels(messages);
+  const effective = await effectiveRecord(root, sessionId, loaded, messages);
+  if (effective) {
+    const { title, epoch, status, nodes } = effective;
     view.session = {
       sessionId,
       title,
       epoch,
       status,
-      nodes: nodes.map(({ id, parent, kind, title }) => ({ id, parent, kind, title })),
+      nodes: nodes.map(({ id, parent, kind, title }) => {
+        const label = labels.get(id);
+        return { id, ...(label === undefined ? {} : { label }), parent, kind, title };
+      }),
     };
-  } else if (loaded.found) {
+  } else if (loaded.found && !loaded.ok) {
     view.sessionError = loaded.error;
   }
-  const transcript = await transcriptMessages(sessionId, io.env);
-  const messages = transcript?.messages ?? null;
   if (messages) {
-    const recorded = new Set(loaded.found && loaded.ok ? loaded.data.nodes.map((n) => n.id) : []);
     view.messageCount = messages.length;
-    view.newMessages = newMessages(messages, recorded);
+    view.newMessages = newMessages(messages, recordedIdsOf(effective), labels);
   } else {
     view.newMessages = null;
   }
-  view.lastMessages = lastMessages(loaded);
+  view.lastMessages = lastMessages(effective, labels);
   // A format change would otherwise look like "nothing written yet" forever.
-  if (transcript && transcript.messages.length === 0) {
-    const userLines = await countUserLines(transcript.file).catch(() => 0);
+  if (messages && messages.length === 0) {
+    const file = await findTranscript(sessionId, io.env);
+    const userLines = file ? await countUserLines(file).catch(() => 0) : 0;
     if (userLines > 0)
       view.transcriptWarning =
         `the transcript has ${userLines} user line(s) but none read as a message; ` +
@@ -218,15 +272,40 @@ export async function sessionShow(dir: string, sessionId: string, io: Io): Promi
   io.out(JSON.stringify(view, null, 2));
 }
 
+/**
+ * The record as the map sees it: old `m1` ids renamed to stable ids when the
+ * messages are known, then the structure from the events file (Story 8.5).
+ */
+async function effectiveRecord(
+  root: string,
+  sessionId: string,
+  loaded: Loaded<Session>,
+  messages: SessionMessage[] | null,
+): Promise<Session | null> {
+  if (!loaded.found || !loaded.ok) return null;
+  const upgraded = messages ? upgradeSessionIds(loaded.data, messages) : loaded.data;
+  const events = await readEvents(root, sessionId);
+  return { ...upgraded, nodes: applyEvents(upgraded.nodes, events) };
+}
+
+function recordedIdsOf(session: Session | null): Set<string> {
+  return new Set(session?.nodes.map((node) => node.id) ?? []);
+}
+
 /** How many recorded messages `session show` repeats for picking a parent. */
 const LAST_MESSAGES = 5;
 
 /**
  * The user's messages with no node yet, with the cheap hints the agent uses to
  * decide a parent: the gap since the previous message, a `/clear` or resume in
- * between, and a commit this session made between them. Hints, not rules.
+ * between, and a commit this session made between them. Hints, not rules. `id`
+ * is the stable id the record keeps; `label` is the `m1` the user reads.
  */
-function newMessages(messages: UserMessage[], recorded: Set<string>): Record<string, unknown>[] {
+function newMessages(
+  messages: SessionMessage[],
+  recorded: ReadonlySet<string>,
+  labels: ReadonlyMap<string, string>,
+): Record<string, unknown>[] {
   return messages
     .map((message, i) => {
       const previous = i > 0 ? messages[i - 1] : undefined;
@@ -235,9 +314,10 @@ function newMessages(messages: UserMessage[], recorded: Set<string>): Record<str
         : undefined;
       return { message, gapMinutes };
     })
-    .filter(({ message }) => !recorded.has(message.id))
+    .filter(({ message }) => !isRecorded(recorded, message))
     .map(({ message, gapMinutes }) => ({
-      id: message.id,
+      id: message.hash,
+      label: labels.get(message.hash) ?? message.label,
       at: message.at,
       text: excerpt(message.text),
       ...(gapMinutes === undefined ? {} : { gapMinutes }),
@@ -246,14 +326,23 @@ function newMessages(messages: UserMessage[], recorded: Set<string>): Record<str
     }));
 }
 
-/** The last few recorded messages (id, title, parent) so the agent can pick a parent. */
+/** The last few recorded messages (stable id, label, title, parent) for a parent pick. */
 function lastMessages(
-  loaded: Loaded<Session>,
-): { id: string; title: string; parent: string | null }[] {
-  if (!loaded.found || !loaded.ok) return [];
-  return loaded.data.nodes
-    .filter((n) => n.kind === "message" && MESSAGE_ID.test(n.id))
-    .sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)))
-    .slice(-LAST_MESSAGES)
-    .map(({ id, title, parent }) => ({ id, title, parent }));
+  session: Session | null,
+  labels: ReadonlyMap<string, string>,
+): { id: string; label?: string; title: string; parent: string | null }[] {
+  if (!session) return [];
+  /** Send-order position from the label; a node without one keeps its stored place. */
+  const position = (id: string): number => {
+    const match = /^m([1-9][0-9]*)$/.exec(labels.get(id) ?? "");
+    return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+  };
+  const messages = session.nodes
+    .filter((n) => n.kind === "message")
+    .sort((a, b) => position(a.id) - position(b.id))
+    .slice(-LAST_MESSAGES);
+  return messages.map(({ id, title, parent }) => {
+    const label = labels.get(id);
+    return { id, ...(label === undefined ? {} : { label }), title, parent };
+  });
 }

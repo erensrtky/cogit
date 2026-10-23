@@ -101,6 +101,10 @@ export interface ToolUse {
 export interface ChatTurn extends UserMessage {
   /** The transcript's uuid for the user line; the key of the conversation store. */
   uuid?: string;
+  /** The message's stable id (`h…`, Story 8.5); set once the session id is known. */
+  hash?: string;
+  /** The display label (`m1`, `m2`, …); set once the session id is known. */
+  label?: string;
   /** The agent's written replies, in order; tool output never appears here. */
   replies: string[];
   tools: ToolUse;

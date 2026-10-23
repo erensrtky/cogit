@@ -110,6 +110,14 @@ describe("commands through the CLI", () => {
     expect(io.lines.at(-1)).toBe("Saved session s1 (0 nodes)");
   });
 
+  it("runs the hidden migrate command", async () => {
+    await cli("init", root, "--yes", "--retention", "keep");
+    await cli("migrate", root);
+    expect(io.lines.at(-1)).toBe(
+      "Migrated 0 session(s); 0 skipped (already migrated or unmappable).",
+    );
+  });
+
   it("runs session show for the skill", async () => {
     await cli("init", root, "--yes", "--retention", "keep");
     await cli("session", "show", "s1", "-C", root);

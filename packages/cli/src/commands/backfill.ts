@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { CliError, type Io } from "../io.js";
+import { hashTurns, isRecorded, type SessionMessage, upgradeSessionIds } from "../messages.js";
 import type { Session } from "../schema/session.js";
+import { applyEvents, readEvents } from "../store/events.js";
 import { LockBusyError, withLock } from "../store/lock.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
@@ -23,7 +25,7 @@ function turnBlock(turn: ChatTurn): string {
   const { commands, other } = turn.tools;
   const tools = `${commands} command(s), ${turn.tools.files.length} file(s) edited, ${other} other tool call(s)`;
   return [
-    `### ${turn.id} · ${turn.at}`,
+    `### ${turn.label ?? turn.id} · ${turn.at}`,
     `USER: ${cut(turn.text)}`,
     `AGENT: ${agent}`,
     `TOOLS: ${tools}`,
@@ -165,13 +167,18 @@ async function missingTurns(
   root: string,
   sessionId: string,
   env: NodeJS.ProcessEnv,
-): Promise<ChatTurn[]> {
+): Promise<SessionMessage[]> {
   const file = await findTranscript(sessionId, env);
   if (!file) return [];
-  const turns = await readConversation(file);
+  const turns = hashTurns(sessionId, await readConversation(file));
   const loaded = await loadSession(root, sessionId);
-  const recorded = new Set(loaded.found && loaded.ok ? loaded.data.nodes.map((n) => n.id) : []);
-  return turns.filter((turn) => !recorded.has(turn.id));
+  let recorded = new Set<string>();
+  if (loaded.found && loaded.ok) {
+    const upgraded = upgradeSessionIds(loaded.data, turns);
+    const events = await readEvents(root, sessionId);
+    recorded = new Set(applyEvents(upgraded.nodes, events).map((node) => node.id));
+  }
+  return turns.filter((turn) => !isRecorded(recorded, turn));
 }
 
 /**

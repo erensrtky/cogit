@@ -24,10 +24,28 @@ export function buildMessages(
   nodes: LineageNode[],
   pending: ViewPendingMessage[] = [],
 ): ViewNode[] {
-  const messages = nodes.filter((node) => node.kind === "message").sort(compareMessages);
-  const known = new Set(messages.map((message) => message.id));
+  const recorded = nodes.filter((node) => node.kind === "message");
+  // One row per message in send order; unrecorded messages are part of the same
+  // order, so a session's labels (`m1`, `m2`, …) count both and line up with
+  // `session show` (Story 8.5).
+  type Row =
+    | { kind: "recorded"; node: LineageNode; index: number }
+    | { kind: "pending"; message: ViewPendingMessage; index: number };
+  const combined: Row[] = [
+    ...recorded.map((node, index): Row => ({ kind: "recorded", node, index })),
+    ...pending.map(
+      (message, index): Row => ({ kind: "pending", message, index: recorded.length + index }),
+    ),
+  ].sort(
+    (a, b) =>
+      ((a.kind === "recorded" ? a.node.at : a.message.at) ?? "").localeCompare(
+        (b.kind === "recorded" ? b.node.at : b.message.at) ?? "",
+      ) || a.index - b.index,
+  );
+  const idOf = (row: Row): string => (row.kind === "recorded" ? row.node.id : row.message.id);
+  const known = new Set(combined.map(idOf));
   /** Position in send order: a parent or link must come before the message. */
-  const order = new Map(messages.map((message, index) => [message.id, index]));
+  const order = new Map(combined.map((row, index) => [idOf(row), index]));
   const earlier = (other: string, id: string): boolean => {
     const otherAt = order.get(other);
     const selfAt = order.get(id);
@@ -38,11 +56,26 @@ export function buildMessages(
 
   const push = (message: ViewNode, parent: string | null): void => {
     message.parent = parent;
+    message.label = `m${out.length + 1}`;
     out.push(message);
     previous = message.id;
   };
 
-  for (const node of messages) {
+  for (const row of combined) {
+    if (row.kind === "pending") {
+      push(
+        {
+          id: row.message.id,
+          kind: "message",
+          title: row.message.title,
+          at: row.message.at,
+          unsummarized: true,
+        },
+        previous,
+      );
+      continue;
+    }
+    const node = row.node;
     const parent =
       node.parent === null
         ? null
@@ -72,34 +105,7 @@ export function buildMessages(
       parent,
     );
   }
-
-  // Messages the record does not hold yet continue the chain where it stopped.
-  for (const message of pending) {
-    push(
-      {
-        id: message.id,
-        kind: "message",
-        title: message.title,
-        at: message.at,
-        unsummarized: true,
-      },
-      previous,
-    );
-  }
   return out;
-}
-
-const MESSAGE_NUMBER = /^m([1-9][0-9]*)$/;
-
-function messageNumber(id: string): number {
-  const match = MESSAGE_NUMBER.exec(id);
-  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
-}
-
-/** Send time first; the message number keeps records written in one go in order. */
-function compareMessages(a: LineageNode, b: LineageNode): number {
-  const at = (a.at ?? "").localeCompare(b.at ?? "");
-  return at !== 0 ? at : messageNumber(a.id) - messageNumber(b.id);
 }
 
 /** A session counts as active while it was updated within this window. */

@@ -13,6 +13,11 @@ import { projectPaths } from "./paths.js";
 export interface StoredTurn {
   /** The transcript's uuid for the user line; the key that makes appends idempotent. */
   uuid: string;
+  /**
+   * The message's stable id (Story 8.5), so ids survive the transcript. Absent
+   * on turns stored before hashes existed; they are hashed from these fields.
+   */
+  hash?: string;
   at: string;
   text: string;
   replies: string[];
@@ -53,15 +58,27 @@ export async function readConversationStore(
   } catch {
     return [];
   }
-  const turns: StoredTurn[] = [];
+  /** Later records for one uuid add a stable id without rewriting the turn. */
+  const byUuid = new Map<string, StoredTurn>();
+  const order: string[] = [];
   for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
+    let value: unknown;
     try {
-      const value: unknown = JSON.parse(line);
-      if (isStoredTurn(value)) turns.push(value);
-    } catch {}
+      value = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!isStoredTurn(value)) continue;
+    const prev = byUuid.get(value.uuid);
+    if (!prev) {
+      byUuid.set(value.uuid, value);
+      order.push(value.uuid);
+      continue;
+    }
+    if (prev.hash === undefined && value.hash !== undefined) byUuid.set(value.uuid, value);
   }
-  return turns;
+  return order.map((uuid) => byUuid.get(uuid) as StoredTurn);
 }
 
 /**
@@ -82,6 +99,7 @@ export async function appendConversationTurns(
     known.add(turn.uuid);
     fresh.push({
       uuid: turn.uuid,
+      ...(turn.hash === undefined ? {} : { hash: turn.hash }),
       at: turn.at,
       text: turn.text,
       replies: turn.replies,
@@ -93,6 +111,30 @@ export async function appendConversationTurns(
   // gets the same secret net as the page, not the raw text.
   const { value } = redactDeep(fresh);
   const chunk = `${value.map((turn) => JSON.stringify(turn)).join("\n")}\n`;
+  const file = projectPaths(root).conversation(sessionId);
+  await mkdir(dirname(file), { recursive: true });
+  await appendFile(file, gzipSync(Buffer.from(chunk, "utf8")));
+  return fresh.length;
+}
+
+/**
+ * Adds the stable id to turns stored before Story 8.5, as a later line for the
+ * same uuid: the file stays append-only and reading prefers the line with a
+ * hash. Without this, deleting the transcript would change every id and show
+ * recorded messages as unrecorded.
+ */
+export async function appendConversationHashes(
+  root: string,
+  sessionId: string,
+  hashes: ReadonlyMap<string, string>,
+): Promise<number> {
+  if (hashes.size === 0) return 0;
+  const stored = await readConversationStore(root, sessionId);
+  const fresh = stored
+    .filter((turn) => turn.hash === undefined && hashes.has(turn.uuid))
+    .map((turn) => ({ ...turn, hash: hashes.get(turn.uuid) as string }));
+  if (fresh.length === 0) return 0;
+  const chunk = `${fresh.map((turn) => JSON.stringify(turn)).join("\n")}\n`;
   const file = projectPaths(root).conversation(sessionId);
   await mkdir(dirname(file), { recursive: true });
   await appendFile(file, gzipSync(Buffer.from(chunk, "utf8")));

@@ -21,7 +21,10 @@ export const LIVE_META_NAME = "codelineage-live";
 export const VIEW_SCHEMA = 1;
 
 export interface ViewNode {
+  /** Stable id (`h…`); the key of the node, never shown to the user. */
   id: string;
+  /** Display label (`m1`, `m2`, …) derived from send order (Story 8.5). */
+  label?: string;
   kind: NodeKind;
   title: string;
   summary?: string;
@@ -77,8 +80,10 @@ export interface StatusCard extends ViewStatus {
 
 /** A user message the record does not hold yet, read from the transcript at build time. */
 export interface ViewPendingMessage {
-  /** Same id the message will get as a node (`m1`, `m2`, …). */
+  /** The stable id the message will get as a node (`h…`). */
   id: string;
+  /** The `m1`, `m2`, … label the user reads. */
+  label?: string;
   at: string;
   /** The first words of the message, used as the card title. */
   title: string;
@@ -86,8 +91,10 @@ export interface ViewPendingMessage {
 
 /** One user message and the agent's written answer, read from the transcript at build time. */
 export interface ViewChatTurn {
-  /** Same id as the message node it belongs to (`m1`, `m2`, …). */
+  /** Same stable id as the message node it belongs to (`h…`). */
   id: string;
+  /** The `m1`, `m2`, … label the user reads. */
+  label?: string;
   at: string;
   /** The user's message as written, without injected reminders. */
   text: string;

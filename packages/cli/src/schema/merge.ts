@@ -11,6 +11,16 @@ export interface MergeResult {
   warnings: string[];
 }
 
+export interface MergeOptions {
+  /**
+   * Position in send order of every message the session knows, by its stable id
+   * (`h…`). Without it, `m1`, `m2`, … define the order, as before 8.5.
+   */
+  order?: ReadonlyMap<string, number>;
+  /** Stable id → display label, for warnings the agent reads. */
+  labels?: ReadonlyMap<string, string>;
+}
+
 /**
  * Merges agent input into the stored session. Nodes are upserted by id and never
  * removed; status is replaced when sent; other fields change only when sent.
@@ -19,6 +29,7 @@ export function mergeSession(
   existing: Session | undefined,
   input: SessionInput,
   now: string,
+  opts: MergeOptions = {},
 ): MergeResult {
   if (existing && existing.sessionId !== input.sessionId) {
     throw new Error(`session id mismatch: ${existing.sessionId} vs ${input.sessionId}`);
@@ -36,24 +47,33 @@ export function mergeSession(
   };
 
   const nodes = new Map<string, LineageNode>(base.nodes.map((n) => [n.id, n]));
-  const messageNumbers = new Map<string, number>();
+  /**
+   * Send-order position of every message the record holds or this write adds.
+   * The table (stable ids) decides it; without one, `m1`, `m2`, … still do. A
+   * parent must be one of these, so a message that has no node cannot be one.
+   */
+  const recorded = new Map<string, number>();
   for (const n of [...base.nodes, ...(input.nodes ?? [])]) {
+    if (n.kind !== "message") continue;
+    const fromTable = opts.order?.get(n.id);
     const number = messageNumber(n);
-    if (number !== null) messageNumbers.set(n.id, number);
+    const position = fromTable ?? (number === null ? null : number - 1);
+    if (position !== null) recorded.set(n.id, position);
   }
+  const label = (id: string): string => opts.labels?.get(id) ?? id;
   const messageWarnings: string[] = [];
   for (const { parent, links, ...n } of input.nodes ?? []) {
     const prev = nodes.get(n.id);
-    const own = n.kind === "message" ? messageNumber(n) : null;
+    const own = n.kind === "message" ? (recorded.get(n.id) ?? null) : null;
     const nextParent =
       parent !== undefined && own !== null
-        ? checkParent(n.id, parent, own, messageNumbers, messageWarnings)
+        ? checkParent(n.id, parent, own, recorded, messageWarnings, label)
         : parent === undefined
           ? (prev?.parent ?? null)
           : parent;
     const nextLinks =
       links !== undefined && own !== null
-        ? checkLinks(n.id, links, own, messageNumbers, messageWarnings)
+        ? checkLinks(n.id, links, own, recorded, messageWarnings, label)
         : links;
     const next: LineageNode = {
       ...prev,
@@ -94,10 +114,10 @@ function isEarlierMessage(numbers: Map<string, number>, id: string, own: number)
   return number !== undefined && number < own;
 }
 
-/** The recorded message just before `own` by number, or null when there is none. */
+/** The recorded message just before `own` by position, or null when there is none. */
 function previousMessage(numbers: Map<string, number>, own: number): string | null {
   let best: string | null = null;
-  let bestNumber = 0;
+  let bestNumber = -1;
   for (const [id, number] of numbers) {
     if (number < own && number > bestNumber) {
       best = id;
@@ -119,13 +139,14 @@ function checkParent(
   own: number,
   numbers: Map<string, number>,
   warnings: string[],
+  label: (id: string) => string,
 ): string | null {
   if (parent === null || isEarlierMessage(numbers, parent, own)) return parent;
   const fallback = previousMessage(numbers, own);
   warnings.push(
     fallback === null
-      ? `message ${id}: parent ${parent} is not an earlier message of this session, moved to root`
-      : `message ${id}: parent ${parent} is not an earlier message of this session, using ${fallback}`,
+      ? `message ${label(id)}: parent ${label(parent)} is not an earlier message of this session, moved to root`
+      : `message ${label(id)}: parent ${label(parent)} is not an earlier message of this session, using ${label(fallback)}`,
   );
   return fallback;
 }
@@ -137,10 +158,13 @@ function checkLinks(
   own: number,
   numbers: Map<string, number>,
   warnings: string[],
+  label: (id: string) => string,
 ): string[] {
   return links.filter((link) => {
     if (isEarlierMessage(numbers, link, own)) return true;
-    warnings.push(`message ${id}: link ${link} is not an earlier message of this session, dropped`);
+    warnings.push(
+      `message ${label(id)}: link ${label(link)} is not an earlier message of this session, dropped`,
+    );
     return false;
   });
 }

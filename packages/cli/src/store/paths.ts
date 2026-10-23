@@ -10,6 +10,10 @@ export function projectPaths(root: string) {
     project: join(base, "project.json"),
     sessions: join(base, "sessions"),
     session: (id: string) => join(base, "sessions", `${id}.json`),
+    /** Append-only structure events for a session (Story 8.5). */
+    events: (id: string) => join(base, "sessions", `${id}.events.jsonl`),
+    /** Pre-migration copies of the record files. */
+    backup: (name: string) => join(base, name),
     /** The conversation store: what the drill-down needs, outliving the transcript. */
     conversations: join(base, "conversations"),
     conversation: (id: string) => join(base, "conversations", `${id}.jsonl.gz`),

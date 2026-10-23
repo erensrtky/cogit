@@ -31,7 +31,7 @@ function returnMark(row: GitMessageRow): ReactElement | null {
     <span className="git-returns">
       {row.returns.map((back) => (
         <span key={back.id} className="git-return" style={{ color: color(back.colorIndex) }}>
-          ↩ {back.id}
+          ↩ {back.label}
         </span>
       ))}
     </span>
@@ -98,7 +98,7 @@ function Row({
           {branchTitle}
         </span>
       ) : null}
-      <span className="git-id">{message.id}</span>
+      <span className="git-id">{message.label ?? message.id}</span>
       <span className="git-title">{message.title}</span>
       {returnMark(row)}
       {row.head ? <span className="left-off">left off here</span> : null}

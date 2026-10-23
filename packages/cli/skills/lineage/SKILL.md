@@ -42,15 +42,17 @@ Build one JSON object:
 ## The map is the user's messages
 
 Each message the user wrote is one node on the map. `newMessages` in the record
-lists the user's messages that have no node yet, in order, with their id (`m1`,
-`m2`, …), time and the start of their text. Send one `message` node for every
-one of them; skip none, even a short "ok" or "go on".
+lists the user's messages that have no node yet, in order, each with a stable
+`id` (`h…`), the `label` the user reads (`m1`, `m2`, …), its time and the start
+of its text. Send one `message` node for every one of them; skip none, even a
+short "ok" or "go on".
 
-- `id`: exactly the message's id from `newMessages`. The CLI takes the time from
-  the transcript, so do not send `at`.
+- `id`: the message's `id` from `newMessages`. The `label` (`m1`) is accepted
+  too, and so is either form for a parent or link: the CLI maps it to the stable
+  id. The stable id never changes when a parent is corrected.
 - `kind`: `"message"`.
-- `parent`: the id of the earlier message it reacts to (see below), or `null`
-  for a new root.
+- `parent`: the id (or label) of the earlier message it reacts to (see below),
+  or `null` for a new root.
 - `title`: the message in a few words, in the user's own wording where possible
   ("Continue with Epic 4", "Why does auto mode keep stopping?"). Never copy a
   long paste; name what it is.
@@ -90,10 +92,14 @@ earlier one, and a thread that starts something new is a root.
 - `links`: up to 5 earlier messages of this session that this one returns to or
   builds on besides its parent. They show as dashed arrows. The CLI drops a
   link or parent that is not an earlier message, so a mistyped one is not fatal.
+- Correcting a parent or a link later is safe and is recorded as a new fact: the
+  message keeps its id and its notes. Send the node again with the new `parent`
+  or `links`; resending an unchanged node writes nothing.
 - `newMessages` hints help, but are hints, not rules: `gapMinutes` since the
   previous message, `resumed` (a `/clear`, a resume or a new process came in
   between), `commitBetween` (this session committed between them). The wording
-  decides. `lastMessages` lists the last recorded messages with their parent.
+  decides. `lastMessages` lists the last recorded messages with their stable
+  `id`, `label` and parent.
 
 ## Summarize each branch
 

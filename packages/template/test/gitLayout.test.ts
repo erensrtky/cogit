@@ -205,6 +205,6 @@ describe("returns", () => {
       (candidate): candidate is GitMessageRow =>
         candidate.kind === "message" && candidate.message.id === "m4",
     );
-    expect(row?.returns).toEqual([{ id: "m1", colorIndex: 0 }]);
+    expect(row?.returns).toEqual([{ id: "m1", label: "m1", colorIndex: 0 }]);
   });
 });

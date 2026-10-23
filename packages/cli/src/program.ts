@@ -11,6 +11,7 @@ import {
 } from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
 import { type InitOptions, init } from "./commands/init.js";
+import { migrateIds } from "./commands/migrate.js";
 import { openPanel, openProject } from "./commands/open.js";
 import { readStdin, sessionShow, sessionWrite } from "./commands/session.js";
 import { runHook } from "./hooks/run.js";
@@ -172,6 +173,21 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
             "backfill of past sessions is not available yet; run `codelineage backfill <session-id> --tail`",
           );
         await backfillTail(opts.dir, sessionId, makeIo(false));
+      }),
+    );
+
+  // One-time data upgrade for records written before stable message ids (8.5).
+  program
+    .command("migrate", { hidden: true })
+    .description("give old records stable message ids and an events file")
+    .argument("[dir]", "project directory", ".")
+    .action(
+      run(async (dir: string) => {
+        const io = makeIo(false);
+        const result = await migrateIds(dir, io);
+        io.out(
+          `Migrated ${result.migrated} session(s); ${result.skipped} skipped (already migrated or unmappable).`,
+        );
       }),
     );
 

@@ -1,12 +1,14 @@
 import { existsSync } from "node:fs";
 import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { gzipSync } from "node:zlib";
 import { beforeEach, describe, expect, it } from "vitest";
-import { buildProject, countUnrecorded } from "../src/commands/build.js";
+import { buildProject } from "../src/commands/build.js";
 import { configSet } from "../src/commands/config.js";
 import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
+import { messageHash } from "../src/messages.js";
 import type { LineageNode, Session } from "../src/schema/session.js";
 import { readConversationStore } from "../src/store/conversations.js";
 import { projectPaths } from "../src/store/paths.js";
@@ -213,6 +215,7 @@ describe("buildViewModel", () => {
     expect(messages.map((message) => message.parent)).toEqual([null, "m1", "m2"]);
     expect(messages[2]).toEqual({
       id: "m3",
+      label: "m3",
       kind: "message",
       title: "Third message",
       at: "2026-10-21T10:03:00.000Z",
@@ -492,8 +495,10 @@ describe("codelineage build", () => {
 
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
     const [s1, s2] = model.epochs[0]?.sessions ?? [];
+    const raw = "Fix the card <system-reminder>x</system-reminder>";
     const turn = {
-      id: "m1",
+      id: messageHash("s1", { at: T0, text: raw }),
+      label: "m1",
       at: T0,
       text: "Fix the card",
       replies: ["Done, key [REDACTED]"],
@@ -502,9 +507,9 @@ describe("codelineage build", () => {
     expect(s1?.chat).toEqual([turn]);
     // s2 records no message, so its unrecorded turn is shown as a pending card
     // and needs the same conversation for its drill-down.
-    expect(s2?.chat).toEqual([turn]);
+    expect(s2?.chat).toEqual([{ ...turn, id: messageHash("s2", { at: T0, text: raw }) }]);
     expect(s2?.messages.at(-1)).toMatchObject({
-      id: "m1",
+      id: messageHash("s2", { at: T0, text: raw }),
       kind: "message",
       title: "Fix the card",
       unsummarized: true,
@@ -541,8 +546,14 @@ describe("codelineage build", () => {
       session({ sessionId: "s1", epoch: "e1", nodes: [node("m1", "message", "First")] }),
     );
 
+    const hash = (uuid: string, at: string, text: string) => messageHash("s1", { uuid, at, text });
+    const hashes = [
+      hash("u1", T0, "First"),
+      hash("u2", "2026-10-21T11:00:00.000Z", "Second"),
+      hash("u3", T0, "Third"),
+    ];
     const first = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(first.epochs[0]?.sessions[0]?.chat?.map((t) => t.id)).toEqual(["m1", "m2"]);
+    expect(first.epochs[0]?.sessions[0]?.chat?.map((t) => t.id)).toEqual(hashes.slice(0, 2));
     expect((await readConversationStore(root, "s1")).map((t) => [t.uuid, t.text])).toEqual([
       ["u1", "First"],
       ["u2", "Second"],
@@ -568,9 +579,9 @@ describe("codelineage build", () => {
     expect(third.epochs[0]?.sessions[0]).toMatchObject({
       transcriptAvailable: false,
       chat: [
-        { id: "m1", text: "First", replies: ["Answer one"] },
-        { id: "m2", text: "Second", replies: ["Answer two"] },
-        { id: "m3", text: "Third", replies: [] },
+        { id: hashes[0], text: "First", replies: ["Answer one"] },
+        { id: hashes[1], text: "Second", replies: ["Answer two"] },
+        { id: hashes[2], text: "Third", replies: [] },
       ],
     });
 
@@ -585,6 +596,49 @@ describe("codelineage build", () => {
     expect(io.warnings).toEqual(
       expect.arrayContaining([expect.stringMatching(/^could not read the conversation of s1: /)]),
     );
+  });
+
+  it("gives turns stored before stable ids their hash, so ids survive the transcript", async () => {
+    const folder = join(dir, "claude", "projects", "-proj");
+    await mkdir(folder, { recursive: true });
+    const transcript = join(folder, "s1.jsonl");
+    await writeFile(
+      transcript,
+      JSON.stringify({
+        type: "user",
+        uuid: "u1",
+        timestamp: T0,
+        message: { content: "First" },
+      }),
+    );
+    // A turn stored by 8.4, before the store kept ids.
+    const stored = {
+      uuid: "u1",
+      at: T0,
+      text: "First",
+      replies: [],
+      tools: { commands: 0, files: [], other: 0 },
+    };
+    await mkdir(paths().conversations, { recursive: true });
+    await writeFile(
+      paths().conversation("s1"),
+      gzipSync(Buffer.from(`${JSON.stringify(stored)}\n`)),
+    );
+    await saveSession(
+      "s1",
+      session({ sessionId: "s1", epoch: "e1", nodes: [node("m1", "message", "First")] }),
+    );
+    const id = messageHash("s1", { uuid: "u1", at: T0, text: "First" });
+
+    const first = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(first.epochs[0]?.sessions[0]?.messages[0]?.id).toBe(id);
+    expect((await readConversationStore(root, "s1"))[0]?.hash).toBe(id);
+
+    // The transcript goes; the stored hash keeps the same id and the record matches.
+    await rm(transcript);
+    const second = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(second.epochs[0]?.sessions[0]?.messages.map((m) => m.id)).toEqual([id]);
+    expect(second.epochs[0]?.sessions[0]?.messages[0]?.unsummarized).toBeUndefined();
   });
 
   it("adds the conversation gitignore line once, also in an existing project", async () => {
@@ -669,12 +723,16 @@ describe("codelineage build", () => {
       "Second message, with the card",
     ]);
     expect(messages[1]).toMatchObject({
-      id: "m2",
+      id: messageHash("s1", {
+        at: "2026-10-21T10:05:00.000Z",
+        text: "Second message, with the card <system-reminder>noise</system-reminder>",
+      }),
+      label: "m2",
       kind: "message",
       title: "Second message, with the card",
       at: "2026-10-21T10:05:00.000Z",
       unsummarized: true,
-      parent: "m1",
+      parent: messageHash("s1", { at: T0, text: "First message" }),
     });
 
     await sessionWrite({ dir: root }, io, async () =>
@@ -725,16 +783,6 @@ describe("codelineage build", () => {
     expect(off.epochs[0]?.sessions.find((s) => s.sessionId === "s2")).not.toHaveProperty(
       "unrecordedMessages",
     );
-  });
-
-  it("ignores a transcript that cannot be read while counting", async () => {
-    const folder = join(dir, "claude", "projects", "-proj");
-    await mkdir(join(folder, "s1.jsonl"), { recursive: true });
-    const counts = await countUnrecorded(
-      [session({ sessionId: "s1" })],
-      new Map([["s1", join(folder, "s1.jsonl")]]),
-    );
-    expect(counts.size).toBe(0);
   });
 
   it("builds without printing when quiet and survives a missing sessions directory", async () => {

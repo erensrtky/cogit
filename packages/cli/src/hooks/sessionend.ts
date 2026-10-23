@@ -1,5 +1,6 @@
+import { isRecorded, readSessionMessages, upgradeSessionIds } from "../messages.js";
+import { applyEvents, readEvents } from "../store/events.js";
 import { loadConfig, loadSession } from "../store/stores.js";
-import { findTranscript, readConversation } from "../transcript.js";
 import type { HookContext } from "./run.js";
 
 /**
@@ -12,17 +13,16 @@ export async function onSessionEnd(ctx: HookContext): Promise<undefined> {
   if (!ctx.initialized) return undefined;
   const config = await loadConfig(ctx.env);
   if (!config.sessionEndCatchUp) return undefined;
-  const file = await findTranscript(ctx.sessionId, ctx.env);
-  if (!file) return undefined;
-  let turns;
-  try {
-    turns = await readConversation(file);
-  } catch {
-    return undefined;
-  }
+  const messages = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
+  if (!messages || messages.length === 0) return undefined;
   const record = await loadSession(ctx.root, ctx.sessionId);
-  const recorded = new Set(record.found && record.ok ? record.data.nodes.map((n) => n.id) : []);
-  if (turns.every((turn) => recorded.has(turn.id))) return undefined;
+  let recorded = new Set<string>();
+  if (record.found && record.ok) {
+    const upgraded = upgradeSessionIds(record.data, messages);
+    const events = await readEvents(ctx.root, ctx.sessionId);
+    recorded = new Set(applyEvents(upgraded.nodes, events).map((node) => node.id));
+  }
+  if (messages.every((message) => isRecorded(recorded, message))) return undefined;
   ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "-C", ctx.root]);
   return undefined;
 }

@@ -10,6 +10,7 @@ import {
 } from "../src/commands/backfill.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
+import { messageHash } from "../src/messages.js";
 import type { Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
 import { loadSession } from "../src/store/stores.js";
@@ -154,9 +155,11 @@ describe("backfill --tail", () => {
     const io = fakeIo(env);
     await backfillTail(root, "s1", io);
     const saved = await record();
-    expect(saved?.nodes.map((n) => n.id)).toEqual(expect.arrayContaining(["m1", "topic", "m2"]));
+    const first = messageHash("s1", { at: "2026-10-23T10:01:00.000Z", text: "first" });
+    const second = messageHash("s1", { at: "2026-10-23T10:02:00.000Z", text: "second" });
+    expect(saved?.nodes.map((n) => n.id)).toEqual(expect.arrayContaining([first, "topic", second]));
     // The time comes from the transcript, not from the agent.
-    expect(saved?.nodes.find((n) => n.id === "m2")).toMatchObject({
+    expect(saved?.nodes.find((n) => n.id === second)).toMatchObject({
       at: "2026-10-23T10:02:00.000Z",
       summary: "Recorded it",
     });
@@ -165,7 +168,7 @@ describe("backfill --tail", () => {
     const prompt = await readFile(join(dir, "prompt.txt"), "utf8");
     expect(prompt).toContain("USER: second");
     expect(prompt).toContain('"sessionId": "s1"');
-    expect(prompt).toContain("- m1 (message) parent=null: First");
+    expect(prompt).toContain(`- ${first} (message) parent=null: First`);
     expect(prompt).toContain("the conversation's language");
   });
 
