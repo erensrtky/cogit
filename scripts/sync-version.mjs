@@ -12,10 +12,14 @@ export function syncVersion(root) {
   const changed = [];
   for (const rel of TARGETS) {
     const file = join(root, rel);
-    const json = JSON.parse(readFileSync(file, "utf8"));
+    const text = readFileSync(file, "utf8");
+    const json = JSON.parse(text);
     if (json.version === version) continue;
-    json.version = version;
-    writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`);
+    // Replace only the version string, so the file keeps the formatting the repo
+    // lints. A file without one is written fresh.
+    const next = text.replace(/("version"\s*:\s*")[^"]*(")/, `$1${version}$2`);
+    const fallback = `${JSON.stringify({ ...json, version }, null, 2)}\n`;
+    writeFileSync(file, next === text ? fallback : next);
     changed.push(rel);
   }
   return { version, changed };

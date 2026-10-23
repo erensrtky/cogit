@@ -23,6 +23,35 @@ describe("sync-version", () => {
     expect(syncVersion(root).changed).toEqual([]);
   });
 
+  it("changes only the version string, keeping the file's formatting", async () => {
+    const root = await tempDir();
+    await writeFile(join(root, "VERSION"), "2.0.0\n");
+    const original = `{\n  "name": "x",\n  "version": "0.1.0",\n  "keywords": ["a", "b"]\n}\n`;
+    for (const rel of TARGETS as string[]) {
+      await mkdir(join(root, rel, ".."), { recursive: true });
+      await writeFile(join(root, rel), original);
+    }
+    syncVersion(root);
+    const updated = await readFile(join(root, TARGETS[0] as string), "utf8");
+    expect(updated).toBe(original.replace("0.1.0", "2.0.0"));
+  });
+
+  it("writes a version into a manifest that has none", async () => {
+    const root = await tempDir();
+    await writeFile(join(root, "VERSION"), "2.0.0\n");
+    for (const rel of TARGETS as string[]) {
+      await mkdir(join(root, rel, ".."), { recursive: true });
+      await writeFile(join(root, rel), '{"name":"x"}');
+    }
+    syncVersion(root);
+    for (const rel of TARGETS as string[]) {
+      expect(JSON.parse(await readFile(join(root, rel), "utf8"))).toEqual({
+        name: "x",
+        version: "2.0.0",
+      });
+    }
+  });
+
   it("leaves this repository unchanged when it is already in sync", () => {
     expect(run(() => {})).toEqual([]);
   });
