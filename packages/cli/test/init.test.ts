@@ -52,7 +52,7 @@ describe("init", () => {
       io,
     );
     expect((await loadConfig(env)).language).toBe("Turkish");
-    expect(await readText(join(root, ".gitignore"))).toContain("/.codelineage/snapshots/");
+    expect(await readText(join(root, ".gitignore"))).toContain("/.codelineage/state/");
   });
 
   it("asks for the git policy in a repo and writes .gitignore", async () => {
@@ -214,7 +214,7 @@ describe("git helpers", () => {
   it("appends only missing lines and keeps existing content", async () => {
     const gi = join(root, ".gitignore");
     await writeFile(gi, "node_modules/");
-    expect(await ensureGitignore(root, "commit")).toHaveLength(5);
+    expect(await ensureGitignore(root, "commit")).toHaveLength(4);
     expect(await ensureGitignore(root, "commit")).toEqual([]);
     expect(await ensureGitignore(root, "ignore")).toEqual(["/.codelineage/"]);
     const text = await readText(gi);

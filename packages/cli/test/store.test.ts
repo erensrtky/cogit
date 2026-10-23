@@ -37,10 +37,7 @@ describe("paths", () => {
     expect(p.session("s1")).toBe("/r/.codelineage/sessions/s1.json");
     expect(p.state("s1")).toBe("/r/.codelineage/state/s1.json");
     expect(p.lock("project")).toBe("/r/.codelineage/locks/project.lock");
-    expect([p.snapshots, p.html]).toEqual([
-      "/r/.codelineage/snapshots",
-      "/r/.codelineage/lineage.html",
-    ]);
+    expect(p.html).toBe("/r/.codelineage/lineage.html");
   });
 });
 

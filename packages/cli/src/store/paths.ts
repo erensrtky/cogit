@@ -11,7 +11,6 @@ export function projectPaths(root: string) {
     sessions: join(base, "sessions"),
     session: (id: string) => join(base, "sessions", `${id}.json`),
     state: (id: string) => join(base, "state", `${id}.json`),
-    snapshots: join(base, "snapshots"),
     locks: join(base, "locks"),
     /** Where the skill drops session JSON for `session write --file`. */
     inbox: (id: string) => join(base, "inbox", `${id}.json`),

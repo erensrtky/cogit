@@ -23,7 +23,6 @@ const HEADER = "# codelineage";
 /** Machine-local data that must never be committed, whatever the policy. */
 const ALWAYS = [
   "/.codelineage/state/",
-  "/.codelineage/snapshots/",
   "/.codelineage/locks/",
   "/.codelineage/inbox/",
   "/.codelineage/lineage.html",

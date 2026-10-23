@@ -149,7 +149,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
   // Called by the plugin's hooks.json with the hook input on stdin. Never fails.
   program
     .command("hook", { hidden: true })
-    .argument("<event>", "hook event, e.g. stop")
+    .argument("<event>", "hook event, e.g. stop or sessionstart")
     .action(async (event: string) => {
       const io = makeIo(false);
       const input = await (deps.stdin ?? readStdin)();

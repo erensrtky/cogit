@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Slug } from "../schema/common.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
+import { onSessionStart } from "./sessionstart.js";
 import { onStop } from "./stop.js";
 
 /** The common fields of a Claude Code hook input we rely on. */
@@ -10,6 +11,8 @@ export const HookInput = z.looseObject({
   session_id: z.string(),
   cwd: z.string().optional(),
   stop_hook_active: z.boolean().optional(),
+  /** SessionStart only: `startup`, `resume`, `clear` or `compact`. */
+  source: z.string().optional(),
 });
 export type HookInput = z.infer<typeof HookInput>;
 
@@ -26,6 +29,7 @@ export type HookOutput = Record<string, unknown>;
 
 const HANDLERS: Record<string, (ctx: HookContext) => Promise<HookOutput | undefined>> = {
   stop: onStop,
+  sessionstart: onSessionStart,
 };
 
 export const HOOK_EVENTS = Object.keys(HANDLERS);

@@ -252,6 +252,26 @@ ${line("second", 2)}
     ]);
   });
 
+  it("warns when the transcript has user lines but none reads as a message", async () => {
+    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    const folder = join(dir, "claude", "projects", "-p");
+    await mkdir(folder, { recursive: true });
+    await writeFile(
+      join(folder, "s1.jsonl"),
+      `${JSON.stringify({
+        type: "user",
+        timestamp: "2026-10-23T10:01:00.000Z",
+        message: { role: "user", content: { changed: "shape" } },
+      })}\n`,
+    );
+    await sessionShow(root, "s1", io);
+    expect(shown()).toMatchObject({
+      messageCount: 0,
+      newMessages: [],
+      transcriptWarning: expect.stringMatching(/format may have changed/),
+    });
+  });
+
   it("flags an unreadable record instead of hiding it", async () => {
     await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
     await writeFile(join(root, ".codelineage", "sessions", "s1.json"), "{nope");

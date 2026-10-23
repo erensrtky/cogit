@@ -191,6 +191,24 @@ export async function readUserMessages(file: string): Promise<UserMessage[]> {
   return (await readConversation(file)).map(({ id, at, text }) => ({ id, at, text }));
 }
 
+/**
+ * Counts `type: "user"` lines in a transcript, whether or not they are messages
+ * (tool results, injected text and shell lines are user lines too). When this is
+ * above zero and `readUserMessages` finds none, Claude Code's format changed under
+ * us rather than the user having written nothing.
+ */
+export async function countUserLines(file: string): Promise<number> {
+  let count = 0;
+  const lines = createInterface({ input: createReadStream(file, "utf8"), crlfDelay: Infinity });
+  for await (const raw of lines) {
+    if (!raw.includes('"type":"user"')) continue;
+    try {
+      if ((JSON.parse(raw) as { type?: unknown }).type === "user") count += 1;
+    } catch {}
+  }
+  return count;
+}
+
 /** Up to this many characters of a message go to the agent. */
 export const EXCERPT_LENGTH = 300;
 

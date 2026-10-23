@@ -8,7 +8,13 @@ import { MESSAGE_ID, SessionInput } from "../schema/session.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadConfig, loadProject, loadSession, updateSession } from "../store/stores.js";
-import { excerpt, findTranscript, readUserMessages, type UserMessage } from "../transcript.js";
+import {
+  countUserLines,
+  excerpt,
+  findTranscript,
+  readUserMessages,
+  type UserMessage,
+} from "../transcript.js";
 import { buildProject } from "./build.js";
 
 export async function readStdin(stream: NodeJS.ReadableStream = process.stdin): Promise<string> {
@@ -83,18 +89,26 @@ export async function sessionWrite(
   }
 }
 
+/** The session's transcript file and user messages, or null when it cannot be read. */
+async function transcriptMessages(
+  sessionId: string,
+  env: NodeJS.ProcessEnv,
+): Promise<{ file: string; messages: UserMessage[] } | null> {
+  const file = await findTranscript(sessionId, env);
+  if (!file) return null;
+  try {
+    return { file, messages: await readUserMessages(file) };
+  } catch {
+    return null;
+  }
+}
+
 /** The session's user messages, or null when its transcript cannot be read. */
 async function userMessages(
   sessionId: string,
   env: NodeJS.ProcessEnv,
 ): Promise<UserMessage[] | null> {
-  const file = await findTranscript(sessionId, env);
-  if (!file) return null;
-  try {
-    return await readUserMessages(file);
-  } catch {
-    return null;
-  }
+  return (await transcriptMessages(sessionId, env))?.messages ?? null;
 }
 
 /**
@@ -176,7 +190,8 @@ export async function sessionShow(dir: string, sessionId: string, io: Io): Promi
   } else if (loaded.found) {
     view.sessionError = loaded.error;
   }
-  const messages = await userMessages(sessionId, io.env);
+  const transcript = await transcriptMessages(sessionId, io.env);
+  const messages = transcript?.messages ?? null;
   if (messages) {
     const recorded = new Set(loaded.found && loaded.ok ? loaded.data.nodes.map((n) => n.id) : []);
     view.messageCount = messages.length;
@@ -185,6 +200,14 @@ export async function sessionShow(dir: string, sessionId: string, io: Io): Promi
       .map(({ id, at, text }) => ({ id, at, text: excerpt(text) }));
   } else {
     view.newMessages = null;
+  }
+  // A format change would otherwise look like "nothing written yet" forever.
+  if (transcript && transcript.messages.length === 0) {
+    const userLines = await countUserLines(transcript.file).catch(() => 0);
+    if (userLines > 0)
+      view.transcriptWarning =
+        `the transcript has ${userLines} user line(s) but none read as a message; ` +
+        "Claude Code's transcript format may have changed";
   }
   view.inbox = projectPaths(given).inbox(sessionId);
   io.out(JSON.stringify(view, null, 2));

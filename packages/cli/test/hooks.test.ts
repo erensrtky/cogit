@@ -6,6 +6,7 @@ import { configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
 import { runHook } from "../src/hooks/run.js";
+import { COMPACT_REQUEST } from "../src/hooks/sessionstart.js";
 import { countTurn, UPDATE_REQUEST } from "../src/hooks/stop.js";
 import { projectPaths } from "../src/store/paths.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
@@ -44,6 +45,11 @@ describe("runHook", () => {
 
   const stop = (extra: Record<string, unknown> = {}, e = env) =>
     runHook("stop", JSON.stringify({ session_id: "s1", cwd: root, ...extra }), e, T0, (l) =>
+      debug.push(l),
+    );
+
+  const sessionStart = (source: string, e = env) =>
+    runHook("sessionstart", JSON.stringify({ session_id: "s1", cwd: root, source }), e, T0, (l) =>
       debug.push(l),
     );
 
@@ -107,6 +113,75 @@ describe("runHook", () => {
     expect(JSON.parse(await readFile(projectPaths(root).state("s1"), "utf8"))).toMatchObject({
       turns: 1,
     });
+  });
+
+  const transcript = async (lines: unknown[]) => {
+    const folder = join(env.CLAUDE_CONFIG_DIR ?? "", "projects", "proj");
+    await mkdir(folder, { recursive: true });
+    await writeFile(
+      join(folder, "s1.jsonl"),
+      `${lines.map((l) => JSON.stringify(l)).join("\n")}\n`,
+    );
+  };
+
+  const typed = (text: string, m: number) => ({
+    type: "user",
+    timestamp: `2026-10-23T10:0${m}:00.000Z`,
+    message: { role: "user", content: text },
+  });
+
+  it("asks for an update after compaction when messages have no node", async () => {
+    await initialized(2);
+    await transcript([typed("first", 1), typed("second", 2)]);
+    expect(JSON.parse((await sessionStart("compact")) ?? "")).toEqual({
+      hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: COMPACT_REQUEST },
+    });
+  });
+
+  it("stays quiet after compaction when every message has a node", async () => {
+    await initialized(2);
+    await transcript([typed("first", 1)]);
+    await sessionWrite({ dir: root }, fakeIo(env), async () =>
+      JSON.stringify({ sessionId: "s1", nodes: [{ id: "m1", kind: "message", title: "First" }] }),
+    );
+    expect(await sessionStart("compact")).toBeUndefined();
+  });
+
+  it("stays quiet for other sources, without a transcript and when disabled", async () => {
+    await initialized(2);
+    expect(await sessionStart("compact")).toBeUndefined();
+    await transcript([typed("first", 1)]);
+    expect(await sessionStart("startup")).toBeUndefined();
+    expect(await sessionStart("resume")).toBeUndefined();
+    expect(await sessionStart("clear")).toBeUndefined();
+    expect(await sessionStart("compact", { ...env, CODELINEAGE_DISABLE: "1" })).toBeUndefined();
+  });
+
+  it("stays quiet when the transcript cannot be read", async () => {
+    await initialized(2);
+    // A directory where the transcript should be: found, but reading it fails.
+    await mkdir(join(env.CLAUDE_CONFIG_DIR ?? "", "projects", "proj", "s1.jsonl"), {
+      recursive: true,
+    });
+    expect(await sessionStart("compact")).toBeUndefined();
+  });
+
+  it("stays quiet before init even when the transcript has unrecorded messages", async () => {
+    await transcript([typed("first", 1)]);
+    expect(await sessionStart("compact")).toBeUndefined();
+    expect(existsSync(join(root, ".codelineage"))).toBe(false);
+  });
+
+  it("ignores transcript lines that are not messages", async () => {
+    await initialized(2);
+    await transcript([
+      {
+        type: "user",
+        timestamp: "2026-10-23T10:01:00.000Z",
+        message: { role: "user", content: [{ type: "tool_result", content: "out" }] },
+      },
+    ]);
+    expect(await sessionStart("compact")).toBeUndefined();
   });
 
   it("stays silent when disabled, for unknown events and for bad input", async () => {
