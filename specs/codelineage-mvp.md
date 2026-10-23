@@ -17,8 +17,15 @@ The agent itself records a structured summary of its session as it works. A CLI 
 these records into static HTML:
 
 - **Project map** (one per project): project → epoch (feature/epic) → session →
-  phase/step/decision. Every node can be expanded to drill down. Each session node
-  carries a `claude --resume <id>` copy button.
+  topic → sub-topics (any depth) → step/decision/question. It opens like layers of
+  an onion: time runs down the page (sessions in order), a session's top-level
+  topics sit side by side as columns ordered by when they began, and an opened
+  topic lists its items down its column in the order they were added. Every node
+  with children expands and collapses; the latest session opens with its topics
+  closed except the branches to the nodes its last write added or changed, which
+  are marked "left off here". Cards size themselves to their text. A click opens
+  a drill-down panel with the full text, who decided, the options considered and
+  rejected, the commits and files, and a `claude --resume <id>` copy button.
 - **Status card** at the top of every project: goal, done, pending (flags items
   waiting on the user), next step, last activity. With parallel sessions, goal and
   next come from the most recently updated session; `needsUser` items are merged
@@ -71,13 +78,24 @@ Session file (schema v1, sketch):
     "next": "…"
   },
   "nodes": [
-    { "id": "n1", "parent": null, "kind": "phase", "title": "…", "summary": "…" },
-    { "id": "n2", "parent": "n1", "kind": "decision", "title": "…", "why": "…" }
+    { "id": "n1", "parent": null, "kind": "phase", "title": "…", "summary": "…",
+      "addedAt": "…", "touchedAt": "…" },
+    { "id": "n2", "parent": "n1", "kind": "decision", "title": "…", "why": "…",
+      "decidedBy": "agreed",
+      "alternatives": [{ "option": "…", "why": "rejected because …" }],
+      "commits": ["322259a"], "files": ["src/…"],
+      "addedAt": "…", "touchedAt": "…" }
   ]
 }
 ```
 
-`kind` is one of `phase | step | decision | question`. Epochs live in `project.json`.
+`kind` is one of `phase | step | decision | question`; a `phase` is a topic and is
+shown as one. Nodes are grouped by topic, not by time, and nest to any depth through
+`parent`. `decidedBy` is `user | agent | agreed`. `addedAt` (first write) and
+`touchedAt` (last change) are stamped by `session write` and never taken from agent
+input; a resent node that changed nothing keeps its `touchedAt`. Siblings are
+ordered by when their thread began (the earliest `addedAt` in their subtree);
+nodes recorded before the stamps existed keep their stored order, first. Epochs live in `project.json`.
 The agent picks an existing epoch or adds one through the CLI (`codelineage epoch add`),
 which does a locked, atomic write.
 
