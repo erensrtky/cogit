@@ -118,7 +118,7 @@ async function askLanguage(io: Io, opts: InitOptions): Promise<void> {
   );
 }
 
-async function register(io: Io, root: string, name: string): Promise<void> {
+export async function register(io: Io, root: string, name: string): Promise<void> {
   await bestEffort(io, "could not register the project in the global panel", () =>
     updateRegistry(
       (r) =>

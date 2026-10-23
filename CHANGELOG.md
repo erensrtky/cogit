@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `open` adds an initialized project that is missing from the global registry (for example one set up inside a sandbox with its own home) back before serving it; the local map server only shows registered projects, so such a map returned "not found". When the registry cannot be written, `open` opens the file instead.
+
 ## [0.6.0] - 2026-10-23
 ### Added
 - Live map server: `codelineage open` makes sure one background server per user runs on `127.0.0.1:<serverPort>` (new setting `serverPort`, default 4747) and opens the map or the panel through it, returning at once. A served page refreshes its data when the map is rebuilt without losing open topics, selection, zoom or scroll, and the panel's links point at those live maps; over `file://` nothing changes. The server serves only registered projects' maps and the panel, rejects a foreign `Host` header (DNS rebinding), binds loopback only and exits after 30 idle minutes. When the port is taken or the server cannot start, `open` opens the file as before and prints one line saying so.

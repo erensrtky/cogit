@@ -3,8 +3,10 @@ import type { Io } from "../io.js";
 import { ensureServer, mapPageUrl } from "../server.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
+import { loadProject, loadRegistry } from "../store/stores.js";
 import { buildPanel } from "../view/panel.js";
 import { buildProject } from "./build.js";
+import { register } from "./init.js";
 
 export interface OpenOptions {
   io: Io;
@@ -90,7 +92,15 @@ export async function openProject(opts: OpenProjectOptions): Promise<void> {
     io,
     ...(opts.templateHtml === undefined ? {} : { templateHtml: opts.templateHtml }),
   });
-  const base = await (opts.server ?? defaultServer)(io.env);
+  // The server shows registered projects only; an initialized project missing from
+  // the registry (written elsewhere, e.g. from a sandbox with its own home) is added back.
+  const project = await loadProject(root);
+  if (project.found && project.ok) await register(io, root, project.data.name);
+  const listed = await loadRegistry(io.env).then(
+    (r) => r.found && r.ok && r.data.projects.some((p) => p.path === root),
+    () => false,
+  );
+  const base = listed ? await (opts.server ?? defaultServer)(io.env) : null;
   if (base) {
     await openTarget(mapPageUrl(base, root), opts);
     return;

@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { init } from "../src/commands/init.js";
@@ -103,6 +103,49 @@ describe("openProject", () => {
     expect(launched).toEqual([url]);
     expect(io.lines).toEqual([`Wrote ${projectPaths(root).html}`, `Opened ${url}`]);
     expect(io.warnings).toEqual([]);
+  });
+
+  it("adds an initialized project missing from the registry back before serving it", async () => {
+    const registry = join(dir, "home", "projects.json");
+    await writeFile(registry, JSON.stringify({ schema: 1, projects: [] }));
+    const launched: string[] = [];
+    await openProject({
+      dir: root,
+      io,
+      templateHtml: TEMPLATE,
+      server: async () => "http://127.0.0.1:4747",
+      launch: async (target) => {
+        launched.push(target);
+        return true;
+      },
+    });
+    expect(launched).toEqual([`http://127.0.0.1:4747/map?dir=${encodeURIComponent(root)}`]);
+    expect(JSON.parse(await readFile(registry, "utf8")).projects).toEqual([
+      expect.objectContaining({ path: root, name: "proj" }),
+    ]);
+  });
+
+  it("opens the file when the project cannot be registered, without asking for a server", async () => {
+    // A directory where the registry file should be: it can be neither read nor written.
+    await rm(join(dir, "home", "projects.json"), { force: true });
+    await mkdir(join(dir, "home", "projects.json"));
+    let asked = false;
+    const launched: string[] = [];
+    await openProject({
+      dir: root,
+      io,
+      templateHtml: TEMPLATE,
+      server: async () => {
+        asked = true;
+        return "http://127.0.0.1:4747";
+      },
+      launch: async (target) => {
+        launched.push(target);
+        return true;
+      },
+    });
+    expect(asked).toBe(false);
+    expect(launched).toEqual([projectPaths(root).html]);
   });
 
   it("falls back to the file when no server can start", async () => {
