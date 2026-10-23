@@ -85,6 +85,11 @@ export interface ViewSession {
   /** The linked git worktree the session ran in, if any. */
   worktree?: { path: string; branch: string | null };
   /**
+   * User messages the record does not hold yet, counted from the transcript at
+   * build time. Only set while the SessionEnd catch-up is off.
+   */
+  unrecordedMessages?: number;
+  /**
    * The conversation, for sessions that record messages and still have their
    * transcript. It lives only in the generated page, never in the session file.
    */

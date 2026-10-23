@@ -1,5 +1,6 @@
 import { Command, InvalidArgumentError, Option } from "commander";
 import pkg from "../package.json" with { type: "json" };
+import { backfillTail } from "./commands/backfill.js";
 import { buildProject } from "./commands/build.js";
 import {
   configGet,
@@ -130,6 +131,22 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       run(async (opts: { dryRun?: boolean }) =>
         configPrune({ dryRun: opts.dryRun === true }, makeIo(false)),
       ),
+    );
+
+  program
+    .command("backfill")
+    .description("record the user messages a session has not summarized yet")
+    .argument("<session-id>", "session id")
+    .option("-C, --dir <dir>", "project directory", ".")
+    .option("--tail", "only this session's messages that have no node yet")
+    .action(
+      run(async (sessionId: string, opts: { dir: string; tail?: boolean }) => {
+        if (opts.tail !== true)
+          throw new CliError(
+            "backfill of past sessions is not available yet; run `codelineage backfill <session-id> --tail`",
+          );
+        await backfillTail(opts.dir, sessionId, makeIo(false));
+      }),
     );
 
   const epoch = program.command("epoch").description("manage epochs (features, epics)");

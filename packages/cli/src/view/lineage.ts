@@ -154,6 +154,7 @@ function toViewSession(
   session: Session,
   transcripts?: ReadonlySet<string>,
   chat?: ViewChatTurn[],
+  unrecorded?: number,
 ): ViewSession {
   return {
     sessionId: session.sessionId,
@@ -168,6 +169,7 @@ function toViewSession(
     // record is shown as resumable rather than pretending the transcript is gone.
     transcriptAvailable: transcripts === undefined ? true : transcripts.has(session.sessionId),
     ...(session.worktree ? { worktree: session.worktree } : {}),
+    ...(unrecorded ? { unrecordedMessages: unrecorded } : {}),
     ...(chat ? { chat } : {}),
   };
 }
@@ -187,6 +189,8 @@ export interface ViewModelInput {
   transcripts?: ReadonlySet<string>;
   /** Each session's conversation from its transcript, shown in the drill-down. */
   chats?: ReadonlyMap<string, ViewChatTurn[]>;
+  /** Unrecorded message counts, shown while the catch-up is off. */
+  unrecorded?: ReadonlyMap<string, number> | undefined;
 }
 
 /**
@@ -201,7 +205,12 @@ export function buildViewModel(input: ViewModelInput): LineageViewModel {
   const sessions = [...input.sessions].sort(byStartedAt);
 
   for (const session of sessions) {
-    const view = toViewSession(session, input.transcripts, input.chats?.get(session.sessionId));
+    const view = toViewSession(
+      session,
+      input.transcripts,
+      input.chats?.get(session.sessionId),
+      input.unrecorded?.get(session.sessionId),
+    );
     const bucket = session.epoch === null ? undefined : buckets.get(session.epoch);
     (bucket ?? unassigned).push(view);
   }

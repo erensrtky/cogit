@@ -9,6 +9,8 @@ export const Config = z.object({
   language: z.string().min(1).max(32).default("auto"),
   updateEveryTurns: z.int().min(1).max(100).default(5),
   sessionEndCatchUp: z.boolean().default(true),
+  /** Model for the headless catch-up (SessionEnd) and, later, backfill. */
+  catchUpModel: z.string().trim().min(1).max(64).default("haiku"),
   /** Default for new projects; `init` asks per repo. */
   gitPolicy: z.enum(["ignore", "commit"]).default("ignore"),
   agents: z.array(z.string().min(1)).default(["claude-code"]),

@@ -2,7 +2,8 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { buildProject } from "../src/commands/build.js";
+import { buildProject, countUnrecorded } from "../src/commands/build.js";
+import { configSet } from "../src/commands/config.js";
 import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
@@ -483,6 +484,48 @@ describe("codelineage build", () => {
     ]);
     expect(s2).not.toHaveProperty("chat");
     expect(await readFile(paths().session("s1"), "utf8")).not.toContain("Fix the card");
+  });
+
+  it("counts unrecorded messages only while the catch-up is off", async () => {
+    const folder = join(dir, "claude", "projects", "-proj");
+    await mkdir(folder, { recursive: true });
+    const lines = [
+      { type: "user", timestamp: T0, message: { content: "one" } },
+      { type: "user", timestamp: "2026-01-02T00:00:00.000Z", message: { content: "two" } },
+    ];
+    await writeFile(join(folder, "s1.jsonl"), lines.map((l) => JSON.stringify(l)).join("\n"));
+    await saveSession(
+      "s1",
+      session({
+        sessionId: "s1",
+        epoch: "e1",
+        nodes: [node("m1", "message", "One", null, { at: T0 })],
+      }),
+    );
+    // A session with no transcript must not break the count.
+    await saveSession("s2", session({ sessionId: "s2", epoch: "e1" }));
+
+    const on = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    const recorded = (model: typeof on) =>
+      model.epochs[0]?.sessions.find((s) => s.sessionId === "s1");
+    expect(recorded(on)).not.toHaveProperty("unrecordedMessages");
+
+    await configSet("sessionEndCatchUp", "false", fakeIo(envFor(dir)));
+    const off = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(recorded(off)?.unrecordedMessages).toBe(1);
+    expect(off.epochs[0]?.sessions.find((s) => s.sessionId === "s2")).not.toHaveProperty(
+      "unrecordedMessages",
+    );
+  });
+
+  it("ignores a transcript that cannot be read while counting", async () => {
+    const folder = join(dir, "claude", "projects", "-proj");
+    await mkdir(join(folder, "s1.jsonl"), { recursive: true });
+    const counts = await countUnrecorded(
+      [session({ sessionId: "s1" })],
+      new Map([["s1", join(folder, "s1.jsonl")]]),
+    );
+    expect(counts.size).toBe(0);
   });
 
   it("builds without printing when quiet and survives a missing sessions directory", async () => {

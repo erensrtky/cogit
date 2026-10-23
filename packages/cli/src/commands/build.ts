@@ -4,8 +4,8 @@ import type { Session } from "../schema/session.js";
 import { atomicWrite } from "../store/fs.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
-import { loadAllSessions, loadProject } from "../store/stores.js";
-import { type ChatTurn, displayTurn, readConversation } from "../transcript.js";
+import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
+import { type ChatTurn, displayTurn, readConversation, readUserMessages } from "../transcript.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
 import type { LineageViewModel } from "../view/model.js";
 import { buildPanel } from "../view/panel.js";
@@ -51,6 +51,32 @@ async function readChats(
 }
 
 /**
+ * User messages with no node, per session, counted from the transcripts. The
+ * SessionEnd hook normally records them; while the catch-up is off this count is
+ * the only sign. An unreadable transcript is skipped, never failing the build.
+ */
+export async function countUnrecorded(
+  sessions: Session[],
+  transcripts: ReadonlyMap<string, string>,
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  for (const session of sessions) {
+    const file = transcripts.get(session.sessionId);
+    if (!file) continue;
+    let messages;
+    try {
+      messages = await readUserMessages(file);
+    } catch {
+      continue;
+    }
+    const recorded = new Set(session.nodes.map((node) => node.id));
+    const missing = messages.filter((message) => !recorded.has(message.id)).length;
+    if (missing > 0) counts.set(session.sessionId, missing);
+  }
+  return counts;
+}
+
+/**
  * Rebuilds `.codelineage/lineage.html` from `project.json` and every session file,
  * then refreshes the global panel. One unreadable session is a warning, never a
  * failed build; an unwritable global directory only skips the panel.
@@ -67,6 +93,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   const paths = projectPaths(root);
   const sessions = await loadAllSessions(root, io.warn);
   const transcripts = await collectTranscripts(io.env);
+  const config = await loadConfig(io.env);
   const model = buildViewModel({
     project: project.data,
     sessions,
@@ -74,6 +101,9 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
     generatedAt: io.now(),
     transcripts: new Set(transcripts.keys()),
     chats: await readChats(sessions, transcripts, root, io),
+    // With the catch-up on, the hook records the tail at session end, so the
+    // count would only be a stale warning about work already scheduled.
+    unrecorded: config.sessionEndCatchUp ? undefined : await countUnrecorded(sessions, transcripts),
   });
   // The skill already avoids secrets; this is the safety net before rendering.
   const redacted = redactDeep(model);

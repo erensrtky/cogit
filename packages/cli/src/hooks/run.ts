@@ -1,8 +1,11 @@
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { Slug } from "../schema/common.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
+import { onSessionEnd } from "./sessionend.js";
 import { onSessionStart } from "./sessionstart.js";
 import { onStop } from "./stop.js";
 
@@ -25,16 +28,39 @@ export interface HookContext {
   initialized: boolean;
   env: NodeJS.ProcessEnv;
   now: string;
+  /** Starts the detached catch-up (`node <cli> <args>`); never waited for. */
+  spawnDetached: (args: string[]) => void;
 }
 
 export type HookOutput = Record<string, unknown>;
 
+/** Test seams for the effects a hook leaves behind. */
+export interface HookDeps {
+  /** The CLI file a detached child runs; defaults to the running script. */
+  cli?: string;
+  /** Starts the detached process; tests observe instead of spawning. */
+  spawnDetached?: (cli: string, args: string[], env: NodeJS.ProcessEnv) => void;
+}
+
 const HANDLERS: Record<string, (ctx: HookContext) => Promise<HookOutput | undefined>> = {
   stop: onStop,
   sessionstart: onSessionStart,
+  sessionend: onSessionEnd,
 };
 
 export const HOOK_EVENTS = Object.keys(HANDLERS);
+
+/**
+ * Starts `node <cli> <args>` detached, with capture disabled in the child so it
+ * cannot fire these hooks again. The hook returns at once.
+ */
+export function spawnDetachedProcess(cli: string, args: string[], env: NodeJS.ProcessEnv): void {
+  spawn(process.execPath, [cli, ...args], {
+    detached: true,
+    stdio: "ignore",
+    env: { ...env, CODELINEAGE_DISABLE: "1" },
+  }).unref();
+}
 
 /**
  * Runs one hook and returns what to print on stdout, if anything. A hook must
@@ -47,6 +73,7 @@ export async function runHook(
   env: NodeJS.ProcessEnv,
   now: string,
   debug: (line: string) => void,
+  deps: HookDeps = {},
 ): Promise<string | undefined> {
   try {
     if (env.CODELINEAGE_DISABLE === "1") return undefined;
@@ -60,7 +87,18 @@ export async function runHook(
     // Before `init` every hook is a no-op except SessionStart, which offers setup;
     // projects are never registered here.
     if (!initialized && handler !== onSessionStart) return undefined;
-    const out = await handler({ input, sessionId: input.session_id, root, initialized, env, now });
+    const cli = deps.cli ?? process.argv[1] ?? fileURLToPath(import.meta.url);
+    const startCatchUp = (args: string[]) =>
+      (deps.spawnDetached ?? spawnDetachedProcess)(cli, args, env);
+    const out = await handler({
+      input,
+      sessionId: input.session_id,
+      root,
+      initialized,
+      env,
+      now,
+      spawnDetached: startCatchUp,
+    });
     return out === undefined ? undefined : JSON.stringify(out);
   } catch (err) {
     debug(`codelineage ${event} hook: ${(err as Error).message}`);

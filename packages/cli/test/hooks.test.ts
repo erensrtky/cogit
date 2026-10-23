@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { configHintOff, configHintOn, configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
-import { runHook } from "../src/hooks/run.js";
+import { runHook, spawnDetachedProcess } from "../src/hooks/run.js";
 import { COMPACT_REQUEST } from "../src/hooks/sessionstart.js";
 import { countTurn, UPDATE_REQUEST } from "../src/hooks/stop.js";
 import { projectPaths } from "../src/store/paths.js";
@@ -42,6 +42,7 @@ describe("runHook", () => {
   let root: string;
   let env: NodeJS.ProcessEnv;
   let debug: string[];
+  let spawned: string[][];
 
   const stop = (extra: Record<string, unknown> = {}, e = env) =>
     runHook("stop", JSON.stringify({ session_id: "s1", cwd: root, ...extra }), e, T0, (l) =>
@@ -53,12 +54,27 @@ describe("runHook", () => {
       debug.push(l),
     );
 
+  // The catch-up itself is covered by backfill.test.ts; here we only see the spawn.
+  const sessionEnd = (e = env) =>
+    runHook(
+      "sessionend",
+      JSON.stringify({ session_id: "s1", cwd: root }),
+      e,
+      T0,
+      (l) => debug.push(l),
+      {
+        cli: "/plugin/dist/cli.js",
+        spawnDetached: (cli, args) => spawned.push([cli, ...args]),
+      },
+    );
+
   beforeEach(async () => {
     dir = await tempDir();
     root = join(dir, "proj");
     await mkdir(root);
     env = envFor(dir);
     debug = [];
+    spawned = [];
   });
 
   const initialized = async (everyTurns: number) => {
@@ -234,6 +250,60 @@ describe("runHook", () => {
       },
     ]);
     expect(await sessionStart("compact")).toBeUndefined();
+  });
+
+  it("spawns the detached catch-up at session end when messages have no node", async () => {
+    await initialized(2);
+    await transcript([typed("first", 1)]);
+    expect(await sessionEnd()).toBeUndefined();
+    expect(spawned).toEqual([["/plugin/dist/cli.js", "backfill", "s1", "--tail", "-C", root]]);
+  });
+
+  it("does not spawn at session end when everything is recorded or catch-up is off", async () => {
+    await initialized(2);
+    await transcript([typed("first", 1)]);
+    await sessionWrite({ dir: root }, fakeIo(env), async () =>
+      JSON.stringify({ sessionId: "s1", nodes: [{ id: "m1", kind: "message", title: "First" }] }),
+    );
+    expect(await sessionEnd()).toBeUndefined();
+    expect(spawned).toEqual([]);
+
+    await transcript([typed("second", 2)]);
+    await configSet("sessionEndCatchUp", "false", fakeIo(env));
+    expect(await sessionEnd()).toBeUndefined();
+    expect(spawned).toEqual([]);
+  });
+
+  it("stays quiet at session end without a readable transcript or before init", async () => {
+    await initialized(2);
+    expect(await sessionEnd()).toBeUndefined();
+    // A directory where the transcript should be: found, but reading it fails.
+    await mkdir(join(env.CLAUDE_CONFIG_DIR ?? "", "projects", "proj", "s1.jsonl"), {
+      recursive: true,
+    });
+    expect(await sessionEnd()).toBeUndefined();
+    expect(spawned).toEqual([]);
+
+    const fresh = await tempDir();
+    const freshRoot = join(fresh, "proj");
+    await mkdir(freshRoot);
+    const freshSpawned: string[][] = [];
+    expect(
+      await runHook(
+        "sessionend",
+        JSON.stringify({ session_id: "s1", cwd: freshRoot }),
+        envFor(fresh),
+        T0,
+        () => {},
+        { spawnDetached: (cli, args) => freshSpawned.push([cli, ...args]) },
+      ),
+    ).toBeUndefined();
+    expect(freshSpawned).toEqual([]);
+  });
+
+  it("starts the detached child with capture disabled", () => {
+    // /dev/null exits at once; this exercises the real spawn path without a CLI.
+    expect(() => spawnDetachedProcess("/dev/null", [], env)).not.toThrow();
   });
 
   it("stays silent when disabled, for unknown events and for bad input", async () => {

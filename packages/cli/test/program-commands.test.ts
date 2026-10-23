@@ -91,6 +91,13 @@ describe("commands through the CLI", () => {
     expect((await loadConfig(io.env)).setupHintOff).toEqual([]);
   });
 
+  it("runs backfill --tail and refuses backfill without it", async () => {
+    await cli("init", root, "--yes", "--retention", "keep");
+    expect(await cli("backfill", "s1")).toMatch(/--tail/);
+    expect(await cli("backfill", "s1", "--tail", "-C", root)).toBe("");
+    expect(io.lines.at(-1)).toBe("session s1 has nothing to catch up");
+  });
+
   it("runs session write from a file", async () => {
     await cli("init", root, "--yes", "--retention", "keep");
     const f = join(dir, "s.json");
