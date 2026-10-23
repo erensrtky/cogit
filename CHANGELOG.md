@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `codelineage session write --consume`: deletes the `--file` input once the record is saved and keeps it when the write fails. `gitPolicy=commit` now also ignores `.codelineage/inbox/`.
 
 ### Changed
+- Map cards size themselves to their text: titles and summaries wrap onto as many lines as they need instead of being cut off with "…", and the cards below move down to make room.
 - Map opens like layers of an onion: sessions run down the page in time order, and inside the latest session only its top-level topics show, side by side as columns with an "N items inside" count; an opened topic lists its items down its column, nested ones indented, and any node with children expands and collapses on click (selecting a nested item in the outline opens every layer above it). Phases are labelled "topic", and collapsed session boxes are wide enough for their titles.
 - `/codelineage:lineage` skill: organizes nodes by topic instead of by time (topics and sub-topics at any depth, time order kept inside each), reuses existing topics and moves misplaced nodes by resending them with the right `parent`.
 - The npm package and the plugin manifest now take their version from `VERSION` (the one `./release` bumps): `npm run build` and `npm pack` copy it through `scripts/sync-version.mjs`, and a test fails while they differ. Both move from 0.1.0 to 0.4.0, so the first release continues at 0.5.0.

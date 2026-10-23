@@ -5,6 +5,8 @@ import ELK, {
   type ElkNode,
 } from "elkjs/lib/elk.bundled.js";
 import type { LineageViewModel, ViewNode, ViewSession } from "../../cli/src/view/model.js";
+import { cardHeight } from "./cardHeight.js";
+import { formatTime, itemsInside, kindLabel } from "./format.js";
 
 /**
  * Builds the nested React Flow graph (epoch → session → node) and lays it out
@@ -14,8 +16,9 @@ import type { LineageViewModel, ViewNode, ViewSession } from "../../cli/src/view
  */
 
 /** Fixed card sizes keep ELK fast: it never needs to measure DOM text. */
-const NODE_WIDTH = 220;
-const NODE_HEIGHT = 64;
+const NODE_WIDTH = 240;
+/** Cards grow with their text (see cardHeight); this is the floor. */
+const NODE_HEIGHT = 48;
 const GROUP_HEIGHT = 56;
 const GROUP_WIDTH = 260;
 const GROUP_PADDING = 24;
@@ -168,6 +171,29 @@ interface Placement {
   height: number;
 }
 
+/** Tall enough for the card's whole title and the line below it, as the card renders them. */
+function nodeHeight(node: ViewNode, open: boolean): number {
+  const hasChildren = node.children.length > 0;
+  const body =
+    hasChildren && !open
+      ? itemsInside(countNodes(node.children))
+      : node.at
+        ? formatTime(node.at)
+        : node.summary;
+  return Math.max(
+    NODE_HEIGHT,
+    cardHeight(
+      {
+        kindLabel: kindLabel(node.kind),
+        title: node.title,
+        hasToggle: hasChildren,
+        ...(body ? { body } : {}),
+      },
+      NODE_WIDTH,
+    ),
+  );
+}
+
 function treeEdge(source: string, target: string, targetHandle: string): FlowEdge {
   return {
     id: `edge:${source}->${target}`,
@@ -194,32 +220,29 @@ export function placeSessionNodes(
   const edges: FlowEdge[] = [];
   const top = GROUP_HEADER + 8;
   let columnX = GROUP_PADDING;
-  let maxRows = 0;
+  let bottom = top;
   for (const root of nodes) {
-    let row = 0;
+    let y = top;
     let columnWidth = NODE_WIDTH;
     const visit = (node: ViewNode, parent: string | null, depth: number): void => {
       const id = nodeId(sessionGroup, node.id);
-      boxes.set(id, {
-        x: columnX + depth * INDENT,
-        y: top + row * (NODE_HEIGHT + ROW_GAP),
-        width: NODE_WIDTH,
-        height: NODE_HEIGHT,
-      });
-      row += 1;
+      const open = isOpen(id);
+      const height = nodeHeight(node, open);
+      boxes.set(id, { x: columnX + depth * INDENT, y, width: NODE_WIDTH, height });
+      y += height + ROW_GAP;
       columnWidth = Math.max(columnWidth, depth * INDENT + NODE_WIDTH);
       if (parent !== null) edges.push(treeEdge(parent, id, TREE_LEFT));
-      if (isOpen(id)) for (const child of node.children) visit(child, id, depth + 1);
+      if (open) for (const child of node.children) visit(child, id, depth + 1);
     };
     visit(root, null, 0);
-    maxRows = Math.max(maxRows, row);
+    bottom = Math.max(bottom, y - ROW_GAP);
     columnX += columnWidth + COLUMN_GAP;
   }
   return {
     boxes,
     edges,
     width: Math.max(columnX - COLUMN_GAP, GROUP_PADDING) + GROUP_PADDING,
-    height: top + maxRows * (NODE_HEIGHT + ROW_GAP) - ROW_GAP + GROUP_PADDING,
+    height: bottom + GROUP_PADDING,
   };
 }
 

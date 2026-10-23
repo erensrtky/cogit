@@ -18,3 +18,8 @@ export function formatDate(iso: string | null): string {
 export function kindLabel(kind: string): string {
   return kind === "phase" ? "topic" : kind;
 }
+
+/** The line a collapsed topic shows in place of its summary. */
+export function itemsInside(count: number): string {
+  return `${count} item${count === 1 ? "" : "s"} inside`;
+}

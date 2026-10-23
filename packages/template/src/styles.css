@@ -434,25 +434,25 @@ body:has(.map-shell.is-expanded) {
 
 .lineage-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
 }
 
+/* Text wraps; the layout sizes each card to fit it (cardHeight.ts mirrors these metrics). */
 .lineage-head strong {
-  overflow: hidden;
+  min-width: 0;
   font-size: 13px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  line-height: 17px;
+  overflow-wrap: anywhere;
 }
 
 .lineage-box p {
   margin: 3px 0 0;
-  overflow: hidden;
   color: var(--muted);
   font-size: 11px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  line-height: 15px;
+  overflow-wrap: anywhere;
 }
 
 .lineage-box p.lineage-count {
@@ -461,7 +461,9 @@ body:has(.map-shell.is-expanded) {
 
 .lineage-box time {
   display: block;
-  margin-top: 1px;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 15px;
 }
 
 .kind {
