@@ -12,6 +12,8 @@ export const Config = z.object({
   /** Default for new projects; `init` asks per repo. */
   gitPolicy: z.enum(["ignore", "commit"]).default("ignore"),
   agents: z.array(z.string().min(1)).default(["claude-code"]),
+  /** Project roots ("don't ask again" in this project) where the setup hint stays silent. */
+  setupHintOff: z.array(z.string().min(1)).default([]),
 });
 
 export const RegistryEntry = z.object({

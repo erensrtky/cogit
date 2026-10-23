@@ -1,7 +1,13 @@
 import { Command, InvalidArgumentError, Option } from "commander";
 import pkg from "../package.json" with { type: "json" };
 import { buildProject } from "./commands/build.js";
-import { configGet, configPrune, configSet } from "./commands/config.js";
+import {
+  configGet,
+  configHintOff,
+  configHintOn,
+  configPrune,
+  configSet,
+} from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
 import { type InitOptions, init } from "./commands/init.js";
 import { openPanel, openProject } from "./commands/open.js";
@@ -101,6 +107,21 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .argument("<key>")
     .argument("<value>")
     .action(run(async (key: string, value: string) => configSet(key, value, makeIo(false))));
+  config
+    .command("hint-off")
+    .description("stop the SessionStart setup hint in a project")
+    .argument("[dir]", "project directory", ".")
+    .action(run(async (dir: string) => configHintOff(dir, makeIo(false))));
+  config
+    .command("hint-on")
+    .description("show the SessionStart setup hint again in a project, or everywhere")
+    .argument("[dir]", "project directory", ".")
+    .option("--all", "turn the hint back on for every project")
+    .action(
+      run(async (dir: string, opts: { all?: boolean }) =>
+        configHintOn(dir, { all: opts.all === true }, makeIo(false)),
+      ),
+    );
   config
     .command("prune")
     .description("remove registered projects whose directory no longer exists")

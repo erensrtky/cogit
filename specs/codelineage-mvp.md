@@ -196,8 +196,16 @@ Behavior verified against the Claude Code hooks docs (2026-10-21):
     `spawn(…, { detached: true, stdio: "ignore" }).unref()` outlives both the hook
     and Claude Code exiting, and is reparented to the init process.
 - **Before `init`:** if `.codelineage/` does not exist, all hooks are no-ops, except
-  that SessionStart injects a one-line hint to run `codelineage init`. Projects are
-  never registered automatically.
+  that SessionStart on `startup` or `resume` injects a one-line offer: the agent says
+  codelineage is not set up here and sets it up only when the user asks. Setup happens
+  in the chat: the agent asks the install questions and runs the bundled CLI with
+  `init --yes --git … --retention … --language …` (`--allow-skill` only when agreed).
+  Projects are never registered automatically. `codelineage config hint-off [dir]`
+  silences the offer in that project ("don't ask again", stored in the global
+  `setupHintOff` list, keyed by the main checkout so a worktree is covered);
+  `codelineage config hint-on [dir]` turns it back on, `--all` everywhere. A plugin
+  update reaches a running session only after `/reload-plugins` or a new chat, and
+  the offer says so.
 - **Recursion guard:** every headless run started by codelineage (`backfill`,
   catch-up) sets `CODELINEAGE_DISABLE=1`, and our hooks do nothing when it is set.
   Users can set it too, to turn capture off for any headless run (for example a
@@ -222,6 +230,8 @@ Each update costs agent tokens (the user's subscription or API usage).
 | `codelineage open [dir]` | Builds, then opens the map (or the panel if no dir is given) through the local map server, starting it in the background if it is not running. The open page refreshes itself whenever the map is rebuilt, keeping open topics, selection and zoom. Falls back to opening the file when the server cannot start. |
 | `codelineage epoch add <id> <title>` | Adds an epoch (locked write) |
 | `codelineage config get/set <key> [value]` | Reads or changes settings |
+| `codelineage config hint-off [dir]` | Stops the SessionStart setup offer in that project ("don't ask again") |
+| `codelineage config hint-on [dir] [--all]` | Shows the setup offer again in that project, or everywhere with `--all` |
 | `codelineage session show <id>` | Prints the compact record the skill injects (epochs, language, status, node ids/titles, inbox path) as JSON. Never fails for an uninitialized project. |
 | `codelineage session write` | Reads session JSON from stdin or `--file` (the skill uses `--file <inbox> --consume`), validates, redacts, merges and writes it under the session lock, then builds. |
 | `codelineage backfill [dir]` | Summarizes past transcripts of that project by running the agent headless, one session at a time. Estimates cost and asks first. Selection: `--pick` (default: lists sessions with date, first prompt and estimated cost), `--last <n>`, `--since <date>`, `--all`. |
@@ -248,7 +258,8 @@ Each update costs agent tokens (the user's subscription or API usage).
 Settings in `config.json`: `language`, `updateEveryTurns`, `sessionEndCatchUp`,
 `catchUpModel` (model for the headless catch-up and backfill, default `haiku`),
 `serverPort` (local map server, default 4747),
-`gitPolicy`, `agents`.
+`gitPolicy`, `agents`, `setupHintOff` (project roots where the SessionStart setup
+offer stays silent).
 
 ## Privacy
 

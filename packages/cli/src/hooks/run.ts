@@ -21,6 +21,8 @@ export interface HookContext {
   sessionId: string;
   /** Where `.codelineage/` lives: `CLAUDE_PROJECT_DIR`, else the hook's `cwd`, mapped out of a worktree. */
   root: string;
+  /** Whether `.codelineage/project.json` exists; only SessionStart runs without it. */
+  initialized: boolean;
   env: NodeJS.ProcessEnv;
   now: string;
 }
@@ -54,9 +56,11 @@ export async function runHook(
     if (!Slug.safeParse(input.session_id).success) return undefined;
     // In a linked worktree both point at the worktree; the record lives in the main checkout.
     const { root } = await resolveProjectRoot(env.CLAUDE_PROJECT_DIR ?? input.cwd ?? ".");
-    // Before `init` every hook is a no-op; projects are never registered here.
-    if (!existsSync(projectPaths(root).project)) return undefined;
-    const out = await handler({ input, sessionId: input.session_id, root, env, now });
+    const initialized = existsSync(projectPaths(root).project);
+    // Before `init` every hook is a no-op except SessionStart, which offers setup;
+    // projects are never registered here.
+    if (!initialized && handler !== onSessionStart) return undefined;
+    const out = await handler({ input, sessionId: input.session_id, root, initialized, env, now });
     return out === undefined ? undefined : JSON.stringify(out);
   } catch (err) {
     debug(`codelineage ${event} hook: ${(err as Error).message}`);

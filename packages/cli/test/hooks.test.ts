@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { configSet } from "../src/commands/config.js";
+import { configHintOff, configHintOn, configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
 import { runHook } from "../src/hooks/run.js";
@@ -65,6 +65,58 @@ describe("runHook", () => {
     await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(env));
     await configSet("updateEveryTurns", String(everyTurns), fakeIo(env));
   };
+
+  it("offers setup before init on startup and resume, but not on clear", async () => {
+    const startup = JSON.parse((await sessionStart("startup")) ?? "");
+    expect(startup.hookSpecificOutput.hookEventName).toBe("SessionStart");
+    expect(startup.hookSpecificOutput.additionalContext).toContain(
+      "codelineage is not set up in this project",
+    );
+    expect(startup.hookSpecificOutput.additionalContext).toContain(
+      '"${CLAUDE_PLUGIN_ROOT}/dist/cli.js" init --yes',
+    );
+    const known = JSON.parse(
+      (await sessionStart("resume", { ...env, CLAUDE_PLUGIN_ROOT: "/plugins/codelineage" })) ?? "",
+    );
+    expect(known.hookSpecificOutput.additionalContext).toContain(
+      '"/plugins/codelineage/dist/cli.js" init --yes',
+    );
+    expect(await sessionStart("clear")).toBeUndefined();
+    expect(await sessionStart("startup", { ...env, CODELINEAGE_DISABLE: "1" })).toBeUndefined();
+    expect(existsSync(join(root, ".codelineage"))).toBe(false);
+  });
+
+  it("stays quiet about setup after init", async () => {
+    await initialized(2);
+    expect(await sessionStart("startup")).toBeUndefined();
+    expect(await sessionStart("resume")).toBeUndefined();
+  });
+
+  it("silences the setup hint per project with hint-off and undoes it with hint-on", async () => {
+    const off = fakeIo(env);
+    await configHintOff(root, off);
+    expect(off.lines).toEqual([`Setup hint off in ${root}`]);
+    expect(await sessionStart("startup")).toBeUndefined();
+
+    const again = fakeIo(env);
+    await configHintOff(root, again);
+    expect(again.lines).toEqual([`Setup hint was already off in ${root}`]);
+
+    const on = fakeIo(env);
+    await configHintOn(root, {}, on);
+    expect(on.lines).toEqual([`Setup hint on in ${root}`]);
+    expect(await sessionStart("startup")).toBeDefined();
+
+    const notOff = fakeIo(env);
+    await configHintOn(root, {}, notOff);
+    expect(notOff.lines).toEqual([`Setup hint was not off in ${root}`]);
+
+    await configHintOff(root, fakeIo(env));
+    const all = fakeIo(env);
+    await configHintOn(".", { all: true }, all);
+    expect(all.lines).toEqual(["Setup hint on in every project"]);
+    expect(await sessionStart("startup")).toBeDefined();
+  });
 
   it("does nothing before init and creates nothing", async () => {
     expect(await stop()).toBeUndefined();

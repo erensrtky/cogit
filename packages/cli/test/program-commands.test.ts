@@ -82,6 +82,15 @@ describe("commands through the CLI", () => {
     expect(io.lines.at(-1)).toBe("Added epoch e1: First");
   });
 
+  it("runs config hint-off and hint-on", async () => {
+    await cli("config", "hint-off", root);
+    expect(io.lines.at(-1)).toBe(`Setup hint off in ${root}`);
+    expect((await loadConfig(io.env)).setupHintOff).toEqual([root]);
+    await cli("config", "hint-on", "--all");
+    expect(io.lines.at(-1)).toBe("Setup hint on in every project");
+    expect((await loadConfig(io.env)).setupHintOff).toEqual([]);
+  });
+
   it("runs session write from a file", async () => {
     await cli("init", root, "--yes", "--retention", "keep");
     const f = join(dir, "s.json");

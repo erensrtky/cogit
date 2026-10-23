@@ -1,6 +1,7 @@
 import { CliError, type Io } from "../io.js";
 import { Config, type RegistryEntry } from "../schema/config.js";
 import { isDirectory } from "../store/fs.js";
+import { resolveProjectRoot } from "../store/root.js";
 import { loadConfig, loadRegistry, updateConfig, updateRegistry } from "../store/stores.js";
 
 export const CONFIG_KEYS = Object.keys(Config.shape).filter((k) => k !== "schema") as Exclude<
@@ -48,6 +49,38 @@ export async function configSet(key: string, raw: string, io: Io): Promise<void>
   }
   await updateConfig((c) => ({ ...c, [key]: next.data[key] }), io.env);
   io.out(`${key} = ${JSON.stringify(next.data[key])}`);
+}
+
+/**
+ * Stops the SessionStart setup hint in a project ("don't ask again"). The list is
+ * keyed by the main checkout's root, so a linked worktree is silenced with it.
+ */
+export async function configHintOff(dir: string, io: Io): Promise<void> {
+  const { root } = await resolveProjectRoot(dir);
+  let added = false;
+  await updateConfig((c) => {
+    if (c.setupHintOff.includes(root)) return c;
+    added = true;
+    return { ...c, setupHintOff: [...c.setupHintOff, root] };
+  }, io.env);
+  io.out(added ? `Setup hint off in ${root}` : `Setup hint was already off in ${root}`);
+}
+
+/** Turns the setup hint back on for one project, or for every project with `--all`. */
+export async function configHintOn(dir: string, opts: { all?: boolean }, io: Io): Promise<void> {
+  if (opts.all === true) {
+    await updateConfig((c) => ({ ...c, setupHintOff: [] }), io.env);
+    io.out("Setup hint on in every project");
+    return;
+  }
+  const { root } = await resolveProjectRoot(dir);
+  let removed = false;
+  await updateConfig((c) => {
+    if (!c.setupHintOff.includes(root)) return c;
+    removed = true;
+    return { ...c, setupHintOff: c.setupHintOff.filter((path) => path !== root) };
+  }, io.env);
+  io.out(removed ? `Setup hint on in ${root}` : `Setup hint was not off in ${root}`);
 }
 
 export interface PruneOptions {
