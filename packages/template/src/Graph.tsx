@@ -23,25 +23,38 @@ import {
   useState,
 } from "react";
 import type { LineageViewModel } from "../../cli/src/view/model.js";
-import { cardMeta, cardText, formatDate, formatTime, itemsInside, kindLabel } from "./format.js";
+import { formatDate, formatTime } from "./format.js";
 import { useFullscreen } from "./fullscreen.js";
+import { GitGraph } from "./GitGraph.js";
+import type { GitMessageRow } from "./gitLayout.js";
 import {
   absolutePosition,
   defaultExpanded,
   type EpochFlowNode,
+  GROUP_INSET,
   type GraphNode,
-  type LineageFlowNode,
-  lastTouched,
+  headOf,
   layoutGraph,
+  nodeId,
+  SESSION_GROUP_HEADER,
   type SessionFlowNode,
-  TREE_LEFT,
-  TREE_OUT,
+  sessionId as sessionKey,
 } from "./graph.js";
 import { Outline, type OutlineTarget, outlinePath } from "./Outline.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
 
-/** Toggle callback reaches the group headers without threading props through React Flow. */
-const GraphActions = createContext<{ toggle: (id: string) => void }>({ toggle: () => {} });
+/** Row clicks and group toggles reach the shared state without prop threading. */
+const GraphActions = createContext<{
+  toggle: (id: string) => void;
+  openRow: (sessionId: string, messageId: string, segmentId: string) => void;
+  unfold: (segmentId: string) => void;
+  selection: Selection | null;
+}>({
+  toggle: () => {},
+  openRow: () => {},
+  unfold: () => {},
+  selection: null,
+});
 
 function GroupToggle({
   id,
@@ -65,28 +78,6 @@ function GroupToggle({
     >
       {data.expanded ? "▾" : "▸"}
     </button>
-  );
-}
-
-/** Spine handles for the outline inside a topic column (see placeSessionNodes). */
-function TreeHandles() {
-  return (
-    <>
-      <Handle
-        id={TREE_LEFT}
-        type="target"
-        position={Position.Left}
-        className="flow-handle"
-        isConnectable={false}
-      />
-      <Handle
-        id={TREE_OUT}
-        type="source"
-        position={Position.Bottom}
-        className="flow-handle tree-handle"
-        isConnectable={false}
-      />
-    </>
   );
 }
 
@@ -121,6 +112,13 @@ function EpochNode({ id, data }: NodeProps<EpochFlowNode>) {
 }
 
 function SessionNode({ id, data }: NodeProps<SessionFlowNode>) {
+  const { selection, openRow, unfold } = useContext(GraphActions);
+  const selectedId =
+    selection?.type === "node" && selection.sessionId === data.sessionId ? selection.nodeId : null;
+  const activeSegmentId =
+    selection?.type === "node" && selection.sessionId === data.sessionId
+      ? (selection.branchId ?? null)
+      : null;
   return (
     <div className="flow-group session-group" title={data.goal || data.title}>
       <AnchorHandles />
@@ -128,33 +126,24 @@ function SessionNode({ id, data }: NodeProps<SessionFlowNode>) {
         <GroupToggle id={id} data={data} />
         <strong className="group-title">{data.title}</strong>
         <span className="muted">{data.count}</span>
+        {data.unrecorded ? (
+          <span className="muted unrecorded" title="The SessionEnd catch-up is off">
+            {data.unrecorded} not recorded
+          </span>
+        ) : null}
         <time className="muted" dateTime={data.updatedAt} title={formatTime(data.updatedAt)}>
           {formatDate(data.updatedAt)}
         </time>
       </div>
-    </div>
-  );
-}
-
-function LineageBox({ id, data }: NodeProps<LineageFlowNode>) {
-  return (
-    <div className={`lineage-box kind-${data.kind}${data.isLast ? " is-last" : ""}`}>
-      <TreeHandles />
-      <div className="lineage-head">
-        {data.hasChildren ? <GroupToggle id={id} data={data} /> : null}
-        <span className={`kind kind-${data.kind}`}>{kindLabel(data.kind)}</span>
-        <strong title={data.title}>{data.title}</strong>
-      </div>
-      {data.isLast ? <span className="left-off">left off here</span> : null}
-      {data.unsummarized ? <span className="unsummarized">not summarized yet</span> : null}
-      {data.hasChildren && !data.expanded ? (
-        <p className="lineage-count">{itemsInside(data.count)}</p>
-      ) : data.at && data.kind !== "message" ? (
-        <time dateTime={data.at}>{formatTime(data.at)}</time>
-      ) : cardText(data) ? (
-        <p>{cardText(data)}</p>
+      {data.git ? (
+        <GitGraph
+          git={data.git}
+          selectedId={selectedId}
+          activeSegmentId={activeSegmentId}
+          onSelect={(row: GitMessageRow) => openRow(data.sessionId, row.message.id, row.segmentId)}
+          onUnfold={unfold}
+        />
       ) : null}
-      {cardMeta(data) ? <p className="card-meta">{cardMeta(data)}</p> : null}
     </div>
   );
 }
@@ -162,31 +151,25 @@ function LineageBox({ id, data }: NodeProps<LineageFlowNode>) {
 const nodeTypes: NodeTypes = {
   epoch: EpochNode,
   session: SessionNode,
-  lineage: LineageBox,
 };
 
 /** React Flow overlays get their colours from the node type, not the kind. */
 function minimapColor(node: GraphNode): string {
-  if (node.type === "epoch") return "#2b3446";
-  if (node.type === "session") return "#243040";
-  const kind = node.data.kind;
-  if (kind === "decision") return "#4b3a72";
-  if (kind === "question") return "#5a4526";
-  if (kind === "message") return "#1f3a4a";
-  return "#1f2a3d";
+  return node.type === "epoch" ? "#2b3446" : "#243040";
 }
 
 function Flow({ model }: { model: LineageViewModel }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => defaultExpanded(model));
   const [selection, setSelection] = useState<Selection | null>(null);
+  const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
+  const [openAll, setOpenAll] = useState(false);
   const [layout, setLayout] = useState<Awaited<ReturnType<typeof layoutGraph>> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showOutline, setShowOutline] = useState(false);
   const { expanded: fullscreen, toggle: toggleFullscreen } = useFullscreen();
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  /** Wait for the layout that contains this node, then centre on it. */
   // Open on the session where the work left off, framed around it.
-  const pendingFocus = useRef<string | null>(lastTouched(model)?.sessionKey ?? null);
+  const pendingFocus = useRef<string | null>(headOf(model)?.sessionKey ?? null);
   const focusTimer = useRef<number | null>(null);
   /** Outline selection just re-fitted the view; don't let the generic fit undo it. */
   const lastFocusRequest = useRef(
@@ -218,10 +201,74 @@ function Flow({ model }: { model: LineageViewModel }) {
     [],
   );
 
+  /** A message row picked in the outline, to centre once its layout lands. */
+  const pendingRow = useRef<{ sessionKey: string; messageId: string } | null>(null);
+
+  /**
+   * Centres one message row of a laid-out session at a readable zoom (0.9).
+   * Fitting the whole session would shrink a long history to illegible text.
+   */
+  const centerRow = useCallback(
+    (
+      result: Awaited<ReturnType<typeof layoutGraph>>,
+      sessionKeyValue: string,
+      messageId: string,
+      delay = 0,
+    ): boolean => {
+      const node = result.nodes.find((candidate) => candidate.id === sessionKeyValue);
+      if (node?.type !== "session" || !node.data.git) return false;
+      const { git } = node.data;
+      const row = git.rows.find(
+        (candidate) => candidate.kind === "message" && candidate.message.id === messageId,
+      );
+      const at = absolutePosition(result.nodes, sessionKeyValue);
+      if (!row || !at) return false;
+      const zoom = 0.9;
+      const apply = (): void => {
+        const canvas = document.querySelector(".react-flow")?.getBoundingClientRect();
+        if (!canvas) return;
+        void setViewport({
+          zoom,
+          x: canvas.width / 2 - (at.x + GROUP_INSET + git.graphWidth / 2) * zoom,
+          y: canvas.height / 2 - (at.y + SESSION_GROUP_HEADER + row.y) * zoom,
+        });
+      };
+      if (delay > 0) {
+        // After React Flow has mounted its canvas and run its own initial fit,
+        // or either would overwrite this.
+        if (focusTimer.current !== null) window.clearTimeout(focusTimer.current);
+        focusTimer.current = window.setTimeout(() => {
+          focusTimer.current = null;
+          apply();
+        }, delay);
+      } else {
+        apply();
+      }
+      return true;
+    },
+    [setViewport],
+  );
+
+  /** Opening the map frames the newest message, so HEAD is readable at once. */
+  const focusInitial = useCallback(
+    (result: Awaited<ReturnType<typeof layoutGraph>>, id: string) => {
+      const head = headOf(model);
+      if (
+        head?.messageId &&
+        id === head.sessionKey &&
+        centerRow(result, head.sessionKey, head.messageId, 120)
+      ) {
+        return;
+      }
+      scheduleFocus(id);
+    },
+    [centerRow, model, scheduleFocus],
+  );
+
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    layoutGraph(model, expanded)
+    layoutGraph(model, expanded, { unfolded, openAll })
       .then((result) => {
         if (cancelled) return;
         setLayout(result);
@@ -239,10 +286,19 @@ function Flow({ model }: { model: LineageViewModel }) {
         }
         // Survives into the single-file build so a 500-node run can be measured.
         document.documentElement.dataset.layoutMs = result.layoutMs.toFixed(1);
+        const row = pendingRow.current;
+        if (row && result.nodes.some((node) => node.id === row.sessionKey)) {
+          pendingRow.current = null;
+          pendingFocus.current = null;
+          if (!centerRow(result, row.sessionKey, row.messageId)) {
+            focusInitial(result, row.sessionKey);
+          }
+          return;
+        }
         const focus = pendingFocus.current;
         if (focus && result.nodes.some((node) => node.id === focus)) {
           pendingFocus.current = null;
-          scheduleFocus(focus);
+          focusInitial(result, focus);
         }
       })
       .catch((err: unknown) => {
@@ -252,7 +308,7 @@ function Flow({ model }: { model: LineageViewModel }) {
     return () => {
       cancelled = true;
     };
-  }, [model, expanded, scheduleFocus, getViewport, setViewport]);
+  }, [model, expanded, unfolded, openAll, centerRow, focusInitial, getViewport, setViewport]);
 
   useEffect(() => {
     if (!layout || framed.current) return;
@@ -289,28 +345,51 @@ function Flow({ model }: { model: LineageViewModel }) {
     },
     [layout],
   );
-  const actions = useMemo(() => ({ toggle }), [toggle]);
+  const openRow = useCallback((sessionIdValue: string, messageId: string, segmentId: string) => {
+    setFocusedId(nodeId(sessionKey(sessionIdValue), messageId));
+    setSelection({
+      type: "node",
+      sessionId: sessionIdValue,
+      nodeId: messageId,
+      branchId: segmentId,
+    });
+  }, []);
+  const unfold = useCallback((segmentId: string) => {
+    setUnfolded((previous) => {
+      const next = new Set(previous);
+      next.add(segmentId);
+      return next;
+    });
+  }, []);
+  const toggleUnfoldAll = useCallback(() => {
+    setOpenAll((value) => !value);
+    setUnfolded(new Set());
+  }, []);
+  const actions = useMemo(
+    () => ({ toggle, openRow, unfold, selection }),
+    [toggle, openRow, unfold, selection],
+  );
   const closePanel = useCallback(() => setSelection(null), []);
   const toggleOutline = useCallback(() => setShowOutline((value) => !value), []);
   const onNodeClick = useCallback<NodeMouseHandler<GraphNode>>((_event, node) => {
     setFocusedId(node.id);
-    if (node.type === "lineage") {
-      setSelection({ type: "node", node: node.data });
-    } else if (node.type === "session") {
+    if (node.type === "session") {
       setSelection({ type: "session", sessionId: node.data.sessionId });
     }
   }, []);
 
   /**
-   * Selecting in the outline must reveal the target's group chain in the graph
+   * Selecting in the outline must reveal the target's group chain in the map
    * first: a collapsed group has no flow node at all, so its child cannot be
    * focused until the next layout lands.
    */
   const selectFromOutline = useCallback(
     (target: OutlineTarget) => {
-      // Open every layer above the target, including topics it is nested in.
       const reveal = [...target.expand, ...(outlinePath(model, target.focusId) ?? []).slice(0, -1)];
       const needsLayout = reveal.some((id) => !expanded.has(id));
+      // A message row belongs to its session's group, which is what gets framed.
+      const focusId =
+        target.selection?.type === "node" ? sessionKey(target.selection.sessionId) : target.focusId;
       setExpanded((previous) => {
         const next = new Set(previous);
         for (const id of reveal) next.add(id);
@@ -319,14 +398,27 @@ function Flow({ model }: { model: LineageViewModel }) {
       setSelection(target.selection);
       setFocusedId(target.focusId);
       lastFocusRequest.current = performance.now();
+      const rowTarget =
+        target.selection?.type === "node"
+          ? {
+              sessionKey: sessionKey(target.selection.sessionId),
+              messageId: target.selection.nodeId,
+            }
+          : null;
       if (needsLayout) {
-        pendingFocus.current = target.focusId;
+        pendingFocus.current = rowTarget ? null : focusId;
+        pendingRow.current = rowTarget;
       } else {
         pendingFocus.current = null;
-        scheduleFocus(target.focusId);
+        pendingRow.current = null;
+        const centered =
+          rowTarget !== null &&
+          layout !== null &&
+          centerRow(layout, rowTarget.sessionKey, rowTarget.messageId);
+        if (!centered) scheduleFocus(focusId);
       }
     },
-    [expanded, model, scheduleFocus],
+    [centerRow, expanded, layout, model, scheduleFocus],
   );
 
   let content: ReactNode;
@@ -375,6 +467,14 @@ function Flow({ model }: { model: LineageViewModel }) {
           <button
             type="button"
             className="outline-button"
+            aria-pressed={openAll}
+            onClick={toggleUnfoldAll}
+          >
+            {openAll ? "Fold all" : "Unfold all"}
+          </button>
+          <button
+            type="button"
+            className="outline-button"
             aria-pressed={showOutline}
             onClick={toggleOutline}
           >
@@ -405,7 +505,7 @@ function Flow({ model }: { model: LineageViewModel }) {
   );
 }
 
-/** Nested epoch → session → node map; layout runs in the page from embedded data. */
+/** Epoch → session map; each session draws its messages as a git graph. */
 export function Graph({ model }: { model: LineageViewModel }) {
   return (
     <section className="lineage-map" aria-label="Project lineage graph">

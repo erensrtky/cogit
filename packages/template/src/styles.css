@@ -7,6 +7,13 @@
   --muted: #8b93a7;
   --accent: #7aa2f7;
   --warn: #e0af68;
+  /* Branch lanes in the git graph (Story 8.2). */
+  --l0: #7aa2f7;
+  --l1: #9ece6a;
+  --l2: #e0af68;
+  --l3: #bb9af7;
+  --l4: #7dcfff;
+  --l5: #f7768e;
 }
 
 * {
@@ -379,11 +386,6 @@ body:has(.map-shell.is-expanded) {
 }
 
 /* Edges attach here; handles stay invisible because layout decides the shape. */
-/* The outline spine runs down the left edge of each card, clear of indented items. */
-.react-flow__handle.tree-handle {
-  left: 16px;
-}
-
 .react-flow__handle.flow-handle {
   width: 4px;
   height: 4px;
@@ -395,73 +397,8 @@ body:has(.map-shell.is-expanded) {
   background: transparent;
 }
 
-/* Node cards; the left border encodes the node kind. */
-.lineage-box {
-  width: 100%;
-  height: 100%;
-  padding: 7px 10px;
-  overflow: hidden;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.lineage-box:hover {
-  border-color: var(--accent);
-}
-
 .session-group:hover {
   border-color: var(--accent);
-}
-
-.lineage-box.kind-phase {
-  border-left-color: var(--accent);
-}
-
-.lineage-box.kind-step {
-  border-left-color: #7dcfff;
-}
-
-.lineage-box.kind-decision {
-  border-left-color: #c0a8ff;
-}
-
-.lineage-box.kind-question {
-  border-left-color: var(--warn);
-}
-
-.lineage-box.kind-message {
-  border-left-color: #9ece6a;
-}
-
-.lineage-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  min-width: 0;
-}
-
-/* Text wraps; the layout sizes each card to fit it (cardHeight.ts mirrors these metrics). */
-.lineage-head strong {
-  min-width: 0;
-  font-size: 13px;
-  line-height: 17px;
-  overflow-wrap: anywhere;
-}
-
-.lineage-box p {
-  margin: 3px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 15px;
-  overflow-wrap: anywhere;
-}
-
-.lineage-box.is-last {
-  border-color: var(--warn);
-  box-shadow: 0 0 0 2px rgba(240, 180, 90, 0.35);
 }
 
 .left-off {
@@ -475,8 +412,8 @@ body:has(.map-shell.is-expanded) {
   line-height: 14px;
 }
 
-/* A card built from the transcript before the record summarizes it. */
-.lineage-box.kind-message .unsummarized {
+/* A row built from the transcript before the record summarizes it. */
+.unsummarized {
   display: inline-block;
   margin-top: 4px;
   padding: 1px 6px;
@@ -485,23 +422,6 @@ body:has(.map-shell.is-expanded) {
   border-radius: 999px;
   font-size: 10px;
   line-height: 14px;
-}
-
-.lineage-box p.card-meta {
-  font-size: 10px;
-  color: var(--accent);
-  opacity: 0.85;
-}
-
-.lineage-box p.lineage-count {
-  color: var(--accent);
-}
-
-.lineage-box time {
-  display: block;
-  margin-top: 3px;
-  font-size: 11px;
-  line-height: 15px;
 }
 
 .kind {
@@ -880,4 +800,119 @@ time {
   font-size: 12px;
   color: var(--muted);
   font-style: italic;
+}
+
+/* Git graph inside a session (Story 8.2): rows in time order, dots and lanes
+   drawn in an SVG to their left. */
+.git-graph {
+  position: relative;
+  margin: 0 0 24px 24px;
+}
+
+.git-lanes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+}
+
+.git-rows {
+  position: absolute;
+  top: 0;
+  width: 520px;
+}
+
+.git-row {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 8px;
+  overflow: hidden;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.git-row:hover {
+  background: #1d222c;
+}
+
+.git-row.in-branch {
+  background: rgba(122, 162, 247, 0.06);
+}
+
+.git-row.is-selected {
+  background: #243040;
+  outline: 1px solid var(--accent);
+}
+
+.git-more {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.git-time {
+  flex: none;
+  width: 74px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-branch {
+  flex: none;
+  max-width: 150px;
+  overflow: hidden;
+  padding: 1px 6px;
+  color: #0f1115;
+  font-size: 10px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.git-id {
+  flex: none;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.git-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-returns {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.git-row .left-off,
+.git-row .unsummarized {
+  flex: none;
+  margin: 0;
+}
+
+/* The branch summary a clicked row opens in the side panel. */
+.branch-range {
+  color: var(--muted);
+  font-size: 12px;
 }

@@ -9,7 +9,7 @@ import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
 import type { LineageNode, Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
-import { buildNodeTree, buildViewModel, embedViewModel, statusCard } from "../src/view/lineage.js";
+import { buildMessages, buildViewModel, embedViewModel, statusCard } from "../src/view/lineage.js";
 import { DATA_ELEMENT_ID } from "../src/view/model.js";
 import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
 
@@ -49,94 +49,70 @@ function session(over: Partial<Session> & { sessionId: string }): Session {
   };
 }
 
-describe("buildNodeTree", () => {
-  it("carries decision detail into the view and drops empty lists", () => {
-    const [d] = buildNodeTree([
-      node("d", "decision", "D", null, {
+describe("buildMessages", () => {
+  it("carries message detail into the view and drops empty lists", () => {
+    const [m] = buildMessages([
+      node("m1", "message", "M", null, {
         decidedBy: "user",
         alternatives: [{ option: "x", why: "y" }],
         commits: ["abc1234"],
         files: [],
       }),
     ]);
-    expect(d).toMatchObject({ decidedBy: "user", commits: ["abc1234"] });
-    expect(d?.alternatives).toHaveLength(1);
-    expect(d).not.toHaveProperty("files");
-  });
-
-  it("orders siblings by when their thread began, keeping unstamped ones first and in order", () => {
-    const t = (h: number) => `2026-10-23T${String(h).padStart(2, "0")}:00:00.000Z`;
-    const tree = buildNodeTree([
-      node("late", "phase", "Late topic", null, { addedAt: t(1) }),
-      node("old", "phase", "Unstamped topic"),
-      node("early", "phase", "Renamed topic", null, { addedAt: t(9) }),
-      node("x", "step", "Old item moved in", "early", { addedAt: t(0) }),
-      node("y", "step", "Second", "late", { addedAt: t(5) }),
-      node("z", "step", "First", "late", { addedAt: t(2) }),
-      node("old2", "phase", "Another unstamped"),
-    ]);
-    expect(tree.map((n) => n.id)).toEqual(["old", "old2", "early", "late"]);
-    expect(tree[3]?.children.map((n) => n.id)).toEqual(["z", "y"]);
-    expect(tree[2]?.addedAt).toBe(t(9));
+    expect(m).toMatchObject({ decidedBy: "user", commits: ["abc1234"], parent: null });
+    expect(m?.alternatives).toHaveLength(1);
+    expect(m).not.toHaveProperty("files");
   });
 
   it("orders messages by when the user sent them and carries the agent's work", () => {
     const t = (h: number) => `2026-10-23T${String(h).padStart(2, "0")}:00:00.000Z`;
-    const [topic] = buildNodeTree([
-      node("topic", "phase", "Topic", null, { addedAt: t(1) }),
-      // Written in one go, so the add time cannot tell their order.
-      node("m2", "message", "Second", "topic", { at: t(3), addedAt: t(5) }),
-      node("m1", "message", "First", "topic", {
+    // Written in one go, so the add time cannot tell their order.
+    const messages = buildMessages([
+      node("m2", "message", "Second", "m1", { at: t(3), addedAt: t(5) }),
+      node("m1", "message", "First", null, {
         at: t(2),
         addedAt: t(5),
         work: ["did a thing"],
         agentDecisions: [{ title: "Chose x", why: "simpler" }],
       }),
     ]);
-    expect(topic?.children.map((n) => n.id)).toEqual(["m1", "m2"]);
-    expect(topic?.children[0]).toMatchObject({
+    expect(messages.map((m) => m.id)).toEqual(["m1", "m2"]);
+    expect(messages[0]).toMatchObject({
+      parent: null,
       work: ["did a thing"],
       agentDecisions: [{ title: "Chose x", why: "simpler" }],
     });
-    expect(topic?.children[1]).not.toHaveProperty("work");
+    expect(messages[1]).toMatchObject({ parent: "m1" });
+    expect(messages[1]).not.toHaveProperty("work");
   });
 
-  it("nests children in order and keeps optional fields only when present", () => {
-    const tree = buildNodeTree([
-      node("a", "phase", "A", null, { summary: "phase one", at: T0 }),
-      node("b", "step", "B", "a"),
-      node("c", "decision", "C", "b", { why: "because" }),
-      node("d", "question", "D", "a"),
+  it("chains an old record whose parents point at topics, and drops forward parents", () => {
+    const t = (h: number) => `2026-10-23T${String(h).padStart(2, "0")}:00:00.000Z`;
+    const old = buildMessages([
+      node("m1", "message", "One", "topic", { at: t(1) }),
+      node("m2", "message", "Two", "topic", { at: t(2) }),
+      node("m3", "message", "Three", "m2", { at: t(3) }),
     ]);
-    expect(tree).toEqual([
-      {
-        id: "a",
-        kind: "phase",
-        title: "A",
-        summary: "phase one",
-        at: T0,
-        children: [
-          {
-            id: "b",
-            kind: "step",
-            title: "B",
-            children: [{ id: "c", kind: "decision", title: "C", why: "because", children: [] }],
-          },
-          { id: "d", kind: "question", title: "D", children: [] },
-        ],
-      },
+    expect(old.map((m) => m.parent)).toEqual([null, "m1", "m2"]);
+
+    const forward = buildMessages([
+      node("m1", "message", "One", "m2", { at: t(1) }),
+      node("m2", "message", "Two", null, { at: t(2) }),
     ]);
+    expect(forward.map((m) => m.parent)).toEqual([null, null]);
   });
 
-  it("re-roots missing parents, self references and cycles without losing nodes", () => {
-    const tree = buildNodeTree([
-      node("a", "phase", "A", "ghost"),
-      node("b", "step", "B", "b"),
-      node("x", "decision", "X", "y"),
-      node("y", "step", "Y", "x"),
+  it("keeps only links to earlier messages and a branch summary where it belongs", () => {
+    const t = (h: number) => `2026-10-23T${String(h).padStart(2, "0")}:00:00.000Z`;
+    const branch = { title: "Thread", asked: "What?", outcome: "This.", open: "" };
+    const messages = buildMessages([
+      node("m1", "message", "One", null, { at: t(1), branch }),
+      node("m2", "message", "Two", "m1", { at: t(2), links: ["m1", "m3"] }),
+      node("m3", "message", "Three", "m2", { at: t(3) }),
     ]);
-    expect(tree.map((n) => n.id)).toEqual(["a", "b", "x"]);
-    expect(tree[2]).toMatchObject({ id: "x", children: [{ id: "y", children: [] }] });
+    expect(messages[0]?.branch).toEqual(branch);
+    expect(messages[1]?.links).toEqual(["m1"]);
+    expect(messages[2]).not.toHaveProperty("branch");
   });
 });
 
@@ -202,11 +178,18 @@ describe("buildViewModel", () => {
     expect(model.project).toEqual({ name: "p", path: "/tmp/p", generatedAt: T0 });
   });
 
-  it("puts unrecorded messages in one New group at the end, with a free id", () => {
+  it("appends unrecorded messages to the end of the chain", () => {
     const model = buildViewModel({
       project: { schema: 1, name: "p", epochs: [] },
       sessions: [
-        session({ sessionId: "s", nodes: [node("pending", "phase", "A recorded topic")] }),
+        session({
+          sessionId: "s",
+          nodes: [
+            node("m1", "message", "Recorded message", null, {
+              at: "2026-10-21T10:00:00.000Z",
+            }),
+          ],
+        }),
       ],
       path: "/tmp/p",
       generatedAt: T0,
@@ -220,31 +203,20 @@ describe("buildViewModel", () => {
         ],
       ]),
     });
-    const nodes = model.unassigned[0]?.nodes ?? [];
-    expect(nodes.map((n) => n.title)).toEqual(["A recorded topic", "New"]);
-    // The recorded node already owns the id "pending".
-    expect(nodes[1]).toEqual({
-      id: "pending-2",
-      kind: "phase",
-      title: "New",
-      children: [
-        {
-          id: "m2",
-          kind: "message",
-          title: "Second message",
-          at: "2026-10-21T10:02:00.000Z",
-          unsummarized: true,
-          children: [],
-        },
-        {
-          id: "m3",
-          kind: "message",
-          title: "Third message",
-          at: "2026-10-21T10:03:00.000Z",
-          unsummarized: true,
-          children: [],
-        },
-      ],
+    const messages = model.unassigned[0]?.messages ?? [];
+    expect(messages.map((message) => message.title)).toEqual([
+      "Recorded message",
+      "Second message",
+      "Third message",
+    ]);
+    expect(messages.map((message) => message.parent)).toEqual([null, "m1", "m2"]);
+    expect(messages[2]).toEqual({
+      id: "m3",
+      kind: "message",
+      title: "Third message",
+      at: "2026-10-21T10:03:00.000Z",
+      unsummarized: true,
+      parent: "m2",
     });
   });
 
@@ -418,8 +390,8 @@ describe("codelineage build", () => {
         epoch: "e1",
         startedAt: "2026-01-02T00:00:00.000Z",
         nodes: [
-          node("a", "phase", "A"),
-          node("b", "step", "B", "a", {
+          node("m1", "message", "A", null, {
+            at: "2026-01-02T01:00:00.000Z",
             summary: "token ghp_abcdefghijklmnopqrstuvwxyz0123456789",
           }),
         ],
@@ -479,7 +451,7 @@ describe("codelineage build", () => {
 
     expect(model.epochs[0]?.sessions.map((s) => s.sessionId)).toEqual(["s2", "s1", "newer"]);
     expect(model.unassigned.map((s) => s.sessionId)).toEqual(["s4", "s3"]);
-    expect(model.epochs[0]?.sessions[1]?.nodes[0]?.children[0]?.summary).toBe("token [REDACTED]");
+    expect(model.epochs[0]?.sessions[1]?.messages[0]?.summary).toBe("token [REDACTED]");
     expect(model.status.goal).toBe("latest");
 
     const html = await readFile(paths().html, "utf8");
@@ -530,10 +502,11 @@ describe("codelineage build", () => {
     // s2 records no message, so its unrecorded turn is shown as a pending card
     // and needs the same conversation for its drill-down.
     expect(s2?.chat).toEqual([turn]);
-    expect(s2?.nodes.at(-1)).toMatchObject({
-      kind: "phase",
-      title: "New",
-      children: [{ id: "m1", kind: "message", title: "Fix the card", unsummarized: true }],
+    expect(s2?.messages.at(-1)).toMatchObject({
+      id: "m1",
+      kind: "message",
+      title: "Fix the card",
+      unsummarized: true,
     });
     expect(await readFile(paths().session("s1"), "utf8")).not.toContain("Fix the card");
   });
@@ -565,18 +538,18 @@ describe("codelineage build", () => {
     );
 
     const before = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    const nodes = before.epochs[0]?.sessions[0]?.nodes ?? [];
-    expect(nodes.map((n) => n.title)).toEqual(["Topic", "New"]);
-    expect(nodes[1]).toMatchObject({
-      children: [
-        {
-          id: "m2",
-          kind: "message",
-          title: "Second message, with the card",
-          at: "2026-10-21T10:05:00.000Z",
-          unsummarized: true,
-        },
-      ],
+    const messages = before.epochs[0]?.sessions[0]?.messages ?? [];
+    expect(messages.map((message) => message.title)).toEqual([
+      "First",
+      "Second message, with the card",
+    ]);
+    expect(messages[1]).toMatchObject({
+      id: "m2",
+      kind: "message",
+      title: "Second message, with the card",
+      at: "2026-10-21T10:05:00.000Z",
+      unsummarized: true,
+      parent: "m1",
     });
 
     await sessionWrite({ dir: root }, io, async () =>
@@ -591,7 +564,10 @@ describe("codelineage build", () => {
       expect.stringMatching(/m2: parent topic is not an earlier message of this session, using m1/),
     ]);
     const after = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(after.epochs[0]?.sessions[0]?.nodes.map((n) => n.title)).toEqual(["Topic"]);
+    expect(after.epochs[0]?.sessions[0]?.messages.map((message) => message.title)).toEqual([
+      "First",
+      "Second message",
+    ]);
   });
 
   it("counts unrecorded messages only while the catch-up is off", async () => {

@@ -5,40 +5,27 @@ import ELK, {
   type ElkNode,
 } from "elkjs/lib/elk.bundled.js";
 import type { LineageViewModel, ViewNode, ViewSession } from "../../cli/src/view/model.js";
-import { cardHeight } from "./cardHeight.js";
-import { cardMeta, cardText, formatTime, itemsInside, kindLabel } from "./format.js";
+import { type GitLayout, layoutGitGraph } from "./gitLayout.js";
 
 /**
- * Builds the nested React Flow graph (epoch → session → node) and lays it out
- * with ELK in the page. ELK returns child coordinates relative to their parent,
- * which is what React Flow's `parentId` children expect, so no conversion is
- * needed for nested nodes.
+ * Builds the nested map (epoch → session) and lays it out with ELK in the page.
+ * What a session shows inside (its git graph) is laid out by `gitLayout.ts`;
+ * only the groups are React Flow nodes, so a 500-message session costs ELK
+ * nothing. ELK returns child coordinates relative to their parent, which is
+ * what React Flow's `parentId` children expect.
  */
 
-/** Fixed card sizes keep ELK fast: it never needs to measure DOM text. */
-const NODE_WIDTH = 240;
-/** Cards grow with their text (see cardHeight); this is the floor. */
-const NODE_HEIGHT = 48;
 const GROUP_HEIGHT = 56;
 const GROUP_WIDTH = 260;
 const GROUP_PADDING = 24;
 const GROUP_HEADER = 44;
-
+/** Height of a session's header bar; its git graph starts right below. */
+export const SESSION_GROUP_HEADER = GROUP_HEADER;
+/** Inner padding of a group box. */
+export const GROUP_INSET = GROUP_PADDING;
 const ROOT_PADDING = 48;
-
-/** Inside a topic column nodes read top to bottom, nested items indented below their topic. */
-const INDENT = 32;
-const ROW_GAP = 16;
-const COLUMN_GAP = 24;
-/** Room for the "left off here" or "not summarized yet" badge under the title. */
-const LEFT_OFF_BADGE = 20;
-const PENDING_BADGE = 20;
 /** Wide enough that a collapsed session shows a readable title. */
 const SESSION_WIDTH = 380;
-
-/** Handle ids on lineage cards: the spine leaves at the bottom left and enters at the left side. */
-export const TREE_OUT = "tree-out";
-export const TREE_LEFT = "tree-left";
 
 export type EpochData = {
   title: string;
@@ -55,9 +42,13 @@ export type SessionData = {
   count: number;
   expanded: boolean;
   hasChildren: boolean;
+  /** Draw inside the session; only set while the session is open. */
+  git?: GitLayout;
+  /** User messages the record does not hold yet, while the catch-up is off. */
+  unrecorded?: number;
 };
 
-/** Everything the drill-down panel shows about a node. */
+/** Everything the drill-down panel shows about a message. */
 export type NodeDetail = {
   kind: ViewNode["kind"];
   title: string;
@@ -72,6 +63,8 @@ export type NodeDetail = {
   agentDecisions?: ViewNode["agentDecisions"];
   addedAt?: string;
   touchedAt?: string;
+  parent?: string | null;
+  links?: string[];
   /** A user message the record does not hold yet. */
   unsummarized?: true;
   /** Owning session, so the drill-down panel can show and resume it. */
@@ -81,24 +74,13 @@ export type NodeDetail = {
 };
 
 export function toNodeDetail(node: ViewNode, sessionId: string): NodeDetail {
-  const { id, children: _children, ...detail } = node;
-  return { ...detail, sessionId, nodeId: id };
+  return { ...node, sessionId, nodeId: node.id };
 }
 
-export type LineageData = NodeDetail & {
-  /** Nodes nested below this one, at any depth. */
-  count: number;
-  expanded: boolean;
-  hasChildren: boolean;
-  /** One of the nodes the last write added or changed: where the work left off. */
-  isLast: boolean;
-};
-
-export type EpochFlowNode = FlowNode<EpochData, "epoch">;
 export type SessionFlowNode = FlowNode<SessionData, "session">;
-export type LineageFlowNode = FlowNode<LineageData, "lineage">;
+export type EpochFlowNode = FlowNode<EpochData, "epoch">;
 
-export type GraphNode = EpochFlowNode | SessionFlowNode | LineageFlowNode;
+export type GraphNode = EpochFlowNode | SessionFlowNode;
 
 export interface GraphLayout {
   nodes: GraphNode[];
@@ -118,8 +100,8 @@ export function sessionId(id: string): string {
 }
 
 /**
- * Node ids are flat per session (not per parent): the outline and the graph
- * must agree on the same id to focus each other's items.
+ * Node ids are flat per session: the outline and the map agree on the same id
+ * when the outline highlights a message.
  */
 export function nodeId(sessionGroup: string, id: string): string {
   return `node:${sessionGroup}:${id}`;
@@ -141,48 +123,13 @@ function groupOptions() {
   };
 }
 
-export interface LastTouched {
+/** Where the work left off: the newest message of the most recently updated session. */
+export interface Head {
   sessionKey: string;
-  /** Every node the last write added or changed: they share the newest touch time. */
-  nodeKeys: string[];
-  /** Epoch, session and every topic above those nodes, outermost first. */
-  ancestors: string[];
-}
-
-/**
- * Where the work left off, in the most recently updated session: its last user
- * message when it has messages, else the nodes touched by its last write (one
- * write stamps all its nodes at once, so they are all marked rather than
- * guessing which of them came last).
- */
-export function lastTouched(model: LineageViewModel): LastTouched | null {
-  const latest = latestSession(model);
-  if (!latest) return null;
-  const sessionKey = sessionId(latest.session.sessionId);
-  let newest = "";
-  const found: { key: string; ancestors: string[]; at: string }[] = [];
-  const visit = (nodes: ViewNode[], ancestors: string[]): void => {
-    for (const node of nodes) {
-      const key = nodeId(sessionKey, node.id);
-      const at = byMessage ? (node.kind === "message" ? node.at : undefined) : node.touchedAt;
-      if (at) {
-        found.push({ key, ancestors, at });
-        if (at > newest) newest = at;
-      }
-      visit(node.children, [...ancestors, key]);
-    }
-  };
-  const byMessage = hasMessage(latest.session.nodes);
-  visit(latest.session.nodes, []);
-  const last = found.filter((entry) => entry.at === newest);
-  if (last.length === 0) return null;
-  const ancestors = new Set([latest.group, sessionKey]);
-  for (const entry of last) for (const key of entry.ancestors) ancestors.add(key);
-  return { sessionKey, nodeKeys: last.map((entry) => entry.key), ancestors: [...ancestors] };
-}
-
-function hasMessage(nodes: ViewNode[]): boolean {
-  return nodes.some((node) => (node.kind === "message" && node.at) || hasMessage(node.children));
+  sessionId: string;
+  messageId: string | null;
+  /** Epoch group the session belongs to. */
+  group: string;
 }
 
 function latestSession(
@@ -198,17 +145,34 @@ function latestSession(
   )[0];
 }
 
+export function headOf(model: LineageViewModel): Head | null {
+  const latest = latestSession(model);
+  if (!latest) return null;
+  return {
+    sessionKey: sessionId(latest.session.sessionId),
+    sessionId: latest.session.sessionId,
+    messageId: latest.session.messages[latest.session.messages.length - 1]?.id ?? null,
+    group: latest.group,
+  };
+}
+
 /**
  * The map opens on the most recently updated session, with its epoch expanded,
- * showing that session's top-level topics and the branch to the last touched node;
- * deeper layers open on click.
+ * showing that session's git graph.
  */
 export function defaultExpanded(model: LineageViewModel): Set<string> {
-  const latest = latestSession(model);
-  if (!latest) return new Set();
-  // Also open the branch that leads to where the work left off.
-  const last = lastTouched(model);
-  return new Set([latest.group, sessionId(latest.session.sessionId), ...(last?.ancestors ?? [])]);
+  const head = headOf(model);
+  if (!head) return new Set();
+  return new Set([head.group, head.sessionKey]);
+}
+
+/** The epoch group a session lives in, for the outline's reveal list. */
+export function sessionGroupId(model: LineageViewModel, id: string): string | null {
+  for (const epoch of model.epochs) {
+    if (epoch.sessions.some((session) => session.sessionId === id)) return epochId(epoch.id);
+  }
+  if (model.unassigned.some((session) => session.sessionId === id)) return UNASSIGNED_EPOCH_ID;
+  return null;
 }
 
 interface Group {
@@ -239,141 +203,76 @@ function chainEdges(ids: string[]): ElkExtendedEdge[] {
   return edges;
 }
 
-interface Placement {
-  boxes: Map<string, Sized>;
-  edges: FlowEdge[];
+interface Sized {
+  x: number;
+  y: number;
   width: number;
   height: number;
 }
 
-/** Tall enough for the card's whole title and the line below it, as the card renders them. */
-function nodeHeight(node: ViewNode, open: boolean): number {
-  const hasChildren = node.children.length > 0;
-  const body =
-    hasChildren && !open
-      ? itemsInside(countNodes(node.children))
-      : node.at && node.kind !== "message"
-        ? formatTime(node.at)
-        : cardText(node);
-  const meta = cardMeta(node);
-  return Math.max(
-    NODE_HEIGHT,
-    cardHeight(
-      {
-        kindLabel: kindLabel(node.kind),
-        title: node.title,
-        hasToggle: hasChildren,
-        ...(body ? { body } : {}),
-        ...(meta ? { meta } : {}),
-      },
-      NODE_WIDTH,
-    ),
-  );
+interface SessionSize {
+  width: number;
+  height: number;
+  git?: GitLayout;
 }
 
-function treeEdge(source: string, target: string, targetHandle: string): FlowEdge {
+function measureSession(open: boolean, git: GitLayout | null): SessionSize {
+  if (!open || !git) return { width: SESSION_WIDTH, height: GROUP_HEIGHT };
   return {
-    id: `edge:${source}->${target}`,
-    source,
-    target,
-    sourceHandle: TREE_OUT,
-    targetHandle,
-    type: "smoothstep",
-  };
-}
-
-/**
- * Places a session's nodes: top-level topics side by side as columns (they run in
- * parallel, so their order matters little), and inside each column an indented,
- * top-to-bottom outline of what the topic holds, in recorded order. Time runs
- * down the map across sessions; topics run across.
- */
-export function placeSessionNodes(
-  nodes: ViewNode[],
-  sessionGroup: string,
-  isOpen: (id: string) => boolean = () => true,
-  lastKeys: ReadonlySet<string> = new Set(),
-): Placement {
-  const boxes = new Map<string, Sized>();
-  const edges: FlowEdge[] = [];
-  const top = GROUP_HEADER + 8;
-  let columnX = GROUP_PADDING;
-  let bottom = top;
-  for (const root of nodes) {
-    let y = top;
-    let columnWidth = NODE_WIDTH;
-    const visit = (node: ViewNode, parent: string | null, depth: number): void => {
-      const id = nodeId(sessionGroup, node.id);
-      const open = isOpen(id);
-      const height =
-        nodeHeight(node, open) +
-        (lastKeys.has(id) ? LEFT_OFF_BADGE : 0) +
-        (node.unsummarized ? PENDING_BADGE : 0);
-      boxes.set(id, { x: columnX + depth * INDENT, y, width: NODE_WIDTH, height });
-      y += height + ROW_GAP;
-      columnWidth = Math.max(columnWidth, depth * INDENT + NODE_WIDTH);
-      if (parent !== null) edges.push(treeEdge(parent, id, TREE_LEFT));
-      if (open) for (const child of node.children) visit(child, id, depth + 1);
-    };
-    visit(root, null, 0);
-    bottom = Math.max(bottom, y - ROW_GAP);
-    columnX += columnWidth + COLUMN_GAP;
-  }
-  return {
-    boxes,
-    edges,
-    width: Math.max(columnX - COLUMN_GAP, GROUP_PADDING) + GROUP_PADDING,
-    height: bottom + GROUP_PADDING,
+    width: Math.max(SESSION_WIDTH, git.width + GROUP_PADDING * 2),
+    height: GROUP_HEADER + 8 + git.height + GROUP_PADDING,
+    git,
   };
 }
 
 function buildSession(
   session: ViewSession,
   expanded: ReadonlySet<string>,
-  parentId: string,
   meta: Map<string, string | null>,
-  placements: Map<string, Placement>,
-  lastKeys: ReadonlySet<string>,
-): ElkNode {
+  parentId: string,
+  headId: string | null,
+  unfolded: ReadonlySet<string>,
+  openAll: boolean,
+): { node: ElkNode; git?: GitLayout } {
   const id = sessionId(session.sessionId);
   meta.set(id, parentId);
-  const showChildren = expanded.has(id) && session.nodes.length > 0;
-  if (!showChildren) return { id, width: SESSION_WIDTH, height: GROUP_HEIGHT };
-
-  // ELK sizes the session box; its contents are placed by hand.
-  const placement = placeSessionNodes(
-    session.nodes,
-    id,
-    (nodeKey) => expanded.has(nodeKey),
-    lastKeys,
-  );
-  placements.set(id, placement);
-  return { id, width: Math.max(SESSION_WIDTH, placement.width), height: placement.height };
+  const open = expanded.has(id) && session.messages.length > 0;
+  const git = open ? layoutGitGraph(session.messages, { unfolded, openAll, headId }) : null;
+  const size = measureSession(open, git);
+  return {
+    node: { id, width: size.width, height: size.height },
+    ...(size.git ? { git: size.git } : {}),
+  };
 }
 
 function buildEpoch(
   group: Group,
   expanded: ReadonlySet<string>,
   meta: Map<string, string | null>,
-  placements: Map<string, Placement>,
-  lastKeys: ReadonlySet<string>,
+  head: Head | null,
+  unfolded: ReadonlySet<string>,
+  openAll: boolean,
+  gits: Map<string, GitLayout>,
 ): ElkNode {
   meta.set(group.id, null);
   const showChildren = expanded.has(group.id) && group.sessions.length > 0;
   if (!showChildren) return { id: group.id, width: GROUP_WIDTH, height: GROUP_HEIGHT };
 
-  const children = group.sessions.map((session) =>
-    buildSession(session, expanded, group.id, meta, placements, lastKeys),
-  );
+  const children = group.sessions.map((session) => {
+    const built = buildSession(
+      session,
+      expanded,
+      meta,
+      group.id,
+      head?.sessionId === session.sessionId ? head.messageId : null,
+      unfolded,
+      openAll,
+    );
+    if (built.git) gits.set(session.sessionId, built.git);
+    return built.node;
+  });
   const edges = chainEdges(children.map((child) => child.id));
   return { id: group.id, children, edges, layoutOptions: groupOptions() };
-}
-
-interface Sized {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
 }
 
 function collectSizes(elk: ElkNode, out: Map<string, Sized>): void {
@@ -388,8 +287,19 @@ function collectSizes(elk: ElkNode, out: Map<string, Sized>): void {
   }
 }
 
-export function countNodes(nodes: ViewNode[]): number {
-  return nodes.reduce((sum, node) => sum + 1 + countNodes(node.children), 0);
+/** The messages just before and after a message in its session, by send order. */
+export function messageNeighbors(
+  messages: ViewNode[],
+  id: string,
+): { previous: ViewNode | null; next: ViewNode | null } {
+  const index = messages.findIndex((message) => message.id === id);
+  if (index < 0) return { previous: null, next: null };
+  return { previous: messages[index - 1] ?? null, next: messages[index + 1] ?? null };
+}
+
+export interface GitLayoutPreferences {
+  unfolded: ReadonlySet<string>;
+  openAll: boolean;
 }
 
 /**
@@ -399,6 +309,7 @@ export function countNodes(nodes: ViewNode[]): number {
 export async function layoutGraph(
   model: LineageViewModel,
   expanded: ReadonlySet<string>,
+  preferences: GitLayoutPreferences = { unfolded: new Set(), openAll: false },
   elk: ElkInstance = new ELK(),
 ): Promise<GraphLayout> {
   const groups: Group[] = model.epochs.map((epoch) => ({
@@ -410,11 +321,11 @@ export async function layoutGraph(
     groups.push({ id: UNASSIGNED_EPOCH_ID, title: "Unassigned", sessions: model.unassigned });
   }
 
-  const lastKeys: ReadonlySet<string> = new Set(lastTouched(model)?.nodeKeys ?? []);
+  const head = headOf(model);
   const parents = new Map<string, string | null>();
-  const placements = new Map<string, Placement>();
+  const gits = new Map<string, GitLayout>();
   const rootChildren = groups.map((group) =>
-    buildEpoch(group, expanded, parents, placements, lastKeys),
+    buildEpoch(group, expanded, parents, head, preferences.unfolded, preferences.openAll, gits),
   );
   const rootEdges = chainEdges(rootChildren.map((child) => child.id));
 
@@ -434,9 +345,6 @@ export async function layoutGraph(
 
   const sizes = new Map<string, Sized>();
   collectSizes(result, sizes);
-  for (const placement of placements.values()) {
-    for (const [id, box] of placement.boxes) sizes.set(id, box);
-  }
   const seenEdges = new Set<string>();
   const edges: FlowEdge[] = [];
   const addEdge = (edge: ElkExtendedEdge): void => {
@@ -444,10 +352,7 @@ export async function layoutGraph(
     if (flow) edges.push(flow);
   };
   for (const edge of rootEdges) addEdge(edge);
-  for (const child of rootChildren) {
-    for (const edge of child.edges ?? []) addEdge(edge);
-  }
-  for (const placement of placements.values()) edges.push(...placement.edges);
+  for (const child of rootChildren) for (const edge of child.edges ?? []) addEdge(edge);
 
   const nodes: GraphNode[] = [];
   const box = (id: string): Sized =>
@@ -479,6 +384,7 @@ export async function layoutGraph(
       const id = sessionId(session.sessionId);
       const sessionExpanded = expanded.has(id);
       const sessionSize = box(id);
+      const git = gits.get(session.sessionId);
       nodes.push({
         id,
         type: "session",
@@ -495,53 +401,17 @@ export async function layoutGraph(
           sessionId: session.sessionId,
           updatedAt: session.updatedAt,
           goal: session.status.goal,
-          count: countNodes(session.nodes),
+          count: session.messages.length,
           expanded: sessionExpanded,
-          hasChildren: session.nodes.length > 0,
+          hasChildren: session.messages.length > 0,
+          ...(git ? { git } : {}),
+          ...(session.unrecordedMessages ? { unrecorded: session.unrecordedMessages } : {}),
         },
       });
-      if (!sessionExpanded) continue;
-      collectFlowNodes(session.nodes, id, session.sessionId, nodes, sizes, expanded, lastKeys);
     }
   }
 
   return { nodes, edges, layoutMs };
-}
-
-function collectFlowNodes(
-  nodes: ViewNode[],
-  parent: string,
-  sessionId: string,
-  out: GraphNode[],
-  sizes: Map<string, Sized>,
-  expanded: ReadonlySet<string>,
-  lastKeys: ReadonlySet<string>,
-): void {
-  for (const node of nodes) {
-    const id = nodeId(parent, node.id);
-    const open = expanded.has(id);
-    const size = sizes.get(id) ?? { x: 0, y: 0, width: NODE_WIDTH, height: NODE_HEIGHT };
-    out.push({
-      id,
-      type: "lineage",
-      parentId: parent,
-      position: { x: size.x, y: size.y },
-      width: size.width,
-      height: size.height,
-      style: { width: size.width, height: size.height },
-      draggable: false,
-      connectable: false,
-      selectable: false,
-      data: {
-        ...toNodeDetail(node, sessionId),
-        count: countNodes(node.children),
-        expanded: open,
-        hasChildren: node.children.length > 0,
-        isLast: lastKeys.has(id),
-      },
-    });
-    if (open) collectFlowNodes(node.children, parent, sessionId, out, sizes, expanded, lastKeys);
-  }
 }
 
 /**
@@ -566,23 +436,4 @@ export function absolutePosition(
     node = node.parentId ? byId.get(node.parentId) : undefined;
   }
   return { x, y };
-}
-
-/** The messages just before and after a message in its session, by when they were sent. */
-export function messageNeighbors(
-  nodes: ViewNode[],
-  id: string,
-): { previous: ViewNode | null; next: ViewNode | null } {
-  const messages: ViewNode[] = [];
-  const visit = (list: ViewNode[]): void => {
-    for (const node of list) {
-      if (node.kind === "message") messages.push(node);
-      visit(node.children);
-    }
-  };
-  visit(nodes);
-  messages.sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
-  const index = messages.findIndex((node) => node.id === id);
-  if (index < 0) return { previous: null, next: null };
-  return { previous: messages[index - 1] ?? null, next: messages[index + 1] ?? null };
 }

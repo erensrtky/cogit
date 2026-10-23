@@ -14,80 +14,92 @@ import {
 } from "./model.js";
 
 /**
- * Turns a session's flat node list into the nested tree the graph draws, siblings
- * in the order their threads began (stored order for unstamped nodes). A missing parent, a self-reference or a cycle becomes a root, so no
- * recorded node is ever dropped.
+ * The session's user messages, flat and in the order they were sent (8.2). A
+ * message hangs from the earlier message it reacts to; an explicit `null` in
+ * the record makes a new root. Any other parent (a topic in an older record, a
+ * forward or unknown id) falls back to the previous message, so an old record
+ * renders as one chain and no message is ever dropped.
  */
-export function buildNodeTree(nodes: LineageNode[]): ViewNode[] {
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const childrenOf = new Map<string, LineageNode[]>();
-  const roots: LineageNode[] = [];
-  for (const node of nodes) {
-    const parent = node.parent === null ? undefined : byId.get(node.parent);
-    if (parent && parent.id !== node.id) {
-      const list = childrenOf.get(parent.id) ?? [];
-      list.push(node);
-      childrenOf.set(parent.id, list);
-    } else {
-      roots.push(node);
-    }
-  }
+export function buildMessages(
+  nodes: LineageNode[],
+  pending: ViewPendingMessage[] = [],
+): ViewNode[] {
+  const messages = nodes.filter((node) => node.kind === "message").sort(compareMessages);
+  const known = new Set(messages.map((message) => message.id));
+  /** Position in send order: a parent or link must come before the message. */
+  const order = new Map(messages.map((message, index) => [message.id, index]));
+  const earlier = (other: string, id: string): boolean => {
+    const otherAt = order.get(other);
+    const selfAt = order.get(id);
+    return otherAt !== undefined && selfAt !== undefined && otherAt < selfAt;
+  };
+  const out: ViewNode[] = [];
+  let previous: string | null = null;
 
-  const visited = new Set<string>();
-  const build = (node: LineageNode): ViewNode => {
-    visited.add(node.id);
-    const children = (childrenOf.get(node.id) ?? [])
-      .filter((child) => !visited.has(child.id))
-      .map(build);
-    return {
-      id: node.id,
-      kind: node.kind,
-      title: node.title,
-      ...(node.summary === undefined ? {} : { summary: node.summary }),
-      ...(node.why === undefined ? {} : { why: node.why }),
-      ...(node.at === undefined ? {} : { at: node.at }),
-      ...(node.decidedBy === undefined ? {} : { decidedBy: node.decidedBy }),
-      ...(node.alternatives?.length ? { alternatives: node.alternatives } : {}),
-      ...(node.commits?.length ? { commits: node.commits } : {}),
-      ...(node.files?.length ? { files: node.files } : {}),
-      ...(node.work?.length ? { work: node.work } : {}),
-      ...(node.agentDecisions?.length ? { agentDecisions: node.agentDecisions } : {}),
-      ...(node.addedAt === undefined ? {} : { addedAt: node.addedAt }),
-      ...(node.touchedAt === undefined ? {} : { touchedAt: node.touchedAt }),
-      children,
-    };
+  const push = (message: ViewNode, parent: string | null): void => {
+    message.parent = parent;
+    out.push(message);
+    previous = message.id;
   };
 
-  const tree = roots.filter((root) => !visited.has(root.id)).map(build);
-  // A pure cycle has no root, so break it at the first node not yet emitted.
-  for (const node of nodes) if (!visited.has(node.id)) tree.push(build(node));
-  return byStart(tree);
-}
-
-/**
- * When a node's thread began: its own or any descendant's start, whichever is
- * earliest. A message starts when the user sent it, other nodes when they were
- * added. Unstamped nodes predate the stamps, so they count as earliest of all.
- */
-function startOf(node: ViewNode): string {
-  let start = (node.kind === "message" ? node.at : undefined) ?? node.addedAt ?? "";
-  for (const child of node.children) {
-    const childStart = startOf(child);
-    if (childStart < start) start = childStart;
+  for (const node of messages) {
+    const parent =
+      node.parent === null
+        ? null
+        : node.parent !== undefined && known.has(node.parent) && earlier(node.parent, node.id)
+          ? node.parent
+          : previous;
+    const links = (node.links ?? []).filter((link) => known.has(link) && earlier(link, node.id));
+    push(
+      {
+        id: node.id,
+        kind: node.kind,
+        title: node.title,
+        ...(node.summary === undefined ? {} : { summary: node.summary }),
+        ...(node.why === undefined ? {} : { why: node.why }),
+        ...(node.at === undefined ? {} : { at: node.at }),
+        ...(node.decidedBy === undefined ? {} : { decidedBy: node.decidedBy }),
+        ...(node.alternatives?.length ? { alternatives: node.alternatives } : {}),
+        ...(node.commits?.length ? { commits: node.commits } : {}),
+        ...(node.files?.length ? { files: node.files } : {}),
+        ...(node.work?.length ? { work: node.work } : {}),
+        ...(node.agentDecisions?.length ? { agentDecisions: node.agentDecisions } : {}),
+        ...(node.addedAt === undefined ? {} : { addedAt: node.addedAt }),
+        ...(node.touchedAt === undefined ? {} : { touchedAt: node.touchedAt }),
+        ...(node.branch === undefined ? {} : { branch: node.branch }),
+        ...(links.length ? { links } : {}),
+      },
+      parent,
+    );
   }
-  return start;
+
+  // Messages the record does not hold yet continue the chain where it stopped.
+  for (const message of pending) {
+    push(
+      {
+        id: message.id,
+        kind: "message",
+        title: message.title,
+        at: message.at,
+        unsummarized: true,
+      },
+      previous,
+    );
+  }
+  return out;
 }
 
-/**
- * Orders siblings by when their thread began, at every level, so topics read left
- * to right and items top to bottom in time order even after the agent renames or
- * moves them. The sort is stable: ties keep their stored order.
- */
-function byStart(nodes: ViewNode[]): ViewNode[] {
-  for (const node of nodes) node.children = byStart(node.children);
-  const keyed = nodes.map((node) => ({ node, start: startOf(node) }));
-  keyed.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
-  return keyed.map((entry) => entry.node);
+const MESSAGE_NUMBER = /^m([1-9][0-9]*)$/;
+
+function messageNumber(id: string): number {
+  const match = MESSAGE_NUMBER.exec(id);
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+/** Send time first; the message number keeps records written in one go in order. */
+function compareMessages(a: LineageNode, b: LineageNode): number {
+  const at = (a.at ?? "").localeCompare(b.at ?? "");
+  return at !== 0 ? at : messageNumber(a.id) - messageNumber(b.id);
 }
 
 /** A session counts as active while it was updated within this window. */
@@ -151,36 +163,10 @@ export function statusCard(sessions: Session[], now: string): StatusCard {
   };
 }
 
-/** Title of the last group of a session: messages the record does not hold yet. */
-export const PENDING_GROUP_TITLE = "New";
-
 /**
- * The messages the record does not hold yet, as cards under one "New" group at
- * the end of the session, so the newest message is on the map before the agent
- * summarizes it. The group id never collides with a recorded node's.
+ * The messages the record does not hold yet join the end of the chain, so the
+ * newest message is on the map before the agent summarizes it (8.2).
  */
-function pendingGroup(session: Session, pending: ViewPendingMessage[] | undefined): ViewNode[] {
-  if (!pending?.length) return [];
-  const used = new Set(session.nodes.map((node) => node.id));
-  let id = "pending";
-  for (let n = 2; used.has(id); n += 1) id = `pending-${n}`;
-  return [
-    {
-      id,
-      kind: "phase",
-      title: PENDING_GROUP_TITLE,
-      children: pending.map((message) => ({
-        id: message.id,
-        kind: "message" as const,
-        title: message.title,
-        at: message.at,
-        unsummarized: true as const,
-        children: [],
-      })),
-    },
-  ];
-}
-
 function toViewSession(
   session: Session,
   transcripts?: ReadonlySet<string>,
@@ -196,7 +182,7 @@ function toViewSession(
     startedAt: session.startedAt,
     updatedAt: session.updatedAt,
     status: session.status,
-    nodes: [...buildNodeTree(session.nodes), ...pendingGroup(session, pending)],
+    messages: buildMessages(session.nodes, pending),
     // Undefined means the caller did not ask (fixtures, unit tests); then the
     // record is shown as resumable rather than pretending the transcript is gone.
     transcriptAvailable: transcripts === undefined ? true : transcripts.has(session.sessionId),

@@ -1,4 +1,4 @@
-import type { NodeKind } from "../schema/session.js";
+import type { BranchSummary, NodeKind } from "../schema/session.js";
 
 /**
  * Serialized contract between `codelineage build` and the HTML template. The
@@ -27,6 +27,16 @@ export interface ViewNode {
   summary?: string;
   why?: string;
   at?: string;
+  /**
+   * The earlier message this one reacts to; `null` for a new root. Always set
+   * on the messages the map draws (buildMessages falls back to the previous
+   * message when a record points elsewhere).
+   */
+  parent?: string | null;
+  /** Earlier messages this one returns to or builds on besides its parent. */
+  links?: string[];
+  /** On a branch's first message: what that thread asked and what came of it. */
+  branch?: BranchSummary;
   decidedBy?: "user" | "agent" | "agreed";
   alternatives?: { option: string; why: string }[];
   commits?: string[];
@@ -43,10 +53,8 @@ export interface ViewNode {
   addedAt?: string;
   /** When the node was last added or changed; marks where the work left off. */
   touchedAt?: string;
-  /** A user message the record does not hold yet: the card is not summarized. */
+  /** A user message the record does not hold yet: the row is not summarized. */
   unsummarized?: true;
-  /** Nested children, already ordered as the graph should draw them. */
-  children: ViewNode[];
 }
 
 export interface ViewPendingItem {
@@ -97,7 +105,12 @@ export interface ViewSession {
   startedAt: string;
   updatedAt: string;
   status: ViewStatus;
-  nodes: ViewNode[];
+  /**
+   * The session's user messages, flat and in the order they were sent. Older
+   * records' topic nodes are not part of the map any more (Epic 8); every
+   * message carries the id of the message it hangs from.
+   */
+  messages: ViewNode[];
   /** False when the Claude Code transcript is gone, so resume cannot work. */
   transcriptAvailable: boolean;
   /** The linked git worktree the session ran in, if any. */

@@ -17,25 +17,29 @@ The agent itself records a structured summary of its session as it works. A CLI 
 these records into static HTML:
 
 - **Project map** (one per project): project → epoch (feature/epic) → session →
-  topic → sub-topics (any depth) → the user's messages. The map is a minimap of
-  the chat: one node per message the user wrote, titled in the user's words and
-  saying what came of it; the agent's work on it (steps, its own decisions with
-  their reasons, commits, files) lives in that node's detail, not in nodes of its
-  own. It opens like layers of an onion: time runs down the page (sessions in
-  order), a session's top-level topics sit side by side as columns ordered by when
-  they began, and an opened topic lists its messages down its column in the order
-  the user sent them. Every node with children expands and collapses; the latest
-  session opens with its topics closed except the branch to its last message,
-  which is marked "left off here". Cards size themselves to their text. A click
-  opens a drill-down panel with the full text, who decided, the options considered
-  and rejected, what the agent did and decided on its own, the commits and files,
-  the conversation itself (the message as written and the agent's written
-  replies, tool output left out and tool use counted), previous/next message
-  buttons, and a `claude --resume <id>` copy button. `build` reads the
-  conversation from the transcript into `lineage.html` only (never committed, see
-  Privacy); session files never hold raw text. Records from before messages became
-  the nodes keep their step/decision/question nodes and their old "left off"
-  mark (the nodes of the last write).
+  a git graph of the user's messages. The map is a minimap of the chat: one row
+  per message the user wrote, in the order they sent it, titled in the user's
+  words and saying what came of it; the agent's work on it (steps, its own
+  decisions with their reasons, commits, files) lives in that row's detail, not
+  in rows of its own. Each session draws like a git history: one dot per message,
+  one coloured lane per branch (a branch is a chain of messages that react to
+  each other one to one), the first message of a branch a hollow ring with the
+  branch title, a branch start curving out of the message it reacts to, and a
+  return (`links`) a dashed arrow through a channel left of the lanes, marked
+  "↩ m22" on the row. A new root starts after a small gap. A branch longer than
+  four messages folds to its first and last message plus a "⋮ N more" row that
+  unfolds it; "Unfold all" opens every branch at once. The newest branch (where
+  "left off here" marks the newest message) starts unfolded. Sessions keep their
+  place in the project map; time runs down the page. A click opens a drill-down
+  panel with the branch summary (title, range, count, time span, asked / outcome
+  / open), the full text, who decided, the options considered and rejected, what
+  the agent did and decided on its own, the commits and files, the conversation
+  itself (the message as written and the agent's written replies, tool output
+  left out and tool use counted), previous/next message buttons, and a
+  `claude --resume <id>` copy button. `build` reads the conversation from the
+  transcript into `lineage.html` only (never committed, see Privacy); session
+  files never hold raw text. Records from before messages carried message
+  parents (their `parent` is a topic or step) render as one chain in send order.
 - **Status card** at the top of every project: goal, done, pending (flags items
   waiting on the user), next step, last activity. With parallel sessions, goal and
   next come from the most recently updated session; `needsUser` items are merged
@@ -109,13 +113,15 @@ and `session write` sets a message's `at` from the transcript. Tool results,
 injected skill text, compaction summaries, subagent turns, `!` shell lines and
 slash commands without arguments are not messages. Raw message text never enters
 the record, only the agent's title and summary. `step`, `decision` and `question`
-are kept for records written before messages became the nodes. Nodes are grouped by topic, not by time, and nest to any depth through
-`parent`. `decidedBy` is `user | agent | agreed`. `addedAt` (first write) and
-`touchedAt` (last change) are stamped by `session write` and never taken from agent
-input; a resent node that changed nothing keeps its `touchedAt`. Siblings are
-ordered by when their thread began (the earliest start in their subtree: a
-message's `at`, any other node's `addedAt`);
-nodes recorded before the stamps existed keep their stored order, first. Epochs live in `project.json`.
+are kept for records written before messages became the nodes. A message's
+`parent` is the earlier message it reacts to (or `null` for a new root); a parent
+that is not an earlier message falls back to the previous message, so old records
+chain in send order. `links` (up to five) name older messages the message returns
+to besides its parent, and `branch` (title, asked, outcome, open) sits on the
+first message of a branch, written when the branch ends rather than every turn.
+`decidedBy` is `user | agent | agreed`. `addedAt` (first write) and `touchedAt`
+(last change) are stamped by `session write` and never taken from agent input; a
+resent node that changed nothing keeps its `touchedAt`. Epochs live in `project.json`.
 The agent picks an existing epoch or adds one through the CLI (`codelineage epoch add`),
 which does a locked, atomic write.
 
@@ -227,7 +233,7 @@ Each update costs agent tokens (the user's subscription or API usage).
 |---|---|
 | `codelineage init` | Creates `.codelineage/`, registers the project, asks the install questions |
 | `codelineage build [dir]` | Regenerates `lineage.html` and `panel.html` |
-| `codelineage open [dir]` | Builds, then opens the map (or the panel if no dir is given) through the local map server, starting it in the background if it is not running. The open page refreshes itself whenever the map is rebuilt, keeping open topics, selection and zoom. Falls back to opening the file when the server cannot start. |
+| `codelineage open [dir]` | Builds, then opens the map (or the panel if no dir is given) through the local map server, starting it in the background if it is not running. The open page refreshes itself whenever the map is rebuilt, keeping the selected branch, unfolded branches, scroll and zoom. Falls back to opening the file when the server cannot start. |
 | `codelineage epoch add <id> <title>` | Adds an epoch (locked write) |
 | `codelineage config get/set <key> [value]` | Reads or changes settings |
 | `codelineage config hint-off [dir]` | Stops the SessionStart setup offer in that project ("don't ask again") |

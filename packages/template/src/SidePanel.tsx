@@ -1,18 +1,30 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import type { LineageViewModel, ViewChatTurn, ViewSession } from "../../cli/src/view/model.js";
+import type {
+  LineageViewModel,
+  ViewChatTurn,
+  ViewNode,
+  ViewSession,
+} from "../../cli/src/view/model.js";
 import { resumeCommand } from "../../cli/src/view/resume.js";
 import { formatTime, kindLabel } from "./format.js";
+import { layoutGitGraph } from "./gitLayout.js";
 import {
   messageNeighbors,
   type NodeDetail,
-  nodeId,
+  sessionGroupId,
   sessionId as sessionKey,
   toNodeDetail,
 } from "./graph.js";
 import type { OutlineTarget } from "./Outline.js";
 
-/** What the drill-down shows: a graph node or a whole session. */
-export type Selection = { type: "node"; node: NodeDetail } | { type: "session"; sessionId: string };
+/**
+ * What the drill-down shows: a message (with the branch it belongs to) or a
+ * whole session. Ids, not copies, so a live rebuild does not leave the panel
+ * showing stale text.
+ */
+export type Selection =
+  | { type: "node"; sessionId: string; nodeId: string; branchId?: string | undefined }
+  | { type: "session"; sessionId: string };
 
 function findSession(model: LineageViewModel, sessionId: string): ViewSession | undefined {
   for (const epoch of model.epochs) {
@@ -21,6 +33,10 @@ function findSession(model: LineageViewModel, sessionId: string): ViewSession | 
     }
   }
   return model.unassigned.find((session) => session.sessionId === sessionId);
+}
+
+function findMessage(session: ViewSession, id: string): ViewNode | undefined {
+  return session.messages.find((message) => message.id === id);
 }
 
 /**
@@ -233,25 +249,85 @@ function Conversation({ session, id }: { session: ViewSession | undefined; id: s
   );
 }
 
+/** The branch a message belongs to, so the panel survives prev/next navigation. */
+function branchOf(session: ViewSession, messageId: string): string | undefined {
+  return layoutGitGraph(session.messages).segments.find((segment) =>
+    segment.ids.includes(messageId),
+  )?.id;
+}
+
+/** The branch summary a clicked row opens the panel with (Story 8.2). */
+function BranchDetails({
+  session,
+  branchId,
+}: {
+  session: ViewSession;
+  branchId?: string | undefined;
+}) {
+  if (!branchId) return null;
+  const segment = layoutGitGraph(session.messages).segments.find(
+    (candidate) => candidate.id === branchId,
+  );
+  if (!segment) return null;
+  const { branch } = segment;
+  const span =
+    branch.firstAt && branch.lastAt && branch.firstAt !== branch.lastAt
+      ? ` · ${formatTime(branch.firstAt)} → ${formatTime(branch.lastAt)}`
+      : "";
+  return (
+    <section className="branch-detail">
+      <h3 style={{ color: `var(--l${segment.colorIndex})` }}>{branch.title}</h3>
+      <p className="branch-range">
+        {branch.count > 1 ? `${branch.fromId}–${branch.toId}` : branch.fromId} · {branch.count}{" "}
+        message{branch.count === 1 ? "" : "s"}
+        {span}
+      </p>
+      {branch.asked ? (
+        <p>
+          <b>Asked:</b> {branch.asked}
+        </p>
+      ) : null}
+      {branch.outcome ? (
+        <p>
+          <b>Outcome:</b> {branch.outcome}
+        </p>
+      ) : null}
+      {branch.open ? (
+        <p>
+          <b>Open:</b> {branch.open}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 /** Previous and next message of the session, so the chat can be read in order. */
 function MessageNav({
+  model,
   session,
   node,
   onNavigate,
 }: {
+  model: LineageViewModel;
   session: ViewSession | undefined;
   node: NodeDetail;
   onNavigate: ((target: OutlineTarget) => void) | undefined;
 }) {
   if (!session || !onNavigate || node.kind !== "message") return null;
-  const { previous, next } = messageNeighbors(session.nodes, node.nodeId);
-  const go = (target: typeof previous) =>
+  const { previous, next } = messageNeighbors(session.messages, node.nodeId);
+  const group = sessionGroupId(model, session.sessionId);
+  const go = (target: ViewNode | null) =>
     target
       ? () =>
           onNavigate({
-            focusId: nodeId(sessionKey(session.sessionId), target.id),
-            expand: [],
-            selection: { type: "node", node: toNodeDetail(target, session.sessionId) },
+            focusId: sessionKey(session.sessionId),
+            expand: group ? [group, sessionKey(session.sessionId)] : [],
+            selection: {
+              type: "node",
+              sessionId: session.sessionId,
+              nodeId: target.id,
+              ...(branchOf(session, target.id) ? { branchId: branchOf(session, target.id) } : {}),
+            },
           })
       : undefined;
   return (
@@ -269,16 +345,19 @@ function MessageNav({
 function NodeDetails({
   model,
   node,
+  branchId,
   onNavigate,
 }: {
   model: LineageViewModel;
   node: NodeDetail;
+  branchId?: string | undefined;
   onNavigate: ((target: OutlineTarget) => void) | undefined;
 }) {
   const session = findSession(model, node.sessionId);
   return (
     <>
-      <MessageNav session={session} node={node} onNavigate={onNavigate} />
+      <MessageNav model={model} session={session} node={node} onNavigate={onNavigate} />
+      {session ? <BranchDetails session={session} branchId={branchId} /> : null}
       {node.summary ? (
         <section>
           <h3>Summary</h3>
@@ -450,9 +529,12 @@ export function DrillDown({
     );
   }
 
-  const { node } = selection;
+  const session = findSession(model, selection.sessionId);
+  const message = session ? findMessage(session, selection.nodeId) : undefined;
+  if (!session || !message) return null;
+  const node = toNodeDetail(message, session.sessionId);
   return (
-    <aside className="drilldown" role="dialog" aria-label="Node details">
+    <aside className="drilldown" role="dialog" aria-label="Message details">
       <header className="drilldown-head">
         <div>
           <span className={`kind kind-${node.kind}`}>{kindLabel(node.kind)}</span>
@@ -463,7 +545,12 @@ export function DrillDown({
         </button>
       </header>
       <div className="drilldown-body">
-        <NodeDetails model={model} node={node} onNavigate={onNavigate} />
+        <NodeDetails
+          model={model}
+          node={node}
+          branchId={selection.branchId}
+          onNavigate={onNavigate}
+        />
       </div>
     </aside>
   );

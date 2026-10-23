@@ -1,21 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import type { LineageViewModel, ViewNode, ViewSession } from "../../cli/src/view/model.js";
+import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { kindLabel } from "./format.js";
-import {
-  countNodes,
-  epochId,
-  nodeId,
-  sessionId,
-  toNodeDetail,
-  UNASSIGNED_EPOCH_ID,
-} from "./graph.js";
+import { epochId, nodeId, sessionId, UNASSIGNED_EPOCH_ID } from "./graph.js";
 import type { Selection } from "./SidePanel.js";
 
 /**
- * Experimental outline tree (epoch → session → nodes) that sits next to the
- * graph. Selecting a row expands the graph groups the row lives in, centres the
- * matching React Flow node and opens the same drill-down panel a click would.
- * Epochs have no panel of their own: focusing the group is their detail view.
+ * Experimental outline tree (epoch → session → messages) that sits next to the
+ * map. Selecting a row opens its epoch and session, centres the session's git
+ * graph and opens the same drill-down panel a row click would.
  */
 
 export interface OutlineTarget {
@@ -45,21 +37,10 @@ function groups(model: LineageViewModel): Group[] {
   return result;
 }
 
-/** Ids from the first matching node down to the target, or `null`. */
-function findNodePath(nodes: ViewNode[], group: string, targetId: string): string[] | null {
-  for (const node of nodes) {
-    const id = nodeId(group, node.id);
-    if (id === targetId) return [id];
-    const childPath = findNodePath(node.children, group, targetId);
-    if (childPath) return [id, ...childPath];
-  }
-  return null;
-}
-
 /**
  * Ancestor chain of an outline item, including the item itself: the epoch for a
- * session, the epoch, session and node ancestors for a node. `null` when the id
- * does not belong to this model.
+ * session, the epoch and session for a message. `null` when the id does not
+ * belong to this model.
  */
 export function outlinePath(model: LineageViewModel, targetId: string): string[] | null {
   for (const group of groups(model)) {
@@ -67,8 +48,9 @@ export function outlinePath(model: LineageViewModel, targetId: string): string[]
     for (const session of group.sessions) {
       const key = sessionId(session.sessionId);
       if (key === targetId) return [group.id];
-      const nodePath = findNodePath(session.nodes, key, targetId);
-      if (nodePath) return [group.id, key, ...nodePath];
+      if (session.messages.some((message) => nodeId(key, message.id) === targetId)) {
+        return [group.id, key];
+      }
     }
   }
   return null;
@@ -99,79 +81,6 @@ function ExpandToggle({
   );
 }
 
-function NodeRows({
-  nodes,
-  epoch,
-  sessionKey,
-  rawSessionId,
-  activeId,
-  expanded,
-  onToggle,
-  onSelect,
-}: {
-  nodes: ViewNode[];
-  epoch: string;
-  sessionKey: string;
-  rawSessionId: string;
-  activeId: string | null;
-  expanded: ReadonlySet<string>;
-  onToggle: (id: string) => void;
-  onSelect: (target: OutlineTarget) => void;
-}) {
-  return (
-    <>
-      {nodes.map((node) => {
-        const id = nodeId(sessionKey, node.id);
-        const hasChildren = node.children.length > 0;
-        const open = hasChildren && expanded.has(id);
-        return (
-          <li key={id}>
-            <div className="outline-row">
-              <ExpandToggle
-                id={id}
-                hasChildren={hasChildren}
-                expanded={expanded.has(id)}
-                onToggle={onToggle}
-              />
-              <button
-                type="button"
-                className={`outline-item${activeId === id ? " is-active" : ""}`}
-                onClick={() =>
-                  onSelect({
-                    focusId: id,
-                    expand: [epoch, sessionKey],
-                    selection: {
-                      type: "node",
-                      node: toNodeDetail(node, rawSessionId),
-                    },
-                  })
-                }
-              >
-                <span className={`kind kind-${node.kind}`}>{kindLabel(node.kind)}</span>
-                <span className="label">{node.title}</span>
-              </button>
-            </div>
-            {open ? (
-              <ul>
-                <NodeRows
-                  nodes={node.children}
-                  epoch={epoch}
-                  sessionKey={sessionKey}
-                  rawSessionId={rawSessionId}
-                  activeId={activeId}
-                  expanded={expanded}
-                  onToggle={onToggle}
-                  onSelect={onSelect}
-                />
-              </ul>
-            ) : null}
-          </li>
-        );
-      })}
-    </>
-  );
-}
-
 function SessionRow({
   group,
   session,
@@ -188,7 +97,7 @@ function SessionRow({
   onSelect: (target: OutlineTarget) => void;
 }) {
   const key = sessionId(session.sessionId);
-  const hasChildren = session.nodes.length > 0;
+  const hasChildren = session.messages.length > 0;
   const open = hasChildren && expanded.has(key);
   return (
     <li>
@@ -205,27 +114,45 @@ function SessionRow({
           onClick={() =>
             onSelect({
               focusId: key,
-              expand: [group],
+              expand: [group, key],
               selection: { type: "session", sessionId: session.sessionId },
             })
           }
         >
           <span className="label">{session.title || session.sessionId}</span>
-          <span className="outline-count">{countNodes(session.nodes)}</span>
+          <span className="outline-count">{session.messages.length}</span>
         </button>
       </div>
       {open ? (
         <ul>
-          <NodeRows
-            nodes={session.nodes}
-            epoch={group}
-            sessionKey={key}
-            rawSessionId={session.sessionId}
-            activeId={activeId}
-            expanded={expanded}
-            onToggle={onToggle}
-            onSelect={onSelect}
-          />
+          {session.messages.map((message) => {
+            const id = nodeId(key, message.id);
+            return (
+              <li key={id}>
+                <div className="outline-row">
+                  <span className="outline-toggle is-empty" aria-hidden="true" />
+                  <button
+                    type="button"
+                    className={`outline-item${activeId === id ? " is-active" : ""}`}
+                    onClick={() =>
+                      onSelect({
+                        focusId: id,
+                        expand: [group, key],
+                        selection: {
+                          type: "node",
+                          sessionId: session.sessionId,
+                          nodeId: message.id,
+                        },
+                      })
+                    }
+                  >
+                    <span className={`kind kind-${message.kind}`}>{kindLabel(message.kind)}</span>
+                    <span className="label">{message.title}</span>
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </li>
@@ -244,13 +171,13 @@ export function Outline({
   onClose: () => void;
 }) {
   const allGroups = useMemo(() => groups(model), [model]);
-  // Epochs start open so the tree lists every session; sessions and nodes close
-  // their own children until asked, mirroring the graph's collapsed default.
+  // Epochs start open so the tree lists every session; sessions close their
+  // messages until asked, mirroring the map's collapsed default.
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(allGroups.map((group) => group.id)),
   );
 
-  // Graph clicks drive the highlight too; reveal the row when it is nested.
+  // Map clicks drive the highlight too; reveal the row when it is nested.
   useEffect(() => {
     if (!activeId) return;
     const path = outlinePath(model, activeId);

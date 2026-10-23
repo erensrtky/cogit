@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Lineage records: each message node now hangs from the earlier message it reacts to (or is a new root), with up to five `links` back to other messages and a `branch` summary (title, asked, outcome, open) on the first message of each branch. `session write` moves a parent that is not an earlier message to the previous message and drops links that are not earlier messages, with a warning; `session show` hints each unrecorded message with `gapMinutes`, `resumed` (a `/clear` or a resume in between) and `commitBetween` (a commit this session made), and lists the last recorded messages with their parent.
 
+### Changed
+- The map draws each session as a git graph of the user's messages: one row per message in send order, one coloured lane per branch, a hollow ring and the branch title at a branch's first row, a curve out of the message a branch reacts to, and a dashed return arrow through a channel left of the lanes with "↩ m22" on the row. Long branches fold to first / "⋮ N more" / last with an "Unfold all" toggle, the newest branch starts unfolded and "left off here" marks the newest message. A clicked row opens the branch summary (range, count, time span, asked / outcome / open) above the existing message drill-down, and the map opens framed on the newest message at a readable zoom. Records whose message parents point at topics render as one chain; the old topic layout and its card sizing are removed. Live rebuilds keep the selected branch, unfolded branches, scroll and zoom.
+
 ### Fixed
 - `open` adds an initialized project that is missing from the global registry (for example one set up inside a sandbox with its own home) back before serving it; the local map server only shows registered projects, so such a map returned "not found". When the registry cannot be written, `open` opens the file instead.
 

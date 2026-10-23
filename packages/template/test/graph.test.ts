@@ -1,71 +1,84 @@
 import { describe, expect, it } from "vitest";
-import type { ViewNode } from "../../cli/src/view/model.js";
+import type { LineageViewModel, ViewNode } from "../../cli/src/view/model.js";
 import {
   absolutePosition,
+  layoutGraph,
   messageNeighbors,
-  placeSessionNodes,
-  TREE_LEFT,
+  sessionId,
   toNodeDetail,
 } from "../src/graph.js";
 
-function node(id: string, children: ViewNode[] = []): ViewNode {
-  return { id, kind: "phase", title: id, children };
+const AT = "2026-10-21T10:00:00.000Z";
+
+function message(id: string, at = AT, parent: string | null = null): ViewNode {
+  return { id, kind: "message", title: id, at, parent };
 }
 
-describe("placeSessionNodes", () => {
-  const tree = [node("a", [node("a1"), node("a2", [node("a2x")])]), node("b", [node("b1")])];
-  const { boxes, edges, width, height } = placeSessionNodes(tree, "s");
-  const box = (id: string) => boxes.get(`node:s:${id}`);
+const model: LineageViewModel = {
+  kind: "lineage",
+  schema: 1,
+  project: { name: "p", path: "/tmp/p", generatedAt: AT },
+  status: { goal: "", done: [], pending: [], next: "", lastActivity: null },
+  epochs: [
+    {
+      id: "e1",
+      title: "Epoch one",
+      createdAt: AT,
+      sessions: [
+        {
+          sessionId: "s1",
+          agent: "claude-code",
+          title: "One",
+          epoch: "e1",
+          startedAt: AT,
+          updatedAt: AT,
+          status: { goal: "", done: [], pending: [], next: "" },
+          messages: [message("m1"), message("m2", "2026-10-21T10:01:00.000Z", "m1")],
+          transcriptAvailable: true,
+        },
+        {
+          sessionId: "s2",
+          agent: "claude-code",
+          title: "Two",
+          epoch: "e1",
+          startedAt: "2026-10-20T10:00:00.000Z",
+          updatedAt: "2026-10-20T11:00:00.000Z",
+          status: { goal: "", done: [], pending: [], next: "" },
+          messages: [],
+          transcriptAvailable: true,
+        },
+      ],
+    },
+  ],
+  unassigned: [],
+};
 
-  it("puts top-level topics side by side in one row", () => {
-    expect(box("a")?.y).toBe(box("b")?.y);
-    expect(box("b")?.x).toBeGreaterThan((box("a2x")?.x ?? 0) + (box("a2x")?.width ?? 0));
+describe("layoutGraph", () => {
+  it("gives an open session its git layout and leaves a closed one empty", async () => {
+    const expanded = new Set(["epoch:e1", "session:s1"]);
+    const layout = await layoutGraph(model, expanded);
+    const session = layout.nodes.find((node) => node.id === "session:s1");
+    const closed = layout.nodes.find((node) => node.id === "session:s2");
+    expect(session?.type).toBe("session");
+    if (session?.type === "session") {
+      expect(session.data.git?.rows).toHaveLength(2);
+      expect(session.width).toBeGreaterThanOrEqual(session.data.git?.width ?? 0);
+      expect(session.height).toBeGreaterThan(56);
+    }
+    if (closed?.type === "session") {
+      expect(closed.data.git).toBeUndefined();
+      expect(closed.height).toBe(56);
+    }
   });
 
-  it("lists a topic's items below it in recorded order, indented by depth", () => {
-    const column = ["a", "a1", "a2", "a2x"].map((id) => box(id)?.y ?? -1);
-    expect(column).toEqual([...column].sort((x, y) => x - y));
-    expect(new Set(column).size).toBe(column.length);
-    expect(box("a1")?.x).toBeGreaterThan(box("a")?.x ?? 0);
-    expect(box("a2x")?.x).toBeGreaterThan(box("a2")?.x ?? 0);
-    expect(width).toBeGreaterThan((box("b1")?.x ?? 0) + (box("b1")?.width ?? 0));
-    expect(height).toBeGreaterThan((box("a2x")?.y ?? 0) + (box("a2x")?.height ?? 0));
-  });
-
-  it("hangs items off their parent and never links parallel topics", () => {
-    const link = (from: string, to: string) =>
-      edges.find((e) => e.source === `node:s:${from}` && e.target === `node:s:${to}`);
-    expect(link("a", "a1")?.targetHandle).toBe(TREE_LEFT);
-    expect(link("a2", "a2x")?.targetHandle).toBe(TREE_LEFT);
-    expect(link("a", "b")).toBeUndefined();
-    expect(edges).toHaveLength(4);
-  });
-
-  it("hides the children of a closed topic and narrows its column", () => {
-    const closed = placeSessionNodes(tree, "s", (id) => id !== "node:s:a");
-    expect(closed.boxes.has("node:s:a1")).toBe(false);
-    expect(closed.boxes.has("node:s:b1")).toBe(true);
-    expect(closed.boxes.get("node:s:b")?.x).toBeLessThan(box("b")?.x ?? 0);
-    expect(closed.edges.map((e) => e.target)).toEqual(["node:s:b1"]);
-  });
-
-  it("gives an empty session a minimal box", () => {
-    expect(placeSessionNodes([], "s").boxes.size).toBe(0);
-  });
-
-  it("makes room for the left-off badge on the last touched card", () => {
-    const marked = placeSessionNodes(tree, "s", undefined, new Set(["node:s:a1"]));
-    expect(marked.boxes.get("node:s:a1")?.height).toBeGreaterThan(box("a1")?.height ?? 0);
-  });
-
-  it("makes room for the not-summarized badge, even on the last touched card", () => {
-    const card: ViewNode = { id: "m1", kind: "message", title: "Hi", children: [] };
-    const pending: ViewNode = { ...card, unsummarized: true, at: "2026-10-23T10:00:00.000Z" };
-    const plainHeight = placeSessionNodes([card], "s").boxes.get("node:s:m1")?.height ?? 0;
-    const pendingHeight = placeSessionNodes([pending], "s").boxes.get("node:s:m1")?.height ?? 0;
-    expect(pendingHeight).toBeGreaterThan(plainHeight);
-    const both = placeSessionNodes([pending], "s", undefined, new Set(["node:s:m1"]));
-    expect(both.boxes.get("node:s:m1")?.height).toBeGreaterThan(pendingHeight);
+  it("puts every session of an open epoch under it and emits no message nodes", async () => {
+    const layout = await layoutGraph(model, new Set(["epoch:e1"]));
+    expect(layout.nodes.map((node) => node.type)).toEqual(["epoch", "session", "session"]);
+    expect(
+      layout.nodes
+        .filter((node) => node.type === "session")
+        .every((n) => n.parentId === "epoch:e1"),
+    ).toBe(true);
   });
 });
 
@@ -89,34 +102,32 @@ describe("absolutePosition", () => {
 });
 
 describe("messageNeighbors", () => {
-  const message = (id: string, at?: string): ViewNode => ({
-    id,
-    kind: "message",
-    title: id,
-    children: [],
-    ...(at ? { at } : {}),
-  });
-  const tree: ViewNode[] = [
-    {
-      ...node("a"),
-      children: [message("m3", "2026-01-01T03:00:00Z"), message("m1", "2026-01-01T01:00:00Z")],
-    },
-    { ...node("b"), children: [message("m2", "2026-01-01T02:00:00Z"), message("mx")] },
+  const messages = [
+    message("m1", "2026-01-01T01:00:00Z"),
+    message("m2", "2026-01-01T02:00:00Z"),
+    message("m3", "2026-01-01T03:00:00Z"),
   ];
 
-  it("finds the messages before and after, by send time across topics", () => {
-    const { previous, next } = messageNeighbors(tree, "m2");
+  it("finds the messages before and after in send order", () => {
+    const { previous, next } = messageNeighbors(messages, "m2");
     expect([previous?.id, next?.id]).toEqual(["m1", "m3"]);
-    expect(messageNeighbors(tree, "m3").next).toBeNull();
+    expect(messageNeighbors(messages, "m3").next).toBeNull();
+    expect(messageNeighbors(messages, "m1").previous).toBeNull();
   });
 
-  it("returns nothing for a node that is not a message", () => {
-    expect(messageNeighbors(tree, "a")).toEqual({ previous: null, next: null });
+  it("returns nothing for an id the session does not have", () => {
+    expect(messageNeighbors(messages, "gone")).toEqual({ previous: null, next: null });
   });
 });
 
 describe("toNodeDetail", () => {
   it("keeps the node's own id next to its session", () => {
-    expect(toNodeDetail(node("x"), "s1")).toMatchObject({ nodeId: "x", sessionId: "s1" });
+    expect(toNodeDetail(message("m1"), "s1")).toMatchObject({ nodeId: "m1", sessionId: "s1" });
+  });
+});
+
+describe("sessionId", () => {
+  it("prefixes the React Flow session group id", () => {
+    expect(sessionId("abc")).toBe("session:abc");
   });
 });
