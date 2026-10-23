@@ -573,6 +573,18 @@ describe("codelineage build", () => {
         { id: "m3", text: "Third", replies: [] },
       ],
     });
+
+    // An unreadable transcript falls back to the store instead of a lost chat.
+    await mkdir(transcript);
+    const fourth = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(fourth.epochs[0]?.sessions[0]?.chat?.map((t) => t.text)).toEqual([
+      "First",
+      "Second",
+      "Third",
+    ]);
+    expect(io.warnings).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^could not read the conversation of s1: /)]),
+    );
   });
 
   it("adds the conversation gitignore line once, also in an existing project", async () => {

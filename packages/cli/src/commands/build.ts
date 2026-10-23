@@ -58,9 +58,8 @@ function toViewTurn(turn: ChatTurn, id = turn.id): ViewChatTurn {
  * Reads each session's conversation, preferring the project's own store and
  * reading the transcript only for turns it does not hold yet. New turns are
  * appended to the store, so the drill-down survives Claude Code deleting the
- * transcript; a session whose transcript is already gone still shows what was
- * stored. A transcript that cannot be read leaves that session without a new
- * chat, with a warning (only when it had one to show).
+ * transcript; a session whose transcript is gone (or unreadable) still shows what
+ * was stored. A transcript that cannot be read is a warning, never a lost map.
  */
 async function readTranscriptViews(
   sessions: Session[],
@@ -76,9 +75,8 @@ async function readTranscriptViews(
     const roots = [session.worktree?.path, root].filter((r): r is string => Boolean(r));
     const stored = await readConversationStore(root, session.sessionId);
     const storedByUuid = new Map(stored.map((turn) => [turn.uuid, turn]));
-    let turns: ViewChatTurn[];
+    let transcript: ChatTurn[] | null = null;
     if (file) {
-      let transcript: ChatTurn[];
       try {
         transcript = await readConversation(file);
       } catch (err) {
@@ -86,8 +84,10 @@ async function readTranscriptViews(
           io.warn(
             `could not read the conversation of ${session.sessionId}: ${(err as Error).message}`,
           );
-        continue;
       }
+    }
+    let turns: ViewChatTurn[];
+    if (transcript && transcript.length > 0) {
       const fresh = transcript.filter(
         (turn) => turn.uuid !== undefined && !storedByUuid.has(turn.uuid),
       );
@@ -110,8 +110,8 @@ async function readTranscriptViews(
           : toViewTurn(displayTurn(turn, roots));
       });
     } else {
-      // No transcript: the store is all that is left. The append-only order is
-      // the transcript order, so `m1`, `m2`, … still line up with the records.
+      // No readable transcript: the store is all that is left. Its append-only
+      // order is the transcript order, so `m1`, `m2`, … still line up.
       turns = stored.map((turn, index) => toViewTurn({ ...turn, id: `m${index + 1}` }));
     }
     const recorded = new Set(session.nodes.map((node) => node.id));
