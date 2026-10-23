@@ -10,6 +10,9 @@ export function projectPaths(root: string) {
     project: join(base, "project.json"),
     sessions: join(base, "sessions"),
     session: (id: string) => join(base, "sessions", `${id}.json`),
+    /** The conversation store: what the drill-down needs, outliving the transcript. */
+    conversations: join(base, "conversations"),
+    conversation: (id: string) => join(base, "conversations", `${id}.jsonl.gz`),
     state: (id: string) => join(base, "state", `${id}.json`),
     locks: join(base, "locks"),
     /** Where the skill drops session JSON for `session write --file`. */

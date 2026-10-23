@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildProject, countUnrecorded } from "../src/commands/build.js";
@@ -8,6 +8,7 @@ import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
 import type { LineageNode, Session } from "../src/schema/session.js";
+import { readConversationStore } from "../src/store/conversations.js";
 import { projectPaths } from "../src/store/paths.js";
 import { buildMessages, buildViewModel, embedViewModel, statusCard } from "../src/view/lineage.js";
 import { DATA_ELEMENT_ID } from "../src/view/model.js";
@@ -509,6 +510,118 @@ describe("codelineage build", () => {
       unsummarized: true,
     });
     expect(await readFile(paths().session("s1"), "utf8")).not.toContain("Fix the card");
+  });
+
+  it("keeps the conversation in the project and shows it after the transcript is gone", async () => {
+    const folder = join(dir, "claude", "projects", "-proj");
+    await mkdir(folder, { recursive: true });
+    const userLine = (uuid: string, text: string, at: string) => ({
+      type: "user",
+      uuid,
+      parentUuid: null,
+      timestamp: at,
+      message: { content: text },
+    });
+    const reply = (uuid: string, parent: string, text: string) => ({
+      type: "assistant",
+      uuid,
+      parentUuid: parent,
+      message: { content: [{ type: "text", text }] },
+    });
+    const lines = [
+      userLine("u1", "First", T0),
+      reply("a1", "u1", "Answer one"),
+      userLine("u2", "Second", "2026-10-21T11:00:00.000Z"),
+      reply("a2", "u2", "Answer two"),
+    ];
+    const transcript = join(folder, "s1.jsonl");
+    await writeFile(transcript, lines.map((line) => JSON.stringify(line)).join("\n"));
+    await saveSession(
+      "s1",
+      session({ sessionId: "s1", epoch: "e1", nodes: [node("m1", "message", "First")] }),
+    );
+
+    const first = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(first.epochs[0]?.sessions[0]?.chat?.map((t) => t.id)).toEqual(["m1", "m2"]);
+    expect((await readConversationStore(root, "s1")).map((t) => [t.uuid, t.text])).toEqual([
+      ["u1", "First"],
+      ["u2", "Second"],
+    ]);
+
+    // A later turn is appended to the store, not to a rewritten file.
+    await appendFile(transcript, `\n${JSON.stringify(userLine("u3", "Third", T0))}`);
+    const second = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(second.epochs[0]?.sessions[0]?.chat?.map((t) => t.text)).toEqual([
+      "First",
+      "Second",
+      "Third",
+    ]);
+    expect((await readConversationStore(root, "s1")).map((t) => t.uuid)).toEqual([
+      "u1",
+      "u2",
+      "u3",
+    ]);
+
+    // Claude Code deletes the transcript; the store still feeds the drill-down.
+    await rm(transcript);
+    const third = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(third.epochs[0]?.sessions[0]).toMatchObject({
+      transcriptAvailable: false,
+      chat: [
+        { id: "m1", text: "First", replies: ["Answer one"] },
+        { id: "m2", text: "Second", replies: ["Answer two"] },
+        { id: "m3", text: "Third", replies: [] },
+      ],
+    });
+  });
+
+  it("adds the conversation gitignore line once, also in an existing project", async () => {
+    const ignore = join(paths().base, ".gitignore");
+    // An older project has no inner .gitignore; the next build writes it.
+    await rm(ignore, { force: true });
+    await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(await readFile(ignore, "utf8")).toBe("conversations/\n");
+    await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(await readFile(ignore, "utf8")).toBe("conversations/\n");
+  });
+
+  it("keeps the map when the conversation store cannot be written", async () => {
+    const folder = join(dir, "claude", "projects", "-proj");
+    await mkdir(folder, { recursive: true });
+    await writeFile(
+      join(folder, "s1.jsonl"),
+      JSON.stringify({
+        type: "user",
+        uuid: "u1",
+        timestamp: T0,
+        message: { content: "Hi" },
+      }),
+    );
+    await saveSession(
+      "s1",
+      session({ sessionId: "s1", epoch: "e1", nodes: [node("m1", "message", "Hi")] }),
+    );
+    // A file where the store's directory belongs makes the append fail.
+    await writeFile(paths().conversations, "not a directory");
+
+    const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(model.epochs[0]?.sessions[0]?.chat?.[0]?.text).toBe("Hi");
+    expect(io.warnings).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^could not store the conversation of s1: /)]),
+    );
+  });
+
+  it("warns but still builds when the inner gitignore cannot be written", async () => {
+    const ignore = join(paths().base, ".gitignore");
+    await rm(ignore, { force: true });
+    await mkdir(ignore);
+    const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(model.epochs[0]?.id).toBe("e1");
+    expect(io.warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^could not update \.codelineage\/\.gitignore: /),
+      ]),
+    );
   });
 
   it("shows unrecorded messages as pending cards until the skill writes them", async () => {

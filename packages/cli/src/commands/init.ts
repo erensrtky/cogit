@@ -8,7 +8,12 @@ import {
   SKILL_RULE,
   setRetention,
 } from "../claude-settings.js";
-import { ensureGitignore, findGitRoot, type GitPolicy } from "../git.js";
+import {
+  ensureConversationGitignore,
+  ensureGitignore,
+  findGitRoot,
+  type GitPolicy,
+} from "../git.js";
 import { CliError, type Io } from "../io.js";
 import { readJson } from "../store/fs.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
@@ -166,8 +171,14 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
 
   await updateProject(root, (cur) => cur ?? { schema: 1, name, epochs: [] });
   await mkdir(projectPaths(root).sessions, { recursive: true });
+  await bestEffort(io, "could not write .codelineage/.gitignore", () =>
+    ensureConversationGitignore(root),
+  );
   await register(io, root, name);
 
+  io.out(
+    "Conversations are stored in .codelineage/conversations/ (kept out of git, even with the commit policy).",
+  );
   io.out(`Initialized ${name} in ${projectPaths(root).base}`);
   io.out("Next: install the Claude Code plugin, then run `codelineage open` after a session.");
 }

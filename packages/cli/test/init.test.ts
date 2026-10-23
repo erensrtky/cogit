@@ -9,7 +9,7 @@ import {
   setRetention,
 } from "../src/claude-settings.js";
 import { init } from "../src/commands/init.js";
-import { ensureGitignore, findGitRoot } from "../src/git.js";
+import { ensureConversationGitignore, ensureGitignore, findGitRoot } from "../src/git.js";
 import { loadConfig, loadProject, loadRegistry } from "../src/store/stores.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
@@ -41,6 +41,18 @@ describe("init", () => {
     expect(io.asked).toHaveLength(4);
     expect(await readSkillAllowed(env)).toBe(true);
     expect(io.lines.at(-2)).toMatch(/^Initialized proj/);
+    // The conversation store stays out of git even when records are committed.
+    expect(await readText(join(root, ".codelineage", ".gitignore"))).toBe("conversations/\n");
+    expect(io.lines).toContain(
+      "Conversations are stored in .codelineage/conversations/ (kept out of git, even with the commit policy).",
+    );
+  });
+
+  it("adds the conversation ignore line once", async () => {
+    await mkdir(join(root, ".codelineage"));
+    expect(await ensureConversationGitignore(root)).toBe(true);
+    expect(await ensureConversationGitignore(root)).toBe(false);
+    expect(await readText(join(root, ".codelineage", ".gitignore"))).toBe("conversations/\n");
   });
 
   it("asks nothing when every answer is given as an option", async () => {

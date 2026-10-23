@@ -47,6 +47,11 @@ describe("messageText", () => {
     ["shell input", user("<bash-input>ls</bash-input>")],
     ["shell output", user("<bash-stdout>x</bash-stdout><bash-stderr></bash-stderr>")],
     ["local command output", user("<local-command-stdout>Bye</local-command-stdout>")],
+    ["an interrupt notice", user("[Request interrupted by user]")],
+    [
+      "an interrupt notice for a tool use",
+      user([{ type: "text", text: "[Request interrupted by user for tool use]" }]),
+    ],
     ["a slash command without arguments", user("<command-name>/exit</command-name>")],
     ["empty text", user("   ")],
     ["content of another shape", user({ text: "x" })],
@@ -62,6 +67,7 @@ describe("readUserMessages", () => {
     const lines = [
       JSON.stringify(user("first", {}, 1)),
       JSON.stringify({ type: "assistant", timestamp: at(2), message: { content: [] } }),
+      JSON.stringify(user("[Request interrupted by user for tool use]", {}, 3)),
       JSON.stringify(user([{ type: "tool_result", content: "x" }], {}, 3)),
       '{"type":"user", broken',
       JSON.stringify(user("second", {}, 4)),

@@ -49,6 +49,8 @@ const NOT_A_MESSAGE =
   /^\s*<(bash-input|bash-stdout|bash-stderr|local-command-[a-z]+|command-message)>/;
 const COMMAND = /^\s*<command-name>([^<]*)<\/command-name>/;
 const COMMAND_ARGS = /<command-args>([\s\S]*?)<\/command-args>/;
+/** Claude Code's own note that the user stopped a turn; the user typed nothing. */
+const INTERRUPTED = /^\s*\[Request interrupted\b[^\]]*\]\s*$/;
 
 /**
  * The text of a user line when it is a message the user typed, else null. Tool
@@ -76,6 +78,7 @@ export function messageText(line: Record<string, unknown>): string | null {
     return null;
   }
   if (NOT_A_MESSAGE.test(text)) return null;
+  if (INTERRUPTED.test(text)) return null;
   const command = COMMAND.exec(text);
   if (command) {
     const args = COMMAND_ARGS.exec(text)?.[1]?.trim() ?? "";
@@ -96,6 +99,8 @@ export interface ToolUse {
 
 /** One user message and what the agent wrote back before the next one. */
 export interface ChatTurn extends UserMessage {
+  /** The transcript's uuid for the user line; the key of the conversation store. */
+  uuid?: string;
   /** The agent's written replies, in order; tool output never appears here. */
   replies: string[];
   tools: ToolUse;
@@ -219,6 +224,7 @@ export async function readConversation(file: string): Promise<ChatTurn[]> {
       id: `m${turns.length + 1}`,
       at: line.timestamp,
       text,
+      ...(uuid === undefined ? {} : { uuid }),
       replies: [],
       tools: { commands: 0, files: [], other: 0 },
       ...(!first && pendingResume ? { resumed: true } : {}),

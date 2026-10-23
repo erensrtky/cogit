@@ -44,3 +44,18 @@ export async function ensureGitignore(root: string, policy: GitPolicy): Promise<
   await atomicWrite(file, `${text}${sep}${block}\n`);
   return missing;
 }
+
+/**
+ * `.codelineage/.gitignore` keeps the conversation store out of git, even when
+ * the user chose to commit `.codelineage/`: the raw chat stays on this machine.
+ * Returns true when the line had to be added; a second call changes nothing.
+ */
+export async function ensureConversationGitignore(root: string): Promise<boolean> {
+  const file = join(root, ".codelineage", ".gitignore");
+  const text = await readFile(file, "utf8").catch(() => "");
+  const present = new Set(text.split(/\r?\n/).map((l) => l.trim()));
+  if (present.has("conversations/")) return false;
+  const sep = text === "" || text.endsWith("\n") ? "" : "\n";
+  await atomicWrite(file, `${text}${sep}conversations/\n`);
+  return true;
+}

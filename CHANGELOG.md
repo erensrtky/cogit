@@ -6,8 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The conversation store: `build` appends what the drill-down needs for turns not stored yet to `.codelineage/conversations/<sessionId>.jsonl.gz` (one gzip member per append, redacted with the same secret net as the page), reads it before the transcript, and keeps showing a session's conversation after Claude Code deletes the transcript. `init` writes `.codelineage/.gitignore` with `conversations/` even when `.codelineage/` is committed, an existing project gets the line on its next build, and the README explains where the raw chat lives.
+
 ### Fixed
 - Map: long message titles and branch labels in the git graph wrap onto more lines (the row grows) instead of being cut with an ellipsis; a not-yet-summarized message shows up to 200 characters of its text instead of 80.
+- Transcript: `[Request interrupted by user]` and `[Request interrupted by user for tool use]` lines are Claude Code's own notes, not user messages; they no longer become message nodes.
 
 ## [0.7.0] - 2026-10-23
 ### Added

@@ -1,6 +1,8 @@
+import { ensureConversationGitignore } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import { redactDeep } from "../redact.js";
 import type { Session } from "../schema/session.js";
+import { appendConversationTurns, readConversationStore } from "../store/conversations.js";
 import { atomicWrite } from "../store/fs.js";
 import { withLock } from "../store/lock.js";
 import { projectPaths } from "../store/paths.js";
@@ -14,7 +16,7 @@ import {
   readUserMessages,
 } from "../transcript.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
-import type { LineageViewModel, ViewPendingMessage } from "../view/model.js";
+import type { LineageViewModel, ViewChatTurn, ViewPendingMessage } from "../view/model.js";
 import { buildPanel } from "../view/panel.js";
 import { TEMPLATE_HTML } from "../view/template.js";
 import { collectTranscripts } from "../view/transcripts.js";
@@ -36,14 +38,29 @@ export interface TranscriptViews {
    * The conversation of every session that shows messages, recorded or not. It
    * goes into the page only, never into a session file.
    */
-  chats: Map<string, ChatTurn[]>;
+  chats: Map<string, ViewChatTurn[]>;
   /** User messages with no node yet, per session, titled for the map. */
   pending: Map<string, ViewPendingMessage[]>;
 }
 
+/** Drops the fields only the drill-down needs (uuid, hints) and keeps the contract. */
+function toViewTurn(turn: ChatTurn, id = turn.id): ViewChatTurn {
+  return {
+    id,
+    at: turn.at,
+    text: turn.text,
+    replies: turn.replies,
+    tools: turn.tools,
+  };
+}
+
 /**
- * Reads each session's transcript once. A transcript that cannot be read leaves
- * that session without a chat, with a warning (only when it had one to show).
+ * Reads each session's conversation, preferring the project's own store and
+ * reading the transcript only for turns it does not hold yet. New turns are
+ * appended to the store, so the drill-down survives Claude Code deleting the
+ * transcript; a session whose transcript is already gone still shows what was
+ * stored. A transcript that cannot be read leaves that session without a new
+ * chat, with a warning (only when it had one to show).
  */
 async function readTranscriptViews(
   sessions: Session[],
@@ -51,26 +68,54 @@ async function readTranscriptViews(
   root: string,
   io: Io,
 ): Promise<TranscriptViews> {
-  const chats = new Map<string, ChatTurn[]>();
+  const chats = new Map<string, ViewChatTurn[]>();
   const pending = new Map<string, ViewPendingMessage[]>();
   for (const session of sessions) {
     const file = transcripts.get(session.sessionId);
-    if (!file) continue;
     const recordsMessages = session.nodes.some((node) => node.kind === "message");
-    let turns: ChatTurn[];
-    try {
-      turns = await readConversation(file);
-    } catch (err) {
-      if (recordsMessages)
-        io.warn(
-          `could not read the conversation of ${session.sessionId}: ${(err as Error).message}`,
-        );
-      continue;
-    }
     const roots = [session.worktree?.path, root].filter((r): r is string => Boolean(r));
-    const displayed = turns.map((turn) => displayTurn(turn, roots));
+    const stored = await readConversationStore(root, session.sessionId);
+    const storedByUuid = new Map(stored.map((turn) => [turn.uuid, turn]));
+    let turns: ViewChatTurn[];
+    if (file) {
+      let transcript: ChatTurn[];
+      try {
+        transcript = await readConversation(file);
+      } catch (err) {
+        if (recordsMessages)
+          io.warn(
+            `could not read the conversation of ${session.sessionId}: ${(err as Error).message}`,
+          );
+        continue;
+      }
+      const fresh = transcript.filter(
+        (turn) => turn.uuid !== undefined && !storedByUuid.has(turn.uuid),
+      );
+      if (fresh.length > 0) {
+        const displayed = fresh.map((turn) => displayTurn(turn, roots));
+        try {
+          await appendConversationTurns(root, session.sessionId, displayed);
+        } catch (err) {
+          // Losing the transcript is a real risk, but a failed append must never
+          // fail the map: the page still shows this build's conversation.
+          io.warn(
+            `could not store the conversation of ${session.sessionId}: ${(err as Error).message}`,
+          );
+        }
+      }
+      turns = transcript.map((turn) => {
+        const kept = turn.uuid === undefined ? undefined : storedByUuid.get(turn.uuid);
+        return kept
+          ? { id: turn.id, at: kept.at, text: kept.text, replies: kept.replies, tools: kept.tools }
+          : toViewTurn(displayTurn(turn, roots));
+      });
+    } else {
+      // No transcript: the store is all that is left. The append-only order is
+      // the transcript order, so `m1`, `m2`, … still line up with the records.
+      turns = stored.map((turn, index) => toViewTurn({ ...turn, id: `m${index + 1}` }));
+    }
     const recorded = new Set(session.nodes.map((node) => node.id));
-    const missing = displayed.filter((turn) => !recorded.has(turn.id));
+    const missing = turns.filter((turn) => !recorded.has(turn.id));
     if (missing.length > 0) {
       pending.set(
         session.sessionId,
@@ -81,7 +126,7 @@ async function readTranscriptViews(
         })),
       );
     }
-    if (recordsMessages || missing.length > 0) chats.set(session.sessionId, displayed);
+    if (recordsMessages || missing.length > 0) chats.set(session.sessionId, turns);
   }
   return { chats, pending };
 }
@@ -127,6 +172,13 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   for (const warning of project.warnings) io.warn(warning);
 
   const paths = projectPaths(root);
+  // Projects initialized before the conversation store get the privacy line on
+  // their next build; an unwritable record must never fail the map.
+  try {
+    await ensureConversationGitignore(root);
+  } catch (err) {
+    io.warn(`could not update .codelineage/.gitignore: ${(err as Error).message}`);
+  }
   // The Stop hook skips a turn while this lock is held, and a second build waits
   // for the first instead of interleaving reads and writes of the same files.
   const model = await withLock(
