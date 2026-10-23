@@ -1,8 +1,8 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { z } from "zod";
 import { Slug } from "../schema/common.js";
 import { projectPaths } from "../store/paths.js";
+import { resolveProjectRoot } from "../store/root.js";
 import { onStop } from "./stop.js";
 
 /** The common fields of a Claude Code hook input we rely on. */
@@ -16,7 +16,7 @@ export type HookInput = z.infer<typeof HookInput>;
 export interface HookContext {
   input: HookInput;
   sessionId: string;
-  /** The project root: `CLAUDE_PROJECT_DIR`, else the hook's `cwd`. */
+  /** Where `.codelineage/` lives: `CLAUDE_PROJECT_DIR`, else the hook's `cwd`, mapped out of a worktree. */
   root: string;
   env: NodeJS.ProcessEnv;
   now: string;
@@ -48,7 +48,8 @@ export async function runHook(
     if (!handler) return undefined;
     const input = HookInput.parse(JSON.parse(stdin));
     if (!Slug.safeParse(input.session_id).success) return undefined;
-    const root = resolve(env.CLAUDE_PROJECT_DIR ?? input.cwd ?? ".");
+    // In a linked worktree both point at the worktree; the record lives in the main checkout.
+    const { root } = await resolveProjectRoot(env.CLAUDE_PROJECT_DIR ?? input.cwd ?? ".");
     // Before `init` every hook is a no-op; projects are never registered here.
     if (!existsSync(projectPaths(root).project)) return undefined;
     const out = await handler({ input, sessionId: input.session_id, root, env, now });

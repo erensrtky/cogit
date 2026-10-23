@@ -246,6 +246,18 @@ Settings in `config.json`: `language`, `updateEveryTurns`, `sessionEndCatchUp`,
   the same session; the session lock plus read → merge → write keeps both changes.
 - **`~/.config/codelineage` not writable** (containers, CI, read-only home): registry
   and panel updates are skipped with a warning; project-local writes still work.
+- **Session in a linked git worktree** (`claude -w`, `.claude/worktrees/<name>/`): hook
+  `cwd` and `CLAUDE_PROJECT_DIR` both point at the worktree (verified 2026-10-23,
+  Claude Code 2.1.300). With `gitPolicy=ignore` the worktree has no `.codelineage/`, so
+  hooks and every `-C`/`[dir]` command map the worktree to the main checkout by reading
+  files only (`.git` → `gitdir` → `commondir`), the way Claude Code itself keeps
+  worktree state in the main checkout. With `gitPolicy=commit` the worktree has its own
+  copy and keeps it. The CLI stamps `worktree: {path, branch}` on the session, and the
+  drill-down shows it. `session show` returns the worktree as `dir`, the main checkout
+  as `store`, and an inbox under the worktree, so the skill's edit permission still
+  matches. `claude --resume <id>` run from the main checkout re-enters the worktree, so
+  the resume command stays the same. `.worktreeinclude` is not used: copying live
+  records into a worktree would fork them and lose them when the worktree is removed.
 
 ## Tech stack
 

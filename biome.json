@@ -1,7 +1,15 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
-    "includes": ["packages/**", "*.json", "*.ts", "!**/dist", "!**/coverage", "!**/*.md"]
+    "includes": [
+      "packages/**",
+      "*.json",
+      "*.ts",
+      "!**/dist",
+      "!**/coverage",
+      "!**/*.md",
+      "!!**/.claude"
+    ]
   },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "linter": { "rules": { "preset": "none" } }

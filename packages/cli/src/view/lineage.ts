@@ -159,6 +159,7 @@ function toViewSession(session: Session, transcripts?: ReadonlySet<string>): Vie
     // Undefined means the caller did not ask (fixtures, unit tests); then the
     // record is shown as resumable rather than pretending the transcript is gone.
     transcriptAvailable: transcripts === undefined ? true : transcripts.has(session.sessionId),
+    ...(session.worktree ? { worktree: session.worktree } : {}),
   };
 }
 

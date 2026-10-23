@@ -1,8 +1,8 @@
-import { resolve } from "node:path";
 import { CliError, type Io } from "../io.js";
 import { redactDeep } from "../redact.js";
 import { atomicWrite } from "../store/fs.js";
 import { projectPaths } from "../store/paths.js";
+import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadProject } from "../store/stores.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
 import type { LineageViewModel } from "../view/model.js";
@@ -26,7 +26,7 @@ export interface BuildOptions {
  */
 export async function buildProject(opts: BuildOptions): Promise<LineageViewModel> {
   const { io } = opts;
-  const root = resolve(opts.dir);
+  const { root } = await resolveProjectRoot(opts.dir);
   const project = await loadProject(root);
   if (!project.found)
     throw new CliError(`${root} is not initialized; run \`codelineage init\` first`);

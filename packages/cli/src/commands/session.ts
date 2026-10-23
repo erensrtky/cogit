@@ -6,6 +6,7 @@ import { Slug } from "../schema/common.js";
 import { mergeSession } from "../schema/merge.js";
 import { SessionInput } from "../schema/session.js";
 import { projectPaths } from "../store/paths.js";
+import { resolveProjectRoot } from "../store/root.js";
 import { loadConfig, loadProject, loadSession, updateSession } from "../store/stores.js";
 import { buildProject } from "./build.js";
 
@@ -32,7 +33,7 @@ export async function sessionWrite(
   io: Io,
   stdin: () => Promise<string> = readStdin,
 ): Promise<void> {
-  const root = resolve(opts.dir);
+  const { root, worktree } = await resolveProjectRoot(opts.dir);
   const project = await loadProject(root);
   if (!project.found)
     throw new CliError(`${root} is not initialized; run \`codelineage init\` first`);
@@ -65,7 +66,8 @@ export async function sessionWrite(
   const saved = await updateSession(root, input.sessionId, (cur) => {
     const merged = mergeSession(cur, input, io.now());
     warnings = merged.warnings;
-    return merged.session;
+    // A write from the main checkout (e.g. after a resume) keeps the stored worktree.
+    return worktree ? { ...merged.session, worktree } : merged.session;
   });
   for (const w of warnings) io.warn(w);
   if (opts.file && opts.consume) await rm(opts.file, { force: true });
@@ -85,14 +87,23 @@ export async function sessionWrite(
  * parents, kinds and titles, without summaries, which merging keeps anyway).
  * Always exits 0 for an uninitialized project or an unreadable record, because a
  * failing injected command aborts the whole skill; the JSON says what is wrong.
+ *
+ * `dir` is the directory the agent passes back to later commands; in a linked
+ * worktree that is the worktree, so writes still learn which worktree they came
+ * from, while `store` names the main checkout that holds the record. The inbox
+ * stays under `dir`, where the skill's edit permission points.
  */
 export async function sessionShow(dir: string, sessionId: string, io: Io): Promise<void> {
   if (!Slug.safeParse(sessionId).success) throw new CliError(`invalid session id: ${sessionId}`);
-  const root = resolve(dir);
+  const given = resolve(dir);
+  const { root } = await resolveProjectRoot(given);
+  const store = root === given ? {} : { store: root };
   const project = await loadProject(root);
   if (!project.found || !project.ok) {
     const error = project.found && !project.ok ? project.error : undefined;
-    io.out(JSON.stringify({ initialized: false, dir: root, ...(error ? { error } : {}) }));
+    io.out(
+      JSON.stringify({ initialized: false, dir: given, ...store, ...(error ? { error } : {}) }),
+    );
     return;
   }
 
@@ -100,7 +111,8 @@ export async function sessionShow(dir: string, sessionId: string, io: Io): Promi
   const loaded = await loadSession(root, sessionId);
   const view: Record<string, unknown> = {
     initialized: true,
-    dir: root,
+    dir: given,
+    ...store,
     project: project.data.name,
     language: config.language,
     epochs: project.data.epochs.map(({ id, title }) => ({ id, title })),
@@ -118,6 +130,6 @@ export async function sessionShow(dir: string, sessionId: string, io: Io): Promi
   } else if (loaded.found) {
     view.sessionError = loaded.error;
   }
-  view.inbox = projectPaths(root).inbox(sessionId);
+  view.inbox = projectPaths(given).inbox(sessionId);
   io.out(JSON.stringify(view, null, 2));
 }

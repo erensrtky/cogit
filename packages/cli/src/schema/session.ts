@@ -61,6 +61,8 @@ export const Session = z.object({
   updatedAt: IsoDate,
   status: Status.default({ goal: "", done: [], pending: [], next: "" }),
   nodes: z.array(LineageNode).default([]),
+  /** The linked git worktree the session ran in; set by the CLI, never by the agent. */
+  worktree: z.object({ path: z.string().min(1), branch: z.string().min(1).nullable() }).optional(),
 });
 
 /** In input, a missing parent keeps the stored one (null for a new node). */

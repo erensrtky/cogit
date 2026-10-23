@@ -61,6 +61,8 @@ export interface ViewSession {
   nodes: ViewNode[];
   /** False when the Claude Code transcript is gone, so resume cannot work. */
   transcriptAvailable: boolean;
+  /** The linked git worktree the session ran in, if any. */
+  worktree?: { path: string; branch: string | null };
 }
 
 export interface ViewEpoch {

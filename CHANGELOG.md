@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Git worktree support: a Claude Code session in a linked worktree (`claude -w`) now records into the main checkout's `.codelineage/` when it is git-ignored (a worktree with its own committed copy keeps it), found by reading `.git` files without running git. Hooks, `session write/show`, `epoch add`, `build` and `open` all resolve it; the session keeps the worktree path and branch, and the map's drill-down shows them.
 - Decision detail in the record and the map: nodes take `decidedBy` (`user`, `agent` or `agreed`), `alternatives` (options considered and rejected, with the reason), `commits` and `files`; decision cards show their reason and a short line such as "agreed · 1 commit · 2 options rejected", and the drill-down panel lists the rejected options, the commits and files, who decided, and when the node was recorded and last changed. The `/codelineage:lineage` skill asks the agent to fill them in.
 - Map shows where the work left off: `session write` now stamps each node it adds or changes (`touchedAt`, set by the CLI and never taken from agent input), and the map opens the branches down to the nodes the last write of the latest session added or changed, marks each "left off here" and frames that session.
 - Claude Code plugin skeleton: the `codelineage` npm package is also the plugin (`.claude-plugin/plugin.json`, bundled `dist/cli.js`), and the repository root carries a `codelineage` marketplace that installs it from npm.

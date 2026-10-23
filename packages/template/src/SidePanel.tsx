@@ -111,6 +111,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+/** Where a session ran when it was not the main checkout. */
+function WorktreeField({ session }: { session: ViewSession }) {
+  const { worktree } = session;
+  if (!worktree) return null;
+  return (
+    <Field label="Worktree">
+      {worktree.branch ?? "detached HEAD"} <code>{worktree.path}</code>
+    </Field>
+  );
+}
+
 function SessionSummary({ model, session }: { model: LineageViewModel; session: ViewSession }) {
   return (
     <>
@@ -121,6 +132,7 @@ function SessionSummary({ model, session }: { model: LineageViewModel; session: 
         </Field>
         <Field label="Started">{formatTime(session.startedAt)}</Field>
         <Field label="Updated">{formatTime(session.updatedAt)}</Field>
+        <WorktreeField session={session} />
       </dl>
       <ResumeRow model={model} session={session} />
     </>
@@ -202,6 +214,7 @@ function NodeDetails({ model, node }: { model: LineageViewModel; node: NodeDetai
           <>
             <Field label="Session started">{formatTime(session.startedAt)}</Field>
             <Field label="Session updated">{formatTime(session.updatedAt)}</Field>
+            <WorktreeField session={session} />
           </>
         ) : null}
       </dl>

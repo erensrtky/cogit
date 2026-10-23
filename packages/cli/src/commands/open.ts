@@ -1,7 +1,7 @@
 import { type SpawnOptions, spawn } from "node:child_process";
-import { resolve } from "node:path";
 import type { Io } from "../io.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
+import { resolveProjectRoot } from "../store/root.js";
 import { buildPanel } from "../view/panel.js";
 import { buildProject } from "./build.js";
 
@@ -68,7 +68,7 @@ async function openFile(file: string, opts: OpenOptions): Promise<void> {
 /** Rebuilds the map, then hands `lineage.html` to the OS opener. */
 export async function openProject(opts: OpenProjectOptions): Promise<void> {
   const { io } = opts;
-  const root = resolve(opts.dir);
+  const { root } = await resolveProjectRoot(opts.dir);
   await buildProject({
     dir: root,
     io,

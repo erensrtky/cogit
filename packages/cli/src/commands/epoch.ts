@@ -1,10 +1,10 @@
-import { resolve } from "node:path";
 import { CliError, type Io } from "../io.js";
 import { Slug } from "../schema/common.js";
+import { resolveProjectRoot } from "../store/root.js";
 import { loadProject, updateProject } from "../store/stores.js";
 
 export async function epochAdd(dir: string, id: string, title: string, io: Io): Promise<void> {
-  const root = resolve(dir);
+  const { root } = await resolveProjectRoot(dir);
   if (!Slug.safeParse(id).success) {
     throw new CliError(`invalid epoch id "${id}": use letters, digits, _ . -`);
   }
