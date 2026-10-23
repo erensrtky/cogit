@@ -23,7 +23,7 @@ export default defineConfig({
     globalSetup: ["./packages/cli/test/global-setup.ts"],
     coverage: {
       provider: "v8",
-      include: ["packages/*/src/**"],
+      include: ["packages/*/src/**", "scripts/**"],
       exclude: ["packages/cli/src/cli.ts"],
       reporter: ["text-summary", "lcov"],
     },

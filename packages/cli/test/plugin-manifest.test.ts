@@ -10,6 +10,9 @@ describe("plugin packaging", () => {
     const plugin = await read("../.claude-plugin/plugin.json");
     // An npm-sourced plugin without a version resolves to "unknown" and never updates.
     expect(plugin.version).toBe(pkg.version);
+    // VERSION is the source; `npm run build` copies it (scripts/sync-version.mjs).
+    const version = (await readFile(new URL("../../../VERSION", import.meta.url), "utf8")).trim();
+    expect(pkg.version, "run npm run build to sync VERSION").toBe(version);
     expect(plugin.name).toBe(pkg.name);
     expect(pkg.files).toEqual(
       expect.arrayContaining(["dist", ".claude-plugin", "skills", "hooks"]),

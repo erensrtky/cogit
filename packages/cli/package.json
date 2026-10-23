@@ -1,6 +1,6 @@
 {
   "name": "codelineage",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "The lineage of your AI coding sessions.",
   "license": "MIT",
   "type": "module",
@@ -17,7 +17,9 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "build": "tsup"
+    "prebuild": "node ../../scripts/sync-version.mjs",
+    "build": "tsup",
+    "prepack": "node ../../scripts/sync-version.mjs"
   },
   "devDependencies": {
     "@inquirer/prompts": "^8.7.4",

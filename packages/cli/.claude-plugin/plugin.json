@@ -1,9 +1,11 @@
 {
   "name": "codelineage",
   "displayName": "codelineage",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "The lineage of your AI coding sessions: records what each session decided and why, and renders it as a static map.",
-  "author": { "name": "Eren Sertkaya" },
+  "author": {
+    "name": "Eren Sertkaya"
+  },
   "license": "MIT",
   "keywords": ["lineage", "sessions", "history", "decisions"]
 }
