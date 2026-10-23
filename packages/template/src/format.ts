@@ -13,3 +13,8 @@ export function formatDate(iso: string | null): string {
     ? iso
     : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
+
+/** Phases are shown as topics: the map groups a session by what the work is about. */
+export function kindLabel(kind: string): string {
+  return kind === "phase" ? "topic" : kind;
+}

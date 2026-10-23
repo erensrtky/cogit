@@ -455,6 +455,10 @@ body:has(.map-shell.is-expanded) {
   text-overflow: ellipsis;
 }
 
+.lineage-box p.lineage-count {
+  color: var(--accent);
+}
+
 .lineage-box time {
   display: block;
   margin-top: 1px;

@@ -23,7 +23,7 @@ import {
   useState,
 } from "react";
 import type { LineageViewModel } from "../../cli/src/view/model.js";
-import { formatDate, formatTime } from "./format.js";
+import { formatDate, formatTime, kindLabel } from "./format.js";
 import { useFullscreen } from "./fullscreen.js";
 import {
   defaultExpanded,
@@ -34,9 +34,8 @@ import {
   type SessionFlowNode,
   TREE_LEFT,
   TREE_OUT,
-  TREE_TOP,
 } from "./graph.js";
-import { Outline, type OutlineTarget } from "./Outline.js";
+import { Outline, type OutlineTarget, outlinePath } from "./Outline.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
 
 /** Toggle callback reaches the group headers without threading props through React Flow. */
@@ -67,17 +66,10 @@ function GroupToggle({
   );
 }
 
-/** Spine handles for the top-to-bottom outline inside a session (see placeSessionNodes). */
+/** Spine handles for the outline inside a topic column (see placeSessionNodes). */
 function TreeHandles() {
   return (
     <>
-      <Handle
-        id={TREE_TOP}
-        type="target"
-        position={Position.Top}
-        className="flow-handle tree-handle"
-        isConnectable={false}
-      />
       <Handle
         id={TREE_LEFT}
         type="target"
@@ -142,15 +134,20 @@ function SessionNode({ id, data }: NodeProps<SessionFlowNode>) {
   );
 }
 
-function LineageBox({ data }: NodeProps<LineageFlowNode>) {
+function LineageBox({ id, data }: NodeProps<LineageFlowNode>) {
   return (
     <div className={`lineage-box kind-${data.kind}`}>
       <TreeHandles />
       <div className="lineage-head">
-        <span className={`kind kind-${data.kind}`}>{data.kind}</span>
+        {data.hasChildren ? <GroupToggle id={id} data={data} /> : null}
+        <span className={`kind kind-${data.kind}`}>{kindLabel(data.kind)}</span>
         <strong title={data.title}>{data.title}</strong>
       </div>
-      {data.at ? (
+      {data.hasChildren && !data.expanded ? (
+        <p className="lineage-count">
+          {data.count} item{data.count === 1 ? "" : "s"} inside
+        </p>
+      ) : data.at ? (
         <time dateTime={data.at}>{formatTime(data.at)}</time>
       ) : data.summary ? (
         <p title={data.summary}>{data.summary}</p>
@@ -282,10 +279,12 @@ function Flow({ model }: { model: LineageViewModel }) {
    */
   const selectFromOutline = useCallback(
     (target: OutlineTarget) => {
-      const needsLayout = target.expand.some((id) => !expanded.has(id));
+      // Open every layer above the target, including topics it is nested in.
+      const reveal = [...target.expand, ...(outlinePath(model, target.focusId) ?? []).slice(0, -1)];
+      const needsLayout = reveal.some((id) => !expanded.has(id));
       setExpanded((previous) => {
         const next = new Set(previous);
-        for (const id of target.expand) next.add(id);
+        for (const id of reveal) next.add(id);
         return next;
       });
       setSelection(target.selection);
@@ -298,7 +297,7 @@ function Flow({ model }: { model: LineageViewModel }) {
         scheduleFocus(target.focusId);
       }
     },
-    [expanded, scheduleFocus],
+    [expanded, model, scheduleFocus],
   );
 
   let content: ReactNode;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatTime } from "../src/format.js";
+import { formatDate, formatTime, kindLabel } from "../src/format.js";
 
 describe("format", () => {
   it("shows a placeholder for a missing time and an unparseable value as-is", () => {
@@ -17,5 +17,12 @@ describe("format", () => {
     });
     expect(formatDate(iso)).toBe(expected);
     expect(formatDate(iso)).not.toContain(":");
+  });
+});
+
+describe("kindLabel", () => {
+  it("shows phases as topics and keeps the other kinds", () => {
+    expect(kindLabel("phase")).toBe("topic");
+    expect(kindLabel("decision")).toBe("decision");
   });
 });

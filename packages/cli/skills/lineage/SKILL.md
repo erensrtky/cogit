@@ -36,14 +36,30 @@ Build one JSON object:
   - `pending`: `{ "text": "…", "needsUser": true }` for anything waiting on the
     user, and `needsUser: false` for work that is simply not done yet.
   - `next`: the next concrete step.
-- `nodes`: only new nodes, or existing ones whose title, summary or reason
-  changed. Nodes you leave out are kept, and so are fields you leave out.
+- `nodes`: only new nodes, or existing ones whose title, summary, reason or
+  parent changed. Nodes you leave out are kept, and so are fields you leave out.
   - `id`: a short, stable slug. Reuse an existing id to change that node.
-  - `kind`: `phase` (a stretch of work), `step` (a concrete action within a
-    phase), `decision` (a choice that was made, with the reason in `why`) or
-    `question` (an open question).
-  - `parent`: the id of the phase the node belongs to, or `null` for a phase.
+  - `kind`: `phase` (a topic), `step` (a concrete action), `decision` (a choice
+    that was made, with the reason in `why`) or `question` (an open question).
+  - `parent`: the id of the topic the node belongs to, or `null` for a
+    top-level topic.
   - `title`: up to about ten words. `summary` and `why`: one or two sentences.
+
+## Organize the nodes by topic, not by time
+
+The map opens like layers of an onion: first the session's top-level topics,
+then a click reveals what is inside each one. Order within a layer is the order
+in which things were added, so time is kept inside every topic.
+
+- A topic (`phase`) names what the work is about, such as "Permissions" or "Map
+  layout", never when it happened ("First part", "Open decisions").
+- Put each new step, decision or question under the topic it belongs to. Open
+  a sub-topic (a `phase` whose parent is a topic) once a topic holds several
+  distinct threads; nest as deep as the work needs.
+- Reuse an existing topic before creating a new one. If an earlier node sits
+  under the wrong topic, send it again (with its `kind` and `title`) and the
+  right `parent`.
+- Keep the top level short: a handful of topics per session.
 
 Write titles and text in the conversation's language when `language` is `"auto"`,
 and in that language otherwise. JSON keys stay in English.

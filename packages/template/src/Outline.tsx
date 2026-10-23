@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LineageViewModel, ViewNode, ViewSession } from "../../cli/src/view/model.js";
+import { kindLabel } from "./format.js";
 import { countNodes, epochId, nodeId, sessionId, UNASSIGNED_EPOCH_ID } from "./graph.js";
 import type { Selection } from "./SidePanel.js";
 
@@ -146,7 +147,7 @@ function NodeRows({
                   })
                 }
               >
-                <span className={`kind kind-${node.kind}`}>{node.kind}</span>
+                <span className={`kind kind-${node.kind}`}>{kindLabel(node.kind)}</span>
                 <span className="label">{node.title}</span>
               </button>
             </div>

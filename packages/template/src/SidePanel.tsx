@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { resumeCommand } from "../../cli/src/view/resume.js";
-import { formatTime } from "./format.js";
+import { formatTime, kindLabel } from "./format.js";
 import type { LineageData } from "./graph.js";
 
+/** What the drill-down shows of a node; the expand state stays in the graph. */
+export type NodeDetail = Omit<LineageData, "count" | "expanded" | "hasChildren">;
+
 /** What the drill-down shows: a graph node or a whole session. */
-export type Selection =
-  | { type: "node"; node: LineageData }
-  | { type: "session"; sessionId: string };
+export type Selection = { type: "node"; node: NodeDetail } | { type: "session"; sessionId: string };
 
 function findSession(model: LineageViewModel, sessionId: string): ViewSession | undefined {
   for (const epoch of model.epochs) {
@@ -129,7 +130,7 @@ function SessionSummary({ model, session }: { model: LineageViewModel; session: 
   );
 }
 
-function NodeDetails({ model, node }: { model: LineageViewModel; node: LineageData }) {
+function NodeDetails({ model, node }: { model: LineageViewModel; node: NodeDetail }) {
   const session = findSession(model, node.sessionId);
   return (
     <>
@@ -231,7 +232,7 @@ export function DrillDown({
     <aside className="drilldown" role="dialog" aria-label="Node details">
       <header className="drilldown-head">
         <div>
-          <span className={`kind kind-${node.kind}`}>{node.kind}</span>
+          <span className={`kind kind-${node.kind}`}>{kindLabel(node.kind)}</span>
           <h2>{node.title}</h2>
         </div>
         <button type="button" className="drilldown-close" aria-label="Close" onClick={onClose}>
