@@ -745,6 +745,34 @@ time {
   cursor: default;
 }
 
+/* The message's stable hash, ready to paste to the agent (Story 8.10). */
+.message-hash {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.message-hash code {
+  font-size: 12px;
+}
+
+.message-hash button {
+  padding: 3px 8px;
+  color: var(--text);
+  background: #243040;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.message-hash button:hover {
+  border-color: var(--accent);
+}
+
 .chat-entry {
   margin-top: 8px;
   padding: 8px 10px;

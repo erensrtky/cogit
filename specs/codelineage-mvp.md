@@ -129,6 +129,11 @@ first message of a branch, written when the branch ends rather than every turn.
 `decidedBy` is `user | agent | agreed`. `addedAt` (first write) and `touchedAt`
 (last change) are stamped by `session write` and never taken from agent input; a
 resent node that changed nothing keeps its `touchedAt`. Epochs live in `project.json`.
+A message's stable id is `h` plus the first 12 hex of a SHA-256 over the session
+id, transcript uuid, time and text; `m1`, `m2`, … stay as display labels. A parent
+is not part of the hash, so correcting it never renames a message (unlike git, on
+purpose). `codelineage show` accepts the hash, any unique prefix of at least six
+hex characters after the `h`, or `<session-id-prefix>:mN`.
 The agent picks an existing epoch or adds one through the CLI (`codelineage epoch add`),
 which does a locked, atomic write.
 
@@ -242,6 +247,8 @@ Each update costs agent tokens (the user's subscription or API usage).
 | `codelineage build [dir]` | Regenerates `lineage.html` and `panel.html` |
 | `codelineage open [dir]` | Builds, then opens the map (or the panel if no dir is given) through the local map server, starting it in the background if it is not running. The open page refreshes itself whenever the map is rebuilt, keeping the selected branch, unfolded branches, scroll and zoom. Falls back to opening the file when the server cannot start. |
 | `codelineage blame <file>[:<line>]` | Follows git blame (or `git log` for a whole file) back to the messages whose record lists those commits; prints each commit, session, message, summary and the map URL that opens that message. Says so plainly when no record knows the code. |
+| `codelineage log [dir]` | Prints the lineage like `git log --graph --oneline`, newest first: per message its short hash, `mN`, time, title, `↩` returns and commit tags, a branch's first message with the branch title, and a header line per session (title, epoch, time span). `--session <id\|prefix>` narrows to one session, `-n <count>` limits the messages, `--branches` prints only the branch summaries (title, asked, outcome, open — the compressed view), and `--json` prints the model. Plain text; no colour when not a TTY. |
+| `codelineage show <ref> [dir]` | Prints one message: hash, `mN`, session, time, parent and children (as refs), `links`, the branch it belongs to with that branch's summary, decisions (`decidedBy`, `why`, `alternatives`), agent decisions, work, commits with their git subjects, files, then its conversation turn from the store (`--no-chat` skips it; `--json` prints the model). A `<ref>` is a message hash or any unique prefix of at least six hex characters after the `h`, or `<session-id-prefix>:mN`; an ambiguous prefix lists the candidates and exits non-zero, an unknown one says so plainly. |
 | `codelineage epoch add <id> <title>` | Adds an epoch (locked write) |
 | `codelineage config get/set <key> [value]` | Reads or changes settings |
 | `codelineage config hint-off [dir]` | Stops the SessionStart setup offer in that project ("don't ask again") |

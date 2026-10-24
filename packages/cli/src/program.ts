@@ -12,6 +12,7 @@ import {
 } from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
 import { type InitOptions, init } from "./commands/init.js";
+import { formatShow, log, show } from "./commands/log.js";
 import { migrateIds } from "./commands/migrate.js";
 import { openPanel, openProject } from "./commands/open.js";
 import { readStdin, sessionShow, sessionWrite } from "./commands/session.js";
@@ -36,6 +37,14 @@ function retention(value: string): number | "keep" {
   const days = Number(value);
   if (!Number.isInteger(days) || days < 1) throw new InvalidArgumentError("days (>= 1) or keep");
   return days;
+}
+
+/** `-n` for `log`: a positive whole number, or Commander's error message. */
+export function positiveCount(value: string): number {
+  const count = Number(value);
+  if (!Number.isInteger(count) || count < 1)
+    throw new InvalidArgumentError("a positive whole number");
+  return count;
 }
 
 export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps = {}): Command {
@@ -97,6 +106,48 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .action(
       run(async (target: string, opts: { dir: string }) => {
         await blame({ dir: opts.dir, target, io: makeIo(false) });
+      }),
+    );
+
+  program
+    .command("log")
+    .description("print the recorded lineage, newest first")
+    .argument("[dir]", "project directory", ".")
+    .option("--session <id>", "only this session (id or prefix)")
+    .option("-n, --number <count>", "at most this many messages", positiveCount)
+    .option("--branches", "only the branch summaries (the compressed view)")
+    .option("--json", "print JSON instead of text")
+    .action(
+      run(
+        async (
+          dir: string,
+          opts: { session?: string; number?: number; branches?: boolean; json?: boolean },
+        ) => {
+          await log({
+            dir,
+            io: makeIo(false),
+            session: opts.session,
+            limit: opts.number,
+            branchesOnly: opts.branches === true,
+            json: opts.json === true,
+          });
+        },
+      ),
+    );
+
+  program
+    .command("show")
+    .description("print one recorded message by hash or <session-id>:mN")
+    .argument("<ref>", "message hash or <session-id-prefix>:mN")
+    .argument("[dir]", "project directory", ".")
+    .option("--no-chat", "leave out the conversation turn")
+    .option("--json", "print JSON instead of text")
+    .action(
+      run(async (ref: string, dir: string, opts: { chat?: boolean; json?: boolean }) => {
+        const io = makeIo(false);
+        const model = await show({ dir, ref, io, chat: opts.chat !== false });
+        if (opts.json === true) io.out(JSON.stringify(model, null, 2));
+        else for (const line of formatShow(model)) io.out(line);
       }),
     );
 

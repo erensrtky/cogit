@@ -9,10 +9,12 @@ import { resumeCommand } from "../../cli/src/view/resume.js";
 import { formatTime, kindLabel } from "./format.js";
 import { layoutGitGraph } from "./gitLayout.js";
 import {
+  isMessageHash,
   nodeId as messageKey,
   messageNeighbors,
   type NodeDetail,
   sessionId as sessionKey,
+  shortHash,
   toNodeDetail,
 } from "./graph.js";
 import type { OutlineTarget } from "./Outline.js";
@@ -72,6 +74,49 @@ export async function copyText(text: string): Promise<boolean> {
 }
 
 type CopyState = "idle" | "copied" | "failed";
+
+/**
+ * The message's stable hash with a copy button (Story 8.10): the user pastes it
+ * to the agent, which runs `codelineage show <hash>` for the full record.
+ */
+function MessageHash({ value }: { value: string }) {
+  const [state, setState] = useState<CopyState>("idle");
+  const code = useRef<HTMLElement>(null);
+  const title = `Ask your agent: codelineage show ${value}`;
+
+  const copy = (): void => {
+    setState("idle");
+    void copyText(value).then((ok) => {
+      if (ok) {
+        setState("copied");
+        return;
+      }
+      // Last resort, as for the resume command: select the hash for Ctrl+C.
+      const element = code.current;
+      if (element) {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
+      setState("failed");
+    });
+  };
+
+  return (
+    <div className="message-hash" title={title}>
+      <code ref={code}>{shortHash(value)}</code>
+      <button type="button" onClick={copy}>
+        Copy hash
+      </button>
+      {state === "copied" ? <span className="muted">Copied.</span> : null}
+      {state === "failed" ? (
+        <span className="muted">Copy failed — press Ctrl+C to copy.</span>
+      ) : null}
+    </div>
+  );
+}
 
 function ResumeRow({ model, session }: { model: LineageViewModel; session: ViewSession }) {
   const [state, setState] = useState<CopyState>("idle");
@@ -354,6 +399,9 @@ function NodeDetails({
   return (
     <>
       <MessageNav session={session} node={node} onNavigate={onNavigate} />
+      {node.kind === "message" && isMessageHash(node.nodeId) ? (
+        <MessageHash value={node.nodeId} />
+      ) : null}
       {session ? <BranchDetails session={session} branchId={branchId} /> : null}
       {node.summary ? (
         <section>

@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `codelineage log [dir]` prints the recorded lineage like `git log --graph --oneline`, newest first: per message its short hash, `mN`, time, title, `↩` returns and commit tags, a branch's first message with the branch title, and a header line per session (title, epoch, time span). `--session <id|prefix>` narrows to one session, `-n <count>` limits the messages, `--branches` prints only the branch summaries (title, asked, outcome, open) and `--json` prints the model. `codelineage show <ref> [dir]` prints one message — session, time, parent and children as refs, returns, the branch it sits in with that branch's summary, decisions, agent decisions, work, commits with their git subjects, files and its stored conversation turn (`--no-chat` skips it, `--json` prints the model) — and takes a message hash, a unique prefix of at least six hex characters after the `h`, or `<session-id-prefix>:mN`; an ambiguous prefix lists the candidates and exits non-zero. The map's drill-down shows the message's short hash with a copy button ("Ask your agent: codelineage show <hash>").
 
 ## [0.8.0] - 2026-10-24
 ### Added

@@ -68,6 +68,16 @@ export function sessionId(id: string): string {
   return `session:${id}`;
 }
 
+/** A stable message id (Story 8.5): `h` plus 12 hex. Older records stay `m1`. */
+export function isMessageHash(id: string): boolean {
+  return /^h[0-9a-f]{12}$/.test(id);
+}
+
+/** `h3f2a1b8`: what the panel shows and `codelineage show` accepts. */
+export function shortHash(id: string): string {
+  return isMessageHash(id) ? id.slice(0, 8) : id;
+}
+
 /** Outline group key of an epoch; epochs are only tags on the map now. */
 export function epochId(id: string): string {
   return `epoch:${id}`;
