@@ -20,6 +20,14 @@ export const LIVE_META_NAME = "codelineage-live";
 /** Version of the serialized view model (not the session schema). */
 export const VIEW_SCHEMA = 1;
 
+/** A code commit a message carries, with the subject read from git at build time. */
+export interface ViewCommit {
+  /** The hash as the record holds it (short or full). */
+  hash: string;
+  /** The commit's subject; absent when git no longer knows the commit. */
+  subject?: string;
+}
+
 export interface ViewNode {
   /** Stable id (`h…`); the key of the node, never shown to the user. */
   id: string;
@@ -49,6 +57,11 @@ export interface ViewNode {
   decidedBy?: "user" | "agent" | "agreed";
   alternatives?: { option: string; why: string }[];
   commits?: string[];
+  /**
+   * `commits` with their subjects (Story 8.8); the map draws them as small tag
+   * chips. A tag without a subject is a commit git no longer has, drawn greyed.
+   */
+  commitTags?: ViewCommit[];
   files?: string[];
   /** For a message: what the agent did about it. */
   work?: string[];

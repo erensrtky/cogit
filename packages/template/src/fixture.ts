@@ -84,6 +84,11 @@ export const fixture: LineageViewModel = {
             }),
             message("m4", "Build the dev fixture", "m3", "2026-10-24T09:41:00.000Z", {
               summary: "Two epochs, three sessions, one unassigned.",
+              commits: ["1a2b3c4", "9f8e7d6"],
+              commitTags: [
+                { hash: "1a2b3c4", subject: "feat(template): add the dev fixture" },
+                { hash: "9f8e7d6" },
+              ],
             }),
             message("m5", "Check the page in the browser", "m4", "2026-10-24T10:02:00.000Z", {
               summary: "Layout measured; console clean.",

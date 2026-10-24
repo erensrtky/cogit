@@ -1,6 +1,7 @@
 import { Command, InvalidArgumentError, Option } from "commander";
 import pkg from "../package.json" with { type: "json" };
 import { backfillTail } from "./commands/backfill.js";
+import { blame } from "./commands/blame.js";
 import { buildProject } from "./commands/build.js";
 import {
   configGet,
@@ -85,6 +86,17 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .action(
       run(async (dir: string, opts: { quiet?: boolean }) => {
         await buildProject({ dir, io: makeIo(false), quiet: opts.quiet === true });
+      }),
+    );
+
+  program
+    .command("blame")
+    .description("show which recorded messages produced the code in a file or line")
+    .argument("<target>", "file, or file:line")
+    .option("-C, --dir <dir>", "project directory", ".")
+    .action(
+      run(async (target: string, opts: { dir: string }) => {
+        await blame({ dir: opts.dir, target, io: makeIo(false) });
       }),
     );
 

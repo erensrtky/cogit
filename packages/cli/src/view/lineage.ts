@@ -23,6 +23,7 @@ import {
 export function buildMessages(
   nodes: LineageNode[],
   pending: ViewPendingMessage[] = [],
+  commitSubjects?: ReadonlyMap<string, string>,
 ): ViewNode[] {
   const recorded = nodes.filter((node) => node.kind === "message");
   // One row per message in send order; unrecorded messages are part of the same
@@ -101,6 +102,14 @@ export function buildMessages(
         ...(node.decidedBy === undefined ? {} : { decidedBy: node.decidedBy }),
         ...(node.alternatives?.length ? { alternatives: node.alternatives } : {}),
         ...(node.commits?.length ? { commits: node.commits } : {}),
+        ...(node.commits?.length
+          ? {
+              commitTags: node.commits.map((hash) => {
+                const subject = commitSubjects?.get(hash);
+                return subject === undefined ? { hash } : { hash, subject };
+              }),
+            }
+          : {}),
         ...(node.files?.length ? { files: node.files } : {}),
         ...(node.work?.length ? { work: node.work } : {}),
         ...(node.agentDecisions?.length ? { agentDecisions: node.agentDecisions } : {}),
@@ -186,6 +195,7 @@ function toViewSession(
   chat?: ViewChatTurn[],
   unrecorded?: number,
   pending?: ViewPendingMessage[],
+  commitSubjects?: ReadonlyMap<string, string>,
 ): ViewSession {
   return {
     sessionId: session.sessionId,
@@ -195,7 +205,7 @@ function toViewSession(
     startedAt: session.startedAt,
     updatedAt: session.updatedAt,
     status: session.status,
-    messages: buildMessages(session.nodes, pending),
+    messages: buildMessages(session.nodes, pending, commitSubjects),
     // Undefined means the caller did not ask (fixtures, unit tests); then the
     // record is shown as resumable rather than pretending the transcript is gone.
     transcriptAvailable: transcripts === undefined ? true : transcripts.has(session.sessionId),
@@ -224,6 +234,8 @@ export interface ViewModelInput {
   unrecorded?: ReadonlyMap<string, number> | undefined;
   /** User messages with no node yet, drawn as not-yet-summarized cards. */
   pending?: ReadonlyMap<string, ViewPendingMessage[]> | undefined;
+  /** Commit subjects read from git at build time (Story 8.8). */
+  commitSubjects?: ReadonlyMap<string, string> | undefined;
 }
 
 /**
@@ -274,6 +286,7 @@ export function buildViewModel(input: ViewModelInput): LineageViewModel {
       input.chats?.get(session.sessionId),
       input.unrecorded?.get(session.sessionId),
       input.pending?.get(session.sessionId),
+      input.commitSubjects,
     );
     const bucket = session.epoch === null ? undefined : buckets.get(session.epoch);
     (bucket ?? unassigned).push(view);

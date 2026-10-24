@@ -16,6 +16,7 @@ export type NodeDetail = {
   decidedBy?: ViewNode["decidedBy"];
   alternatives?: ViewNode["alternatives"];
   commits?: string[];
+  commitTags?: ViewNode["commitTags"];
   files?: string[];
   work?: ViewNode["work"];
   agentDecisions?: ViewNode["agentDecisions"];

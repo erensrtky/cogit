@@ -418,9 +418,20 @@ function NodeDetails({
           <h3>In the code</h3>
           {node.commits?.length ? (
             <p className="drilldown-code">
-              {node.commits.map((commit) => (
-                <code key={commit}>{commit}</code>
-              ))}
+              {node.commits.map((commit) => {
+                const tag = node.commitTags?.find((candidate) => candidate.hash === commit);
+                const missing = node.commitTags !== undefined && tag?.subject === undefined;
+                return (
+                  <code
+                    key={commit}
+                    className={missing ? "is-missing" : undefined}
+                    title={missing ? "commit not in this repository" : undefined}
+                  >
+                    {commit}
+                    {tag?.subject === undefined ? "" : ` ${tag.subject}`}
+                  </code>
+                );
+              })}
             </p>
           ) : null}
           {node.files?.length ? (

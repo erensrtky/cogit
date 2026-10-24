@@ -165,6 +165,34 @@ describe("rows", () => {
     expect(layout.height).toBe(ROW_HEIGHT / 2 + first!.height + second!.height + third!.height);
   });
 
+  it("carries a message's commits as tag chips, marking one git no longer knows", () => {
+    const { messageRows } = rowsOf([
+      message("m1", null, {
+        commitTags: [
+          { hash: "abc1234", subject: "feat(map): draw commit tags" },
+          { hash: "deadbee" },
+        ],
+      }),
+      message("m2", "m1"),
+    ]);
+    expect(messageRows[0]?.tags).toEqual([
+      {
+        hash: "abc1234",
+        short: "abc1234",
+        subject: "feat(map): draw commit tags",
+        missing: false,
+      },
+      { hash: "deadbee", short: "deadbee", missing: true },
+    ]);
+    expect(messageRows[1]?.tags).toEqual([]);
+
+    // A hand-written model with only bare hashes still gets chips, all greyed.
+    const bare = rowsOf([message("m1", null, { commits: ["fedcba9"] })]);
+    expect(bare.messageRows[0]?.tags).toEqual([
+      { hash: "fedcba9", short: "fedcba9", missing: true },
+    ]);
+  });
+
   it("marks the newest message as HEAD unless told otherwise", () => {
     const messages = [message("m1", null), message("m2", "m1"), message("m3", "m2")];
     const rows = layoutGitGraph(messages).rows.filter(

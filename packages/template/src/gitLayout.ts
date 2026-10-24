@@ -27,6 +27,8 @@ export interface GitNode {
   links?: string[] | undefined;
   branch?: ViewNode["branch"];
   continues?: ViewNode["continues"];
+  commits?: string[] | undefined;
+  commitTags?: ViewNode["commitTags"];
   unsummarized?: true | undefined;
   /**
    * When the item stops occupying its lane, as a timestamp. Session level only:
@@ -89,6 +91,40 @@ export interface GitSegment {
   parentY: number | null;
 }
 
+/** One commit chip on a message row (Story 8.8). */
+export interface GitCommitTag {
+  /** The hash as the record holds it; a stable key. */
+  hash: string;
+  /** The short hash the chip shows. */
+  short: string;
+  /** The commit's subject, when git still knows the commit. */
+  subject?: string;
+  /** True when git no longer knows the commit: the chip is drawn greyed. */
+  missing: boolean;
+}
+
+/** The message's commits as chips, from the build's subjects or the bare hashes. */
+function tagsOf(message: GitNode): GitCommitTag[] {
+  const tags: GitCommitTag[] =
+    message.commitTags && message.commitTags.length > 0
+      ? message.commitTags.map((commit) =>
+          commit.subject === undefined
+            ? { hash: commit.hash, short: commit.hash.slice(0, 7), missing: true }
+            : {
+                hash: commit.hash,
+                short: commit.hash.slice(0, 7),
+                subject: commit.subject,
+                missing: false,
+              },
+        )
+      : (message.commits ?? []).map((hash) => ({
+          hash,
+          short: hash.slice(0, 7),
+          missing: true,
+        }));
+  return tags;
+}
+
 export interface GitReturn {
   /** The older message this row returns to. */
   id: string;
@@ -109,6 +145,8 @@ export interface GitMessageRow {
   /** A new root starts here, with a gap above it. */
   gap: boolean;
   returns: GitReturn[];
+  /** Code commits the record lists for this message; empty for most rows. */
+  tags: GitCommitTag[];
   /** "left off here": the newest message or session. */
   head: boolean;
   /** Row height: titles wrap instead of being cut, so long ones get taller rows. */
@@ -206,7 +244,7 @@ const ROW_FIXED = 106;
  */
 export function rowHeight(
   message: GitNode,
-  row: { first: boolean; branchTitle: string; returns: number; head: boolean },
+  row: { first: boolean; branchTitle: string; returns: number; tags: number; head: boolean },
   rowWidth = ROW_WIDTH,
 ): number {
   const fixed =
@@ -214,6 +252,7 @@ export function rowHeight(
     (message.label ?? message.id).length * 7 +
     (row.first ? BRANCH_MAX + 8 : 0) +
     row.returns * 44 +
+    row.tags * 62 +
     (row.head ? 92 : 0) +
     (message.unsummarized ? 116 : 0) +
     // The "↑ continues <session> · m67" mark sits in the row, next to the title.
@@ -381,6 +420,7 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
             first: row.segment.ids[0] === message.id,
             branchTitle: row.segment.branch.title,
             returns: (message.links ?? []).filter((id) => segOf.has(id)).length,
+            tags: tagsOf(message).length,
             head: message.id === headId,
           },
           rowWidth,
@@ -484,6 +524,7 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
       first: row.segment.ids[0] === message.id,
       gap: row.gap,
       returns,
+      tags: tagsOf(message),
       head: message.id === headId,
       height: row.height,
     };

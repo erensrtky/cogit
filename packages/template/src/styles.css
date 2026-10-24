@@ -519,6 +519,12 @@ body:has(.map-shell.is-expanded) {
   gap: 6px;
 }
 
+/* A commit git no longer has stays listed, greyed (Story 8.8). */
+.drilldown-code code.is-missing {
+  color: #5f6675;
+  border-style: dashed;
+}
+
 .drilldown-meta {
   display: grid;
   gap: 8px;
@@ -877,6 +883,36 @@ time {
   flex: none;
   gap: 4px;
   font-size: 11px;
+}
+
+/* Commit tags on a message row (Story 8.8): a short hash, greyed when git no
+   longer knows the commit. */
+.git-tags {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.git-tag {
+  padding: 0 4px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  line-height: 15px;
+  background: #1c222e;
+  border: 1px solid #323b4d;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.git-tag:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.git-tag.is-missing {
+  color: #5f6675;
+  border-style: dashed;
 }
 
 /* "↑ continues <session> · m67": a jump to the earlier session's message. */

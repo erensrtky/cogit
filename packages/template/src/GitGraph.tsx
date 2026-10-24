@@ -103,6 +103,28 @@ function Row({
       ) : null}
       <span className="git-id">{message.label ?? message.id}</span>
       <span className="git-title">{message.title}</span>
+      {row.tags.length > 0 ? (
+        <span className="git-tags">
+          {row.tags.map((tag) => (
+            // A span, not a button: the whole row is already a button.
+            <span
+              key={tag.hash}
+              className={`git-tag${tag.missing ? " is-missing" : ""}`}
+              title={
+                tag.missing
+                  ? `commit ${tag.short} is not in this repository`
+                  : `${tag.short} ${tag.subject ?? ""}`
+              }
+              onClick={(event: MouseEvent) => {
+                event.stopPropagation();
+                onSelect(row);
+              }}
+            >
+              {tag.short}
+            </span>
+          ))}
+        </span>
+      ) : null}
       {message.continues ? (
         <span
           className="git-continues"

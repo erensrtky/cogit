@@ -38,8 +38,13 @@ these records into static HTML:
   left out and tool use counted), previous/next message buttons, and a
   `claude --resume <id>` copy button. `build` reads the conversation from the
   transcript into `lineage.html` only (never committed, see Privacy); session
-  files never hold raw text. Records from before messages carried message
-  parents (their `parent` is a topic or step) render as one chain in send order.
+  files never hold raw text. A message whose record lists commits shows them as
+  small tag chips with the commit subject read from git at build time; a commit
+  git no longer has stays listed and is drawn greyed. `codelineage blame
+  <file>[:<line>]` follows git blame (or every commit that touched the file)
+  back to the messages that recorded those commits, and prints the map URL that
+  opens each message. Records from before messages carried message parents
+  (their `parent` is a topic or step) render as one chain in send order.
 - **Status card** at the top of every project: goal, done, pending (flags items
   waiting on the user), next step, last activity. With parallel sessions, goal and
   next come from the most recently updated session; `needsUser` items are merged
@@ -234,6 +239,7 @@ Each update costs agent tokens (the user's subscription or API usage).
 | `codelineage init` | Creates `.codelineage/`, registers the project, asks the install questions |
 | `codelineage build [dir]` | Regenerates `lineage.html` and `panel.html` |
 | `codelineage open [dir]` | Builds, then opens the map (or the panel if no dir is given) through the local map server, starting it in the background if it is not running. The open page refreshes itself whenever the map is rebuilt, keeping the selected branch, unfolded branches, scroll and zoom. Falls back to opening the file when the server cannot start. |
+| `codelineage blame <file>[:<line>]` | Follows git blame (or `git log` for a whole file) back to the messages whose record lists those commits; prints each commit, session, message, summary and the map URL that opens that message. Says so plainly when no record knows the code. |
 | `codelineage epoch add <id> <title>` | Adds an epoch (locked write) |
 | `codelineage config get/set <key> [value]` | Reads or changes settings |
 | `codelineage config hint-off [dir]` | Stops the SessionStart setup offer in that project ("don't ask again") |

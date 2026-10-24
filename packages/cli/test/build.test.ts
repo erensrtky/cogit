@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { gzipSync } from "node:zlib";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildProject } from "../src/commands/build.js";
@@ -15,6 +17,8 @@ import { projectPaths } from "../src/store/paths.js";
 import { buildMessages, buildViewModel, embedViewModel, statusCard } from "../src/view/lineage.js";
 import { DATA_ELEMENT_ID } from "../src/view/model.js";
 import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
+
+const run = promisify(execFile);
 
 const TEMPLATE = `<!doctype html><html><body><div id="root"></div>
     <script id="${DATA_ELEMENT_ID}" type="application/json"></script></body></html>`;
@@ -553,6 +557,46 @@ describe("codelineage build", () => {
       unsummarized: true,
     });
     expect(await readFile(paths().session("s1"), "utf8")).not.toContain("Fix the card");
+  });
+
+  it("reads commit subjects from git for the map and greys a hash git no longer has", async () => {
+    const git = (...args: string[]) => run("git", ["-C", root, ...args]);
+    await git("init", "-q");
+    await git("config", "user.email", "t@example.com");
+    await git("config", "user.name", "T");
+    await writeFile(join(root, "a.txt"), "one\n");
+    await git("add", "a.txt");
+    await git("commit", "-q", "-m", "feat: first commit");
+    const short = (await git("rev-parse", "--short", "HEAD")).stdout.trim();
+    await saveSession(
+      "s1",
+      session({
+        sessionId: "s1",
+        epoch: "e1",
+        nodes: [node("m1", "message", "Ship it", null, { commits: [short] })],
+      }),
+    );
+
+    const first = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(first.epochs[0]?.sessions[0]?.messages[0]?.commitTags).toEqual([
+      { hash: short, subject: "feat: first commit" },
+    ]);
+
+    // One hash git does not know makes the batched lookup fail; the per-hash
+    // fallback still keeps the commit it can read.
+    await saveSession(
+      "s1",
+      session({
+        sessionId: "s1",
+        epoch: "e1",
+        nodes: [node("m1", "message", "Ship it", null, { commits: [short, "0000000"] })],
+      }),
+    );
+    const second = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(second.epochs[0]?.sessions[0]?.messages[0]?.commitTags).toEqual([
+      { hash: short, subject: "feat: first commit" },
+      { hash: "0000000" },
+    ]);
   });
 
   it("keeps the conversation in the project and shows it after the transcript is gone", async () => {

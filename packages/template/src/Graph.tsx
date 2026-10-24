@@ -85,6 +85,24 @@ const nodeTypes: NodeTypes = {
   messages: MessagesBox,
 };
 
+/**
+ * The message a `#s=<sessionId>&m=<messageId>` URL asks for (Story 8.8:
+ * `codelineage blame` prints such a URL). The session opens and the message's
+ * drill-down is shown; a message id the record no longer holds opens the session.
+ */
+function readTarget(model: LineageViewModel): { sessionId: string; messageId?: string } | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const sessionId = params.get("s");
+  if (sessionId === null || sessionId === "") return null;
+  const session = findSession(model, sessionId);
+  if (session === undefined) return null;
+  const messageId = params.get("m");
+  if (messageId !== null && session.messages.some((message) => message.id === messageId))
+    return { sessionId, messageId };
+  return { sessionId };
+}
+
 function findSession(model: LineageViewModel, id: string): ViewSession | undefined {
   for (const epoch of model.epochs) {
     const session = epoch.sessions.find((candidate) => candidate.sessionId === id);
@@ -94,35 +112,69 @@ function findSession(model: LineageViewModel, id: string): ViewSession | undefin
 }
 
 function Flow({ model }: { model: LineageViewModel }) {
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [selection, setSelection] = useState<Selection | null>(null);
+  // Read once: a live data swap must not move the page back to the hash target.
+  const [initial] = useState(() => readTarget(model));
+  const [openId, setOpenId] = useState<string | null>(initial?.sessionId ?? null);
+  const [selection, setSelection] = useState<Selection | null>(() => {
+    if (initial === null) return null;
+    if (initial.messageId === undefined) return { type: "session", sessionId: initial.sessionId };
+    return { type: "node", sessionId: initial.sessionId, nodeId: initial.messageId };
+  });
   const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
   const [openAll, setOpenAll] = useState(false);
   const [showOutline, setShowOutline] = useState(false);
   const { expanded: fullscreen, toggle: toggleFullscreen } = useFullscreen();
-  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [focusedId, setFocusedId] = useState<string | null>(() => {
+    if (initial === null) return null;
+    if (initial.messageId === undefined) return `session:${initial.sessionId}`;
+    return `node:session:${initial.sessionId}:${initial.messageId}`;
+  });
 
   const openSession = openId === null ? undefined : findSession(model, openId);
   const head = headOf(model);
   const sessionGraph = useMemo(() => layoutSessionGraph(model), [model]);
 
+  /** The open drill-down's message, when it belongs to the open session. */
+  const targetId =
+    selection?.type === "node" && selection.sessionId === openSession?.sessionId
+      ? selection.nodeId
+      : null;
+
   const messageGit = useMemo(() => {
     if (!openSession) return null;
-    return layoutGitGraph(openSession.messages, {
+    const options = {
       unfolded,
       openAll,
       headId: head?.sessionId === openSession.sessionId ? head.messageId : null,
-    });
-  }, [openSession, head?.sessionId, head?.messageId, unfolded, openAll]);
+    };
+    const layout = layoutGitGraph(openSession.messages, options);
+    if (targetId === null) return layout;
+    const visible = layout.rows.some(
+      (row) => row.kind === "message" && row.message.id === targetId,
+    );
+    if (visible) return layout;
+    // A deep link (`blame` prints one) may point inside a folded branch: open it
+    // rather than letting the page land on a row the user cannot see.
+    const segment = layout.segments.find((candidate) => candidate.ids.includes(targetId));
+    return segment === undefined
+      ? layout
+      : layoutGitGraph(openSession.messages, {
+          ...options,
+          unfolded: new Set([...unfolded, segment.id]),
+        });
+  }, [openSession, head?.sessionId, head?.messageId, unfolded, openAll, targetId]);
 
-  /** Row the view centres on when a session opens: its newest message (HEAD). */
+  /** Row the view centres on when a session opens: the open message, else HEAD. */
   const focusRow = useMemo(() => {
-    if (!openSession || !messageGit || head?.sessionId !== openSession.sessionId) return null;
+    if (!openSession || !messageGit) return null;
+    const id =
+      targetId ?? (head?.sessionId === openSession.sessionId ? (head.messageId ?? null) : null);
+    if (id === null) return null;
     const row = messageGit.rows.find(
-      (candidate) => candidate.kind === "message" && candidate.message.id === head.messageId,
+      (candidate) => candidate.kind === "message" && candidate.message.id === id,
     );
     return row ? { x: messageGit.graphWidth / 2, y: row.y } : null;
-  }, [openSession, messageGit, head?.sessionId, head?.messageId]);
+  }, [openSession, messageGit, targetId, head?.sessionId, head?.messageId]);
 
   const viewKey = openSession ? `session:${openSession.sessionId}` : "project";
 

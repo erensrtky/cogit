@@ -1,4 +1,4 @@
-import { ensureConversationGitignore } from "../git.js";
+import { ensureConversationGitignore, findGitRoot, readCommitSubjects } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import {
   hashTurns,
@@ -186,6 +186,25 @@ async function readTranscriptViews(
 }
 
 /**
+ * Every commit hash the records list, with its subject read from git, so the
+ * message rows can show commit tags and the drill-down can name them (Story
+ * 8.8). A project outside git, or a commit git no longer knows, only means
+ * fewer subjects; the build never fails for it.
+ */
+async function commitSubjects(root: string, sessions: Session[]): Promise<Map<string, string>> {
+  const hashes = new Set<string>();
+  for (const session of sessions) {
+    for (const node of session.nodes) {
+      for (const hash of node.commits ?? []) hashes.add(hash);
+    }
+  }
+  if (hashes.size === 0) return new Map();
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === undefined) return new Map();
+  return await readCommitSubjects(gitRoot, hashes);
+}
+
+/**
  * Rebuilds `.codelineage/lineage.html` from `project.json` and every session file,
  * then refreshes the global panel. One unreadable session is a warning, never a
  * failed build; an unwritable global directory only skips the panel.
@@ -216,6 +235,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       const transcripts = await collectTranscripts(io.env);
       const config = await loadConfig(io.env);
       const views = await readTranscriptViews(sessions, transcripts, root, io);
+      const subjects = await commitSubjects(root, views.sessions);
       const built = buildViewModel({
         project: project.data,
         sessions: views.sessions,
@@ -224,6 +244,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         transcripts: new Set(transcripts.keys()),
         chats: views.chats,
         pending: views.pending,
+        commitSubjects: subjects,
         // With the catch-up on, the hook records the tail at session end, so the
         // count would only be a stale warning about work already scheduled.
         unrecorded: config.sessionEndCatchUp ? undefined : views.unrecorded,
