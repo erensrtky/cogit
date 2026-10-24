@@ -944,3 +944,52 @@ time {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* Settings the panel can change when the local server serves it (Story 8.9). */
+.setting-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-form input[type="text"],
+.setting-form input[type="number"] {
+  width: 150px;
+  padding: 3px 6px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.setting-form input[type="checkbox"] {
+  margin: 0;
+}
+
+.setting-form button {
+  padding: 3px 10px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.setting-form button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.setting-status {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.setting-error {
+  color: var(--l5);
+  font-size: 12px;
+}

@@ -40,12 +40,14 @@ function recordPart(record: Session | undefined): string {
   return `The record so far (reuse these topic ids):\n${lines.join("\n")}`;
 }
 
-function rules(language: string): string {
+function rules(language: string, messageSummaries: boolean): string {
   const writing = language === "auto" ? "the conversation's language" : language;
   return [
     "Rules (from the codelineage lineage skill):",
     '- Send one "message" node for every message below, with the id exactly as given; skip none, even a short "ok".',
-    '- kind is "message". title: a few words in the user\'s own wording. summary: one or two sentences on what came of it.',
+    `- kind is "message". title: a few words in the user's own wording.${
+      messageSummaries ? " summary: one or two sentences on what came of it." : ""
+    }`,
     '- parent: the id of the topic it belongs to. Reuse a topic id from the record below; otherwise add a "phase" topic with a short slug id and parent null.',
     '- When the message itself made a decision (the user asked for it, picked an option or approved a proposal): decidedBy ("user" or "agreed"), the reason in why, and the options not taken in alternatives [{"option": "...", "why": "..."}].',
     '- The agent\'s work goes inside the message node that caused it, never in nodes of its own: work (short items), agentDecisions ([{"title": "...", "why": "...", "alternatives": [...]}]), commits (short hashes) and files (a few paths).',
@@ -65,12 +67,13 @@ export function catchUpPrompt(
   record: Session | undefined,
   sessionId: string,
   language: string,
+  messageSummaries = false,
 ): string {
   return [
     "You add the missing part of a codelineage lineage record, a map of the user's messages.",
     "Below are the user's messages that have no node yet, each followed by the agent's written replies and a count of its tool calls.",
     "",
-    rules(language),
+    rules(language, messageSummaries),
     "",
     recordPart(record),
     "",
@@ -214,7 +217,7 @@ export async function backfillTail(dir: string, sessionId: string, io: Io): Prom
   const config = await loadConfig(io.env);
   const loaded = await loadSession(root, sessionId);
   const record = loaded.found && loaded.ok ? loaded.data : undefined;
-  const prompt = catchUpPrompt(turns, record, sessionId, config.language);
+  const prompt = catchUpPrompt(turns, record, sessionId, config.language, config.messageSummaries);
   const stdout = await runClaude(prompt, config.catchUpModel, io.env);
   const payload = { ...agentRecord(resultText(stdout)), sessionId };
   await sessionWrite({ dir: root }, io, async () => JSON.stringify(payload));

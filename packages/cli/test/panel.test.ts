@@ -84,6 +84,8 @@ describe("buildPanel", () => {
         language: "auto",
         updateEveryTurns: 7,
         sessionEndCatchUp: true,
+        catchUpModel: "haiku",
+        messageSummaries: false,
         gitPolicy: "ignore",
         agents: ["claude-code"],
       },

@@ -116,10 +116,19 @@ export const loadConfig = async (env?: NodeJS.ProcessEnv): Promise<Config> => {
   return cur.found && cur.ok ? cur.data : Config.parse({ schema: CONFIG_SCHEMA });
 };
 
-export const updateConfig = (fn: (cur: Config) => Config, env?: NodeJS.ProcessEnv) => {
+export const updateConfig = (
+  fn: (cur: Config) => Config,
+  env?: NodeJS.ProcessEnv,
+  opts?: LockOptions,
+) => {
   const g = globalPaths(env);
-  return update(g.config, `${g.config}.lock`, Config, CONFIG_SCHEMA, (cur) =>
-    fn(cur ?? Config.parse({ schema: CONFIG_SCHEMA })),
+  return update(
+    g.config,
+    `${g.config}.lock`,
+    Config,
+    CONFIG_SCHEMA,
+    (cur) => fn(cur ?? Config.parse({ schema: CONFIG_SCHEMA })),
+    opts,
   );
 };
 

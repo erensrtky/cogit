@@ -22,6 +22,7 @@ describe("config", () => {
     await configGet(undefined, io);
     expect(io.lines).toContain("updateEveryTurns = 5");
     expect(io.lines).toContain('catchUpModel = "haiku"');
+    expect(io.lines).toContain("messageSummaries = false");
     await configGet("gitPolicy", io);
     expect(io.lines.at(-1)).toBe('"ignore"');
   });
@@ -32,12 +33,14 @@ describe("config", () => {
     await configSet("sessionEndCatchUp", "false", io);
     await configSet("language", "Turkish", io);
     await configSet("catchUpModel", "sonnet", io);
+    await configSet("messageSummaries", "true", io);
     await configSet("agents", "claude-code, codex", io);
     expect(await loadConfig(env)).toMatchObject({
       updateEveryTurns: 3,
       sessionEndCatchUp: false,
       language: "Turkish",
       catchUpModel: "sonnet",
+      messageSummaries: true,
       agents: ["claude-code", "codex"],
     });
     await configSet("agents", '["claude-code"]', io);

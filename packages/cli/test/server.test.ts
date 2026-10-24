@@ -1,8 +1,9 @@
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import {
   type ClientRequest,
   createServer as createHttpServer,
   get as httpGet,
+  request as httpRequest,
   type IncomingHttpHeaders,
   type IncomingMessage,
 } from "node:http";
@@ -12,8 +13,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildProject } from "../src/commands/build.js";
 import { init } from "../src/commands/init.js";
 import {
+  CONFIG_TOKEN_HEADER,
   ensureServer,
   injectLiveMeta,
+  injectTokenMeta,
   type MapServer,
   mapPageUrl,
   spawnServerProcess,
@@ -21,8 +24,8 @@ import {
 } from "../src/server.js";
 import { atomicWrite } from "../src/store/fs.js";
 import { globalPaths, projectPaths } from "../src/store/paths.js";
-import { updateConfig } from "../src/store/stores.js";
-import { DATA_ELEMENT_ID, LIVE_META_NAME } from "../src/view/model.js";
+import { loadConfig, updateConfig } from "../src/store/stores.js";
+import { DATA_ELEMENT_ID, LIVE_META_NAME, TOKEN_META_NAME } from "../src/view/model.js";
 import { envFor, fakeIo, tempDir } from "./helpers.js";
 
 const TEMPLATE = `<!doctype html><html><head><title>codelineage</title></head><body><div id="root"></div>
@@ -79,6 +82,63 @@ function request(
   });
 }
 
+function postConfig(
+  url: string,
+  body: string,
+  headers: Record<string, string> = {},
+): Promise<Reply> {
+  const target = new URL(url);
+  return new Promise((done, fail) => {
+    const req = httpRequest(
+      {
+        hostname: target.hostname,
+        port: target.port,
+        path: target.pathname,
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(body),
+          ...headers,
+        },
+      },
+      (res: IncomingMessage) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () =>
+          done({
+            status: res.statusCode ?? 0,
+            body: Buffer.concat(chunks).toString("utf8"),
+            headers: res.headers,
+          }),
+        );
+      },
+    );
+    req.on("error", fail);
+    req.end(body);
+  });
+}
+
+/** The token the panel page carries; every settings write needs it. */
+async function panelToken(server: MapServer): Promise<string> {
+  const page = await request(`${server.url}/`);
+  const match = /<meta name="codelineage-token" content="([^"]+)">/.exec(page.body);
+  if (!match?.[1]) throw new Error("panel page has no token");
+  return match[1];
+}
+
+function configWrite(
+  server: MapServer,
+  token: string,
+  payload: unknown,
+  overrides: Record<string, string> = {},
+): Promise<Reply> {
+  return postConfig(`${server.url}/api/config`, JSON.stringify(payload), {
+    origin: `http://127.0.0.1:${server.port}`,
+    [CONFIG_TOKEN_HEADER]: token,
+    ...overrides,
+  });
+}
+
 function openEvents(url: string): {
   waitFor: (needle: string, ms?: number) => Promise<boolean>;
   close: () => void;
@@ -131,6 +191,14 @@ describe("injectLiveMeta", () => {
 
   it("leaves a page without a head tag alone", () => {
     expect(injectLiveMeta("<p>x</p>")).toBe("<p>x</p>");
+  });
+});
+
+describe("injectTokenMeta", () => {
+  it("adds the token meta to the head once", () => {
+    const once = injectTokenMeta(TEMPLATE, "abc123");
+    expect(once).toContain(`<meta name="${TOKEN_META_NAME}" content="abc123">`);
+    expect(injectTokenMeta(once, "abc123")).toBe(once);
   });
 });
 
@@ -233,6 +301,157 @@ describe("map server", () => {
       events.close();
     }
     await server.closed;
+  });
+});
+
+describe("settings write", () => {
+  it("gives the panel a token and leaves maps without one", async () => {
+    const server = await start();
+    const panel = await request(`${server.url}/`);
+    expect(panel.body).toContain(`name="${TOKEN_META_NAME}"`);
+    const map = await request(mapPageUrl(server.url, root));
+    expect(map.body).not.toContain(`name="${TOKEN_META_NAME}"`);
+  });
+
+  it("accepts a valid write, stores it and refreshes the panel", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const reply = await configWrite(server, token, { key: "messageSummaries", value: true });
+    expect(reply.status).toBe(200);
+    expect(JSON.parse(reply.body)).toEqual({ ok: true, key: "messageSummaries", value: true });
+    expect((await loadConfig(env)).messageSummaries).toBe(true);
+
+    const panel = globalPaths(env).panel;
+    const deadline = Date.now() + 3000;
+    let html = "";
+    while (Date.now() < deadline) {
+      html = await readFile(panel, "utf8");
+      if (html.includes('"messageSummaries":true')) break;
+      await delay(25);
+    }
+    expect(html).toContain('"messageSummaries":true');
+  });
+
+  it("rebuilds an open map so the page picks the new setting up", async () => {
+    const server = await start();
+    const events = openEvents(`${server.url}/events?dir=${encodeURIComponent(root)}`);
+    try {
+      expect(await events.waitFor("retry: 1000")).toBe(true);
+      const token = await panelToken(server);
+      const reply = await configWrite(server, token, { key: "sessionEndCatchUp", value: false });
+      expect(reply.status).toBe(200);
+      expect(await events.waitFor("event: change")).toBe(true);
+    } finally {
+      events.close();
+    }
+  });
+
+  it("rejects a wrong or missing token and writes nothing", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    expect((await configWrite(server, "nope", { key: "language", value: "tr" })).status).toBe(403);
+    expect(
+      (
+        await configWrite(
+          server,
+          token,
+          { key: "language", value: "tr" },
+          {
+            [CONFIG_TOKEN_HEADER]: "",
+          },
+        )
+      ).status,
+    ).toBe(403);
+    expect((await loadConfig(env)).language).toBe("auto");
+  });
+
+  it("rejects another origin and a foreign Host", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const foreign = await configWrite(
+      server,
+      token,
+      { key: "language", value: "tr" },
+      {
+        origin: "http://evil.example",
+      },
+    );
+    expect(foreign.status).toBe(403);
+    const host = await configWrite(
+      server,
+      token,
+      { key: "language", value: "tr" },
+      {
+        host: "evil.example:4747",
+      },
+    );
+    expect(host.status).toBe(403);
+    expect((await loadConfig(env)).language).toBe("auto");
+  });
+
+  it("rejects a read-only key, an unknown key and a bad value type", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    expect((await configWrite(server, token, { key: "gitPolicy", value: "commit" })).status).toBe(
+      400,
+    );
+    expect((await configWrite(server, token, { key: "nope", value: 1 })).status).toBe(400);
+    expect(
+      (await configWrite(server, token, { key: "updateEveryTurns", value: "many" })).status,
+    ).toBe(400);
+    expect(
+      (await configWrite(server, token, { key: "messageSummaries", value: "true" })).status,
+    ).toBe(400);
+    expect((await loadConfig(env)).gitPolicy).toBe("ignore");
+    expect((await loadConfig(env)).messageSummaries).toBe(false);
+  });
+
+  it("rejects a body that is valid JSON but not an object", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const reply = await postConfig(`${server.url}/api/config`, "null", {
+      origin: `http://127.0.0.1:${server.port}`,
+      [CONFIG_TOKEN_HEADER]: token,
+    });
+    expect(reply.status).toBe(400);
+  });
+
+  it("answers 409 instead of waiting when the config lock is held", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const lock = `${globalPaths(env).config}.lock`;
+    await mkdir(lock, { recursive: true });
+    await writeFile(join(lock, "owner"), String(process.pid));
+    try {
+      const reply = await configWrite(server, token, { key: "language", value: "tr" });
+      expect(reply.status).toBe(409);
+    } finally {
+      await rm(lock, { recursive: true, force: true });
+    }
+    expect((await loadConfig(env)).language).toBe("auto");
+  });
+
+  it("rejects a non-JSON body, an oversized body and a wrong method", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const wrongType = await configWrite(
+      server,
+      token,
+      { key: "language", value: "tr" },
+      {
+        "content-type": "text/plain",
+      },
+    );
+    expect(wrongType.status).toBe(415);
+    const huge = await configWrite(server, token, { key: "language", value: "x".repeat(5000) });
+    expect(huge.status).toBe(413);
+    const notJson = await postConfig(`${server.url}/api/config`, "not json", {
+      origin: `http://127.0.0.1:${server.port}`,
+      [CONFIG_TOKEN_HEADER]: token,
+    });
+    expect(notJson.status).toBe(400);
+    expect((await request(`${server.url}/api/config`)).status).toBe(404);
+    expect((await loadConfig(env)).language).toBe("auto");
   });
 });
 

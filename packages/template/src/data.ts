@@ -1,4 +1,9 @@
-import { DATA_ELEMENT_ID, LIVE_META_NAME, type PageModel } from "../../cli/src/view/model.js";
+import {
+  DATA_ELEMENT_ID,
+  LIVE_META_NAME,
+  type PageModel,
+  TOKEN_META_NAME,
+} from "../../cli/src/view/model.js";
 
 /** Parses and checks the JSON contract; throws when the shape is not a page. */
 export function parseViewModel(text: string): PageModel {
@@ -37,4 +42,30 @@ export async function loadViewModel(doc: Document = document): Promise<PageModel
  */
 export function isLivePage(doc: Document = document): boolean {
   return doc.querySelector(`meta[name="${LIVE_META_NAME}"]`) !== null;
+}
+
+/**
+ * The per-server token the local server puts in the panel page. Null over
+ * `file://` (and anywhere the page did not come from the server), which is what
+ * keeps the settings read-only there.
+ */
+export function pageToken(doc: Document = document): string | null {
+  const content = doc
+    .querySelector(`meta[name="${TOKEN_META_NAME}"]`)
+    ?.getAttribute("content")
+    ?.trim();
+  return content ? content : null;
+}
+
+/** One settings write; the server validates the key, the value and the token. */
+export async function saveSetting(key: string, value: unknown, token: string): Promise<void> {
+  const response = await fetch("/api/config", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-codelineage-token": token },
+    body: JSON.stringify({ key, value }),
+  });
+  if (!response.ok) {
+    const text = (await response.text()).trim();
+    throw new Error(text || `could not save (HTTP ${response.status})`);
+  }
 }

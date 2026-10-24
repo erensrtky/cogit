@@ -51,7 +51,9 @@ these records into static HTML:
   from all active sessions. A session is **active** while its `updatedAt` is
   within 7 days of the build, newest first; duplicate item texts are shown once.
 - **Panel** (global): every registered project as a small status card, with quick
-  switching into each project map. Settings are shown read-only.
+  switching into each project map. Settings are editable on the page the local
+  server serves (`POST /api/config`, same-origin, per-server token) and read-only
+  from `file://`.
 
 Sessions are not a separate view. A session is a level of the project tree.
 
@@ -269,9 +271,12 @@ Each update costs agent tokens (the user's subscription or API usage).
 
 Settings in `config.json`: `language`, `updateEveryTurns`, `sessionEndCatchUp`,
 `catchUpModel` (model for the headless catch-up and backfill, default `haiku`),
+`messageSummaries` (write a per-message summary; default `false`),
 `serverPort` (local map server, default 4747),
 `gitPolicy`, `agents`, `setupHintOff` (project roots where the SessionStart setup
-offer stays silent).
+offer stays silent). The panel may change `language`, `updateEveryTurns`,
+`sessionEndCatchUp`, `catchUpModel` and `messageSummaries` over the local server;
+everything else stays on `codelineage config set`.
 
 ## Privacy
 
@@ -333,11 +338,11 @@ offer stays silent).
    and a local map server as the default way `open` shows a map: one background
    server per user on `127.0.0.1`, serving only registered projects' maps and the
    panel, refreshing open pages on change, exiting after 30 idle minutes; opening
-   the file directly is only the fallback when it cannot start.
+   the file directly is only the fallback when it cannot start. The panel edits
+   the safe settings over the same server.
 
 ## Later
 
 - Codex adapter (its hooks and session retention still need research)
-- Editing settings from the panel (needs writes through the local server)
 - A Herdr usage section in the README
 - Video or other "explainer" outputs

@@ -93,6 +93,8 @@ export async function buildPanel(opts: PanelOptions): Promise<PanelViewModel> {
       language: config.language,
       updateEveryTurns: config.updateEveryTurns,
       sessionEndCatchUp: config.sessionEndCatchUp,
+      catchUpModel: config.catchUpModel,
+      messageSummaries: config.messageSummaries,
       gitPolicy: config.gitPolicy,
       agents: config.agents,
     },

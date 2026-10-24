@@ -17,6 +17,31 @@ export const DATA_ELEMENT_ID = "codelineage-data";
  */
 export const LIVE_META_NAME = "codelineage-live";
 
+/**
+ * Meta tag the local map server puts in the panel page: a random token for this
+ * server start that a settings write must echo. Other sites cannot read it, so
+ * they cannot post a change even when the host check is bypassed.
+ */
+export const TOKEN_META_NAME = "codelineage-token";
+
+/**
+ * Settings the panel may change over the local server (Story 8.9). The rest are
+ * setup-time or security-adjacent and stay on `codelineage config set`.
+ */
+export const PANEL_EDITABLE_KEYS = [
+  "messageSummaries",
+  "language",
+  "updateEveryTurns",
+  "sessionEndCatchUp",
+  "catchUpModel",
+] as const;
+
+export type PanelEditableKey = (typeof PANEL_EDITABLE_KEYS)[number];
+
+export function isPanelEditableKey(key: string): key is PanelEditableKey {
+  return (PANEL_EDITABLE_KEYS as readonly string[]).includes(key);
+}
+
 /** Version of the serialized view model (not the session schema). */
 export const VIEW_SCHEMA = 1;
 
@@ -199,11 +224,17 @@ export interface PanelProject {
   lineageUrl: string | null;
 }
 
-/** Global settings, shown read-only on the panel. */
+/**
+ * Global settings on the panel. `gitPolicy` and `agents` are shown read-only;
+ * the keys in `PANEL_EDITABLE_KEYS` are editable when the page comes from the
+ * local server (over `file://` everything stays read-only).
+ */
 export interface PanelSettings {
   language: string;
   updateEveryTurns: number;
   sessionEndCatchUp: boolean;
+  catchUpModel: string;
+  messageSummaries: boolean;
   gitPolicy: "ignore" | "commit";
   agents: string[];
 }

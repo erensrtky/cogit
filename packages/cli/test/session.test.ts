@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it } from "vitest";
+import { configSet } from "../src/commands/config.js";
 import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import { readStdin, sessionShow, sessionWrite } from "../src/commands/session.js";
@@ -249,6 +250,7 @@ describe("session show", () => {
       dir: root,
       project: "p",
       language: "tr",
+      messageSummaries: false,
       epochs: [{ id: "e2e", title: "E2E" }],
       session: null,
       newMessages: null,
@@ -273,6 +275,16 @@ describe("session show", () => {
       status: { goal: "g", done: [], pending: [], next: "" },
       nodes: [{ id: "a", parent: null, kind: "phase", title: "A" }],
     });
+  });
+
+  it("reports the messageSummaries setting the agent writes by", async () => {
+    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    await sessionShow(root, "s1", io);
+    expect(shown().messageSummaries).toBe(false);
+
+    await configSet("messageSummaries", "true", fakeIo(envFor(dir)));
+    await sessionShow(root, "s1", io);
+    expect(shown().messageSummaries).toBe(true);
   });
 
   it("lists the user's messages that have no node yet, and stamps their time on write", async () => {

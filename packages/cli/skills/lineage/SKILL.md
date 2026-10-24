@@ -57,8 +57,10 @@ short "ok" or "go on".
   ("Continue with Epic 4", "Why does auto mode keep stopping?"). Never copy a
   long paste; name what it is.
 - `summary`: one or two sentences on what came of it: the answer, the result or
-  the state it left. Someone returning days later should understand it without
-  the conversation.
+  the state it left. Write it ONLY when `messageSummaries` in the record is
+  `true`; while it is `false` (the default) leave `summary` out, like most git
+  commits: a subject line, no body. `decidedBy`, `why` and `alternatives` are
+  written either way.
 - When the message itself made a decision (the user asked for something, picked
   an option or approved a proposal): `decidedBy` (`"user"` or `"agreed"`), the
   reason in `why`, and the options not taken in `alternatives`, each as

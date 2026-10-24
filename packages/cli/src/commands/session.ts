@@ -275,6 +275,7 @@ export async function sessionShow(dir: string, sessionId: string, io: Io): Promi
     ...store,
     project: project.data.name,
     language: config.language,
+    messageSummaries: config.messageSummaries,
     epochs: project.data.epochs.map(({ id, title }) => ({ id, title })),
     session: null,
   };

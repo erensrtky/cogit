@@ -11,6 +11,11 @@ export const Config = z.object({
   sessionEndCatchUp: z.boolean().default(true),
   /** Model for the headless catch-up (SessionEnd) and, later, backfill. */
   catchUpModel: z.string().trim().min(1).max(64).default("haiku"),
+  /**
+   * Whether the agent writes a per-message `summary`. Off by default: the branch
+   * summary is the outer layer and the drill-down already shows the reply.
+   */
+  messageSummaries: z.boolean().default(false),
   /** Port the local map server binds on `127.0.0.1`. */
   serverPort: z.int().min(1).max(65535).default(4747),
   /** Default for new projects; `init` asks per repo. */

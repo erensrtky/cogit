@@ -97,6 +97,13 @@ describe("catchUpPrompt", () => {
     expect(prompt).toContain('{"sessionId": "s1", "nodes": [...]');
   });
 
+  it("asks for a message summary only when the setting says so", () => {
+    const off = catchUpPrompt([turn], undefined, "s1", "auto");
+    expect(off).not.toContain("summary: one or two sentences");
+    const on = catchUpPrompt([turn], undefined, "s1", "auto", true);
+    expect(on).toContain("summary: one or two sentences");
+  });
+
   it("lists the existing topics, the replies and the tool counts", () => {
     const prompt = catchUpPrompt(
       [{ ...turn, replies: ["ok"], tools: { commands: 1, files: ["a.ts"], other: 2 } }],

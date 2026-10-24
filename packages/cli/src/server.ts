@@ -1,4 +1,5 @@
 import { type SpawnOptions, spawn } from "node:child_process";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { type FSWatcher, watch } from "node:fs";
 import { readFile } from "node:fs/promises";
 import {
@@ -9,9 +10,19 @@ import {
 import type { AddressInfo } from "node:net";
 import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildProject } from "./commands/build.js";
+import { defaultsPrompter, type Io } from "./io.js";
+import { Config } from "./schema/config.js";
+import { LockBusyError } from "./store/lock.js";
 import { globalPaths, projectPaths } from "./store/paths.js";
-import { loadConfig, loadRegistry } from "./store/stores.js";
-import { LIVE_META_NAME } from "./view/model.js";
+import { loadConfig, loadRegistry, updateConfig } from "./store/stores.js";
+import {
+  isPanelEditableKey,
+  LIVE_META_NAME,
+  type PanelEditableKey,
+  TOKEN_META_NAME,
+} from "./view/model.js";
+import { buildPanel } from "./view/panel.js";
 
 /** A page nobody is looking at is a dead server after this long. */
 export const DEFAULT_IDLE_MS = 30 * 60 * 1000;
@@ -22,6 +33,12 @@ export const START_WAIT_MS = 1500;
 const HOST = "127.0.0.1";
 const LIVE_META = `<meta name="${LIVE_META_NAME}" content="1">`;
 
+/** Header a settings write must carry, with the token from the panel page. */
+export const CONFIG_TOKEN_HEADER = "x-codelineage-token";
+
+/** A settings write is a tiny JSON object; anything larger is not ours. */
+export const CONFIG_BODY_LIMIT = 4096;
+
 /**
  * Marks a page as served by the local server. The page only subscribes to
  * rebuild events when this tag is present, so `file://` pages (and the Vite dev
@@ -30,6 +47,16 @@ const LIVE_META = `<meta name="${LIVE_META_NAME}" content="1">`;
 export function injectLiveMeta(html: string): string {
   if (html.includes(LIVE_META)) return html;
   return html.replace(/<head(\s[^>]*)?>/i, (head) => `${head}${LIVE_META}`);
+}
+
+/**
+ * Carries the per-server token into the served panel page. Only the panel needs
+ * it (it is the only page that writes); maps get no token at all.
+ */
+export function injectTokenMeta(html: string, token: string): string {
+  const meta = `<meta name="${TOKEN_META_NAME}" content="${token}">`;
+  if (html.includes(meta)) return html;
+  return html.replace(/<head(\s[^>]*)?>/i, (head) => `${head}${meta}`);
 }
 
 export interface MapServerOptions {
@@ -56,6 +83,8 @@ interface PageTarget {
   file: string;
   /** Directory to watch: atomic writes replace the file, the directory keeps its name. */
   dir: string;
+  /** Only the panel page gets the settings token. */
+  panel: boolean;
 }
 
 interface WatchedPage {
@@ -92,7 +121,7 @@ async function registeredRoot(env: NodeJS.ProcessEnv, dir: string): Promise<stri
 async function pageTarget(env: NodeJS.ProcessEnv, url: URL): Promise<PageTarget | null> {
   const panel = (): PageTarget => {
     const paths = globalPaths(env);
-    return { file: paths.panel, dir: paths.base };
+    return { file: paths.panel, dir: paths.base, panel: true };
   };
   if (url.pathname === "/") return panel();
   if (url.pathname === "/map" || url.pathname === "/events") {
@@ -102,7 +131,7 @@ async function pageTarget(env: NodeJS.ProcessEnv, url: URL): Promise<PageTarget 
     const root = await registeredRoot(env, raw);
     if (!root) return null;
     const paths = projectPaths(root);
-    return { file: paths.html, dir: paths.base };
+    return { file: paths.html, dir: paths.base, panel: false };
   }
   return null;
 }
@@ -123,6 +152,8 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
   const hostname = opts.hostname ?? HOST;
   const idleMs = opts.idleMs ?? DEFAULT_IDLE_MS;
   const pages = new Map<string, WatchedPage>();
+  /** One random token per server start; the panel page carries it into a write. */
+  const token = randomBytes(24).toString("hex");
   let openPages = 0;
   let idleTimer: NodeJS.Timeout | null = null;
   let closing: Promise<void> | null = null;
@@ -185,8 +216,152 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
     void handle(req, res).catch(() => respond(res, 500, "internal error"));
   });
 
+  function tokenMatches(given: string | string[] | undefined): boolean {
+    const value = Array.isArray(given) ? given[0] : given;
+    if (typeof value !== "string") return false;
+    const a = Buffer.from(value);
+    const b = Buffer.from(token);
+    return a.length === b.length && timingSafeEqual(a, b);
+  }
+
+  /** Same origin only: a page from another site cannot post even with its own Host. */
+  function originAllowed(origin: string | undefined, port: number): boolean {
+    return origin === `http://${HOST}:${port}` || origin === `http://localhost:${port}`;
+  }
+
+  async function readLimitedBody(req: IncomingMessage): Promise<string | null> {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of req) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+      size += buf.length;
+      if (size > CONFIG_BODY_LIMIT) {
+        req.resume();
+        return null;
+      }
+      chunks.push(buf);
+    }
+    return Buffer.concat(chunks).toString("utf8");
+  }
+
+  /**
+   * Rebuilds the data of the pages somebody is looking at, as `build` does, so
+   * the open pages get a change event with the new settings. Best effort: the
+   * write already landed, so a failed rebuild must not fail the request.
+   */
+  async function refreshOpenPages(): Promise<void> {
+    const io: Io = {
+      prompt: defaultsPrompter,
+      out: () => {},
+      warn: () => {},
+      env,
+      now: () => new Date().toISOString(),
+    };
+    let rebuiltMap = false;
+    const registry = await loadRegistry(env);
+    if (registry.found && registry.ok) {
+      for (const entry of registry.data.projects) {
+        const page = pages.get(projectPaths(entry.path).html);
+        if (!page || page.clients.size === 0) continue;
+        try {
+          await buildProject({ dir: entry.path, io, quiet: true });
+          rebuiltMap = true;
+        } catch {
+          // A broken project is already a warning elsewhere; keep serving.
+        }
+      }
+    }
+    if (rebuiltMap) return;
+    try {
+      // `buildProject` rebuilds the panel too; without an open map, do it here.
+      await buildPanel({ env, io });
+    } catch {
+      // An unwritable global directory leaves the old page in place.
+    }
+  }
+
+  /**
+   * `POST /api/config` { key, value }: the panel's only write. Host, Origin,
+   * content type and token all have to match, the key must be one the panel may
+   * change and the value has to pass the config schema. Anything else is a 4xx
+   * and the file stays untouched.
+   */
+  async function writeConfig(
+    req: IncomingMessage,
+    res: ServerResponse,
+    port: number,
+  ): Promise<void> {
+    if (
+      !originAllowed(req.headers.origin, port) ||
+      !tokenMatches(req.headers[CONFIG_TOKEN_HEADER])
+    ) {
+      respond(res, 403, "forbidden");
+      return;
+    }
+    const type = req.headers["content-type"];
+    if (
+      typeof type !== "string" ||
+      type.split(";")[0]?.trim().toLowerCase() !== "application/json"
+    ) {
+      respond(res, 415, "content-type must be application/json");
+      return;
+    }
+    const body = await readLimitedBody(req);
+    if (body === null) {
+      respond(res, 413, "request body too large");
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      respond(res, 400, "invalid JSON");
+      return;
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      respond(res, 400, "expected a JSON object");
+      return;
+    }
+    const { key, value } = parsed as Record<string, unknown>;
+    if (typeof key !== "string" || !isPanelEditableKey(key)) {
+      respond(res, 400, `unknown or read-only key: ${String(key)}`);
+      return;
+    }
+    const next = Config.safeParse({ ...(await loadConfig(env)), [key]: value });
+    if (!next.success) {
+      respond(res, 400, `invalid value for ${key}: ${next.error.issues[0]?.message ?? "rejected"}`);
+      return;
+    }
+    try {
+      // A page is waiting: give the lock a moment, not the CLI's usual 10 s.
+      await updateConfig((c) => ({ ...c, [key]: next.data[key] }), env, { timeoutMs: 500 });
+    } catch (err) {
+      respond(res, err instanceof LockBusyError ? 409 : 500, "could not write the config");
+      return;
+    }
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify({ ok: true, key, value: next.data[key] }));
+    void refreshOpenPages();
+  }
+
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const port = (server.address() as AddressInfo | null)?.port ?? opts.port;
+    if (req.method === "POST") {
+      if (!hostAllowed(req.headers.host, port)) {
+        respond(res, 403, "forbidden");
+        return;
+      }
+      const url = new URL(req.url ?? "/", `http://${HOST}:${port}`);
+      if (url.pathname !== "/api/config") {
+        respond(res, 405, "method not allowed");
+        return;
+      }
+      await writeConfig(req, res, port);
+      return;
+    }
     if (req.method !== "GET" && req.method !== "HEAD") {
       respond(res, 405, "method not allowed");
       return;
@@ -242,7 +417,13 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
     });
-    res.end(req.method === "HEAD" ? undefined : injectLiveMeta(html));
+    res.end(
+      req.method === "HEAD"
+        ? undefined
+        : target.panel
+          ? injectTokenMeta(injectLiveMeta(html), token)
+          : injectLiveMeta(html),
+    );
   }
 
   await new Promise<void>((done, fail) => {
