@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-24
 ### Added
 - The panel's settings are editable on the page the local map server serves: `messageSummaries`, `language`, `updateEveryTurns`, `sessionEndCatchUp` and `catchUpModel` get a control and a Save button, and the server takes one small `POST /api/config` (same-origin only, a per-server token from the page, JSON body under 4 KB, validated with the config schema). After a write it rebuilds the panel and any open map so the pages refresh; over `file://` the settings stay read-only.
 - Message summaries are optional and off by default: the new `messageSummaries` setting (also in `session show` and the catch-up prompt) tells the agent whether to write a message's `summary`; the branch summary remains the outer layer, `decidedBy`/`why`/`alternatives` are written either way, and old summaries keep showing in the drill-down.
