@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { LineageViewModel, ViewNode, ViewSession } from "../../cli/src/view/model.js";
-import { defaultExpanded, headOf, sessionGroupId } from "../src/graph.js";
 import { outlinePath } from "../src/Outline.js";
 
 const AT = "2026-10-21T10:00:00.000Z";
@@ -61,53 +60,5 @@ describe("outlinePath", () => {
   it("returns null for an id outside the model", () => {
     expect(outlinePath(model, "session:missing")).toBeNull();
     expect(outlinePath(model, "node:session:s1:gone")).toBeNull();
-  });
-});
-
-describe("headOf", () => {
-  const latest: LineageViewModel = {
-    ...model,
-    epochs: [
-      {
-        id: "e1",
-        title: "Epoch one",
-        createdAt: AT,
-        sessions: [
-          {
-            ...session("s1", "e1", [
-              message("m1"),
-              message("m2", "2026-10-21T10:01:00.000Z", "m1"),
-            ]),
-            updatedAt: "2026-10-22T00:00:00.000Z",
-          },
-        ],
-      },
-    ],
-  };
-
-  it("marks the newest message of the most recently updated session", () => {
-    expect(headOf(latest)).toEqual({
-      sessionKey: "session:s1",
-      sessionId: "s1",
-      messageId: "m2",
-      group: "epoch:e1",
-    });
-    expect(defaultExpanded(latest)).toEqual(new Set(["epoch:e1", "session:s1"]));
-  });
-
-  it("has no message for a session without any, and is null for an empty map", () => {
-    expect(
-      headOf({
-        ...latest,
-        epochs: [{ ...latest.epochs[0]!, sessions: [session("s2", "e1", [])] }],
-      }),
-    ).toMatchObject({ sessionKey: "session:s2", messageId: null });
-    expect(headOf({ ...latest, epochs: [], unassigned: [] })).toBeNull();
-  });
-
-  it("finds the epoch group of a session", () => {
-    expect(sessionGroupId(latest, "s1")).toBe("epoch:e1");
-    expect(sessionGroupId(model, "u1")).toBe("unassigned");
-    expect(sessionGroupId(latest, "gone")).toBeNull();
   });
 });

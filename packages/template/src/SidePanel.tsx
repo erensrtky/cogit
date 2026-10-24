@@ -9,9 +9,9 @@ import { resumeCommand } from "../../cli/src/view/resume.js";
 import { formatTime, kindLabel } from "./format.js";
 import { layoutGitGraph } from "./gitLayout.js";
 import {
+  nodeId as messageKey,
   messageNeighbors,
   type NodeDetail,
-  sessionGroupId,
   sessionId as sessionKey,
   toNodeDetail,
 } from "./graph.js";
@@ -303,25 +303,22 @@ function BranchDetails({
 
 /** Previous and next message of the session, so the chat can be read in order. */
 function MessageNav({
-  model,
   session,
   node,
   onNavigate,
 }: {
-  model: LineageViewModel;
   session: ViewSession | undefined;
   node: NodeDetail;
   onNavigate: ((target: OutlineTarget) => void) | undefined;
 }) {
   if (!session || !onNavigate || node.kind !== "message") return null;
   const { previous, next } = messageNeighbors(session.messages, node.nodeId);
-  const group = sessionGroupId(model, session.sessionId);
   const go = (target: ViewNode | null) =>
     target
       ? () =>
           onNavigate({
-            focusId: sessionKey(session.sessionId),
-            expand: group ? [group, sessionKey(session.sessionId)] : [],
+            sessionId: session.sessionId,
+            focusId: messageKey(sessionKey(session.sessionId), target.id),
             selection: {
               type: "node",
               sessionId: session.sessionId,
@@ -356,7 +353,7 @@ function NodeDetails({
   const session = findSession(model, node.sessionId);
   return (
     <>
-      <MessageNav model={model} session={session} node={node} onNavigate={onNavigate} />
+      <MessageNav session={session} node={node} onNavigate={onNavigate} />
       {session ? <BranchDetails session={session} branchId={branchId} /> : null}
       {node.summary ? (
         <section>
@@ -468,12 +465,47 @@ function NodeDetails({
   );
 }
 
+/**
+ * The session's "squash message" (Story 8.7): what the whole session was for,
+ * what it got done and what is still open.
+ */
 function SessionDetails({ model, session }: { model: LineageViewModel; session: ViewSession }) {
+  const { done, pending } = session.status;
   return (
     <>
       <section>
         <h3>Goal</h3>
         <p>{session.status.goal || "No goal recorded."}</p>
+      </section>
+      <section>
+        <h3>Done</h3>
+        {done.length > 0 ? (
+          <ul className="drilldown-list">
+            {done.map((item, index) => (
+              <li key={`${index}-${item}`}>{item}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted">Nothing yet.</p>
+        )}
+      </section>
+      <section>
+        <h3>Pending</h3>
+        {pending.length > 0 ? (
+          <ul className="drilldown-list">
+            {pending.map((item, index) => (
+              <li
+                key={`${index}-${item.text}`}
+                className={item.needsUser ? "needs-user" : undefined}
+              >
+                {item.text}
+                {item.needsUser ? <span className="badge">needs you</span> : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted">Nothing pending.</p>
+        )}
       </section>
       <section>
         <h3>Next</h3>

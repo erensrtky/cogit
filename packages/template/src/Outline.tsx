@@ -6,15 +6,15 @@ import type { Selection } from "./SidePanel.js";
 
 /**
  * Experimental outline tree (epoch → session → messages) that sits next to the
- * map. Selecting a row opens its epoch and session, centres the session's git
- * graph and opens the same drill-down panel a row click would.
+ * map. Selecting a row opens its session's message graph (or goes back to the
+ * session graph for an epoch) and opens the same drill-down a map click would.
  */
 
 export interface OutlineTarget {
-  /** React Flow node id to centre on. */
+  /** The session to open; null returns the map to the session level. */
+  sessionId: string | null;
+  /** Highlight key: `epoch:…`, `session:…` or `node:…`. */
   focusId: string;
-  /** Graph group ids that must be expanded for `focusId` to exist. */
-  expand: string[];
   /** Drill-down content; `null` for epochs. */
   selection: Selection | null;
 }
@@ -82,14 +82,12 @@ function ExpandToggle({
 }
 
 function SessionRow({
-  group,
   session,
   activeId,
   expanded,
   onToggle,
   onSelect,
 }: {
-  group: string;
   session: ViewSession;
   activeId: string | null;
   expanded: ReadonlySet<string>;
@@ -113,8 +111,8 @@ function SessionRow({
           className={`outline-item${activeId === key ? " is-active" : ""}`}
           onClick={() =>
             onSelect({
+              sessionId: session.sessionId,
               focusId: key,
-              expand: [group, key],
               selection: { type: "session", sessionId: session.sessionId },
             })
           }
@@ -136,8 +134,8 @@ function SessionRow({
                     className={`outline-item${activeId === id ? " is-active" : ""}`}
                     onClick={() =>
                       onSelect({
+                        sessionId: session.sessionId,
                         focusId: id,
-                        expand: [group, key],
                         selection: {
                           type: "node",
                           sessionId: session.sessionId,
@@ -236,7 +234,11 @@ export function Outline({
                       type="button"
                       className={`outline-item${activeId === group.id ? " is-active" : ""}`}
                       onClick={() =>
-                        onSelect({ focusId: group.id, expand: [group.id], selection: null })
+                        onSelect({
+                          sessionId: null,
+                          focusId: group.id,
+                          selection: null,
+                        })
                       }
                     >
                       <span className="label">{group.title}</span>
@@ -248,7 +250,6 @@ export function Outline({
                       {group.sessions.map((session) => (
                         <SessionRow
                           key={session.sessionId}
-                          group={group.id}
                           session={session}
                           activeId={activeId}
                           expanded={expanded}

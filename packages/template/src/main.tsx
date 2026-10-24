@@ -21,7 +21,7 @@ async function fetchLatestModel(): Promise<PageModel | null> {
 
 /**
  * On the local server the page follows rebuilds: swapping the model in place
- * keeps the graph's open topics, selection and viewport, which a reload would
+ * keeps the map's open session, selection and viewport, which a reload would
  * lose. Over `file://` there is no server to ask, so nothing is subscribed.
  */
 function Page({ initial }: { initial: PageModel }) {

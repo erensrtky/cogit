@@ -213,7 +213,7 @@ export function GitGraph({
           );
         })}
       </svg>
-      <div className="git-rows" style={{ left: git.graphWidth + 8 }}>
+      <div className="git-rows" style={{ left: git.graphWidth + 8, width: git.rowWidth }}>
         {git.rows.map((row) => {
           const branch = branches.get(row.segmentId);
           return (

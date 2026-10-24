@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LineageViewModel, ViewNode } from "../../cli/src/view/model.js";
-import {
-  absolutePosition,
-  layoutGraph,
-  messageNeighbors,
-  sessionId,
-  toNodeDetail,
-} from "../src/graph.js";
+import { headOf, messageNeighbors, nodeId, sessionId, toNodeDetail } from "../src/graph.js";
 
 const AT = "2026-10-21T10:00:00.000Z";
 
@@ -36,68 +30,44 @@ const model: LineageViewModel = {
           messages: [message("m1"), message("m2", "2026-10-21T10:01:00.000Z", "m1")],
           transcriptAvailable: true,
         },
-        {
-          sessionId: "s2",
-          agent: "claude-code",
-          title: "Two",
-          epoch: "e1",
-          startedAt: "2026-10-20T10:00:00.000Z",
-          updatedAt: "2026-10-20T11:00:00.000Z",
-          status: { goal: "", done: [], pending: [], next: "" },
-          messages: [],
-          transcriptAvailable: true,
-        },
       ],
     },
   ],
   unassigned: [],
 };
 
-describe("layoutGraph", () => {
-  it("gives an open session its git layout and leaves a closed one empty", async () => {
-    const expanded = new Set(["epoch:e1", "session:s1"]);
-    const layout = await layoutGraph(model, expanded);
-    const session = layout.nodes.find((node) => node.id === "session:s1");
-    const closed = layout.nodes.find((node) => node.id === "session:s2");
-    expect(session?.type).toBe("session");
-    if (session?.type === "session") {
-      expect(session.data.git?.rows).toHaveLength(2);
-      expect(session.width).toBeGreaterThanOrEqual(session.data.git?.width ?? 0);
-      expect(session.height).toBeGreaterThan(56);
-    }
-    if (closed?.type === "session") {
-      expect(closed.data.git).toBeUndefined();
-      expect(closed.height).toBe(56);
-    }
+describe("headOf", () => {
+  it("marks the newest message of the most recently updated session", () => {
+    expect(headOf(model)).toEqual({ sessionId: "s1", messageId: "m2" });
   });
 
-  it("puts every session of an open epoch under it and emits no message nodes", async () => {
-    const layout = await layoutGraph(model, new Set(["epoch:e1"]));
-    expect(layout.nodes.map((node) => node.type)).toEqual(["epoch", "session", "session"]);
-    expect(
-      layout.nodes
-        .filter((node) => node.type === "session")
-        .every((n) => n.parentId === "epoch:e1"),
-    ).toBe(true);
-  });
-});
-
-describe("absolutePosition", () => {
-  const nodes = [
-    { id: "epoch", position: { x: 10, y: 20 } },
-    { id: "session", position: { x: 5, y: 40 }, parentId: "epoch" },
-    { id: "card", position: { x: 1, y: 2 }, parentId: "session" },
-    { id: "loop", position: { x: 1, y: 1 }, parentId: "loop" },
-  ];
-
-  it("adds up the positions of every parent", () => {
-    expect(absolutePosition(nodes, "card")).toEqual({ x: 16, y: 62 });
-    expect(absolutePosition(nodes, "epoch")).toEqual({ x: 10, y: 20 });
+  it("has no message for a session without any, and is null for an empty map", () => {
+    const empty: LineageViewModel = {
+      ...model,
+      epochs: [
+        {
+          ...model.epochs[0]!,
+          sessions: [{ ...model.epochs[0]!.sessions[0]!, messages: [] }],
+        },
+      ],
+    };
+    expect(headOf(empty)).toEqual({ sessionId: "s1", messageId: null });
+    expect(headOf({ ...model, epochs: [], unassigned: [] })).toBeNull();
   });
 
-  it("is null for a node the layout does not hold, and survives a parent loop", () => {
-    expect(absolutePosition(nodes, "gone")).toBeNull();
-    expect(absolutePosition(nodes, "loop")).toEqual({ x: 1, y: 1 });
+  it("picks the latest updatedAt across epochs and unassigned sessions", () => {
+    const withUnassigned: LineageViewModel = {
+      ...model,
+      unassigned: [
+        {
+          ...model.epochs[0]!.sessions[0]!,
+          sessionId: "u1",
+          updatedAt: "2026-10-23T00:00:00.000Z",
+          messages: [message("m9")],
+        },
+      ],
+    };
+    expect(headOf(withUnassigned)).toEqual({ sessionId: "u1", messageId: "m9" });
   });
 });
 
@@ -126,8 +96,9 @@ describe("toNodeDetail", () => {
   });
 });
 
-describe("sessionId", () => {
-  it("prefixes the React Flow session group id", () => {
+describe("ids", () => {
+  it("prefixes the outline and map keys", () => {
     expect(sessionId("abc")).toBe("session:abc");
+    expect(nodeId("session:abc", "m1")).toBe("node:session:abc:m1");
   });
 });

@@ -1,15 +1,40 @@
 import type { ViewNode } from "../../cli/src/view/model.js";
 
 /**
- * Lays a session's messages out as a git graph (Story 8.2): one row per message
- * in send order, one lane per branch, branch starts curving out of the message
- * they react to, returns routed through a channel left of the lanes. Pure: the
- * React component draws exactly what this returns.
+ * Lays a git graph out (Stories 8.2 and 8.7): one row per item in send order,
+ * one lane per branch, branch starts curving out of the item they react to,
+ * returns routed through a channel left of the lanes. Pure: the React component
+ * draws exactly what this returns.
  *
- * Git terms here: a message is a commit, its `parent` is the message it reacts
- * to, a root starts something new, a branch is a chain of messages with only
- * one child each, and `links` are returns to older messages.
+ * The same code lays out both levels: a session's messages (a message is a
+ * commit, `parent` is the message it reacts to) and the project's sessions (a
+ * session is a commit, `parent` is the session it continues). Git terms: a root
+ * starts something new, a branch is a chain of items with only one child each,
+ * and `links` are returns to older items.
  */
+
+/**
+ * What the layout reads from a row. `ViewNode` (a message) satisfies this, and
+ * the session level maps each session onto it, so there is one layout engine.
+ */
+export interface GitNode {
+  id: string;
+  label?: string | undefined;
+  title: string;
+  summary?: string | undefined;
+  at?: string | undefined;
+  parent?: string | null | undefined;
+  links?: string[] | undefined;
+  branch?: ViewNode["branch"];
+  continues?: ViewNode["continues"];
+  unsummarized?: true | undefined;
+  /**
+   * When the item stops occupying its lane, as a timestamp. Session level only:
+   * two sessions that overlap in time must get parallel lanes even when their
+   * dots sit on different rows.
+   */
+  until?: string | undefined;
+}
 
 /** One message per row; long branches fold into first / ⋮ N more / last. */
 export const ROW_HEIGHT = 30;
@@ -74,17 +99,17 @@ export interface GitReturn {
 
 export interface GitMessageRow {
   kind: "message";
-  message: ViewNode;
+  message: GitNode;
   segmentId: string;
   colorIndex: number;
   /** Centre of the row on the canvas. */
   y: number;
-  /** First message of its branch: hollow ring and branch label. */
+  /** First item of its branch: hollow ring and branch label. */
   first: boolean;
   /** A new root starts here, with a gap above it. */
   gap: boolean;
   returns: GitReturn[];
-  /** "left off here": the newest message of the newest session. */
+  /** "left off here": the newest message or session. */
   head: boolean;
   /** Row height: titles wrap instead of being cut, so long ones get taller rows. */
   height: number;
@@ -122,6 +147,8 @@ export interface GitLayout {
   laneX: number[];
   /** Width of the channel + lanes area; the row text starts after it. */
   graphWidth: number;
+  /** Width of the row text right of the dots. */
+  rowWidth: number;
   /** Whole box: graph width, gap, then the row text. */
   width: number;
   height: number;
@@ -135,6 +162,20 @@ export interface GitLayoutOptions {
   openAll?: boolean;
   /** Message that carries "left off here"; defaults to the newest message. */
   headId?: string | null;
+  /**
+   * Fold long branches (default true). The session level passes false: one dot
+   * per session, and folding a chain of sessions would hide sessions.
+   */
+  fold?: boolean;
+  /**
+   * Where an item stops occupying its lane, in send-order index space. Session
+   * level only: a session keeps its lane until `updatedAt`, so a session that
+   * starts while another is still running gets a parallel lane even when the
+   * two dots are not adjacent rows.
+   */
+  itemEnd?: (item: GitNode) => number | null;
+  /** Width of the row text area; defaults to `ROW_WIDTH`. */
+  rowWidth?: number;
 }
 
 interface RawRow {
@@ -164,8 +205,9 @@ const ROW_FIXED = 106;
  * the row decides how many lines it needs.
  */
 export function rowHeight(
-  message: ViewNode,
+  message: GitNode,
   row: { first: boolean; branchTitle: string; returns: number; head: boolean },
+  rowWidth = ROW_WIDTH,
 ): number {
   const fixed =
     ROW_FIXED +
@@ -176,7 +218,7 @@ export function rowHeight(
     (message.unsummarized ? 116 : 0) +
     // The "↑ continues <session> · m67" mark sits in the row, next to the title.
     (message.continues ? 150 + message.continues.sessionTitle.length * 6.4 : 0);
-  const room = Math.max(120, ROW_WIDTH - fixed);
+  const room = Math.max(120, rowWidth - fixed);
   const titleLines = Math.max(1, Math.ceil((message.title.length * TITLE_CHAR) / room));
   const branchLines = row.first
     ? Math.max(1, Math.ceil((row.branchTitle.length * BRANCH_CHAR) / (BRANCH_MAX - 12)))
@@ -185,7 +227,7 @@ export function rowHeight(
 }
 
 /** Parent ids that point forward, at themselves or outside the session become roots. */
-function parentOf(message: ViewNode, index: Map<string, number>): string | null {
+function parentOf(message: GitNode, index: Map<string, number>): string | null {
   const parent = message.parent;
   if (typeof parent !== "string") return null;
   const self = index.get(message.id) ?? 0;
@@ -193,7 +235,7 @@ function parentOf(message: ViewNode, index: Map<string, number>): string | null 
   return at !== undefined && at < self ? parent : null;
 }
 
-function branchOf(ids: string[], byId: Map<string, ViewNode>): GitBranch {
+function branchOf(ids: string[], byId: Map<string, GitNode>): GitBranch {
   const first = byId.get(ids[0] ?? "");
   const last = byId.get(ids[ids.length - 1] ?? "");
   return {
@@ -211,7 +253,8 @@ function branchOf(ids: string[], byId: Map<string, ViewNode>): GitBranch {
   };
 }
 
-export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions = {}): GitLayout {
+export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = {}): GitLayout {
+  const rowWidth = options.rowWidth ?? ROW_WIDTH;
   const index = new Map(messages.map((message, at) => [message.id, at]));
   const byId = new Map(messages.map((message) => [message.id, message]));
   const kids = new Map<string | null, string[]>();
@@ -263,10 +306,12 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
   const headId = "headId" in options ? options.headId : (messages[messages.length - 1]?.id ?? null);
   const unfolded = options.unfolded ?? new Set<string>();
   const openAll = options.openAll ?? false;
+  const fold = options.fold ?? true;
 
   const raw: RawRow[] = [];
   for (const segment of segments) {
     const folded =
+      fold &&
       segment.ids.length > FOLD_LIMIT &&
       !openAll &&
       !unfolded.has(segment.id) &&
@@ -330,12 +375,16 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
     if (row.gap) cursor += ROOT_GAP;
     const message = row.kind === "message" ? byId.get(row.id ?? "") : undefined;
     row.height = message
-      ? rowHeight(message, {
-          first: row.segment.ids[0] === message.id,
-          branchTitle: row.segment.branch.title,
-          returns: (message.links ?? []).filter((id) => segOf.has(id)).length,
-          head: message.id === headId,
-        })
+      ? rowHeight(
+          message,
+          {
+            first: row.segment.ids[0] === message.id,
+            branchTitle: row.segment.branch.title,
+            returns: (message.links ?? []).filter((id) => segOf.has(id)).length,
+            head: message.id === headId,
+          },
+          rowWidth,
+        )
       : ROW_HEIGHT;
     row.y = cursor + row.height / 2;
     cursor += row.height;
@@ -344,7 +393,9 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
   });
 
   // Lanes: a branch may reuse its parent's lane once the parent is done, and
-  // any lane whose earlier occupants no longer span this row.
+  // any lane whose earlier occupants no longer span this row. Spans are in
+  // send-order index space (monotonic with y), so both levels share this code;
+  // `itemEnd` lets the session level keep a lane busy until `updatedAt`.
   const segById = new Map(segments.map((segment) => [segment.id, segment]));
   const occupancy = new Map<number, [number, number][]>();
   const ordered = [...segments].sort((a, b) => (index.get(a.id) ?? 0) - (index.get(b.id) ?? 0));
@@ -352,9 +403,17 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
     const first = rowOf.get(segment.ids[0] ?? "");
     const last = rowOf.get(segment.ids[segment.ids.length - 1] ?? "");
     if (!first || !last) continue;
-    const parentRow = segment.parentId === null ? null : rowOf.get(segment.parentId);
-    const start = parentRow?.y ?? first.y;
-    const span: [number, number] = [start, last.y + 0.1];
+    const parentIndex = segment.parentId === null ? null : (index.get(segment.parentId) ?? null);
+    const start = parentIndex ?? index.get(segment.ids[0] ?? "") ?? 0;
+    let end = (index.get(segment.ids[segment.ids.length - 1] ?? "") ?? 0) + 0.1;
+    if (options.itemEnd) {
+      for (const id of segment.ids) {
+        const item = byId.get(id);
+        const custom = item ? options.itemEnd(item) : null;
+        if (custom !== null) end = Math.max(end, custom);
+      }
+    }
+    const span: [number, number] = [start, end];
     const free = (lane: number): boolean =>
       !(occupancy.get(lane) ?? []).some(([a, b]) => a < span[1] && span[0] < b);
     const parent = segment.parentSegmentId === null ? null : segById.get(segment.parentSegmentId);
@@ -363,7 +422,7 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
     segment.lane = lane;
     segment.parentLane = parent?.lane ?? null;
     segment.startY = first.y;
-    segment.parentY = parentRow?.y ?? null;
+    segment.parentY = (segment.parentId === null ? null : rowOf.get(segment.parentId)?.y) ?? null;
     const list = occupancy.get(lane) ?? [];
     list.push(span);
     occupancy.set(lane, list);
@@ -436,7 +495,8 @@ export function layoutGitGraph(messages: ViewNode[], options: GitLayoutOptions =
     links,
     laneX,
     graphWidth,
-    width: graphWidth + ROW_GAP + ROW_WIDTH,
+    rowWidth,
+    width: graphWidth + ROW_GAP + rowWidth,
     height: cursor,
     headId,
   };
