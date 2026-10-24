@@ -113,6 +113,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .command("log")
     .description("print the recorded lineage, newest first")
     .argument("[dir]", "project directory", ".")
+    .option("-C, --dir <dir>", "project directory (same as the positional)")
     .option("--session <id>", "only this session (id or prefix)")
     .option("-n, --number <count>", "at most this many messages", positiveCount)
     .option("--branches", "only the branch summaries (the compressed view)")
@@ -121,10 +122,16 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       run(
         async (
           dir: string,
-          opts: { session?: string; number?: number; branches?: boolean; json?: boolean },
+          opts: {
+            dir?: string;
+            session?: string;
+            number?: number;
+            branches?: boolean;
+            json?: boolean;
+          },
         ) => {
           await log({
-            dir,
+            dir: opts.dir ?? dir,
             io: makeIo(false),
             session: opts.session,
             limit: opts.number,
@@ -140,15 +147,22 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .description("print one recorded message by hash or <session-id>:mN")
     .argument("<ref>", "message hash or <session-id-prefix>:mN")
     .argument("[dir]", "project directory", ".")
+    .option("-C, --dir <dir>", "project directory (same as the positional)")
     .option("--no-chat", "leave out the conversation turn")
     .option("--json", "print JSON instead of text")
     .action(
-      run(async (ref: string, dir: string, opts: { chat?: boolean; json?: boolean }) => {
-        const io = makeIo(false);
-        const model = await show({ dir, ref, io, chat: opts.chat !== false });
-        if (opts.json === true) io.out(JSON.stringify(model, null, 2));
-        else for (const line of formatShow(model)) io.out(line);
-      }),
+      run(
+        async (
+          ref: string,
+          dir: string,
+          opts: { dir?: string; chat?: boolean; json?: boolean },
+        ) => {
+          const io = makeIo(false);
+          const model = await show({ dir: opts.dir ?? dir, ref, io, chat: opts.chat !== false });
+          if (opts.json === true) io.out(JSON.stringify(model, null, 2));
+          else for (const line of formatShow(model)) io.out(line);
+        },
+      ),
     );
 
   program

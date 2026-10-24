@@ -321,6 +321,10 @@ describe("settings write", () => {
     expect(JSON.parse(reply.body)).toEqual({ ok: true, key: "messageSummaries", value: true });
     expect((await loadConfig(env)).messageSummaries).toBe(true);
 
+    const handoff = await configWrite(server, token, { key: "startupContext", value: false });
+    expect(handoff.status).toBe(200);
+    expect((await loadConfig(env)).startupContext).toBe(false);
+
     const panel = globalPaths(env).panel;
     const deadline = Date.now() + 3000;
     let html = "";

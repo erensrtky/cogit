@@ -1,6 +1,9 @@
+import { branchesOf, type LogBranch } from "../commands/log.js";
 import { isRecorded, readSessionMessages, upgradeSessionIds } from "../messages.js";
+import type { Session } from "../schema/session.js";
 import { applyEvents, readEvents } from "../store/events.js";
-import { loadConfig, loadSession } from "../store/stores.js";
+import { loadAllSessions, loadConfig, loadSession } from "../store/stores.js";
+import { buildMessages } from "../view/lineage.js";
 import type { HookContext, HookOutput } from "./run.js";
 
 export const COMPACT_REQUEST =
@@ -8,6 +11,18 @@ export const COMPACT_REQUEST =
   "lineage record yet. Run the /codelineage:lineage skill now; `session show` lists the " +
   "messages that have no node. It records only what is missing and replies " +
   '"up to date" when nothing is; do not mention this request otherwise.';
+
+/**
+ * Budget for the handoff context SessionStart injects. The record is meant to
+ * orient the agent, not to carry the project: the agent can always read more
+ * with `log` / `show`.
+ */
+export const STARTUP_CONTEXT_TOKEN_CAP = 1500;
+
+/** Token estimate from character count: good enough for a budget this loose. */
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
 
 /** The bundled CLI, as the agent should spell it in a project without `init`. */
 function cli(ctx: HookContext): string {
@@ -37,16 +52,25 @@ export function setupHint(ctx: HookContext): string {
  * come from the transcript, so nothing is lost; the only risk is a record that fell
  * behind. When the user's messages have no node yet, the agent is asked to run the
  * skill, which works from the compact summary already in its context. On a startup
- * or resume in a project without `init`, the agent gets the setup offer instead.
+ * or resume in a project without `init`, the agent gets the setup offer instead; in
+ * an initialized project it gets the handoff (Story 8.11).
  */
 export async function onSessionStart(ctx: HookContext): Promise<HookOutput | undefined> {
   if (ctx.input.source === "compact") return compactRequest(ctx);
-  if (ctx.input.source !== "startup" && ctx.input.source !== "resume") return undefined;
-  if (ctx.initialized) return undefined;
+  const source = ctx.input.source;
+  if (source !== "startup" && source !== "resume" && source !== "clear") return undefined;
+  if (!ctx.initialized) {
+    // The setup offer stays on startup and resume, as in 4.6.
+    if (source === "clear") return undefined;
+    const config = await loadConfig(ctx.env);
+    // "Don't ask again in this project" lives outside the project.
+    if (config.setupHintOff.includes(ctx.root)) return undefined;
+    return additionalContext(setupHint(ctx));
+  }
   const config = await loadConfig(ctx.env);
-  // "Don't ask again in this project" lives outside the project.
-  if (config.setupHintOff.includes(ctx.root)) return undefined;
-  return additionalContext(setupHint(ctx));
+  // SessionStart runs inside the chat's startup budget: opt out and it is silent.
+  if (!config.startupContext) return undefined;
+  return additionalContext(await startupContext(ctx));
 }
 
 function additionalContext(text: string): HookOutput {
@@ -66,4 +90,110 @@ async function compactRequest(ctx: HookContext): Promise<HookOutput | undefined>
   }
   if (messages.every((message) => isRecorded(recorded, message))) return undefined;
   return additionalContext(COMPACT_REQUEST);
+}
+
+/** One line of prose, however the record stored it. */
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function clip(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
+}
+
+/**
+ * What the agent needs to continue the project: where the lineage lives, how to
+ * read it, and the compressed view of the last session before this one.
+ */
+async function startupContext(ctx: HookContext): Promise<string> {
+  const command = cli(ctx);
+  const header =
+    `codelineage records this project's lineage (one node per user message, hanging from the ` +
+    `message it reacts to, grouped in sessions with branch summaries). Read it with ` +
+    `\`${command} log -C "${ctx.root}"\` and one message with ` +
+    `\`${command} show <ref> -C "${ctx.root}"\` (a ref is a message hash, an h+hex prefix of ` +
+    `six or more characters, or <session-id>:mN). When the user mentions a message hash or ` +
+    `another session's mN, run show before answering.`;
+
+  const sessions = await loadAllSessions(ctx.root, () => {});
+  const previous = mostRecentOtherSession(sessions, ctx.sessionId);
+  if (previous === undefined) return header;
+
+  const events = await readEvents(ctx.root, previous.sessionId);
+  const messages = buildMessages(applyEvents(previous.nodes, events));
+  return composeStartupContext(header, previous, branchesOf(previous.sessionId, messages));
+}
+
+/** The session with the newest activity, ignoring this one. */
+export function mostRecentOtherSession(
+  sessions: readonly Session[],
+  sessionId: string,
+): Session | undefined {
+  return sessions
+    .filter((session) => session.sessionId !== sessionId)
+    .sort(
+      (a, b) =>
+        b.updatedAt.localeCompare(a.updatedAt) ||
+        b.startedAt.localeCompare(a.startedAt) ||
+        a.sessionId.localeCompare(b.sessionId),
+    )[0];
+}
+
+/** The handoff text under the token cap; the oldest branches are cut first. */
+export function composeStartupContext(
+  header: string,
+  session: Session,
+  branches: readonly LogBranch[],
+): string {
+  const head = [header, "", ...statusLines(session)];
+  const blocks = branches.map(branchLines);
+  const cutNote = (cut: number): string[] =>
+    cut === 0
+      ? []
+      : [
+          `  … ${cut} older branch summar${cut === 1 ? "y" : "ies"} cut; ` +
+            "read them with `log --branches`.",
+        ];
+
+  const render = (kept: string[][], cut: number): string =>
+    [...head, ...kept.flat(), ...cutNote(cut)].join("\n");
+
+  const kept = [...blocks];
+  let cut = 0;
+  while (kept.length > 0 && estimateTokens(render(kept, cut)) > STARTUP_CONTEXT_TOKEN_CAP) {
+    // `branchesOf` is in send order, so the first block is the oldest branch.
+    kept.shift();
+    cut += 1;
+  }
+  const text = render(kept, cut);
+  if (estimateTokens(text) <= STARTUP_CONTEXT_TOKEN_CAP) return text;
+  // Only reachable with a huge status block; keep the budget anyway.
+  return `${text.slice(0, STARTUP_CONTEXT_TOKEN_CAP * 4 - 2).trimEnd()}…`;
+}
+
+/** Session title, goal, pending items and next step — the "squash message". */
+function statusLines(session: Session): string[] {
+  const title = session.title.trim() === "" ? session.sessionId : clip(oneLine(session.title), 120);
+  const lines = [`Earlier session: ${title} (${session.sessionId})`];
+  const { goal, pending, next } = session.status;
+  if (goal.trim() !== "") lines.push(`  goal: ${clip(oneLine(goal), 400)}`);
+  const shown = pending.slice(0, 5);
+  for (const item of shown) {
+    const needsUser = item.needsUser ? " (needs the user)" : "";
+    lines.push(`  pending: ${clip(oneLine(item.text), 200)}${needsUser}`);
+  }
+  if (pending.length > shown.length)
+    lines.push(`  pending: … ${pending.length - shown.length} more`);
+  if (next.trim() !== "") lines.push(`  next: ${clip(oneLine(next), 400)}`);
+  return lines;
+}
+
+function branchLines(branch: LogBranch): string[] {
+  const count = `${branch.count} message${branch.count === 1 ? "" : "s"}`;
+  return [
+    `  ╭ ${clip(oneLine(branch.title), 80)}  ${branch.start.label}–${branch.end.label}, ${count}`,
+    `    asked: ${clip(oneLine(branch.asked), 300)}`,
+    `    outcome: ${clip(oneLine(branch.outcome), 600)}`,
+    `    open: ${branch.open.trim() === "" ? "—" : clip(oneLine(branch.open), 300)}`,
+  ];
 }

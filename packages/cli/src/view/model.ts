@@ -30,6 +30,7 @@ export const TOKEN_META_NAME = "codelineage-token";
  */
 export const PANEL_EDITABLE_KEYS = [
   "messageSummaries",
+  "startupContext",
   "language",
   "updateEveryTurns",
   "sessionEndCatchUp",
@@ -235,6 +236,7 @@ export interface PanelSettings {
   sessionEndCatchUp: boolean;
   catchUpModel: string;
   messageSummaries: boolean;
+  startupContext: boolean;
   gitPolicy: "ignore" | "commit";
   agents: string[];
 }

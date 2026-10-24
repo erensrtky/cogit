@@ -16,6 +16,11 @@ export const Config = z.object({
    * summary is the outer layer and the drill-down already shows the reply.
    */
   messageSummaries: z.boolean().default(false),
+  /**
+   * Whether SessionStart hands the agent the lineage of the previous session and
+   * how to read the record (`log` / `show`). On by default; costs only tokens.
+   */
+  startupContext: z.boolean().default(true),
   /** Port the local map server binds on `127.0.0.1`. */
   serverPort: z.int().min(1).max(65535).default(4747),
   /** Default for new projects; `init` asks per repo. */

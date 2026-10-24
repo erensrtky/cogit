@@ -17,6 +17,7 @@ interface EditableSpec {
 /** The keys the panel may change (Story 8.9); the server enforces the same list. */
 const EDITABLE: EditableSpec[] = [
   { key: "messageSummaries", label: "Message summaries", kind: "boolean" },
+  { key: "startupContext", label: "Lineage at session start", kind: "boolean" },
   { key: "language", label: "Language", kind: "text" },
   { key: "updateEveryTurns", label: "Update every turns", kind: "number" },
   { key: "sessionEndCatchUp", label: "Catch up on session end", kind: "boolean" },

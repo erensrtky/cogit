@@ -6,8 +6,15 @@ import { configHintOff, configHintOn, configSet } from "../src/commands/config.j
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
 import { runHook, spawnDetachedProcess } from "../src/hooks/run.js";
-import { COMPACT_REQUEST } from "../src/hooks/sessionstart.js";
+import {
+  COMPACT_REQUEST,
+  composeStartupContext,
+  estimateTokens,
+  mostRecentOtherSession,
+  STARTUP_CONTEXT_TOKEN_CAP,
+} from "../src/hooks/sessionstart.js";
 import { countTurn, UPDATE_REQUEST } from "../src/hooks/stop.js";
+import type { Session, Status } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
@@ -37,6 +44,40 @@ describe("countTurn", () => {
   });
 });
 
+describe("session start handoff", () => {
+  const session = (id: string, startedAt: string, updatedAt: string): Session => ({
+    schema: 1,
+    sessionId: id,
+    agent: "claude-code",
+    title: id,
+    epoch: null,
+    startedAt,
+    updatedAt,
+    status: { goal: "", done: [], pending: [], next: "" },
+    nodes: [],
+  });
+
+  it("picks the session with the newest activity, not this one", () => {
+    const older = session("old", "2026-10-20T10:00:00.000Z", "2026-10-20T11:00:00.000Z");
+    const newer = session("new", "2026-10-19T10:00:00.000Z", "2026-10-21T11:00:00.000Z");
+    expect(mostRecentOtherSession([older, newer], "mine")?.sessionId).toBe("new");
+    expect(mostRecentOtherSession([older, newer], "new")?.sessionId).toBe("old");
+    // Ties fall back to the later start and then the id, so the pick is stable.
+    const tied = session("b", "2026-10-21T12:00:00.000Z", "2026-10-21T11:00:00.000Z");
+    expect(mostRecentOtherSession([older, newer, tied], "mine")?.sessionId).toBe("b");
+    const sameStart = session("a", "2026-10-19T10:00:00.000Z", "2026-10-21T11:00:00.000Z");
+    expect(mostRecentOtherSession([newer, sameStart], "mine")?.sessionId).toBe("a");
+    expect(mostRecentOtherSession([newer], "new")).toBeUndefined();
+  });
+
+  it("truncates even when there are no branches to cut", () => {
+    const huge = "x".repeat(STARTUP_CONTEXT_TOKEN_CAP * 4 + 100);
+    const text = composeStartupContext(huge, session("s", T0, T0), []);
+    expect(estimateTokens(text)).toBeLessThanOrEqual(STARTUP_CONTEXT_TOKEN_CAP);
+    expect(text.endsWith("…")).toBe(true);
+  });
+});
+
 describe("runHook", () => {
   let dir: string;
   let root: string;
@@ -57,8 +98,8 @@ describe("runHook", () => {
       },
     );
 
-  const sessionStart = (source: string, e = env) =>
-    runHook("sessionstart", JSON.stringify({ session_id: "s1", cwd: root, source }), e, T0, (l) =>
+  const sessionStart = (source: string, e = env, id = "s1") =>
+    runHook("sessionstart", JSON.stringify({ session_id: id, cwd: root, source }), e, T0, (l) =>
       debug.push(l),
     );
 
@@ -107,13 +148,110 @@ describe("runHook", () => {
     );
     expect(await sessionStart("clear")).toBeUndefined();
     expect(await sessionStart("startup", { ...env, CODELINEAGE_DISABLE: "1" })).toBeUndefined();
+    expect(
+      JSON.parse((await sessionStart("startup")) ?? "").hookSpecificOutput.additionalContext,
+    ).not.toContain("records this project's lineage");
     expect(existsSync(join(root, ".codelineage"))).toBe(false);
   });
 
-  it("stays quiet about setup after init", async () => {
+  it("replaces the setup offer with the lineage handoff after init", async () => {
     await initialized(2);
+    const context = async (source: string) => {
+      const out = JSON.parse((await sessionStart(source)) ?? "");
+      return out.hookSpecificOutput.additionalContext as string;
+    };
+    // No earlier session yet: only the "how to read it" line.
+    expect(await context("startup")).toContain("codelineage records this project's lineage");
+    expect(await context("resume")).toContain(`log -C "${root}"`);
+    expect(await context("clear")).toContain("run show before answering");
+  });
+
+  const earlierSession = async (
+    nodes: unknown[],
+    status: Status = { goal: "", done: [], pending: [], next: "" },
+  ) =>
+    sessionWrite({ dir: root }, fakeIo(env), async () =>
+      JSON.stringify({ sessionId: "s0", title: "Earlier work", status, nodes }),
+    );
+
+  const startupText = async () =>
+    JSON.parse((await sessionStart("startup")) ?? "").hookSpecificOutput
+      .additionalContext as string;
+
+  it("hands over the previous session's status and branch summaries at startup", async () => {
+    await initialized(2);
+    await earlierSession(
+      [
+        {
+          id: "m1",
+          kind: "message",
+          title: "Start",
+          at: "2026-10-21T09:00:00.000Z",
+          branch: {
+            title: "Setup",
+            asked: "how do we start",
+            outcome: "scaffold ready",
+            open: "tests",
+          },
+        },
+        { id: "m2", kind: "message", title: "Next", parent: "m1", at: "2026-10-21T09:10:00.000Z" },
+      ],
+      {
+        goal: "ship the map",
+        done: [],
+        pending: [
+          { text: "choose a port", needsUser: true },
+          { text: "p2", needsUser: false },
+          { text: "p3", needsUser: false },
+          { text: "p4", needsUser: false },
+          { text: "p5", needsUser: false },
+          { text: "p6", needsUser: false },
+        ],
+        next: "write tests",
+      },
+    );
+    const text = await startupText();
+    expect(text).toContain(`log -C "${root}"`);
+    expect(text).toContain(`show <ref> -C "${root}"`);
+    expect(text).toContain("Earlier session: Earlier work (s0)");
+    expect(text).toContain("goal: ship the map");
+    expect(text).toContain("pending: choose a port (needs the user)");
+    expect(text).toContain("pending: … 1 more");
+    expect(text).toContain("next: write tests");
+    expect(text).toContain("╭ Setup  m1–m2, 2 messages");
+    expect(text).toContain("asked: how do we start");
+    expect(text).toContain("outcome: scaffold ready");
+  });
+
+  it("cuts the oldest branches from the handoff to stay under the token cap", async () => {
+    await initialized(2);
+    const nodes = Array.from({ length: 12 }, (_, i) => ({
+      id: `m${i + 1}`,
+      kind: "message",
+      title: `M${i + 1}`,
+      at: `2026-10-21T09:${String(i).padStart(2, "0")}:00.000Z`,
+      ...(i === 0 ? {} : { parent: `m${i}` }),
+      branch: {
+        title: `Branch ${i + 1}`,
+        asked: `asked ${i + 1} ${"a".repeat(250)}`,
+        outcome: "o".repeat(580),
+        open: "",
+      },
+    }));
+    await earlierSession(nodes);
+    const text = await startupText();
+    expect(estimateTokens(text)).toBeLessThanOrEqual(STARTUP_CONTEXT_TOKEN_CAP);
+    expect(text).toMatch(/older branch summar(y|ies) cut/);
+    expect(text).toContain("╭ Branch 12");
+    expect(text).not.toContain("╭ Branch 1  ");
+  });
+
+  it("stays quiet at session start when startupContext is off", async () => {
+    await initialized(2);
+    await configSet("startupContext", "false", fakeIo(env));
     expect(await sessionStart("startup")).toBeUndefined();
     expect(await sessionStart("resume")).toBeUndefined();
+    expect(await sessionStart("clear")).toBeUndefined();
   });
 
   it("silences the setup hint per project with hint-off and undoes it with hint-on", async () => {
@@ -240,13 +378,11 @@ describe("runHook", () => {
     expect(await sessionStart("compact")).toBeUndefined();
   });
 
-  it("stays quiet for other sources, without a transcript and when disabled", async () => {
+  it("stays quiet for unknown sources, without a transcript and when disabled", async () => {
     await initialized(2);
     expect(await sessionStart("compact")).toBeUndefined();
     await transcript([typed("first", 1)]);
-    expect(await sessionStart("startup")).toBeUndefined();
-    expect(await sessionStart("resume")).toBeUndefined();
-    expect(await sessionStart("clear")).toBeUndefined();
+    expect(await sessionStart("elsewhere")).toBeUndefined();
     expect(await sessionStart("compact", { ...env, CODELINEAGE_DISABLE: "1" })).toBeUndefined();
   });
 
