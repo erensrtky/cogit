@@ -268,25 +268,6 @@ ul {
   font-weight: normal;
 }
 
-.status {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr;
-  gap: 16px;
-  margin: 24px 0;
-  padding: 16px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-}
-
-.status h2,
-.status h3 {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-}
-
 .needs-user {
   color: var(--warn);
 }
@@ -861,10 +842,6 @@ time {
 }
 
 @media (max-width: 720px) {
-  .status {
-    grid-template-columns: 1fr;
-  }
-
   .project {
     flex-direction: column;
     align-items: flex-start;
