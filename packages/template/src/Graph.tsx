@@ -111,9 +111,28 @@ const nodeTypes: NodeTypes = {
  * i.e. where the work left off. The session opens and the message's drill-down
  * is shown; a message id the record no longer holds opens the session.
  */
-function readTarget(model: LineageViewModel): { sessionId: string; messageId?: string } | null {
+type Target = { sessionId: string; messageId?: string; quiet?: boolean };
+
+/** "Left off here": the newest session and its newest message. */
+function headTarget(model: LineageViewModel, quiet: boolean): Target | null {
+  const head = headOf(model);
+  if (head === null) return null;
+  const target: Target =
+    head.messageId === null
+      ? { sessionId: head.sessionId }
+      : { sessionId: head.sessionId, messageId: head.messageId };
+  return quiet ? { ...target, quiet } : target;
+}
+
+/**
+ * With no hash the map opens where the work left off: the newest session
+ * unfolds and the view centres on its newest message, without opening the
+ * side panel (`quiet`).
+ */
+function readTarget(model: LineageViewModel): Target | null {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  if (!params.has("focus") && !params.has("s")) return headTarget(model, true);
   if (params.get("focus") === "head") {
     const head = headOf(model);
     if (head === null) return null;
@@ -142,11 +161,16 @@ function findSession(model: LineageViewModel, id: string): ViewSession | undefin
 function Flow({ model }: { model: LineageViewModel }) {
   // Read once: a live data swap must not move the page back to the hash target.
   const [initial] = useState(() => readTarget(model));
+  useEffect(() => {
+    // Land on the map, not on the page header, when it opens at a message.
+    if (initial?.messageId !== undefined)
+      document.querySelector(".lineage-map")?.scrollIntoView({ block: "start" });
+  }, [initial]);
   const [openIds, setOpenIds] = useState<ReadonlySet<string>>(
     () => new Set(initial === null ? [] : [initial.sessionId]),
   );
   const [selection, setSelection] = useState<Selection | null>(() => {
-    if (initial === null) return null;
+    if (initial === null || initial.quiet) return null;
     if (initial.messageId === undefined) return { type: "session", sessionId: initial.sessionId };
     return { type: "node", sessionId: initial.sessionId, nodeId: initial.messageId };
   });
@@ -235,16 +259,36 @@ function Flow({ model }: { model: LineageViewModel }) {
     return out;
   }, [sessionGraph, messageGits]);
 
-  /** Where the view centres on load: a deep-linked message, else the whole map. */
-  const focusRow = useMemo(() => {
-    if (initial?.messageId === undefined) return null;
-    const opening = openings.find((candidate) => candidate.session.sessionId === initial.sessionId);
-    const row = opening?.git.rows.find(
-      (candidate) => candidate.kind === "message" && candidate.message.id === initial.messageId,
-    );
-    if (!opening || !row) return null;
-    return { x: opening.left + opening.git.graphWidth / 2, y: opening.top + row.y };
-  }, [initial, openings]);
+  /** Canvas point of a message in an open session, or null when it is not drawn. */
+  const pointOf = useCallback(
+    (sessionId: string, messageId: string | undefined) => {
+      if (messageId === undefined) return null;
+      const opening = openings.find((candidate) => candidate.session.sessionId === sessionId);
+      const row = opening?.git.rows.find(
+        (candidate) => candidate.kind === "message" && candidate.message.id === messageId,
+      );
+      if (!opening || !row) return null;
+      return { x: opening.left + opening.git.graphWidth / 2, y: opening.top + row.y };
+    },
+    [openings],
+  );
+
+  /** Where the view centres on load: the target message, else the whole map. */
+  const focusRow = useMemo(
+    () => (initial === null ? null : pointOf(initial.sessionId, initial.messageId)),
+    [initial, pointOf],
+  );
+
+  /** "Left off here" button: a request to centre on HEAD, re-sent on every click. */
+  const [jumps, setJumps] = useState(0);
+  const leftOff = useMemo(() => headTarget(model, true), [model]);
+  const jump = useMemo(
+    () =>
+      jumps === 0 || leftOff === null
+        ? null
+        : { key: jumps, point: pointOf(leftOff.sessionId, leftOff.messageId) },
+    [jumps, leftOff, pointOf],
+  );
 
   const ensureOpen = useCallback((sessionId: string) => {
     setOpenIds((previous) =>
@@ -335,6 +379,20 @@ function Flow({ model }: { model: LineageViewModel }) {
               sessionGraph.git.rows.length === 1 ? "" : "s"
             } · click a session to open or close its messages`}
           </span>
+          {leftOff ? (
+            <button
+              type="button"
+              className="outline-button"
+              title="Open the newest session and go to its newest message"
+              onClick={() => {
+                ensureOpen(leftOff.sessionId);
+                setJumps((value) => value + 1);
+                document.querySelector(".lineage-map")?.scrollIntoView({ block: "start" });
+              }}
+            >
+              ↧ Left off here
+            </button>
+          ) : null}
           {openIds.size > 0 ? (
             <button
               type="button"
@@ -378,7 +436,7 @@ function Flow({ model }: { model: LineageViewModel }) {
             {sessionGraph.git.rows.length === 0 ? (
               <p className="graph-status empty">No sessions recorded yet.</p>
             ) : (
-              <MapCanvas nodes={nodes} focusRow={focusRow} />
+              <MapCanvas nodes={nodes} focusRow={focusRow} jump={jump} />
             )}
             <DrillDown
               model={model}
@@ -401,12 +459,30 @@ function Flow({ model }: { model: LineageViewModel }) {
 function MapCanvas({
   nodes,
   focusRow,
+  jump,
 }: {
   nodes: MapFlowNode[];
   /** Point to centre on at load; null fits the whole graph. */
   focusRow: { x: number; y: number } | null;
+  /** A user request to centre on a point; a new `key` moves the view again. */
+  jump: { key: number; point: { x: number; y: number } | null } | null;
 }) {
   const { fitView, setViewport } = useReactFlow();
+
+  const jumpKey = jump?.key ?? 0;
+  const jumpX = jump?.point?.x;
+  const jumpY = jump?.point?.y;
+  useEffect(() => {
+    if (jumpKey === 0 || jumpX === undefined || jumpY === undefined) return;
+    const canvas = document.querySelector(".react-flow")?.getBoundingClientRect();
+    if (!canvas) return;
+    const zoom = 0.9;
+    void setViewport(
+      { zoom, x: canvas.width / 2 - jumpX * zoom, y: canvas.height / 2 - jumpY * zoom },
+      { duration: 300 },
+    );
+    // Only a new click moves the view; a live data swap must not.
+  }, [jumpKey]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
