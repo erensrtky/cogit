@@ -176,7 +176,7 @@ function Flow({ model }: { model: LineageViewModel }) {
   });
   const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
   const [openAll, setOpenAll] = useState(false);
-  const [showOutline, setShowOutline] = useState(false);
+  const [showOutline, setShowOutline] = useState(true);
   const { expanded: fullscreen, toggle: toggleFullscreen } = useFullscreen();
   const [focusedId, setFocusedId] = useState<string | null>(() => {
     if (initial === null) return null;
@@ -281,6 +281,8 @@ function Flow({ model }: { model: LineageViewModel }) {
 
   /** "Left off here" button: a request to centre on HEAD, re-sent on every click. */
   const [jumps, setJumps] = useState(0);
+  /** "Fold all": a request to frame the whole map again once everything closed. */
+  const [fits, setFits] = useState(0);
   const leftOff = useMemo(() => headTarget(model, true), [model]);
   const jump = useMemo(
     () =>
@@ -393,19 +395,26 @@ function Flow({ model }: { model: LineageViewModel }) {
               ↧ Left off here
             </button>
           ) : null}
-          {openIds.size > 0 ? (
-            <button
-              type="button"
-              className="outline-button"
-              aria-pressed={openAll}
-              onClick={() => {
-                setOpenAll((value) => !value);
-                setUnfolded(new Set());
-              }}
-            >
-              {openAll ? "Fold all" : "Unfold all"}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="outline-button"
+            aria-pressed={openAll}
+            title={
+              openAll
+                ? "Close every session and fold long branches again"
+                : "Open every session and every folded branch"
+            }
+            onClick={() => {
+              // "All" means the whole map: every session opens (or closes), not
+              // only the folded branches of the sessions already open.
+              setOpenIds(openAll ? new Set() : new Set(sessionGraph.sessions.keys()));
+              if (openAll) setFits((value) => value + 1);
+              setOpenAll((value) => !value);
+              setUnfolded(new Set());
+            }}
+          >
+            {openAll ? "Fold all" : "Unfold all"}
+          </button>
           <button
             type="button"
             className="outline-button"
@@ -436,7 +445,7 @@ function Flow({ model }: { model: LineageViewModel }) {
             {sessionGraph.git.rows.length === 0 ? (
               <p className="graph-status empty">No sessions recorded yet.</p>
             ) : (
-              <MapCanvas nodes={nodes} focusRow={focusRow} jump={jump} />
+              <MapCanvas nodes={nodes} focusRow={focusRow} jump={jump} fit={fits} />
             )}
             <DrillDown
               model={model}
@@ -460,14 +469,27 @@ function MapCanvas({
   nodes,
   focusRow,
   jump,
+  fit,
 }: {
   nodes: MapFlowNode[];
   /** Point to centre on at load; null fits the whole graph. */
   focusRow: { x: number; y: number } | null;
   /** A user request to centre on a point; a new `key` moves the view again. */
   jump: { key: number; point: { x: number; y: number } | null } | null;
+  /** A new value frames the whole map again (after "Fold all"). */
+  fit: number;
 }) {
   const { fitView, setViewport } = useReactFlow();
+
+  useEffect(() => {
+    if (fit === 0) return;
+    // Wait a frame so React Flow has the smaller, closed map before framing it.
+    const timer = window.setTimeout(
+      () => void fitView({ padding: 0.12, maxZoom: 1, duration: 300 }),
+      50,
+    );
+    return () => window.clearTimeout(timer);
+  }, [fit]);
 
   const jumpKey = jump?.key ?? 0;
   const jumpX = jump?.point?.x;
