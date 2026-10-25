@@ -1,6 +1,6 @@
 {
   "name": "codelineage",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "The lineage of your AI coding sessions.",
   "license": "MIT",
   "type": "module",
