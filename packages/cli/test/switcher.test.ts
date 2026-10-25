@@ -51,6 +51,7 @@ function session(input: {
   updatedAt: string;
   next?: string;
   messages?: string[];
+  messageAt?: string;
 }) {
   return Session.parse({
     schema: 1,
@@ -63,7 +64,7 @@ function session(input: {
       kind: "message",
       title,
       parent: index === 0 ? null : `m${index}`,
-      at: "2026-10-20T00:00:00.000Z",
+      at: input.messageAt ?? "2026-10-20T00:00:00.000Z",
     })),
   });
 }
@@ -121,6 +122,26 @@ describe("leftOffLine", () => {
       session({ sessionId: "old", updatedAt: "2026-10-20T10:00:00.000Z", next: "Old step." }),
     ];
     expect(leftOffLine(sessions)).toBe("Ship it.");
+  });
+
+  it("follows the newest message, not a record fixed later", () => {
+    const sessions = [
+      session({
+        sessionId: "old-but-touched",
+        updatedAt: "2026-10-25T10:00:00.000Z",
+        next: "Old step.",
+        messages: ["Old message"],
+        messageAt: "2026-10-20T10:00:00.000Z",
+      }),
+      session({
+        sessionId: "current",
+        updatedAt: "2026-10-24T10:00:00.000Z",
+        next: "Current step.",
+        messages: ["Newest message"],
+        messageAt: "2026-10-24T09:00:00.000Z",
+      }),
+    ];
+    expect(leftOffLine(sessions)).toBe("Current step.");
   });
 
   it("falls back to the newest session's last message title, then to empty", () => {

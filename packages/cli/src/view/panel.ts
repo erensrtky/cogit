@@ -40,15 +40,28 @@ function lastMessageTitle(session: Session): string {
   return messages[messages.length - 1]?.title ?? "";
 }
 
+/** When the session's newest message was sent; its `updatedAt` when no message has a time. */
+function lastActive(session: Session): number {
+  let last = Number.NEGATIVE_INFINITY;
+  for (const node of session.nodes) {
+    if (node.kind !== "message" || node.at === undefined) continue;
+    const at = Date.parse(node.at);
+    if (!Number.isNaN(at) && at > last) last = at;
+  }
+  if (last !== Number.NEGATIVE_INFINITY) return last;
+  const updated = Date.parse(session.updatedAt);
+  return Number.isNaN(updated) ? Number.NEGATIVE_INFINITY : updated;
+}
+
 /**
- * Where the newest session left off: its own `next` step, or the title of its
- * last message when no next step was recorded.
+ * Where the work left off: the `next` step of the session with the newest
+ * message (not the most recently updated record — fixing an old record must
+ * not move it), or the title of its last message when no next step was recorded.
  */
 export function leftOffLine(sessions: Session[]): string {
-  const newest = [...sessions].sort((a, b) => {
-    const byTime = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
-    return Number.isNaN(byTime) ? a.sessionId.localeCompare(b.sessionId) : byTime;
-  })[0];
+  const newest = [...sessions].sort(
+    (a, b) => lastActive(b) - lastActive(a) || a.sessionId.localeCompare(b.sessionId),
+  )[0];
   if (!newest) return "";
   return newest.status.next.trim() || lastMessageTitle(newest);
 }

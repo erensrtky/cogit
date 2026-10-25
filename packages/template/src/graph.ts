@@ -54,7 +54,23 @@ function latestSession(model: LineageViewModel): ViewSession | undefined {
   )[0];
 }
 
+/**
+ * "Left off here": the newest message the user sent, in whichever session it
+ * is — not the most recently updated record, since fixing an old session's
+ * record must not move HEAD there. Sessions whose messages carry no time fall
+ * back to the most recently updated session and its last message.
+ */
 export function headOf(model: LineageViewModel): Head | null {
+  let best: { sessionId: string; messageId: string; at: number } | null = null;
+  for (const session of [...model.epochs.flatMap((epoch) => epoch.sessions), ...model.unassigned]) {
+    for (const message of session.messages) {
+      const at = time(message.at ?? "");
+      if (at === Number.NEGATIVE_INFINITY) continue;
+      if (best === null || at > best.at)
+        best = { sessionId: session.sessionId, messageId: message.id, at };
+    }
+  }
+  if (best !== null) return { sessionId: best.sessionId, messageId: best.messageId };
   const latest = latestSession(model);
   if (!latest) return null;
   return {

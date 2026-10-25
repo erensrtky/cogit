@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- "Left off here" (the map's HEAD, the jump on load and the project switcher's left-off line) follows the newest message the user sent instead of the most recently updated session record, so fixing an old session's record no longer moves it there.
+
 ### Changed
 - Map: the status card at the top of the page is gone; the map comes first. What it showed is in the side panel when you click a session (goal, done, pending with "needs you", next), and the agent gets it at session start.
 

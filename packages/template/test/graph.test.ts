@@ -37,7 +37,7 @@ const model: LineageViewModel = {
 };
 
 describe("headOf", () => {
-  it("marks the newest message of the most recently updated session", () => {
+  it("marks the newest message", () => {
     expect(headOf(model)).toEqual({ sessionId: "s1", messageId: "m2" });
   });
 
@@ -55,19 +55,47 @@ describe("headOf", () => {
     expect(headOf({ ...model, epochs: [], unassigned: [] })).toBeNull();
   });
 
-  it("picks the latest updatedAt across epochs and unassigned sessions", () => {
-    const withUnassigned: LineageViewModel = {
+  it("follows the newest message, not the most recently updated record", () => {
+    const fixedLater: LineageViewModel = {
       ...model,
       unassigned: [
         {
           ...model.epochs[0]!.sessions[0]!,
           sessionId: "u1",
+          // Its record was touched last (say, an old pending item was fixed),
+          // but its message is older than s1's newest one.
           updatedAt: "2026-10-23T00:00:00.000Z",
           messages: [message("m9")],
         },
       ],
     };
-    expect(headOf(withUnassigned)).toEqual({ sessionId: "u1", messageId: "m9" });
+    expect(headOf(fixedLater)).toEqual({ sessionId: "s1", messageId: "m2" });
+
+    const newerMessage: LineageViewModel = {
+      ...fixedLater,
+      unassigned: [
+        { ...fixedLater.unassigned[0]!, messages: [message("m9", "2026-10-22T00:00:00.000Z")] },
+      ],
+    };
+    expect(headOf(newerMessage)).toEqual({ sessionId: "u1", messageId: "m9" });
+  });
+
+  it("falls back to the most recently updated session when messages carry no time", () => {
+    const untimed: LineageViewModel = {
+      ...model,
+      epochs: [
+        {
+          ...model.epochs[0]!,
+          sessions: [
+            {
+              ...model.epochs[0]!.sessions[0]!,
+              messages: [{ id: "m1", kind: "message", title: "m1", parent: null }],
+            },
+          ],
+        },
+      ],
+    };
+    expect(headOf(untimed)).toEqual({ sessionId: "s1", messageId: "m1" });
   });
 });
 
