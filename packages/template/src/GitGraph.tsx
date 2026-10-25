@@ -234,6 +234,25 @@ export function GitGraph({
             <circle key={row.message.id} cx={x} cy={row.y} r={4.5} fill={color(row.colorIndex)} />
           );
         })}
+        {git.rows.map((row) => {
+          if (row.kind !== "message") return null;
+          const x = git.laneX[branches.get(row.segmentId)?.lane ?? 0] ?? 0;
+          // An invisible, larger target so a click on the dot does what a click on its row does.
+          return (
+            <circle
+              key={`${row.message.id}-hit`}
+              className="git-dot-hit nodrag nopan"
+              cx={x}
+              cy={row.y}
+              r={10}
+              fill="transparent"
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelect(row);
+              }}
+            />
+          );
+        })}
       </svg>
       <div className="git-rows" style={{ left: git.graphWidth + 8, width: git.rowWidth }}>
         {git.rows.map((row) => {

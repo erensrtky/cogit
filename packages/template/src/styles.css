@@ -1197,3 +1197,18 @@ time {
   font-size: 12px;
 }
 
+/*
+ * React Flow turns pointer events off on nodes that are neither selectable nor
+ * draggable, so the rows and dots inside a map node must turn them back on;
+ * the rest of the node stays click-through and keeps panning the canvas.
+ */
+.map-node button,
+.map-node .git-row,
+.session-dot,
+.git-dot-hit {
+  pointer-events: all;
+}
+
+.git-dot-hit {
+  cursor: pointer;
+}
