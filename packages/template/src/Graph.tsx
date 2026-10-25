@@ -86,13 +86,22 @@ const nodeTypes: NodeTypes = {
 };
 
 /**
- * The message a `#s=<sessionId>&m=<messageId>` URL asks for (Story 8.8:
- * `codelineage blame` prints such a URL). The session opens and the message's
- * drill-down is shown; a message id the record no longer holds opens the session.
+ * The place a URL asks for. `#s=<sessionId>&m=<messageId>` (Story 8.8:
+ * `codelineage blame` prints such a URL) opens that session and message;
+ * `#focus=head` is what the project switcher uses (8.12) — the newest message,
+ * i.e. where the work left off. The session opens and the message's drill-down
+ * is shown; a message id the record no longer holds opens the session.
  */
 function readTarget(model: LineageViewModel): { sessionId: string; messageId?: string } | null {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  if (params.get("focus") === "head") {
+    const head = headOf(model);
+    if (head === null) return null;
+    return head.messageId === null
+      ? { sessionId: head.sessionId }
+      : { sessionId: head.sessionId, messageId: head.messageId };
+  }
   const sessionId = params.get("s");
   if (sessionId === null || sessionId === "") return null;
   const session = findSession(model, sessionId);

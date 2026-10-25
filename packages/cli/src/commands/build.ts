@@ -23,7 +23,8 @@ import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
 import { type ChatTurn, displayTurn, excerpt, readConversation } from "../transcript.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
 import type { LineageViewModel, ViewChatTurn, ViewPendingMessage } from "../view/model.js";
-import { buildPanel } from "../view/panel.js";
+import { buildPanel, type CollectedProject, collectRegistryProjects } from "../view/panel.js";
+import { switcherEntries } from "../view/switcher.js";
 import { TEMPLATE_HTML } from "../view/template.js";
 import { collectTranscripts } from "../view/transcripts.js";
 
@@ -226,6 +227,17 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   } catch (err) {
     io.warn(`could not update .codelineage/.gitignore: ${(err as Error).message}`);
   }
+  // The map's switcher (8.12) and the panel read the same project list; collect
+  // it once. A broken registry is a warning: it must never fail the map.
+  const generatedAt = io.now();
+  let panelProjects: CollectedProject[] = [];
+  try {
+    panelProjects = await collectRegistryProjects(io.env, generatedAt, io.warn, root);
+  } catch (err) {
+    io.warn(`could not read the project list: ${(err as Error).message}`);
+  }
+  const switcher = switcherEntries(panelProjects, root);
+
   // The Stop hook skips a turn while this lock is held, and a second build waits
   // for the first instead of interleaving reads and writes of the same files.
   const model = await withLock(
@@ -240,7 +252,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         project: project.data,
         sessions: views.sessions,
         path: root,
-        generatedAt: io.now(),
+        generatedAt,
         transcripts: new Set(transcripts.keys()),
         chats: views.chats,
         pending: views.pending,
@@ -249,6 +261,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         // count would only be a stale warning about work already scheduled.
         unrecorded: config.sessionEndCatchUp ? undefined : views.unrecorded,
       });
+      built.switcher = switcher;
       // The skill already avoids secrets; this is the safety net before rendering.
       const redacted = redactDeep(built);
       if (redacted.count > 0)
@@ -269,7 +282,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       env: io.env,
       io,
       templateHtml: opts.templateHtml ?? TEMPLATE_HTML,
-      quietPath: root,
+      projects: panelProjects,
     });
   } catch (err) {
     io.warn(`could not build panel.html: ${(err as Error).message}`);

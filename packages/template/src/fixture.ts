@@ -189,4 +189,23 @@ export const fixture: LineageViewModel = {
       },
     ),
   ],
+  // Story 8.12: the switcher's data, as `build` collects it from the registry.
+  switcher: [
+    {
+      name: "codelineage",
+      path: "/home/dev/codelineage",
+      lastActivity: "2026-10-24T11:42:00.000Z",
+      leftOff: "Render the fixture through the template and check the single-file build.",
+      lineageUrl: "file:///home/dev/codelineage/.codelineage/lineage.html",
+      current: true,
+    },
+    {
+      name: "start-project",
+      path: "/home/dev/start-project",
+      lastActivity: "2026-10-23T18:05:00.000Z",
+      leftOff: "Write the push commands for the release notes.",
+      lineageUrl: "file:///home/dev/start-project/.codelineage/lineage.html",
+      current: false,
+    },
+  ],
 };

@@ -197,6 +197,23 @@ export interface ViewEpoch {
   sessions: ViewSession[];
 }
 
+/**
+ * One entry of the map's project switcher (Story 8.12): a registered project
+ * with the line that says where its work left off.
+ */
+export interface ViewSwitcherProject {
+  name: string;
+  path: string;
+  /** `updatedAt` of the project's most recently updated session. */
+  lastActivity: string | null;
+  /** The newest session's `next`, or its last message title when `next` is empty. */
+  leftOff: string;
+  /** `file://` URL of the project's map. */
+  lineageUrl: string;
+  /** True for the project the page belongs to. */
+  current: boolean;
+}
+
 export interface LineageViewModel {
   kind: "lineage";
   schema: typeof VIEW_SCHEMA;
@@ -209,6 +226,12 @@ export interface LineageViewModel {
   epochs: ViewEpoch[];
   /** Sessions with no epoch, or with an epoch that no longer exists. */
   unassigned: ViewSession[];
+  /**
+   * Every registered project, most recently active first, for the map's
+   * switcher (Story 8.12). Missing directories are left out; older pages simply
+   * have no switcher.
+   */
+  switcher?: ViewSwitcherProject[];
 }
 
 /** One project card in the global panel. */

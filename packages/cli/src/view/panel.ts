@@ -2,11 +2,13 @@ import { pathToFileURL } from "node:url";
 import type { Io } from "../io.js";
 import { redactDeep } from "../redact.js";
 import type { RegistryEntry } from "../schema/config.js";
+import type { Session } from "../schema/session.js";
 import { atomicWrite, isDirectory } from "../store/fs.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
 import { loadAllSessions, loadConfig, loadRegistry } from "../store/stores.js";
 import { embedViewModel, statusCard } from "./lineage.js";
-import { type PanelProject, type PanelViewModel, VIEW_SCHEMA } from "./model.js";
+import { type PanelViewModel, VIEW_SCHEMA } from "./model.js";
+import type { SwitcherSource } from "./switcher.js";
 import { TEMPLATE_HTML } from "./template.js";
 
 export interface PanelOptions {
@@ -16,9 +18,40 @@ export interface PanelOptions {
   templateHtml?: string;
   /** A project whose session warnings were already printed by the map build. */
   quietPath?: string;
+  /**
+   * Projects the caller already collected (the map build needs the same data for
+   * its switcher); skipped, the panel reads the registry itself.
+   */
+  projects?: CollectedProject[];
 }
 
+/**
+ * A panel card with the one line the map's switcher shows (Story 8.12). The
+ * panel page itself does not embed `leftOff`; the map's switcher does. The
+ * shape lives in `switcher.ts` so the template can import it without this file.
+ */
+export type CollectedProject = SwitcherSource;
+
 const PANEL_TITLE = "<title>codelineage — panel</title>";
+
+/** The title of the newest message in a session, in send order. */
+function lastMessageTitle(session: Session): string {
+  const messages = session.nodes.filter((node) => node.kind === "message");
+  return messages[messages.length - 1]?.title ?? "";
+}
+
+/**
+ * Where the newest session left off: its own `next` step, or the title of its
+ * last message when no next step was recorded.
+ */
+export function leftOffLine(sessions: Session[]): string {
+  const newest = [...sessions].sort((a, b) => {
+    const byTime = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+    return Number.isNaN(byTime) ? a.sessionId.localeCompare(b.sessionId) : byTime;
+  })[0];
+  if (!newest) return "";
+  return newest.status.next.trim() || lastMessageTitle(newest);
+}
 
 /**
  * One card per registry entry. A directory that is gone is marked missing
@@ -29,8 +62,8 @@ export async function collectPanelProjects(
   generatedAt: string,
   warn: (line: string) => void,
   quietPath?: string,
-): Promise<PanelProject[]> {
-  const projects: PanelProject[] = [];
+): Promise<CollectedProject[]> {
+  const projects: CollectedProject[] = [];
   for (const entry of entries) {
     if (!(await isDirectory(entry.path))) {
       projects.push({
@@ -40,12 +73,14 @@ export async function collectPanelProjects(
         lastActivity: null,
         needsUserCount: 0,
         lineageUrl: null,
+        leftOff: "",
       });
       continue;
     }
     try {
       const sessionWarn = entry.path === quietPath ? () => {} : warn;
-      const card = statusCard(await loadAllSessions(entry.path, sessionWarn), generatedAt);
+      const sessions = await loadAllSessions(entry.path, sessionWarn);
+      const card = statusCard(sessions, generatedAt);
       projects.push({
         name: entry.name,
         path: entry.path,
@@ -53,6 +88,7 @@ export async function collectPanelProjects(
         lastActivity: card.lastActivity,
         needsUserCount: card.pending.filter((item) => item.needsUser).length,
         lineageUrl: pathToFileURL(projectPaths(entry.path).html).href,
+        leftOff: leftOffLine(sessions),
       });
     } catch (err) {
       warn(`skipping project ${entry.path}: ${(err as Error).message}`);
@@ -63,10 +99,34 @@ export async function collectPanelProjects(
         lastActivity: null,
         needsUserCount: 0,
         lineageUrl: pathToFileURL(projectPaths(entry.path).html).href,
+        leftOff: "",
       });
     }
   }
   return projects;
+}
+
+/**
+ * Reads the registry and collects every project. An unreadable registry is a
+ * warning and no projects, never a failed build: the panel and the map's
+ * switcher are derived state.
+ */
+export async function collectRegistryProjects(
+  env: NodeJS.ProcessEnv,
+  generatedAt: string,
+  warn: (line: string) => void,
+  quietPath?: string,
+): Promise<CollectedProject[]> {
+  const registry = await loadRegistry(env);
+  if (registry.found && !registry.ok) {
+    warn(`registry: ${registry.error}; showing no projects`);
+    return [];
+  }
+  if (registry.found) {
+    for (const warning of registry.warnings) warn(warning);
+  }
+  if (!registry.found || !registry.ok) return [];
+  return await collectPanelProjects(registry.data.projects, generatedAt, warn, quietPath);
 }
 
 /**
@@ -77,13 +137,10 @@ export async function collectPanelProjects(
 export async function buildPanel(opts: PanelOptions): Promise<PanelViewModel> {
   const { io } = opts;
   const generatedAt = io.now();
-  const [config, registry] = await Promise.all([loadConfig(opts.env), loadRegistry(opts.env)]);
-  if (registry.found && !registry.ok) {
-    io.warn(`registry: ${registry.error}; showing no projects`);
-  } else if (registry.found) {
-    for (const warning of registry.warnings) io.warn(warning);
-  }
-  const entries = registry.found && registry.ok ? registry.data.projects : [];
+  const config = await loadConfig(opts.env);
+  const projects =
+    opts.projects ??
+    (await collectRegistryProjects(opts.env, generatedAt, io.warn, opts.quietPath));
 
   const model: PanelViewModel = {
     kind: "panel",
@@ -99,7 +156,8 @@ export async function buildPanel(opts: PanelOptions): Promise<PanelViewModel> {
       gitPolicy: config.gitPolicy,
       agents: config.agents,
     },
-    projects: await collectPanelProjects(entries, generatedAt, io.warn, opts.quietPath),
+    // `leftOff` belongs to the map's switcher; the panel page stays as it was.
+    projects: projects.map(({ leftOff: _leftOff, ...project }) => project),
   };
 
   // Same safety net as the map: nothing leaves this process unredacted.

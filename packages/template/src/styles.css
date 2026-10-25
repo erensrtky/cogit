@@ -70,6 +70,181 @@ ul {
   padding-left: 20px;
 }
 
+/* Project switcher (Story 8.12): a tab strip of recent projects and a
+   Ctrl/Cmd+K search over every registered one. */
+.switcher {
+  margin-bottom: 18px;
+}
+
+.switcher-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.switcher-tab {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 220px;
+  padding: 6px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+  background: #151922;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.switcher-tab:hover {
+  color: var(--text);
+  border-color: #3b4557;
+}
+
+.switcher-tab.is-current {
+  color: var(--text);
+  background: #1d2431;
+  border-color: var(--accent);
+}
+
+.switcher-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switcher-time {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.switcher-more {
+  flex: none;
+  padding: 5px 12px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.switcher-more:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.switcher-more kbd {
+  padding: 1px 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.switcher-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 32px;
+  background: rgba(5, 7, 10, 0.62);
+}
+
+.switcher-dialog {
+  width: min(640px, 100%);
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.switcher-input {
+  width: 100%;
+  padding: 9px 12px;
+  color: var(--text);
+  font: inherit;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.switcher-input:focus {
+  outline: 1px solid var(--accent);
+}
+
+.switcher-results {
+  max-height: 50vh;
+  margin: 8px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.switcher-result {
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.switcher-result.is-active {
+  background: #243040;
+  border-color: var(--accent);
+}
+
+.switcher-result-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.switcher-result-head .switcher-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.switcher-result-head .switcher-time {
+  margin-left: auto;
+}
+
+.switcher-leftoff {
+  display: -webkit-box;
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 13px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.switcher-path {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switcher-hint {
+  margin: 8px 2px 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.switcher-none {
+  padding: 8px 10px;
+}
+
 .project {
   display: flex;
   align-items: flex-end;
@@ -1021,3 +1196,4 @@ time {
   color: var(--l5);
   font-size: 12px;
 }
+

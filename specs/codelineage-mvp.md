@@ -54,6 +54,13 @@ these records into static HTML:
   switching into each project map. Settings are editable on the page the local
   server serves (`POST /api/config`, same-origin, per-server token) and read-only
   from `file://`.
+- **Project switcher** (on every map): a tab strip of the most recently active
+  projects and a Ctrl/Cmd+K search over every registered project, each entry
+  showing the project name, its last activity and where it left off (the newest
+  session's `next`, or its last message title). Choosing one opens that project's
+  map at its own "left off here" — a page of the same local server over http, the
+  `lineage.html` file over `file://`. A project whose directory is gone is left
+  out. The data comes from the registry at build time; no model calls.
 
 Sessions are not a separate view. A session is a level of the project tree.
 

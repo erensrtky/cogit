@@ -1,6 +1,7 @@
 import type { LineageViewModel, StatusCard } from "../../cli/src/view/model.js";
 import { formatTime } from "./format.js";
 import { Graph } from "./Graph.js";
+import { ProjectSwitcher } from "./ProjectSwitcher.js";
 
 function StatusPanel({ status }: { status: StatusCard }) {
   return (
@@ -53,6 +54,8 @@ export function App({ model }: { model: LineageViewModel }) {
   return (
     <main>
       <div className="page-head">
+        <ProjectSwitcher model={model} />
+
         <header className="project">
           <div>
             <h1>{model.project.name}</h1>
