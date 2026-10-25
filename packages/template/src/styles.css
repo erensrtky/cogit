@@ -1212,3 +1212,23 @@ time {
 .git-dot-hit {
   cursor: pointer;
 }
+
+/* An opened session's messages, accordion-style below its row (Story 8.7). */
+.map-node {
+  position: relative;
+}
+
+.session-open {
+  position: absolute;
+}
+
+.session-toggle {
+  flex: none;
+  width: 10px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.session-row.is-open {
+  background: rgba(122, 162, 247, 0.08);
+}

@@ -11,6 +11,9 @@ import type { SessionGraph } from "./sessionLayout.js";
  * in place. The geometry comes from `sessionLayout.ts`; this file only renders.
  */
 
+/** How far below the session row the line into its opened messages turns right. */
+export const OPEN_LINK_DROP = 18;
+
 function color(index: number): string {
   return `var(--l${index % LANE_COLORS})`;
 }
@@ -35,6 +38,7 @@ function SessionRow({
   session,
   epochTitle,
   selected,
+  open,
   onOpen,
   onContinue,
 }: {
@@ -42,6 +46,8 @@ function SessionRow({
   session: ViewSession;
   epochTitle: string | null;
   selected: boolean;
+  /** Its messages are open below the row. */
+  open: boolean;
   onOpen: (sessionId: string) => void;
   onContinue: (continues: NonNullable<ViewSession["messages"][number]["continues"]>) => void;
 }) {
@@ -51,14 +57,18 @@ function SessionRow({
   return (
     <button
       type="button"
-      className={`git-row session-row${selected ? " is-selected" : ""}`}
+      className={`git-row session-row${selected ? " is-selected" : ""}${open ? " is-open" : ""}`}
       style={style}
+      aria-expanded={open}
       onClick={(event: MouseEvent) => {
         event.stopPropagation();
         onOpen(session.sessionId);
       }}
       title={session.status.goal || session.title}
     >
+      <span className="session-toggle" aria-hidden="true">
+        {open ? "▾" : "▸"}
+      </span>
       <span className="git-time">{session.startedAt ? formatStamp(session.startedAt) : ""}</span>
       {epochTitle ? (
         <span className="epoch-tag" title={`Epoch: ${epochTitle}`}>
@@ -96,12 +106,15 @@ export function SessionMap({
   model,
   graph,
   selectedSessionId,
+  openIds,
   onOpen,
   onContinue,
 }: {
   model: LineageViewModel;
   graph: SessionGraph;
   selectedSessionId: string | null;
+  /** Sessions whose messages are open below their rows. */
+  openIds: ReadonlySet<string>;
   onOpen: (sessionId: string) => void;
   onContinue: (sessionId: string, messageId: string) => void;
 }) {
@@ -144,6 +157,22 @@ export function SessionMap({
           );
         })}
         {git.rows.map((row) => {
+          if (row.kind !== "message" || row.spaceTop === undefined) return null;
+          // An opened session: a line from its dot down into its messages below.
+          const x = git.laneX[segments.get(row.segmentId)?.lane ?? 0] ?? 0;
+          const y = row.spaceTop + OPEN_LINK_DROP;
+          return (
+            <path
+              key={`${row.message.id}-open`}
+              d={`M${x},${row.y} L${x},${y} L${git.graphWidth + 4},${y}`}
+              stroke={color(row.colorIndex)}
+              strokeWidth={1.5}
+              strokeDasharray="3 3"
+              fill="none"
+            />
+          );
+        })}
+        {git.rows.map((row) => {
           if (row.kind !== "message") return null;
           const x = git.laneX[segments.get(row.segmentId)?.lane ?? 0] ?? 0;
           return row.first ? (
@@ -183,6 +212,7 @@ export function SessionMap({
               session={session}
               epochTitle={epochTitle}
               selected={selectedSessionId === session.sessionId}
+              open={openIds.has(session.sessionId)}
               onOpen={onOpen}
               onContinue={(continues) => onContinue(continues.sessionId, continues.id)}
             />

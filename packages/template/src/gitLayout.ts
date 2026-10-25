@@ -151,6 +151,11 @@ export interface GitMessageRow {
   head: boolean;
   /** Row height: titles wrap instead of being cut, so long ones get taller rows. */
   height: number;
+  /**
+   * Top of the space reserved below this row (`spaceAfter`), where the project
+   * map draws an opened session's messages, accordion-style.
+   */
+  spaceTop?: number;
 }
 
 export interface GitMoreRow {
@@ -214,6 +219,12 @@ export interface GitLayoutOptions {
   itemEnd?: (item: GitNode) => number | null;
   /** Width of the row text area; defaults to `ROW_WIDTH`. */
   rowWidth?: number;
+  /**
+   * Extra height to leave below an item's row, by item id: the project map opens
+   * a session in place by reserving room for its messages under the session's
+   * row; the rows below move down and lanes run on through the space.
+   */
+  spaceAfter?: ReadonlyMap<string, number>;
 }
 
 interface RawRow {
@@ -226,6 +237,7 @@ interface RawRow {
   y: number;
   height: number;
   gap: boolean;
+  spaceTop?: number;
 }
 
 /** Average glyph widths at the row's font sizes; a rough estimate is enough. */
@@ -428,6 +440,11 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
       : ROW_HEIGHT;
     row.y = cursor + row.height / 2;
     cursor += row.height;
+    const space = row.kind === "message" ? options.spaceAfter?.get(row.id ?? "") : undefined;
+    if (space !== undefined && space > 0) {
+      row.spaceTop = cursor;
+      cursor += space;
+    }
     if (row.kind === "message" && row.id) rowOf.set(row.id, row);
     for (const hidden of row.hidden ?? []) rowOf.set(hidden, row);
   });
@@ -527,6 +544,7 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
       tags: tagsOf(message),
       head: message.id === headId,
       height: row.height,
+      ...(row.spaceTop === undefined ? {} : { spaceTop: row.spaceTop }),
     };
   });
 

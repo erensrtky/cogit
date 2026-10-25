@@ -48,7 +48,11 @@ export interface SessionGraph {
  * get parallel lanes even when their rows are not adjacent. Long chains never
  * fold: every session must stay visible.
  */
-export function layoutSessionGraph(model: LineageViewModel): SessionGraph {
+export function layoutSessionGraph(
+  model: LineageViewModel,
+  /** Room to leave under a session's row for its opened messages, by session id. */
+  spaceAfter?: ReadonlyMap<string, number>,
+): SessionGraph {
   const sessions = allSessions(model);
   const byId = new Map(sessions.map((session) => [session.sessionId, session]));
   const known = new Set(byId.keys());
@@ -82,6 +86,7 @@ export function layoutSessionGraph(model: LineageViewModel): SessionGraph {
     rowWidth: SESSION_ROW_WIDTH,
     headId: headOf(model)?.sessionId ?? null,
     itemEnd: endIndex,
+    ...(spaceAfter === undefined ? {} : { spaceAfter }),
   });
   return { git, sessions: byId, parents };
 }

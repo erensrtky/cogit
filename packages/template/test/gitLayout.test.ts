@@ -193,6 +193,17 @@ describe("rows", () => {
     ]);
   });
 
+  it("leaves room below a row when asked, moving the rows below down (accordion)", () => {
+    const messages = [message("m1", null), message("m2", "m1"), message("m3", "m2")];
+    const plain = rowsOf(messages).messageRows;
+    const { messageRows, layout } = rowsOf(messages, { spaceAfter: new Map([["m2", 100]]) });
+    expect(messageRows[1]!.spaceTop).toBe(plain[1]!.y + plain[1]!.height / 2);
+    expect(messageRows[0]!.spaceTop).toBeUndefined();
+    expect(messageRows[2]!.y).toBe(plain[2]!.y + 100);
+    expect(messageRows[0]!.y).toBe(plain[0]!.y);
+    expect(layout.height).toBe(rowsOf(messages).layout.height + 100);
+  });
+
   it("marks the newest message as HEAD unless told otherwise", () => {
     const messages = [message("m1", null), message("m2", "m1"), message("m3", "m2")];
     const rows = layoutGitGraph(messages).rows.filter(

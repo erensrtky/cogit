@@ -17,72 +17,91 @@ import { GitGraph } from "./GitGraph.js";
 import { type GitLayout, layoutGitGraph } from "./gitLayout.js";
 import { headOf } from "./graph.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
-import { SessionMap } from "./SessionMap.js";
+import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
 import { layoutSessionGraph, type SessionGraph } from "./sessionLayout.js";
 
 /**
- * The project map (Story 8.7). Level one: the sessions as a git graph, one dot
- * each. Level two: the clicked session's messages as their git graph (8.2), in
- * place, with a back control. Both levels share the same layout engine.
+ * The project map (Story 8.7). The sessions are a git graph, one dot each;
+ * clicking a session opens its messages as their own git graph (8.2) right below
+ * its row, accordion-style: the other sessions stay where they are and the ones
+ * below move down. Several sessions can be open; clicking again closes one.
+ * Both levels share the same layout engine.
  */
+
+/** Gap between a session row and its opened messages, and below them. */
+const OPEN_TOP = OPEN_LINK_DROP - 12;
+const OPEN_BOTTOM = 20;
+/** Room for the "no messages yet" line of an opened session with none. */
+const OPEN_EMPTY = 36;
 
 const GraphActions = createContext<{
   selection: Selection | null;
+  openIds: ReadonlySet<string>;
   openSession: (sessionId: string) => void;
   openNode: (sessionId: string, messageId: string, branchId?: string) => void;
   openContinue: (sessionId: string, messageId: string) => void;
   unfold: (segmentId: string) => void;
 }>({
   selection: null,
+  openIds: new Set(),
   openSession: () => {},
   openNode: () => {},
   openContinue: () => {},
   unfold: () => {},
 });
 
-type ProjectData = { model: LineageViewModel; graph: SessionGraph };
-type MessagesData = { session: ViewSession; git: GitLayout };
+/** An opened session: its message graph and where it sits on the canvas. */
+type Opening = { session: ViewSession; git: GitLayout; top: number; left: number };
+type ProjectData = { model: LineageViewModel; graph: SessionGraph; openings: Opening[] };
 
 type ProjectFlowNode = Node<ProjectData, "project">;
-type MessagesFlowNode = Node<MessagesData, "messages">;
-type MapFlowNode = ProjectFlowNode | MessagesFlowNode;
+type MapFlowNode = ProjectFlowNode;
+
+function SessionMessages({ session, git }: { session: ViewSession; git: GitLayout }) {
+  const { selection, openNode, openContinue, unfold } = useContext(GraphActions);
+  const own = selection?.sessionId === session.sessionId;
+  if (git.rows.length === 0)
+    return <p className="graph-status empty">No messages recorded in this session yet.</p>;
+  return (
+    <GitGraph
+      git={git}
+      selectedId={selection?.type === "node" && own ? selection.nodeId : null}
+      activeSegmentId={selection?.type === "node" && own ? (selection.branchId ?? null) : null}
+      onSelect={(row) => openNode(session.sessionId, row.message.id, row.segmentId)}
+      onUnfold={unfold}
+      onContinue={(continues) => openContinue(continues.sessionId, continues.id)}
+    />
+  );
+}
 
 function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
-  const { openSession, openContinue, selection } = useContext(GraphActions);
+  const { openSession, openContinue, selection, openIds } = useContext(GraphActions);
   return (
     <div className="map-node">
       <SessionMap
         model={data.model}
         graph={data.graph}
         selectedSessionId={selection?.sessionId ?? null}
+        openIds={openIds}
         onOpen={openSession}
         onContinue={openContinue}
       />
-    </div>
-  );
-}
-
-function MessagesBox({ data }: NodeProps<MessagesFlowNode>) {
-  const { selection, openNode, openContinue, unfold } = useContext(GraphActions);
-  const own = selection?.sessionId === data.session.sessionId;
-  return (
-    <div className="map-node">
-      <GitGraph
-        git={data.git}
-        selectedId={selection?.type === "node" && own ? selection.nodeId : null}
-        activeSegmentId={selection?.type === "node" && own ? (selection.branchId ?? null) : null}
-        onSelect={(row) => openNode(data.session.sessionId, row.message.id, row.segmentId)}
-        onUnfold={unfold}
-        onContinue={(continues) => openContinue(continues.sessionId, continues.id)}
-      />
+      {data.openings.map((opening) => (
+        <div
+          key={opening.session.sessionId}
+          className="session-open"
+          style={{ top: opening.top, left: opening.left }}
+        >
+          <SessionMessages session={opening.session} git={opening.git} />
+        </div>
+      ))}
     </div>
   );
 }
 
 const nodeTypes: NodeTypes = {
   project: ProjectBox,
-  messages: MessagesBox,
 };
 
 /**
@@ -123,7 +142,9 @@ function findSession(model: LineageViewModel, id: string): ViewSession | undefin
 function Flow({ model }: { model: LineageViewModel }) {
   // Read once: a live data swap must not move the page back to the hash target.
   const [initial] = useState(() => readTarget(model));
-  const [openId, setOpenId] = useState<string | null>(initial?.sessionId ?? null);
+  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(
+    () => new Set(initial === null ? [] : [initial.sessionId]),
+  );
   const [selection, setSelection] = useState<Selection | null>(() => {
     if (initial === null) return null;
     if (initial.messageId === undefined) return { type: "session", sessionId: initial.sessionId };
@@ -139,69 +160,126 @@ function Flow({ model }: { model: LineageViewModel }) {
     return `node:session:${initial.sessionId}:${initial.messageId}`;
   });
 
-  const openSession = openId === null ? undefined : findSession(model, openId);
   const head = headOf(model);
-  const sessionGraph = useMemo(() => layoutSessionGraph(model), [model]);
 
-  /** The open drill-down's message, when it belongs to the open session. */
-  const targetId =
-    selection?.type === "node" && selection.sessionId === openSession?.sessionId
-      ? selection.nodeId
-      : null;
+  /** The open drill-down's message, if any. */
+  const target = selection?.type === "node" ? selection : null;
 
-  const messageGit = useMemo(() => {
-    if (!openSession) return null;
-    const options = {
-      unfolded,
-      openAll,
-      headId: head?.sessionId === openSession.sessionId ? head.messageId : null,
-    };
-    const layout = layoutGitGraph(openSession.messages, options);
-    if (targetId === null) return layout;
-    const visible = layout.rows.some(
-      (row) => row.kind === "message" && row.message.id === targetId,
-    );
-    if (visible) return layout;
-    // A deep link (`blame` prints one) may point inside a folded branch: open it
-    // rather than letting the page land on a row the user cannot see.
-    const segment = layout.segments.find((candidate) => candidate.ids.includes(targetId));
-    return segment === undefined
-      ? layout
-      : layoutGitGraph(openSession.messages, {
-          ...options,
-          unfolded: new Set([...unfolded, segment.id]),
-        });
-  }, [openSession, head?.sessionId, head?.messageId, unfolded, openAll, targetId]);
+  /** Message graph of every open session. */
+  const messageGits = useMemo(() => {
+    const out = new Map<string, GitLayout>();
+    for (const sessionId of openIds) {
+      const session = findSession(model, sessionId);
+      if (!session) continue;
+      const options = {
+        unfolded,
+        openAll,
+        headId: head?.sessionId === sessionId ? head.messageId : null,
+      };
+      let layout = layoutGitGraph(session.messages, options);
+      const targetId = target?.sessionId === sessionId ? target.nodeId : null;
+      if (
+        targetId !== null &&
+        !layout.rows.some((row) => row.kind === "message" && row.message.id === targetId)
+      ) {
+        // A deep link (`blame` prints one) may point inside a folded branch: open it
+        // rather than letting the page land on a row the user cannot see.
+        const segment = layout.segments.find((candidate) => candidate.ids.includes(targetId));
+        if (segment !== undefined)
+          layout = layoutGitGraph(session.messages, {
+            ...options,
+            unfolded: new Set([...unfolded, segment.id]),
+          });
+      }
+      out.set(sessionId, layout);
+    }
+    return out;
+  }, [
+    model,
+    openIds,
+    unfolded,
+    openAll,
+    head?.sessionId,
+    head?.messageId,
+    target?.sessionId,
+    target?.nodeId,
+  ]);
 
-  /** Row the view centres on when a session opens: the open message, else HEAD. */
+  /** Room under each open session's row for its messages. */
+  const spaceAfter = useMemo(() => {
+    const out = new Map<string, number>();
+    for (const [sessionId, git] of messageGits)
+      out.set(
+        sessionId,
+        OPEN_TOP + (git.rows.length === 0 ? OPEN_EMPTY : git.height) + OPEN_BOTTOM,
+      );
+    return out;
+  }, [messageGits]);
+
+  const sessionGraph = useMemo(() => layoutSessionGraph(model, spaceAfter), [model, spaceAfter]);
+
+  const openings = useMemo(() => {
+    const out: Opening[] = [];
+    for (const row of sessionGraph.git.rows) {
+      if (row.kind !== "message" || row.spaceTop === undefined) continue;
+      const session = sessionGraph.sessions.get(row.message.id);
+      const git = messageGits.get(row.message.id);
+      if (!session || !git) continue;
+      out.push({
+        session,
+        git,
+        top: row.spaceTop + OPEN_TOP,
+        left: sessionGraph.git.graphWidth + 8,
+      });
+    }
+    return out;
+  }, [sessionGraph, messageGits]);
+
+  /** Where the view centres on load: a deep-linked message, else the whole map. */
   const focusRow = useMemo(() => {
-    if (!openSession || !messageGit) return null;
-    const id =
-      targetId ?? (head?.sessionId === openSession.sessionId ? (head.messageId ?? null) : null);
-    if (id === null) return null;
-    const row = messageGit.rows.find(
-      (candidate) => candidate.kind === "message" && candidate.message.id === id,
+    if (initial?.messageId === undefined) return null;
+    const opening = openings.find((candidate) => candidate.session.sessionId === initial.sessionId);
+    const row = opening?.git.rows.find(
+      (candidate) => candidate.kind === "message" && candidate.message.id === initial.messageId,
     );
-    return row ? { x: messageGit.graphWidth / 2, y: row.y } : null;
-  }, [openSession, messageGit, targetId, head?.sessionId, head?.messageId]);
+    if (!opening || !row) return null;
+    return { x: opening.left + opening.git.graphWidth / 2, y: opening.top + row.y };
+  }, [initial, openings]);
 
-  const viewKey = openSession ? `session:${openSession.sessionId}` : "project";
-
-  const openSessionAt = useCallback((sessionId: string) => {
-    setOpenId(sessionId);
-    setFocusedId(`session:${sessionId}`);
-    setSelection({ type: "session", sessionId });
+  const ensureOpen = useCallback((sessionId: string) => {
+    setOpenIds((previous) =>
+      previous.has(sessionId) ? previous : new Set([...previous, sessionId]),
+    );
   }, []);
-  const openNode = useCallback((sessionId: string, messageId: string, branchId?: string) => {
-    setOpenId(sessionId);
-    setFocusedId(`node:session:${sessionId}:${messageId}`);
-    setSelection({
-      type: "node",
-      sessionId,
-      nodeId: messageId,
-      ...(branchId === undefined ? {} : { branchId }),
-    });
-  }, []);
+  const toggleSession = useCallback(
+    (sessionId: string) => {
+      if (openIds.has(sessionId)) {
+        const next = new Set(openIds);
+        next.delete(sessionId);
+        setOpenIds(next);
+        setSelection((previous) => (previous?.sessionId === sessionId ? null : previous));
+        return;
+      }
+      // Opening only unfolds the accordion; the side panel waits for a message click
+      // so it does not cover the messages that just opened.
+      setOpenIds(new Set([...openIds, sessionId]));
+      setFocusedId(`session:${sessionId}`);
+    },
+    [openIds],
+  );
+  const openNode = useCallback(
+    (sessionId: string, messageId: string, branchId?: string) => {
+      ensureOpen(sessionId);
+      setFocusedId(`node:session:${sessionId}:${messageId}`);
+      setSelection({
+        type: "node",
+        sessionId,
+        nodeId: messageId,
+        ...(branchId === undefined ? {} : { branchId }),
+      });
+    },
+    [ensureOpen],
+  );
   const openContinue = useCallback(
     (sessionId: string, messageId: string) => openNode(sessionId, messageId),
     [openNode],
@@ -213,72 +291,51 @@ function Flow({ model }: { model: LineageViewModel }) {
       return next;
     });
   }, []);
-  const back = useCallback(() => {
-    setOpenId(null);
-    setSelection(null);
-    setFocusedId(null);
-  }, []);
-  const selectFromOutline = useCallback((target: OutlineTarget) => {
-    setFocusedId(target.focusId);
-    setOpenId(target.sessionId);
-    setSelection(target.selection);
-  }, []);
+  const selectFromOutline = useCallback(
+    (target: OutlineTarget) => {
+      setFocusedId(target.focusId);
+      if (target.sessionId !== null) ensureOpen(target.sessionId);
+      setSelection(target.selection);
+    },
+    [ensureOpen],
+  );
 
   const actions = useMemo(
-    () => ({ selection, openSession: openSessionAt, openNode, openContinue, unfold }),
-    [selection, openSessionAt, openNode, openContinue, unfold],
+    () => ({ selection, openIds, openSession: toggleSession, openNode, openContinue, unfold }),
+    [selection, openIds, toggleSession, openNode, openContinue, unfold],
   );
 
   const nodes = useMemo<MapFlowNode[]>(() => {
-    if (openSession && messageGit) {
-      return [
-        {
-          id: viewKey,
-          type: "messages",
-          position: { x: 0, y: 0 },
-          width: messageGit.width,
-          height: messageGit.height,
-          style: { width: messageGit.width, height: messageGit.height },
-          draggable: false,
-          connectable: false,
-          selectable: false,
-          data: { session: openSession, git: messageGit },
-        },
-      ];
-    }
+    const width = Math.max(
+      sessionGraph.git.width,
+      ...openings.map((opening) => opening.left + opening.git.width),
+    );
     return [
       {
         id: "project",
         type: "project",
         position: { x: 0, y: 0 },
-        width: sessionGraph.git.width,
+        width,
         height: sessionGraph.git.height,
-        style: { width: sessionGraph.git.width, height: sessionGraph.git.height },
+        style: { width, height: sessionGraph.git.height },
         draggable: false,
         connectable: false,
         selectable: false,
-        data: { model, graph: sessionGraph },
+        data: { model, graph: sessionGraph, openings },
       },
     ];
-  }, [openSession, messageGit, model, sessionGraph, viewKey]);
+  }, [model, sessionGraph, openings]);
 
   return (
     <GraphActions.Provider value={actions}>
       <div className={fullscreen ? "map-shell is-expanded" : "map-shell"}>
         <div className="map-toolbar">
-          {openSession ? (
-            <button type="button" className="outline-button" onClick={back}>
-              ← All sessions
-            </button>
-          ) : null}
-          <span className="map-title" title={openSession?.title}>
-            {openSession
-              ? openSession.title || openSession.sessionId
-              : `${sessionGraph.git.rows.length} session${
-                  sessionGraph.git.rows.length === 1 ? "" : "s"
-                } · click a dot to open its messages`}
+          <span className="map-title">
+            {`${sessionGraph.git.rows.length} session${
+              sessionGraph.git.rows.length === 1 ? "" : "s"
+            } · click a session to open or close its messages`}
           </span>
-          {openSession ? (
+          {openIds.size > 0 ? (
             <button
               type="button"
               className="outline-button"
@@ -318,12 +375,10 @@ function Flow({ model }: { model: LineageViewModel }) {
             />
           ) : null}
           <div className="graph-canvas">
-            {!openSession && sessionGraph.git.rows.length === 0 ? (
+            {sessionGraph.git.rows.length === 0 ? (
               <p className="graph-status empty">No sessions recorded yet.</p>
-            ) : openSession && (messageGit?.rows.length ?? 0) === 0 ? (
-              <p className="graph-status empty">No messages recorded in this session yet.</p>
             ) : (
-              <MapCanvas key={viewKey} nodes={nodes} focusRow={focusRow} fitWhole={!openSession} />
+              <MapCanvas nodes={nodes} focusRow={focusRow} />
             )}
             <DrillDown
               model={model}
@@ -339,26 +394,24 @@ function Flow({ model }: { model: LineageViewModel }) {
 }
 
 /**
- * One React Flow canvas per level (the `key` remounts it and reframes). A live
- * data swap keeps the level, so the viewport stays where the user left it.
+ * One React Flow canvas for the whole map. It frames the map once on load (or
+ * centres a deep-linked message); opening or closing a session and live data
+ * swaps leave the viewport where the user put it.
  */
 function MapCanvas({
   nodes,
   focusRow,
-  fitWhole,
 }: {
   nodes: MapFlowNode[];
-  /** Point to centre on when a session opens; null fits the whole graph. */
+  /** Point to centre on at load; null fits the whole graph. */
   focusRow: { x: number; y: number } | null;
-  /** Frame the whole graph instead of one row (the project level). */
-  fitWhole: boolean;
 }) {
   const { fitView, setViewport } = useReactFlow();
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const canvas = document.querySelector(".react-flow")?.getBoundingClientRect();
-      if (!fitWhole && focusRow && canvas) {
+      if (focusRow && canvas) {
         const zoom = 0.9;
         void setViewport({
           zoom,
@@ -367,10 +420,10 @@ function MapCanvas({
         });
         return;
       }
-      void fitView({ padding: fitWhole ? 0.12 : 0.15, maxZoom: 1, duration: 200 });
+      void fitView({ padding: 0.12, maxZoom: 1, duration: 200 });
     }, 80);
     return () => window.clearTimeout(timer);
-    // Mount only: the component is keyed by level, and a model swap must not refit.
+    // Mount only: opening a session or a model swap must not refit.
   }, []);
 
   return (
