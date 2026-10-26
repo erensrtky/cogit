@@ -8,13 +8,27 @@ import type { HookContext } from "./run.js";
  * 1.5 s budget, so this only starts the detached catch-up and returns. The tail
  * is not stored: the catch-up reads whatever messages still have no node, so a
  * child that dies is retried when the session is opened next.
+ *
+ * With `recordCommit: auto` (Story 9.3) the last record is committed detached as
+ * well; the catch-up does that itself once it has written, so this only starts a
+ * commit when there is nothing to catch up (or the catch-up is off).
  */
 export async function onSessionEnd(ctx: HookContext): Promise<undefined> {
   if (!ctx.initialized) return undefined;
   const config = await loadConfig(ctx.env);
-  if (!config.sessionEndCatchUp) return undefined;
+  const autoCommit = config.recordCommit === "auto";
+  const commitOnly = (): void => {
+    if (autoCommit) ctx.spawnDetached(["record-commit", ctx.sessionId, "-C", ctx.root]);
+  };
+  if (!config.sessionEndCatchUp) {
+    commitOnly();
+    return undefined;
+  }
   const messages = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
-  if (!messages || messages.length === 0) return undefined;
+  if (!messages || messages.length === 0) {
+    commitOnly();
+    return undefined;
+  }
   const record = await loadSession(ctx.root, ctx.sessionId);
   let recorded = new Set<string>();
   if (record.found && record.ok) {
@@ -22,7 +36,10 @@ export async function onSessionEnd(ctx: HookContext): Promise<undefined> {
     const events = await readEvents(ctx.root, ctx.sessionId);
     recorded = new Set(applyEvents(upgraded.nodes, events).map((node) => node.id));
   }
-  if (messages.every((message) => isRecorded(recorded, message))) return undefined;
+  if (messages.every((message) => isRecorded(recorded, message))) {
+    commitOnly();
+    return undefined;
+  }
   ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "-C", ctx.root]);
   return undefined;
 }

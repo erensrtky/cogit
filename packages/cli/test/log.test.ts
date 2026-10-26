@@ -55,6 +55,7 @@ describe("cogit log and show", () => {
     const s1 = session({
       sessionId: "s1",
       title: "Ship the parser",
+      author: "Eren",
       epoch: "e8",
       startedAt: "2026-10-20T09:00:00.000Z",
       updatedAt: "2026-10-20T10:00:00.000Z",
@@ -208,6 +209,8 @@ describe("cogit log and show", () => {
     const model = await log({ dir: root, io });
     const lines = formatLog(model);
     expect(lines[0]).toContain("## Later chat (s2) · unassigned");
+    const byAuthor = lines.find((line) => line.startsWith("## Ship the parser"));
+    expect(byAuthor).toContain("· by Eren ·");
     expect(lines[0]).toContain(stamp("2026-10-21T10:00:00.000Z"));
     expect(lines[1]).toContain(shortHash(D));
     expect(lines[1]).toContain("m1");

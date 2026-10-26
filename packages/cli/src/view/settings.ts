@@ -69,13 +69,25 @@ const EDITABLE: FieldSpec[] = [
     help: "Model the catch-up and backfill use to summarize.",
     kind: "text",
   },
+  {
+    key: "shareConversations",
+    label: "Share conversations",
+    help: "Commit the raw chat text too, not only the session record (off: chat stays local).",
+    kind: "boolean",
+  },
+  {
+    key: "recordCommit",
+    label: "Commit the record",
+    help: "ask, auto or off: what to do with the last messages after the last code commit.",
+    kind: "text",
+  },
 ];
 
 const READ_ONLY: FieldSpec[] = [
   {
     key: "gitPolicy",
     label: "Git policy",
-    help: "Whether captures are committed to git; change it per project with `cogit config set`.",
+    help: "Whether captures are committed to git; change it per project with `cogit config git`.",
     kind: "text",
   },
   {
@@ -114,7 +126,9 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   catchUpModel: "haiku",
   messageSummaries: false,
   startupContext: true,
-  gitPolicy: "ignore",
+  shareConversations: false,
+  recordCommit: "ask",
+  gitPolicy: "commit",
   agents: ["claude-code"],
 };
 
@@ -131,6 +145,8 @@ export function editableSettings(settings: PanelSettings): PanelEditableSettings
     updateEveryTurns: settings.updateEveryTurns,
     sessionEndCatchUp: settings.sessionEndCatchUp,
     catchUpModel: settings.catchUpModel,
+    shareConversations: settings.shareConversations,
+    recordCommit: settings.recordCommit,
   };
 }
 

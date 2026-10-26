@@ -1,8 +1,17 @@
+import { ensureCogitGitignore, ensureGitignore, findGitRoot, type GitPolicy } from "../git.js";
+import { installGitHook } from "../git-hooks.js";
 import { CliError, type Io } from "../io.js";
 import { Config, type RegistryEntry } from "../schema/config.js";
+import { refreshShareConversations } from "../share.js";
 import { isDirectory } from "../store/fs.js";
 import { resolveProjectRoot } from "../store/root.js";
-import { loadConfig, loadRegistry, updateConfig, updateRegistry } from "../store/stores.js";
+import {
+  loadConfig,
+  loadProject,
+  loadRegistry,
+  updateConfig,
+  updateRegistry,
+} from "../store/stores.js";
 
 export const CONFIG_KEYS = Object.keys(Config.shape).filter((k) => k !== "schema") as Exclude<
   keyof Config,
@@ -48,7 +57,31 @@ export async function configSet(key: string, raw: string, io: Io): Promise<void>
     throw new CliError(`invalid value for ${key}: ${next.error.issues[0]?.message ?? "rejected"}`);
   }
   await updateConfig((c) => ({ ...c, [key]: next.data[key] }), io.env);
+  // Sharing the raw chat changes the project ignore files, not just the config.
+  if (key === "shareConversations")
+    await refreshShareConversations(io.env, next.data.shareConversations);
   io.out(`${key} = ${JSON.stringify(next.data[key])}`);
+}
+
+/**
+ * `cogit config git commit|ignore` (Story 9.3): switches an existing project.
+ * Both ignore files are edited; no record file is ever deleted, so switching to
+ * `ignore` leaves what git already tracks alone.
+ */
+export async function configGit(dir: string, policy: GitPolicy, io: Io): Promise<void> {
+  const { root } = await resolveProjectRoot(dir);
+  const project = await loadProject(root);
+  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
+  if (!project.ok) throw new CliError(project.error);
+  if ((await findGitRoot(root)) === undefined)
+    throw new CliError(`${root} is not in a git repository`);
+
+  const added = await ensureGitignore(root, policy);
+  const config = await loadConfig(io.env);
+  await ensureCogitGitignore(root, policy, config.shareConversations);
+  if (policy === "commit") await installGitHook(root, "pre-commit");
+  io.out(`Git policy for ${project.data.name}: ${policy}`);
+  if (added.length > 0) io.out(`Added to .gitignore: ${added.join(", ")}`);
 }
 
 /**

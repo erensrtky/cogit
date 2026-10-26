@@ -88,6 +88,11 @@ function SessionRow({
         </span>
       ) : null}
       <span className="git-title">{session.title || session.sessionId}</span>
+      {session.author ? (
+        <span className="muted session-author" title={`Recorded by ${session.author}`}>
+          {session.author}
+        </span>
+      ) : null}
       <span className="muted session-count">
         {count} message{count === 1 ? "" : "s"}
       </span>

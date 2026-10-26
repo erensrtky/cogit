@@ -6,7 +6,7 @@ import { PROJECT_SCHEMA, Project } from "../schema/project.js";
 import { SESSION_SCHEMA, Session } from "../schema/session.js";
 import { HookState, STATE_SCHEMA } from "../schema/state.js";
 import { type Parsed, parseVersioned } from "../schema/versioned.js";
-import { atomicWriteJson, readJson } from "./fs.js";
+import { atomicWrite, atomicWriteJson, readJson } from "./fs.js";
 import { type LockOptions, withLock } from "./lock.js";
 import { globalPaths, projectPaths } from "./paths.js";
 
@@ -53,12 +53,56 @@ async function update<S extends z.ZodType, R extends z.infer<S>>(
 export const loadProject = (root: string) =>
   load(projectPaths(root).project, Project, PROJECT_SCHEMA);
 
-export const updateProject = (
+/** One object on one line, its keys sorted, so diffs stay line-sized. */
+function stableInline(value: object): string {
+  const entries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
+  return `{${entries.map(([key, v]) => `${JSON.stringify(key)}: ${JSON.stringify(v)}`).join(", ")}}`;
+}
+
+/**
+ * `project.json` as git should see it (Story 9.3): sorted keys and one epoch per
+ * line, so two people adding different epochs merge without a conflict. Epochs
+ * are the only array that grows; everything else is a single line.
+ */
+export function projectJson(project: {
+  schema: number;
+  name: string;
+  epochs: readonly object[];
+}): string {
+  const epochs =
+    project.epochs.length === 0
+      ? '  "epochs": [],'
+      : [
+          '  "epochs": [',
+          project.epochs.map((epoch) => `    ${stableInline(epoch)}`).join(",\n"),
+          "  ],",
+        ].join("\n");
+  return `${[
+    "{",
+    epochs,
+    `  "name": ${JSON.stringify(project.name)},`,
+    `  "schema": ${project.schema}`,
+    "}",
+  ].join("\n")}\n`;
+}
+
+/**
+ * Locked read → update → write for `project.json`, through `projectJson` so the
+ * file stays merge-friendly. The generic store writer keeps the familiar
+ * indented format for every other file.
+ */
+export const updateProject = async (
   root: string,
   fn: (cur: Project | undefined) => Project | Promise<Project>,
-) => {
+): Promise<Project> => {
   const p = projectPaths(root);
-  return update(p.project, p.lock("project"), Project, PROJECT_SCHEMA, fn);
+  return withLock(p.lock("project"), async () => {
+    const cur = await loadProject(root);
+    if (cur.found && !cur.ok) throw new Error(`${p.project}: ${cur.error}`);
+    const next = Project.parse(await fn(cur.found && cur.ok ? cur.data : undefined));
+    await atomicWrite(p.project, projectJson(next));
+    return next;
+  });
 };
 
 export const loadSession = (root: string, id: string) =>

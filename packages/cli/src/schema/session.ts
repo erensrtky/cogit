@@ -103,6 +103,11 @@ export const Session = z.object({
   nodes: z.array(LineageNode).default([]),
   /** The linked git worktree the session ran in; set by the CLI, never by the agent. */
   worktree: z.object({ path: z.string().min(1), branch: z.string().min(1).nullable() }).optional(),
+  /**
+   * Who recorded the session (git `user.name`, else the OS user); set by the CLI
+   * on the first write (Story 9.3). Old records have none.
+   */
+  author: z.string().min(1).max(200).optional(),
 });
 
 /** In input, a missing parent keeps the stored one (null for a new node). */

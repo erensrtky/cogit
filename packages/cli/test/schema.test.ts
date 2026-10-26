@@ -110,7 +110,9 @@ describe("Project and Config schemas", () => {
       language: "auto",
       updateEveryTurns: 5,
       sessionEndCatchUp: true,
-      gitPolicy: "ignore",
+      gitPolicy: "commit",
+      shareConversations: false,
+      recordCommit: "ask",
     });
   });
 });

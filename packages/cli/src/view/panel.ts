@@ -47,6 +47,8 @@ export function panelSettings(config: Config): PanelSettings {
     catchUpModel: config.catchUpModel,
     messageSummaries: config.messageSummaries,
     startupContext: config.startupContext,
+    shareConversations: config.shareConversations,
+    recordCommit: config.recordCommit,
     gitPolicy: config.gitPolicy,
     agents: config.agents,
   };

@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   allowSkill,
@@ -10,7 +12,7 @@ import {
   setRetention,
 } from "../src/claude-settings.js";
 import { init } from "../src/commands/init.js";
-import { ensureConversationGitignore, ensureGitignore, findGitRoot } from "../src/git.js";
+import { cogitGitignore, ensureCogitGitignore, ensureGitignore, findGitRoot } from "../src/git.js";
 import { loadConfig, loadProject, loadRegistry } from "../src/store/stores.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
@@ -57,18 +59,21 @@ describe("init", () => {
     expect(io.asked).toHaveLength(4);
     expect(await readSkillAllowed(env)).toBe(true);
     expect(io.lines.at(-2)).toMatch(/^Initialized proj/);
-    // The conversation store stays out of git even when records are committed.
-    expect(await readText(join(root, ".cogit", ".gitignore"))).toBe("conversations/\n");
+    // Outside a git repository there is nothing to ignore and no hook to install.
+    expect(existsSync(join(root, ".cogit", ".gitignore"))).toBe(false);
     expect(io.lines).toContain(
-      "Conversations are stored in .cogit/conversations/ (kept out of git, even with the commit policy).",
+      "Conversations are stored in .cogit/conversations/ (kept out of git; turn on shareConversations to share them).",
     );
   });
 
-  it("adds the conversation ignore line once", async () => {
+  it("writes the project ignore file once for the commit policy", async () => {
     await mkdir(join(root, ".cogit"));
-    expect(await ensureConversationGitignore(root)).toBe(true);
-    expect(await ensureConversationGitignore(root)).toBe(false);
-    expect(await readText(join(root, ".cogit", ".gitignore"))).toBe("conversations/\n");
+    expect(await ensureCogitGitignore(root, "commit", false)).toBe(true);
+    expect(await ensureCogitGitignore(root, "commit", false)).toBe(false);
+    expect(await readText(join(root, ".cogit", ".gitignore"))).toBe(cogitGitignore(false));
+    // Sharing the conversation store un-ignores it in the same file.
+    expect(await ensureCogitGitignore(root, "commit", true)).toBe(true);
+    expect(await readText(join(root, ".cogit", ".gitignore"))).toContain("!conversations/");
   });
 
   it("asks nothing when every answer is given as an option", async () => {
@@ -80,7 +85,9 @@ describe("init", () => {
       io,
     );
     expect((await loadConfig(env)).language).toBe("Turkish");
-    expect(await readText(join(root, ".gitignore"))).toContain("/.cogit/state/");
+    // Commit policy: the root file stays untouched, the project writes its own rules.
+    expect(existsSync(join(root, ".gitignore"))).toBe(false);
+    expect(await readText(join(root, ".cogit", ".gitignore"))).toBe(cogitGitignore(false));
   });
 
   it("asks for the git policy in a repo and writes .gitignore", async () => {
@@ -237,16 +244,56 @@ describe("git helpers", () => {
     expect(await findGitRoot("/")).toBeUndefined();
   });
 
-  it("appends only missing lines and keeps existing content", async () => {
+  it("adds the ignore line under the ignore policy and removes it when switching", async () => {
     const gi = join(root, ".gitignore");
     await writeFile(gi, "node_modules/");
-    expect(await ensureGitignore(root, "commit")).toHaveLength(4);
     expect(await ensureGitignore(root, "commit")).toEqual([]);
+    expect(await readText(gi)).toBe("node_modules/");
     expect(await ensureGitignore(root, "ignore")).toEqual(["/.cogit/"]);
+    expect(await ensureGitignore(root, "ignore")).toEqual([]);
     const text = await readText(gi);
-    expect(text.startsWith("node_modules/\n# cogit\n")).toBe(true);
+    expect(text).toBe("node_modules/\n# cogit\n/.cogit/\n");
     expect(text.match(/# cogit/g)).toHaveLength(1);
+    // Switching back removes only our line, never the user's.
+    expect(await ensureGitignore(root, "commit")).toEqual([]);
+    expect(await readText(gi)).toBe("node_modules/\n# cogit\n");
     expect(basename(gi)).toBe(".gitignore");
+  });
+
+  it("restores the record hook when init runs again on a commit project", async () => {
+    const run = promisify(execFile);
+    const git = (...args: string[]) => run("git", ["-C", root, ...args]);
+    await git("init", "-q");
+    await git("config", "user.email", "t@example.com");
+    await git("config", "user.name", "Tester");
+    await init(
+      root,
+      { name: "P", git: "commit", retention: "keep", allowSkill: false, language: "auto" },
+      fakeIo(env),
+    );
+    const hook = join(root, ".git", "hooks", "pre-commit");
+    expect(existsSync(hook)).toBe(true);
+    await rm(hook);
+    const io = fakeIo(env);
+    await init(root, { retention: "keep" }, io);
+    expect(io.lines[0]).toMatch(/^Already initialized: P/);
+    expect(existsSync(hook)).toBe(true);
+  });
+
+  it("warns about an unwritable root ignore file and still initializes", async () => {
+    // A directory where .gitignore belongs makes the write fail.
+    await mkdir(join(root, ".git"));
+    await mkdir(join(root, ".gitignore"));
+    const io = fakeIo(env);
+    await init(
+      root,
+      { name: "P", git: "ignore", retention: "keep", allowSkill: false, language: "auto" },
+      io,
+    );
+    expect(io.warnings).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^could not update \.gitignore: /)]),
+    );
+    expect(await loadProject(root)).toMatchObject({ ok: true });
   });
 });
 

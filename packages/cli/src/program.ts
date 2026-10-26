@@ -5,6 +5,7 @@ import { blame } from "./commands/blame.js";
 import { buildProject } from "./commands/build.js";
 import {
   configGet,
+  configGit,
   configHintOff,
   configHintOn,
   configPrune,
@@ -17,9 +18,11 @@ import { migrateIds } from "./commands/migrate.js";
 import { openPanel, openProject } from "./commands/open.js";
 import { search } from "./commands/search.js";
 import { readStdin, sessionShow, sessionWrite } from "./commands/session.js";
+import { isGitHookEvent, runGitHook } from "./git-hooks.js";
 import { runHook } from "./hooks/run.js";
 import { CliError, type Io, processIo } from "./io.js";
 import { startMapServer } from "./server.js";
+import { maybeAutoCommit } from "./session-git.js";
 import { takeMigrationWarnings } from "./store/migrate.js";
 import { loadConfig } from "./store/stores.js";
 
@@ -255,6 +258,18 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .argument("<value>")
     .action(run(async (key: string, value: string) => configSet(key, value, makeIo(false))));
   config
+    .command("git")
+    .description("commit or ignore this project's session records (story 9.3)")
+    .argument("<policy>", "commit or ignore")
+    .argument("[dir]", "project directory", ".")
+    .action(
+      run(async (policy: string, dir: string) => {
+        if (policy !== "commit" && policy !== "ignore")
+          throw new CliError(`invalid git policy "${policy}"; use commit or ignore`);
+        await configGit(dir, policy, makeIo(false));
+      }),
+    );
+  config
     .command("hint-off")
     .description("stop the SessionStart setup hint in a project")
     .argument("[dir]", "project directory", ".")
@@ -345,12 +360,34 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       run(async (id: string, opts: { dir: string }) => sessionShow(opts.dir, id, makeIo(false))),
     );
 
-  // Called by the plugin's hooks.json with the hook input on stdin. Never fails.
+  // Started detached by the SessionEnd hook when `recordCommit` is `auto`.
+  program
+    .command("record-commit", { hidden: true })
+    .description("commit the session record files without touching other staged changes")
+    .argument("<session-id>", "session id")
+    .option("-C, --dir <dir>", "project directory", ".")
+    .action(
+      run(async (sessionId: string, opts: { dir: string }) => {
+        await maybeAutoCommit(opts.dir, sessionId, makeIo(false).env);
+      }),
+    );
+
+  // Called by the plugin's hooks.json with the hook input on stdin, and by the
+  // git hooks cogit installs (Story 9.3) with git's arguments. Never fails.
   program
     .command("hook", { hidden: true })
-    .argument("<event>", "hook event, e.g. stop or sessionstart")
-    .action(async (event: string) => {
+    .argument("<event>", "hook event, e.g. stop, sessionstart, pre-commit")
+    .option("-C, --dir <dir>", "project directory (git hooks pass theirs)")
+    .action(async (event: string, opts: { dir?: string }) => {
       const io = makeIo(false);
+      if (isGitHookEvent(event)) {
+        try {
+          await runGitHook(event, opts.dir ?? process.cwd(), io.env);
+        } catch {
+          // A hook must never block the commit or the session.
+        }
+        return;
+      }
       const input = await (deps.stdin ?? readStdin)();
       const out = await runHook(event, input, io.env, io.now(), io.warn);
       if (out !== undefined) io.out(out);

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { CliError, type Io } from "../io.js";
 import { hashTurns, isRecorded, type SessionMessage, upgradeSessionIds } from "../messages.js";
 import type { Session } from "../schema/session.js";
+import { maybeAutoCommit } from "../session-git.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { LockBusyError, withLock } from "../store/lock.js";
 import { projectPaths } from "../store/paths.js";
@@ -210,6 +211,8 @@ export async function backfillTail(dir: string, sessionId: string, io: Io): Prom
   }
   if (turns.length === 0) {
     io.out(`session ${sessionId} has nothing to catch up`);
+    // Story 9.3: `recordCommit: auto` still commits what an earlier update wrote.
+    await maybeAutoCommit(root, sessionId, io.env);
     return;
   }
 
@@ -220,4 +223,7 @@ export async function backfillTail(dir: string, sessionId: string, io: Io): Prom
   const stdout = await runClaude(prompt, config.catchUpModel, io.env);
   const payload = { ...agentRecord(resultText(stdout)), sessionId };
   await sessionWrite({ dir: root }, io, async () => JSON.stringify(payload));
+  // The session end wrote the last messages after the last code commit; auto
+  // mode commits exactly those record files now (Story 9.3).
+  await maybeAutoCommit(root, sessionId, io.env);
 }

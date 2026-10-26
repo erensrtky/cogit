@@ -58,6 +58,8 @@ export const fixture: LineageViewModel = {
     catchUpModel: "haiku",
     messageSummaries: false,
     startupContext: true,
+    shareConversations: false,
+    recordCommit: "ask",
     gitPolicy: "ignore",
     agents: ["claude-code"],
   },

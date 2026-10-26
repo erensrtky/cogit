@@ -1,5 +1,7 @@
 import { readFile, rm } from "node:fs/promises";
+import { userInfo } from "node:os";
 import { resolve } from "node:path";
+import { findGitRoot, gitUserName } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import {
   hashesToLabels,
@@ -33,6 +35,25 @@ export async function readStdin(stream: NodeJS.ReadableStream = process.stdin): 
   const chunks: Buffer[] = [];
   for await (const c of stream) chunks.push(typeof c === "string" ? Buffer.from(c) : c);
   return Buffer.concat(chunks).toString("utf8");
+}
+
+/**
+ * Who gets credited for a session (Story 9.3): the git name this repository
+ * commits with, else the OS user. Recorded once, on the first write; a record
+ * made on another machine keeps its own author.
+ */
+export async function sessionAuthor(
+  root: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string | undefined> {
+  const gitRoot = await findGitRoot(root);
+  const fromGit = gitRoot === undefined ? undefined : await gitUserName(gitRoot, env);
+  if (fromGit !== undefined) return fromGit;
+  try {
+    return userInfo().username || undefined;
+  } catch {
+    return env.USER ?? env.USERNAME ?? undefined;
+  }
 }
 
 export interface SessionWriteOptions {
@@ -88,6 +109,10 @@ export async function sessionWrite(
   // merge; `startedAt` is the current session's own start.
   const current = await loadSession(root, input.sessionId);
   const startedAt = current.found && current.ok ? current.data.startedAt : io.now();
+  const author =
+    current.found && current.ok && current.data.author
+      ? current.data.author
+      : await sessionAuthor(root, io.env);
   const crossTargets = await crossSessionTargets(root, input.sessionId, startedAt, input, io.env);
   let warnings: string[] = [];
   const saved = await updateSession(root, input.sessionId, async (cur) => {
@@ -111,7 +136,9 @@ export async function sessionWrite(
         : [];
     await appendEvents(root, input.sessionId, [...seed, ...changes]);
     // A write from the main checkout (e.g. after a resume) keeps the stored worktree.
-    return worktree ? { ...merged.session, worktree } : merged.session;
+    const stored = worktree ? { ...merged.session, worktree } : merged.session;
+    // Story 9.3: the first write stamps who recorded the session.
+    return stored.author === undefined && author !== undefined ? { ...stored, author } : stored;
   });
   for (const w of warnings) io.warn(w);
   if (opts.file && opts.consume) await rm(opts.file, { force: true });

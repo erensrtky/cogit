@@ -1,13 +1,15 @@
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { type AddressInfo, createServer as createNetServer } from "node:net";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import { readSkillAllowed } from "../src/claude-settings.js";
 import { createProgram } from "../src/program.js";
 import { globalPaths } from "../src/store/paths.js";
 import { loadConfig, loadProject } from "../src/store/stores.js";
-import { envFor, type FakeIo, fakeIo, tempDir } from "./helpers.js";
+import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
 
 let dir: string;
 let root: string;
@@ -183,6 +185,67 @@ describe("commands through the CLI", () => {
     expect(io.lines.at(-1)).toMatch(new RegExp(`^Would remove .+ \\(${gone}\\)$`));
     await cli("config", "prune");
     expect(io.lines.at(-1)).toMatch(new RegExp(`^Removed .+ \\(${gone}\\)$`));
+  });
+
+  it("runs the git hook and the detached record commit through the CLI", async () => {
+    const run = promisify(execFile);
+    const git = async (...args: string[]): Promise<string> =>
+      (await run("git", ["-C", root, ...args])).stdout;
+    await git("init", "-q");
+    await git("config", "user.email", "t@example.com");
+    await git("config", "user.name", "Tester");
+    await writeFile(join(root, "a.txt"), "one\n");
+    await git("add", "a.txt");
+    await git("commit", "-q", "-m", "feat: base");
+
+    await cli(
+      "init",
+      root,
+      "--yes",
+      "--git",
+      "commit",
+      "--name",
+      "P",
+      "--retention",
+      "keep",
+      "--language",
+      "auto",
+    );
+    expect(await readFile(join(root, ".git", "hooks", "pre-commit"), "utf8")).toContain(
+      "cogit hook pre-commit",
+    );
+
+    const session = {
+      schema: 1,
+      sessionId: "s1",
+      agent: "claude-code",
+      title: "CLI session",
+      epoch: null,
+      startedAt: T0,
+      updatedAt: T0,
+      status: { goal: "", done: [], pending: [], next: "" },
+      nodes: [],
+    };
+    await mkdir(join(root, ".cogit", "sessions"), { recursive: true });
+    await writeFile(join(root, ".cogit", "sessions", "s1.json"), JSON.stringify(session));
+    await writeFile(join(root, ".cogit", "HEAD"), JSON.stringify({ sessionId: "s1", at: T0 }));
+    await writeFile(join(root, "a.txt"), "two\n");
+    await git("add", "a.txt");
+    await cli("hook", "pre-commit", "--dir", root);
+    expect(await git("diff", "--cached", "--name-only")).toContain(".cogit/sessions/s1.json");
+
+    await cli("config", "set", "recordCommit", "auto");
+    await cli("record-commit", "s1", "-C", root);
+    expect((await git("log", "-1", "--format=%s")).trim()).toBe("chore(cogit): record CLI session");
+
+    expect(await cli("config", "git", "nope")).toMatch(/^error: invalid git policy "nope"/);
+    expect(await cli("config", "git", "ignore", root)).toBe("");
+    expect(await readFile(join(root, ".gitignore"), "utf8")).toBe("# cogit\n/.cogit/\n");
+  });
+
+  it("refuses config git outside a git repository", async () => {
+    await cli("init", root, "--yes", "--retention", "keep");
+    expect(await cli("config", "git", "commit", root)).toMatch(/not in a git repository/);
   });
 
   it("prints user errors as one line", async () => {

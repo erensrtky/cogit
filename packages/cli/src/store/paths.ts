@@ -37,6 +37,13 @@ export function projectPaths(root: string) {
     inbox: (id: string) => join(base, "inbox", `${id}.json`),
     lock: (name: string) => join(base, "locks", `${name}.lock`),
     html: join(base, "map.html"),
+    /**
+     * The session whose next code commit carries its record (Story 9.3), written
+     * by the UserPromptSubmit hook. Local state, never committed.
+     */
+    head: join(base, "HEAD"),
+    /** The project-scoped ignore rules that keep local state out of git. */
+    gitignore: join(base, ".gitignore"),
   };
 }
 

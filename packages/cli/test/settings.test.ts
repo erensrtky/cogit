@@ -19,6 +19,8 @@ describe("settings model", () => {
       catchUpModel: parsed.catchUpModel,
       messageSummaries: parsed.messageSummaries,
       startupContext: parsed.startupContext,
+      shareConversations: parsed.shareConversations,
+      recordCommit: parsed.recordCommit,
       gitPolicy: parsed.gitPolicy,
       agents: parsed.agents,
     });
@@ -64,6 +66,8 @@ describe("settings model", () => {
       updateEveryTurns: 8,
       sessionEndCatchUp: true,
       catchUpModel: "haiku",
+      shareConversations: false,
+      recordCommit: "ask",
     });
     expect(Object.keys(editableSettings(settings)).sort()).toEqual([...PANEL_EDITABLE_KEYS].sort());
   });

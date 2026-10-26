@@ -348,6 +348,22 @@ describe("settings write", () => {
     expect(html).toContain('"messageSummaries":true');
   });
 
+  it("accepts the Story 9.3 settings and validates their values", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    expect(
+      (await configWrite(server, token, { key: "shareConversations", value: true })).status,
+    ).toBe(200);
+    expect((await configWrite(server, token, { key: "recordCommit", value: "auto" })).status).toBe(
+      200,
+    );
+    expect((await loadConfig(env)).shareConversations).toBe(true);
+    expect((await loadConfig(env)).recordCommit).toBe("auto");
+    expect(
+      (await configWrite(server, token, { key: "recordCommit", value: "sometimes" })).status,
+    ).toBe(400);
+  });
+
   it("rebuilds an open map so the page picks the new setting up", async () => {
     const server = await start();
     const events = openEvents(`${server.url}/events?dir=${encodeURIComponent(root)}`);
@@ -418,7 +434,7 @@ describe("settings write", () => {
     expect(
       (await configWrite(server, token, { key: "messageSummaries", value: "true" })).status,
     ).toBe(400);
-    expect((await loadConfig(env)).gitPolicy).toBe("ignore");
+    expect((await loadConfig(env)).gitPolicy).toBe("commit");
     expect((await loadConfig(env)).messageSummaries).toBe(false);
   });
 
@@ -488,6 +504,8 @@ describe("settings read", () => {
         updateEveryTurns: 5,
         sessionEndCatchUp: true,
         catchUpModel: "haiku",
+        shareConversations: false,
+        recordCommit: "ask",
       },
     });
   });

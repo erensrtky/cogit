@@ -195,6 +195,7 @@ function SessionSummary({ model, session }: { model: LineageViewModel; session: 
     <>
       <dl className="drilldown-meta">
         <Field label="Agent">{session.agent}</Field>
+        {session.author ? <Field label="Recorded by">{session.author}</Field> : null}
         <Field label="Session">
           <code>{session.sessionId}</code>
         </Field>
@@ -277,10 +278,11 @@ function Conversation({ session, id }: { session: ViewSession | undefined; id: s
       </>
     );
   } else if (!session.transcriptAvailable) {
+    // A clone has the session record (it travels with the repo) but usually not
+    // the raw chat: conversations stay local unless `shareConversations` is on.
     body = (
       <p className="muted">
-        The conversation is gone: Claude Code has deleted this session's transcript. The summary
-        above is what remains.
+        This conversation is not on this machine. The summary above is what remains.
       </p>
     );
   } else {

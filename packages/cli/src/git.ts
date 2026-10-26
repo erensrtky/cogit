@@ -24,17 +24,32 @@ export async function findGitRoot(dir: string): Promise<string | undefined> {
 
 const HEADER = "# cogit";
 
-/** Machine-local data that must never be committed, whatever the policy. */
-const ALWAYS = ["/.cogit/state/", "/.cogit/locks/", "/.cogit/inbox/", "/.cogit/map.html"];
+/** The root line that keeps the whole `.cogit/` out under the ignore policy. */
+const IGNORE_ALL = "/.cogit/";
 
+/**
+ * What the root `.gitignore` needs for a policy (Story 9.3). Under `commit` the
+ * root lists nothing: the project's own `.cogit/.gitignore` keeps local state out
+ * and lets the session records travel. Under `ignore` a single line hides it all.
+ */
 export function gitignoreLines(policy: GitPolicy): string[] {
-  return policy === "ignore" ? ["/.cogit/"] : ALWAYS;
+  return policy === "ignore" ? [IGNORE_ALL] : [];
 }
 
-/** Appends the policy's lines to `<root>/.gitignore`, skipping lines already there. */
+/**
+ * Applies the policy to `<root>/.gitignore`: adds the ignore line, or removes the
+ * one an older init wrote when the project switches to `commit`. User lines are
+ * never touched. Returns the lines added (none when switching to commit).
+ */
 export async function ensureGitignore(root: string, policy: GitPolicy): Promise<string[]> {
   const file = join(root, ".gitignore");
   const text = await readFile(file, "utf8").catch(() => "");
+  if (policy === "commit") {
+    const lines = text.split(/\r?\n/);
+    const kept = lines.filter((line) => line.trim() !== IGNORE_ALL);
+    if (kept.length !== lines.length) await atomicWrite(file, kept.join("\n"));
+    return [];
+  }
   const present = new Set(text.split(/\r?\n/).map((l) => l.trim()));
   const missing = gitignoreLines(policy).filter((l) => !present.has(l));
   if (missing.length === 0) return [];
@@ -44,19 +59,63 @@ export async function ensureGitignore(root: string, policy: GitPolicy): Promise<
   return missing;
 }
 
+/** True when the root `.gitignore` hides all of `.cogit/` (the ignore policy). */
+export async function cogitIgnored(root: string): Promise<boolean> {
+  const text = await readFile(join(root, ".gitignore"), "utf8").catch(() => "");
+  return text.split(/\r?\n/).some((line) => line.trim() === IGNORE_ALL);
+}
+
 /**
- * `.cogit/.gitignore` keeps the conversation store out of git, even when
- * the user chose to commit `.cogit/`: the raw chat stays on this machine.
- * Returns true when the line had to be added; a second call changes nothing.
+ * The `.cogit/.gitignore` the commit policy writes (Story 9.3): everything in the
+ * directory stays local except the session records, `project.json` and these
+ * rules themselves. The file has to travel: without it a clone would not ignore
+ * the conversation store and one `git add -A` would publish the raw chat. The
+ * list has no timestamps and a stable order, so switching a setting rewrites it
+ * once and later builds leave it alone.
  */
-export async function ensureConversationGitignore(root: string): Promise<boolean> {
+export function cogitGitignore(shareConversations: boolean): string {
+  return [
+    HEADER,
+    "*",
+    "!.gitignore",
+    "!sessions/",
+    "!sessions/**",
+    "!project.json",
+    ...(shareConversations ? ["!conversations/", "!conversations/**"] : []),
+    "",
+  ].join("\n");
+}
+
+/**
+ * Writes `.cogit/.gitignore` for the commit policy; a no-op under `ignore`
+ * (the root already hides everything). Returns true when the file changed.
+ */
+export async function ensureCogitGitignore(
+  root: string,
+  policy: GitPolicy,
+  shareConversations: boolean,
+): Promise<boolean> {
+  if (policy !== "commit") return false;
   const file = join(root, ".cogit", ".gitignore");
-  const text = await readFile(file, "utf8").catch(() => "");
-  const present = new Set(text.split(/\r?\n/).map((l) => l.trim()));
-  if (present.has("conversations/")) return false;
-  const sep = text === "" || text.endsWith("\n") ? "" : "\n";
-  await atomicWrite(file, `${text}${sep}conversations/\n`);
+  const content = cogitGitignore(shareConversations);
+  const current = await readFile(file, "utf8").catch(() => undefined);
+  if (current === content) return false;
+  await atomicWrite(file, content);
   return true;
+}
+
+/**
+ * Keeps an existing project's `.cogit/.gitignore` in step with the settings
+ * (Story 9.3): reads the policy from the root ignore file, so a project that
+ * committed its records before this story gets the new rules on its next build.
+ */
+export async function refreshCogitGitignore(
+  root: string,
+  shareConversations: boolean,
+): Promise<boolean> {
+  if ((await findGitRoot(root)) === undefined) return false;
+  if (await cogitIgnored(root)) return false;
+  return ensureCogitGitignore(root, "commit", shareConversations);
 }
 
 interface CommitLine {
@@ -246,8 +305,7 @@ export function projectFiles(
  * Full hashes git blames for `file`; `file:line` asks about one line and a bare
  * file means every commit that touched it (Story 8.8). `file` is relative to
  * `root`, the repository's worktree.
- */
-export async function blameCommitHashes(
+ */ export async function blameCommitHashes(
   root: string,
   file: string,
   line?: number,
@@ -266,4 +324,30 @@ export async function blameCommitHashes(
     if (row.length === 40 || /^[0-9a-f]{40} \d+ \d+/.test(row)) out.add(hash);
   }
   return [...out];
+}
+
+/** The name a commit in this repository would carry; undefined outside git or unset. */
+export async function gitUserName(
+  root: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string | undefined> {
+  try {
+    const { stdout } = await exec("git", ["-C", root, "config", "user.name"], { env });
+    const name = stdout.trim();
+    return name === "" ? undefined : name;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The hooks directory git really uses here: `core.hooksPath`, Husky and worktrees included. */
+export async function gitHooksDir(root: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await exec("git", ["-C", root, "rev-parse", "--git-path", "hooks"]);
+    const path = stdout.trim();
+    if (path === "") return undefined;
+    return isAbsolute(path) ? path : join(root, path);
+  } catch {
+    return undefined;
+  }
 }

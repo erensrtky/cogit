@@ -9,11 +9,14 @@ import {
   setRetention,
 } from "../claude-settings.js";
 import {
-  ensureConversationGitignore,
+  cogitIgnored,
+  ensureCogitGitignore,
   ensureGitignore,
   findGitRoot,
   type GitPolicy,
+  refreshCogitGitignore,
 } from "../git.js";
+import { installGitHook } from "../git-hooks.js";
 import { CliError, type Io } from "../io.js";
 import { readJson } from "../store/fs.js";
 import { migrateProject } from "../store/migrate.js";
@@ -136,6 +139,46 @@ export async function register(io: Io, root: string, name: string): Promise<void
   );
 }
 
+/**
+ * Applies a policy to the two ignore files and, under `commit`, installs the git
+ * pre-commit hook that carries the current session's record (Story 9.3). Each
+ * step is best-effort: a read-only `.gitignore` or a repository git will not
+ * report hooks for must never fail setup.
+ */
+async function applyGitPolicy(
+  io: Io,
+  root: string,
+  policy: GitPolicy,
+  shareConversations: boolean,
+): Promise<void> {
+  const added: string[] = [];
+  await bestEffort(io, "could not update .gitignore", async () => {
+    added.push(...(await ensureGitignore(root, policy)));
+  });
+  if (added.length > 0) io.out(`Added to .gitignore: ${added.join(", ")}`);
+  await bestEffort(io, "could not write .cogit/.gitignore", () =>
+    ensureCogitGitignore(root, policy, shareConversations),
+  );
+  if (policy === "commit")
+    await bestEffort(io, "could not install the pre-commit hook", () =>
+      installGitHook(root, "pre-commit"),
+    );
+}
+
+/**
+ * Brings an already initialized project up to date: a repository that commits
+ * its records gets the new `.cogit/.gitignore` and the hook, without changing the
+ * policy the user chose at setup.
+ */
+async function refreshGitIntegration(io: Io, root: string): Promise<void> {
+  if ((await findGitRoot(root)) === undefined) return;
+  await bestEffort(io, "could not refresh the git integration", async () => {
+    if (await cogitIgnored(root)) return;
+    await refreshCogitGitignore(root, (await loadConfig(io.env)).shareConversations);
+    await installGitHook(root, "pre-commit");
+  });
+}
+
 export async function init(dir: string, opts: InitOptions, io: Io): Promise<void> {
   const root = resolve(dir);
   // `init` does not go through `resolveProjectRoot`; migrate here so a
@@ -146,27 +189,28 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
     if (!existing.ok) throw new CliError(`${projectPaths(root).project}: ${existing.error}`);
     await register(io, root, existing.data.name);
     if (opts.allowSkill !== undefined) await askSkillPermission(io, opts);
+    await refreshGitIntegration(io, root);
     io.out(`Already initialized: ${existing.data.name} (${root})`);
     return;
   }
 
   const name = opts.name ?? (await io.prompt.input("Project name?", basename(root)));
+  const config = await loadConfig(io.env);
 
   const gitRoot = await findGitRoot(root);
+  let policy: GitPolicy | undefined;
   if (gitRoot) {
-    const fallback = (await loadConfig(io.env)).gitPolicy;
-    const policy =
+    // Story 9.3: the record travels with the repository by default.
+    policy =
       opts.git ??
       (await io.prompt.select<GitPolicy>(
-        "This is a git repository. Commit the lineage records?",
+        "This is a git repository. Commit the session records?",
         [
-          { value: "ignore", name: "No, keep .cogit/ out of git (private)" },
           { value: "commit", name: "Yes, commit session records (local state stays ignored)" },
+          { value: "ignore", name: "No, keep .cogit/ out of git (private)" },
         ],
-        fallback,
+        config.gitPolicy,
       ));
-    const added = await ensureGitignore(root, policy);
-    if (added.length > 0) io.out(`Added to .gitignore: ${added.join(", ")}`);
   }
 
   await askRetention(io, opts);
@@ -175,13 +219,13 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
 
   await updateProject(root, (cur) => cur ?? { schema: 1, name, epochs: [] });
   await mkdir(projectPaths(root).sessions, { recursive: true });
-  await bestEffort(io, "could not write .cogit/.gitignore", () =>
-    ensureConversationGitignore(root),
-  );
+  if (policy !== undefined) await applyGitPolicy(io, root, policy, config.shareConversations);
   await register(io, root, name);
 
   io.out(
-    "Conversations are stored in .cogit/conversations/ (kept out of git, even with the commit policy).",
+    config.shareConversations
+      ? "Conversations are stored in .cogit/conversations/ (shared through git: shareConversations is on)."
+      : "Conversations are stored in .cogit/conversations/ (kept out of git; turn on shareConversations to share them).",
   );
   io.out(`Initialized ${name} in ${projectPaths(root).base}`);
   io.out("Next: install the Claude Code plugin, then run `cogit open` after a session.");

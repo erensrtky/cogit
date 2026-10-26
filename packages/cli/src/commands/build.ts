@@ -1,9 +1,9 @@
 import {
-  ensureConversationGitignore,
   findGitRoot,
   projectFiles,
   readCommitFiles,
   readCommitSubjects,
+  refreshCogitGitignore,
 } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import {
@@ -241,10 +241,11 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   for (const warning of project.warnings) io.warn(warning);
 
   const paths = projectPaths(root);
-  // Projects initialized before the conversation store get the privacy line on
+  const config = await loadConfig(io.env);
+  // Projects initialized before the conversation store get the privacy rules on
   // their next build; an unwritable record must never fail the map.
   try {
-    await ensureConversationGitignore(root);
+    await refreshCogitGitignore(root, config.shareConversations);
   } catch (err) {
     io.warn(`could not update .cogit/.gitignore: ${(err as Error).message}`);
   }
@@ -266,7 +267,6 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
     async () => {
       const sessions = await loadAllSessions(root, io.warn);
       const transcripts = await collectTranscripts(io.env);
-      const config = await loadConfig(io.env);
       const views = await readTranscriptViews(sessions, transcripts, root, io);
       const commits = await commitInfo(root, views.sessions);
       const built = buildViewModel({

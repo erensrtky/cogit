@@ -202,6 +202,7 @@ function toViewSession(
     sessionId: session.sessionId,
     agent: session.agent,
     title: session.title,
+    ...(session.author === undefined ? {} : { author: session.author }),
     epoch: session.epoch,
     startedAt: session.startedAt,
     updatedAt: session.updatedAt,

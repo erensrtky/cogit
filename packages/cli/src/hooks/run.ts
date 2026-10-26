@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Slug } from "../schema/common.js";
 import { captureDisabled, projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
+import { onPromptSubmit } from "./promptsubmit.js";
 import { onSessionEnd } from "./sessionend.js";
 import { onSessionStart } from "./sessionstart.js";
 import { onStop } from "./stop.js";
@@ -13,6 +14,8 @@ import { onStop } from "./stop.js";
 export const HookInput = z.looseObject({
   session_id: z.string(),
   cwd: z.string().optional(),
+  /** Where Claude Code keeps the session's transcript (UserPromptSubmit and friends). */
+  transcript_path: z.string().optional(),
   stop_hook_active: z.boolean().optional(),
   /** SessionStart only: `startup`, `resume`, `clear` or `compact`. */
   source: z.string().optional(),
@@ -46,6 +49,7 @@ const HANDLERS: Record<string, (ctx: HookContext) => Promise<HookOutput | undefi
   stop: onStop,
   sessionstart: onSessionStart,
   sessionend: onSessionEnd,
+  promptsubmit: onPromptSubmit,
 };
 
 export const HOOK_EVENTS = Object.keys(HANDLERS);

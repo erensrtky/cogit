@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { buildProject } from "./commands/build.js";
 import { defaultsPrompter, type Io } from "./io.js";
 import { Config } from "./schema/config.js";
+import { refreshShareConversations } from "./share.js";
 import { LockBusyError } from "./store/lock.js";
 import { globalPaths, projectPaths } from "./store/paths.js";
 import { loadConfig, loadRegistry, updateConfig } from "./store/stores.js";
@@ -367,6 +368,9 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       respond(res, err instanceof LockBusyError ? 409 : 500, "could not write the config");
       return;
     }
+    // Story 9.3: un-ignore (or hide) the conversation store in every project.
+    if (key === "shareConversations")
+      await refreshShareConversations(env, next.data.shareConversations);
     res.writeHead(200, {
       "content-type": "application/json",
       "cache-control": "no-store",

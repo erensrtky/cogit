@@ -441,6 +441,36 @@ describe("runHook", () => {
     expect(spawned).toEqual([]);
   });
 
+  it("commits the record at session end in auto mode, even with the catch-up off", async () => {
+    await initialized(2);
+    await configSet("recordCommit", "auto", fakeIo(env));
+    // Nothing to catch up: the last update still leaves files to commit.
+    expect(await sessionEnd()).toBeUndefined();
+    expect(spawned).toEqual([["/plugin/dist/cli.js", "record-commit", "s1", "-C", root]]);
+
+    spawned = [];
+    await transcript([typed("first", 1)]);
+    await configSet("sessionEndCatchUp", "false", fakeIo(env));
+    expect(await sessionEnd()).toBeUndefined();
+    expect(spawned).toEqual([["/plugin/dist/cli.js", "record-commit", "s1", "-C", root]]);
+  });
+
+  it("records the current session for the next code commit", async () => {
+    await initialized(2);
+    await runHook(
+      "promptsubmit",
+      JSON.stringify({ session_id: "s1", cwd: root, transcript_path: "/t/s1.jsonl" }),
+      env,
+      T0,
+      () => {},
+    );
+    expect(JSON.parse(await readFile(join(root, ".cogit", "HEAD"), "utf8"))).toEqual({
+      sessionId: "s1",
+      transcriptPath: "/t/s1.jsonl",
+      at: T0,
+    });
+  });
+
   it("stays quiet at session end without a readable transcript or before init", async () => {
     await initialized(2);
     expect(await sessionEnd()).toBeUndefined();

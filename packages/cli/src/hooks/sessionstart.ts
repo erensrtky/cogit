@@ -1,6 +1,7 @@
 import { branchesOf, type LogBranch } from "../commands/log.js";
 import { isRecorded, readSessionMessages, upgradeSessionIds } from "../messages.js";
 import type { Session } from "../schema/session.js";
+import { uncommittedSession } from "../session-git.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { loadAllSessions, loadConfig, loadSession } from "../store/stores.js";
 import { buildMessages } from "../view/lineage.js";
@@ -70,7 +71,7 @@ export async function onSessionStart(ctx: HookContext): Promise<HookOutput | und
   const config = await loadConfig(ctx.env);
   // SessionStart runs inside the chat's startup budget: opt out and it is silent.
   if (!config.startupContext) return undefined;
-  return additionalContext(await startupContext(ctx));
+  return additionalContext(await startupContext(ctx, config.recordCommit));
 }
 
 function additionalContext(text: string): HookOutput {
@@ -103,9 +104,11 @@ function clip(text: string, max: number): string {
 
 /**
  * What the agent needs to continue the project: where the lineage lives, how to
- * read it, and the compressed view of the last session before this one.
+ * read it, and the compressed view of the last session before this one. Under
+ * `recordCommit: ask` (Story 9.3) it also says when that session's record is
+ * still uncommitted, so the agent can offer to commit it.
  */
-async function startupContext(ctx: HookContext): Promise<string> {
+async function startupContext(ctx: HookContext, recordCommit: string): Promise<string> {
   const command = cli(ctx);
   const header =
     `cogit records this project's lineage (one node per user message, hanging from the ` +
@@ -122,7 +125,26 @@ async function startupContext(ctx: HookContext): Promise<string> {
 
   const events = await readEvents(ctx.root, previous.sessionId);
   const messages = buildMessages(applyEvents(previous.nodes, events));
-  return composeStartupContext(header, previous, branchesOf(previous.sessionId, messages));
+  const recordLine =
+    recordCommit === "ask" && (await uncommittedSession(ctx.root, previous.sessionId, ctx.env))
+      ? recordCommitLine(previous)
+      : "";
+  return composeStartupContext(
+    header,
+    previous,
+    branchesOf(previous.sessionId, messages),
+    recordLine,
+  );
+}
+
+/** The offer the agent makes for a record the last code commit did not carry. */
+export function recordCommitLine(session: Session): string {
+  const title = session.title.trim() === "" ? session.sessionId : clip(oneLine(session.title), 120);
+  return (
+    "The last session's record is not committed. Offer to commit it with the message " +
+    `\`chore(cogit): record ${title}\`, only the .cogit/sessions/ paths (never other staged ` +
+    "changes), and run it only if the user agrees."
+  );
 }
 
 /** The session with the newest activity, ignoring this one. */
@@ -145,8 +167,14 @@ export function composeStartupContext(
   header: string,
   session: Session,
   branches: readonly LogBranch[],
+  recordLine = "",
 ): string {
-  const head = [header, "", ...statusLines(session)];
+  const head = [
+    header,
+    ...(recordLine === "" ? [] : ["", recordLine]),
+    "",
+    ...statusLines(session),
+  ];
   const blocks = branches.map(branchLines);
   const cutNote = (cut: number): string[] =>
     cut === 0

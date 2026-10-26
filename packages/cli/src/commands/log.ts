@@ -123,6 +123,8 @@ export interface LogMessage {
 export interface LogSession {
   sessionId: string;
   title: string;
+  /** Who recorded the session (Story 9.3); absent on older records. */
+  author?: string;
   epoch: string | null;
   startedAt: string;
   updatedAt: string;
@@ -184,6 +186,7 @@ function toLogSession(effective: EffectiveSession): LogSession {
   return {
     sessionId: session.sessionId,
     title: session.title,
+    ...(session.author === undefined ? {} : { author: session.author }),
     epoch: session.epoch,
     startedAt: session.startedAt,
     updatedAt: session.updatedAt,
@@ -258,8 +261,9 @@ export function buildLog(sessions: EffectiveSession[], opts: LogOptions = {}): L
 
 function sessionHeading(session: LogSession): string {
   const title = session.title.trim() === "" ? session.sessionId : oneLine(session.title);
+  const author = session.author === undefined ? "" : ` · by ${session.author}`;
   return (
-    `## ${title} (${session.sessionId}) · ${session.epoch ?? "unassigned"} · ` +
+    `## ${title} (${session.sessionId})${author} · ${session.epoch ?? "unassigned"} · ` +
     `${stamp(session.startedAt)} → ${stamp(session.updatedAt)}`
   );
 }

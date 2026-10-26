@@ -936,6 +936,16 @@ body:has(.map-shell.is-expanded) {
   white-space: nowrap;
 }
 
+/* Who recorded the session (Story 9.3); never squeezes the title out. */
+.session-author {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* An epoch is a tag on a session dot, not a box around sessions. */
 .epoch-tag {
   display: inline-flex;

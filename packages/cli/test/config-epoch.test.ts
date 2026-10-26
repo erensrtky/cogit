@@ -25,7 +25,7 @@ describe("config", () => {
     expect(io.lines).toContain("messageSummaries = false");
     expect(io.lines).toContain("startupContext = true");
     await configGet("gitPolicy", io);
-    expect(io.lines.at(-1)).toBe('"ignore"');
+    expect(io.lines.at(-1)).toBe('"commit"');
   });
 
   it("sets numbers, booleans, strings and agent lists", async () => {

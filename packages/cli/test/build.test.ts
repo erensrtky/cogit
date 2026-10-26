@@ -10,6 +10,7 @@ import { configSet } from "../src/commands/config.js";
 import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
+import { cogitGitignore } from "../src/git.js";
 import { messageHash } from "../src/messages.js";
 import type { LineageNode, Session } from "../src/schema/session.js";
 import { readConversationStore } from "../src/store/conversations.js";
@@ -558,7 +559,9 @@ describe("cogit build", () => {
       messageSummaries: true,
       startupContext: true,
       updateEveryTurns: 5,
-      gitPolicy: "ignore",
+      shareConversations: false,
+      recordCommit: "ask",
+      gitPolicy: "commit",
       agents: ["claude-code"],
     });
     expect(embedded(await readFile(paths().html, "utf8"))).toEqual(model);
@@ -783,14 +786,15 @@ describe("cogit build", () => {
     expect(second.epochs[0]?.sessions[0]?.messages[0]?.unsummarized).toBeUndefined();
   });
 
-  it("adds the conversation gitignore line once, also in an existing project", async () => {
+  it("writes the project ignore rules once, also in an existing project", async () => {
     const ignore = join(paths().base, ".gitignore");
-    // An older project has no inner .gitignore; the next build writes it.
+    // A commit-policy project: a git dir and no root rule hiding .cogit/.
+    await mkdir(join(root, ".git"));
     await rm(ignore, { force: true });
     await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(await readFile(ignore, "utf8")).toBe("conversations/\n");
+    expect(await readFile(ignore, "utf8")).toBe(cogitGitignore(false));
     await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(await readFile(ignore, "utf8")).toBe("conversations/\n");
+    expect(await readFile(ignore, "utf8")).toBe(cogitGitignore(false));
   });
 
   it("keeps the map when the conversation store cannot be written", async () => {
@@ -821,6 +825,7 @@ describe("cogit build", () => {
 
   it("warns but still builds when the inner gitignore cannot be written", async () => {
     const ignore = join(paths().base, ".gitignore");
+    await mkdir(join(root, ".git"));
     await rm(ignore, { force: true });
     await mkdir(ignore);
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });

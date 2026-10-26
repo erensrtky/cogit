@@ -36,6 +36,8 @@ export const PANEL_EDITABLE_KEYS = [
   "updateEveryTurns",
   "sessionEndCatchUp",
   "catchUpModel",
+  "shareConversations",
+  "recordCommit",
 ] as const;
 
 export type PanelEditableKey = (typeof PANEL_EDITABLE_KEYS)[number];
@@ -165,6 +167,8 @@ export interface ViewSession {
   sessionId: string;
   agent: string;
   title: string;
+  /** Who recorded the session (Story 9.3); absent on records written before it. */
+  author?: string;
   epoch: string | null;
   startedAt: string;
   updatedAt: string;
@@ -303,6 +307,8 @@ export interface PanelSettings {
   catchUpModel: string;
   messageSummaries: boolean;
   startupContext: boolean;
+  shareConversations: boolean;
+  recordCommit: "ask" | "auto" | "off";
   gitPolicy: "ignore" | "commit";
   agents: string[];
 }
