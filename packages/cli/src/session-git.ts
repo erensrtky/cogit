@@ -60,8 +60,14 @@ async function git(
  */
 async function sessionPaths(gitRoot: string, root: string, sessionId: string): Promise<string[]> {
   const paths = projectPaths(root);
-  return [paths.session(sessionId), paths.events(sessionId)]
-    .filter((file) => existsSync(file))
+  const session = [paths.session(sessionId), paths.events(sessionId)].filter((file) =>
+    existsSync(file),
+  );
+  if (session.length === 0) return [];
+  // The project file and the ignore rules travel with the first record: a clone
+  // without them has sessions but no project, and no rules for the local state.
+  const shared = [paths.project, paths.gitignore].filter((file) => existsSync(file));
+  return [...session, ...shared]
     .map((file) => relative(gitRoot, file).split(sep).join("/"))
     .filter((file) => file !== "" && !file.startsWith(".."));
 }

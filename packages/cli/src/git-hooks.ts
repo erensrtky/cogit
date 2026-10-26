@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { findGitRoot, gitHooksDir } from "./git.js";
@@ -14,13 +15,46 @@ import { addThoughtTrailer } from "./thought.js";
 export const BLOCK_START = "# >>> cogit";
 export const BLOCK_END = "# <<< cogit";
 
-/** The block `init` adds to a hook; `"$@"` passes git's arguments through. */
-export function hookBlock(event: string, projectRoot: string): string {
-  return [
+/**
+ * The CLI that installs the hooks: the fallback when `cogit` is not on PATH, the
+ * common case for a plugin-only install. A path that later disappears (a plugin
+ * update) is refreshed by the next UserPromptSubmit hook.
+ */
+export function currentCliPath(): string | undefined {
+  const entry = process.argv[1];
+  if (entry === undefined || entry === "") return undefined;
+  try {
+    return realpathSync(entry);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The block `init` adds to a hook; `"$@"` passes git's arguments through. A
+ * `cogit` on PATH wins; otherwise the CLI that installed the block runs under
+ * `node`; with neither, the hook does nothing and the commit goes on.
+ */
+export function hookBlock(
+  event: string,
+  projectRoot: string,
+  cliPath: string | null = currentCliPath() ?? null,
+): string {
+  const args = `hook ${event} --dir ${shellQuote(projectRoot)} "$@"`;
+  const lines = [
     BLOCK_START,
-    `cogit hook ${event} --dir ${shellQuote(projectRoot)} "$@" || true`,
-    BLOCK_END,
-  ].join("\n");
+    "if command -v cogit >/dev/null 2>&1; then",
+    `  cogit ${args} || true`,
+  ];
+  if (cliPath !== null) {
+    const cli = shellQuote(cliPath);
+    lines.push(
+      `elif command -v node >/dev/null 2>&1 && [ -f ${cli} ]; then`,
+      `  node ${cli} ${args} || true`,
+    );
+  }
+  lines.push("fi", BLOCK_END);
+  return lines.join("\n");
 }
 
 /** Single quotes for the shell, with the embedded single quote escaped. */
@@ -94,6 +128,24 @@ export async function installGitHooks(root: string): Promise<GitHookEvent[]> {
     if (await installGitHook(root, event)) installed.push(event);
   }
   return installed;
+}
+
+/**
+ * Rewrites the blocks that are already there, so they point at the CLI running
+ * now (a plugin update moves it). Never adds a block to a hook that has none.
+ */
+export async function refreshGitHooks(root: string): Promise<GitHookEvent[]> {
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === undefined) return [];
+  const dir = await gitHooksDir(gitRoot);
+  if (dir === undefined) return [];
+  const refreshed: GitHookEvent[] = [];
+  for (const event of GIT_HOOK_EVENTS) {
+    const current = await readFile(join(dir, event), "utf8").catch(() => undefined);
+    if (current === undefined || !current.includes(BLOCK_START)) continue;
+    if (await installGitHook(root, event)) refreshed.push(event);
+  }
+  return refreshed;
 }
 
 /**

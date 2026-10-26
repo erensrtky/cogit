@@ -10,10 +10,12 @@ import {
 import { type AddressInfo, createServer as createNetServer } from "node:net";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import pkg from "../package.json" with { type: "json" };
 import { buildProject } from "../src/commands/build.js";
 import { init } from "../src/commands/init.js";
 import {
   CONFIG_TOKEN_HEADER,
+  checkHealth,
   ensureServer,
   injectLiveMeta,
   injectTokenMeta,
@@ -21,6 +23,7 @@ import {
   mapPageUrl,
   spawnServerProcess,
   startMapServer,
+  stopStaleServer,
 } from "../src/server.js";
 import { atomicWrite } from "../src/store/fs.js";
 import { globalPaths, projectPaths } from "../src/store/paths.js";
@@ -266,7 +269,7 @@ describe("map server", () => {
     expect((await request(mapPageUrl(server.url, root))).status).toBe(500);
   });
 
-  it("answers its health with this home", async () => {
+  it("answers its health with this home and version", async () => {
     const server = await start();
     const reply = await request(`${server.url}/health`);
     expect(reply.status).toBe(200);
@@ -274,7 +277,21 @@ describe("map server", () => {
       ok: true,
       name: "cogit",
       home: globalPaths(env).base,
+      version: pkg.version,
     });
+    expect(await checkHealth(server.url, env)).toBe(true);
+  });
+
+  it("stops on /api/stop from the CLI, never from a page", async () => {
+    const server = await start();
+    const fromPage = await fetch(`${server.url}/api/stop`, {
+      method: "POST",
+      headers: { origin: server.url },
+    });
+    expect(fromPage.status).toBe(403);
+    const fromCli = await fetch(`${server.url}/api/stop`, { method: "POST" });
+    expect(fromCli.status).toBe(200);
+    await server.closed;
   });
 
   it("rejects a foreign Host header", async () => {
@@ -627,6 +644,65 @@ describe("ensureServer", () => {
       expect(spawned).toBe(1);
     } finally {
       await new Promise<void>((done) => other.close(() => done()));
+    }
+  });
+
+  it("retires a server of another version and starts a current one", async () => {
+    let stopped = false;
+    const stale = createHttpServer((req, res) => {
+      if (req.method === "POST" && req.url === "/api/stop") {
+        stopped = true;
+        res.end("stopping");
+        stale.close();
+        stale.closeAllConnections();
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({ ok: true, name: "cogit", home: globalPaths(env).base, version: "0.0.1" }),
+      );
+    });
+    const port = await listen(stale);
+    const base = `http://127.0.0.1:${port}`;
+    await updateConfig((config) => ({ ...config, serverPort: port }), env);
+    expect(await checkHealth(base, env)).toBe(false);
+    const url = await ensureServer(env, {
+      spawn: () => {
+        void startMapServer({ env, port }).then((server) => servers.push(server));
+      },
+      waitMs: 2000,
+    });
+    expect(stopped).toBe(true);
+    expect(url).toBe(base);
+    expect(await checkHealth(base, env)).toBe(true);
+    // A current server is left alone.
+    expect(await stopStaleServer(base, env)).toBe(false);
+  });
+
+  it("leaves an old server that cannot be asked to stop", async () => {
+    const reply = (status: number, destroy: boolean) =>
+      createHttpServer((req, res) => {
+        if (req.method === "POST") {
+          if (destroy) {
+            req.socket.destroy();
+            return;
+          }
+          res.writeHead(status);
+          res.end();
+          return;
+        }
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, name: "cogit", home: globalPaths(env).base }));
+      });
+    // Refuses, drops the request, or says yes and keeps running.
+    for (const old of [reply(405, false), reply(200, true), reply(200, false)]) {
+      const port = await listen(old);
+      try {
+        expect(await stopStaleServer(`http://127.0.0.1:${port}`, env)).toBe(false);
+      } finally {
+        old.closeAllConnections();
+        await new Promise<void>((done) => old.close(() => done()));
+      }
     }
   });
 

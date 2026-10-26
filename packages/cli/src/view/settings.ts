@@ -53,7 +53,7 @@ const EDITABLE: FieldSpec[] = [
   },
   {
     key: "updateEveryTurns",
-    label: "Update every turns",
+    label: "Record every N turns",
     help: "Ask the agent to record after this many turns.",
     kind: "number",
   },

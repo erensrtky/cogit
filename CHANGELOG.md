@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- The git hooks work without a `cogit` on PATH (a plugin-only install): the hook block falls back to the CLI that installed it, run with `node`, and does nothing — no "command not found" — when neither is there; each prompt points an existing block at the current CLI, so a plugin update does not break it. `cogit hooks install` adds or refreshes the blocks by hand.
+- The `Thought:` trailer is added in every project, also when the record stays out of git, so `blame` and `show <sha>` follow the exact link locally; only the record staging follows the commit policy. `init`, `cogit config git` and the rename migration install the hooks for both policies.
+- The first code commit carries `.cogit/project.json` and `.cogit/.gitignore` with the session record, so a clone gets the project and the local-state rules, not only the sessions.
+- `cogit show <sha>` for a commit whose thought is not recorded yet names that thought instead of "no recorded thought"; `cogit open` no longer reuses a map server of another cogit version (the server's health reports its version and an outdated one is asked to stop); the minimap hides on a narrow map instead of covering the messages; the setting reads "Record every N turns".
+
 
 ## [0.12.0] - 2026-10-26
 ### Added

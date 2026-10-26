@@ -34,6 +34,7 @@ import {
   attachThoughtTrailers,
   earliestSessionStart,
   parseThoughtTrailers,
+  readCommitThought,
   readThoughtTrailers,
 } from "../src/thought.js";
 import { buildMessages } from "../src/view/lineage.js";
@@ -257,7 +258,7 @@ describe("the thought behind a commit (Story 9.4)", () => {
       expect(await readMessage(file)).toContain(`Thought: ${thoughtOf()}`);
     });
 
-    it("skips an empty transcript and a project that keeps its record out of git", async () => {
+    it("skips an empty transcript and a disabled capture, not the ignore policy", async () => {
       await writeHead();
       await writeFile(transcript, "");
       const file = await messageFile();
@@ -265,11 +266,13 @@ describe("the thought behind a commit (Story 9.4)", () => {
         await addThoughtTrailer({ dir: root, messageFile: file, source: "message", env, now: NOW }),
       ).toBe(false);
 
+      // The record stays local, but the link still serves `blame` and `show` here.
       await writeTranscript();
       await ensureGitignore(root, "ignore");
       expect(
         await addThoughtTrailer({ dir: root, messageFile: file, source: "message", env, now: NOW }),
-      ).toBe(false);
+      ).toBe(true);
+      await writeFile(file, "feat: change\n");
 
       expect(
         await addThoughtTrailer({
@@ -478,6 +481,29 @@ describe("the thought behind a commit (Story 9.4)", () => {
 
     const hits = await blame({ dir: root, target: "a.txt", io });
     expect(hits.map((hit) => hit.messageId)).toEqual([thought]);
+  });
+
+  it("names the thought behind a commit that is not recorded yet", async () => {
+    await writeProject([]);
+    const thought = thoughtOf();
+    await writeFile(join(root, "a.txt"), "two\n");
+    await git("add", "a.txt");
+    await git("commit", "-q", "-m", "feat: early", "--trailer", `Thought: ${thought}`);
+    const short = (await git("rev-parse", "--short", "HEAD")).trim();
+    expect(await readCommitThought(root, short)).toBe(thought);
+    await expect(show({ dir: root, ref: short, io, chat: false })).rejects.toThrow(
+      `commit ${short} comes from thought ${thought}, which is not recorded yet`,
+    );
+
+    // No trailer, an unknown ref or no repository: nothing to name.
+    await git("commit", "-q", "--allow-empty", "-m", "chore: plain");
+    const plain = (await git("rev-parse", "--short", "HEAD")).trim();
+    expect(await readCommitThought(root, plain)).toBeUndefined();
+    await expect(show({ dir: root, ref: plain, io, chat: false })).rejects.toThrow(
+      `no recorded thought for commit ${plain}`,
+    );
+    expect(await readCommitThought(root, "f".repeat(7))).toBeUndefined();
+    expect(await readCommitThought(dir, plain)).toBeUndefined();
   });
 
   it("resolves a commit ref and reports one it cannot place", () => {

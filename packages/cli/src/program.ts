@@ -12,7 +12,7 @@ import {
   configSet,
 } from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
-import { hooksUninstall } from "./commands/hooks.js";
+import { hooksInstall, hooksUninstall } from "./commands/hooks.js";
 import { type InitOptions, init } from "./commands/init.js";
 import { formatShow, log, logFile, show } from "./commands/log.js";
 import { migrateIds } from "./commands/migrate.js";
@@ -380,6 +380,11 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
   const hooks = program
     .command("hooks")
     .description("manage the git hooks cogit adds to a project");
+  hooks
+    .command("install")
+    .description("add or refresh the cogit block in this project's git hooks")
+    .argument("[dir]", "project directory", ".")
+    .action(run(async (dir: string) => hooksInstall(dir, makeIo(false))));
   hooks
     .command("uninstall")
     .description("remove only the cogit block from the git hooks it installed")

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import { configGit, configSet } from "../src/commands/config.js";
+import { hooksInstall, hooksUninstall } from "../src/commands/hooks.js";
 import { sessionAuthor, sessionWrite } from "../src/commands/session.js";
 import {
   cogitGitignore,
@@ -12,7 +13,13 @@ import {
   ensureGitignore,
   refreshCogitGitignore,
 } from "../src/git.js";
-import { hookBlock, installGitHook, withHookBlock } from "../src/git-hooks.js";
+import {
+  currentCliPath,
+  hookBlock,
+  installGitHook,
+  refreshGitHooks,
+  withHookBlock,
+} from "../src/git-hooks.js";
 import { runHook } from "../src/hooks/run.js";
 import type { Session } from "../src/schema/session.js";
 import {
@@ -293,6 +300,104 @@ describe("ignore files and git hooks", () => {
     expect(next.match(/# >>> cogit/g)).toHaveLength(1);
     expect(next).not.toContain("cogit hook pre-commit || true");
     expect(next).toContain("--dir '/p'");
+  });
+
+  it("carries project.json and the inner ignore file with the first record", async () => {
+    await mkdir(projectPaths(root).sessions, { recursive: true });
+    await writeFile(projectPaths(root).session("s1"), "{}\n");
+    await writeFile(projectPaths(root).gitignore, cogitGitignore(false));
+    await writeFile(projectPaths(root).head, JSON.stringify({ sessionId: "s1", at: T0 }));
+    await writeFile(join(root, "a.txt"), "two\n");
+    await git("add", "a.txt");
+    expect(await stageSessionFiles(root)).toBe(true);
+    const staged = (await git("diff", "--cached", "--name-only")).trim().split("\n");
+    expect(staged).toEqual(
+      expect.arrayContaining([
+        "a.txt",
+        ".cogit/sessions/s1.json",
+        ".cogit/project.json",
+        ".cogit/.gitignore",
+      ]),
+    );
+  });
+
+  it("falls back to the installing CLI under node, else does nothing", () => {
+    const withCli = hookBlock("pre-commit", "/p", "/opt/cogit/cli.js");
+    expect(withCli).toContain("if command -v cogit >/dev/null 2>&1; then");
+    expect(withCli).toContain(`  cogit hook pre-commit --dir '/p' "$@" || true`);
+    expect(withCli).toContain(`  node '/opt/cogit/cli.js' hook pre-commit --dir '/p' "$@" || true`);
+    const bare = hookBlock("pre-commit", "/p", null);
+    expect(bare).not.toContain("node ");
+    expect(bare.endsWith("fi\n# <<< cogit")).toBe(true);
+  });
+
+  it("has no fallback CLI path when the entry script is unknown", () => {
+    const saved = process.argv[1];
+    try {
+      process.argv[1] = join(dir, "missing.js");
+      expect(currentCliPath()).toBeUndefined();
+      process.argv[1] = "";
+      expect(currentCliPath()).toBeUndefined();
+    } finally {
+      process.argv[1] = saved as string;
+    }
+  });
+
+  it("runs the CLI through node when cogit is not on PATH", async () => {
+    // A stand-in CLI that records the arguments the hook passed.
+    const marker = join(dir, "called.txt");
+    const cli = join(dir, "cli.js");
+    await writeFile(
+      cli,
+      `require("node:fs").writeFileSync(${JSON.stringify(marker)}, process.argv.slice(2).join(" "));\n`,
+    );
+    const hook = join(dir, "hook.sh");
+    await writeFile(hook, `#!/bin/sh\n${hookBlock("pre-commit", root, cli)}\n`);
+    const path = `${join(process.execPath, "..")}:/usr/bin:/bin`;
+    await run("sh", [hook, "x"], { env: { PATH: path } });
+    expect(await readFile(marker, "utf8")).toBe(`hook pre-commit --dir ${root} x`);
+  });
+
+  it("stays silent and succeeds with neither cogit nor the CLI", async () => {
+    const hook = join(dir, "hook.sh");
+    await writeFile(hook, `#!/bin/sh\n${hookBlock("pre-commit", root, join(dir, "gone.js"))}\n`);
+    const { stderr } = await run("sh", [hook], { env: { PATH: "/usr/bin:/bin" } });
+    expect(stderr).toBe("");
+  });
+
+  it("refreshes only the hooks that already carry a cogit block", async () => {
+    const hooks = join(root, ".git", "hooks");
+    await writeFile(
+      join(hooks, "pre-commit"),
+      "#!/bin/sh\n# >>> cogit\ncogit hook pre-commit || true\n# <<< cogit\n",
+    );
+    await writeFile(join(hooks, "prepare-commit-msg"), "#!/bin/sh\necho mine\n");
+    expect(await refreshGitHooks(root)).toEqual(["pre-commit"]);
+    expect(await readFile(join(hooks, "pre-commit"), "utf8")).toContain(
+      hookBlock("pre-commit", root),
+    );
+    expect(await readFile(join(hooks, "prepare-commit-msg"), "utf8")).toBe(
+      "#!/bin/sh\necho mine\n",
+    );
+    expect(await refreshGitHooks(root)).toEqual([]);
+    expect(await refreshGitHooks(join(dir, "not-a-repo"))).toEqual([]);
+  });
+
+  it("installs the hooks on request and with the ignore policy", async () => {
+    const io = fakeIo(env);
+    const other = join(dir, "other");
+    await mkdir(other);
+    await expect(hooksInstall(other, io)).rejects.toThrow(/not initialized/);
+    await hooksInstall(root, io);
+    await hooksInstall(root, io);
+    expect(io.lines).toEqual([
+      "Added the cogit block to: pre-commit, prepare-commit-msg",
+      "The cogit hook blocks are already current.",
+    ]);
+    await hooksUninstall(root, io);
+    await configGit(root, "ignore", io);
+    const hook = await readFile(join(root, ".git", "hooks", "prepare-commit-msg"), "utf8");
+    expect(hook).toContain("hook prepare-commit-msg --dir");
   });
 
   it("offers the uncommitted record at session start only in ask mode", async () => {

@@ -3,7 +3,7 @@ import { access } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { promisify } from "node:util";
 import { defaultAgent } from "./agents/index.js";
-import { cogitIgnored, findGitRoot } from "./git.js";
+import { findGitRoot } from "./git.js";
 import { messageHash } from "./messages.js";
 import type { Session } from "./schema/session.js";
 import { readSessionHead } from "./session-git.js";
@@ -56,8 +56,8 @@ function messagePath(file: string): string {
 
 /**
  * Adds the `Thought:` trailer to the prepared commit message (Story 9.4). Skip
- * merges and squashes, a missing or stale `.cogit/HEAD`, an unreadable transcript
- * and a project whose records are kept out of git. `--if-exists doNothing` keeps
+ * merges and squashes, a missing or stale `.cogit/HEAD` and an unreadable
+ * transcript. `--if-exists doNothing` keeps
  * a trailer an `--amend` already carried. A failure is the caller's to swallow:
  * this never blocks the commit.
  */
@@ -65,9 +65,9 @@ export async function addThoughtTrailer(opts: TrailerOptions): Promise<boolean> 
   const env = opts.env ?? process.env;
   if (captureDisabled(env)) return false;
   if (opts.source === "merge" || opts.source === "squash") return false;
+  // Every policy gets the trailer: with the ignore policy the record stays on this
+  // machine, but `blame` and `show <sha>` here still follow the exact link.
   const root = resolve(opts.dir);
-  // A record that stays local cannot explain a commit to anyone else.
-  if (await cogitIgnored(root)) return false;
 
   const head = await readSessionHead(root);
   if (head === undefined || head.at === undefined) return false;
@@ -157,6 +157,24 @@ export async function readThoughtTrailers(
     return parseThoughtTrailers(String(stdout));
   } catch {
     return new Map();
+  }
+}
+
+/** The `Thought:` value of one commit, or undefined (no trailer, no such commit). */
+export async function readCommitThought(
+  root: string,
+  ref: string,
+  env?: NodeJS.ProcessEnv,
+): Promise<string | undefined> {
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === undefined) return undefined;
+  const args = ["-C", gitRoot, "log", "-1", "--format=%(trailers:key=Thought,valueonly)", ref];
+  try {
+    const { stdout } = await exec("git", args, env === undefined ? undefined : { env });
+    const value = String(stdout).trim().split("\n")[0]?.trim() ?? "";
+    return THOUGHT_VALUE.test(value) ? value : undefined;
+  } catch {
+    return undefined;
   }
 }
 

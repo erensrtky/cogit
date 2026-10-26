@@ -156,20 +156,20 @@ async function applyGitPolicy(
   await bestEffort(io, "could not write .cogit/.gitignore", () =>
     ensureCogitGitignore(root, policy, shareConversations),
   );
-  if (policy === "commit")
-    await bestEffort(io, "could not install the git hooks", () => installGitHooks(root));
+  // Every policy: the trailer links commits locally; staging follows the policy.
+  await bestEffort(io, "could not install the git hooks", () => installGitHooks(root));
 }
 
 /**
- * Brings an already initialized project up to date: a repository that commits
- * its records gets the new `.cogit/.gitignore` and the hooks, without changing the
- * policy the user chose at setup.
+ * Brings an already initialized project up to date: every repository gets the
+ * hooks, one that commits its records also the new `.cogit/.gitignore`, without
+ * changing the policy the user chose at setup.
  */
 async function refreshGitIntegration(io: Io, root: string): Promise<void> {
   if ((await findGitRoot(root)) === undefined) return;
   await bestEffort(io, "could not refresh the git integration", async () => {
-    if (await cogitIgnored(root)) return;
-    await refreshCogitGitignore(root, (await loadConfig(io.env)).shareConversations);
+    if (!(await cogitIgnored(root)))
+      await refreshCogitGitignore(root, (await loadConfig(io.env)).shareConversations);
     await installGitHooks(root);
   });
 }

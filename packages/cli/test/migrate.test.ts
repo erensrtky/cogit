@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { atomicWriteJson } from "../src/store/fs.js";
 import {
@@ -33,6 +35,16 @@ describe("migrateProject", () => {
 
     // Idempotent: the second run has nothing left to do.
     expect(await migrateProject(root)).toBe(false);
+  });
+
+  it("installs the git hooks in a repository that keeps its record out of git", async () => {
+    const root = await tempDir();
+    await promisify(execFile)("git", ["-C", root, "init", "-q"]);
+    await mkdir(join(root, ".codelineage"), { recursive: true });
+    await writeFile(join(root, ".gitignore"), "/.codelineage/\n");
+    expect(await migrateProject(root)).toBe(true);
+    const hook = await readFile(join(root, ".git", "hooks", "prepare-commit-msg"), "utf8");
+    expect(hook).toContain("hook prepare-commit-msg --dir");
   });
 
   it("leaves the old dir alone when the filesystem refuses the rename", async () => {

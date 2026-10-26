@@ -1,10 +1,13 @@
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import { configHintOff, configHintOn, configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
+import { hookBlock } from "../src/git-hooks.js";
 import { runHook, spawnDetachedProcess } from "../src/hooks/run.js";
 import {
   COMPACT_REQUEST,
@@ -469,6 +472,21 @@ describe("runHook", () => {
       transcriptPath: "/t/s1.jsonl",
       at: T0,
     });
+  });
+
+  it("points an existing git hook block at the CLI running now", async () => {
+    await initialized(2);
+    await promisify(execFile)("git", ["-C", root, "init", "-q"]);
+    const hook = join(root, ".git", "hooks", "pre-commit");
+    await writeFile(hook, "#!/bin/sh\n# >>> cogit\ncogit hook pre-commit || true\n# <<< cogit\n");
+    await runHook(
+      "promptsubmit",
+      JSON.stringify({ session_id: "s1", cwd: root }),
+      env,
+      T0,
+      () => {},
+    );
+    expect(await readFile(hook, "utf8")).toContain(hookBlock("pre-commit", root));
   });
 
   it("stays quiet at session end without a readable transcript or before init", async () => {

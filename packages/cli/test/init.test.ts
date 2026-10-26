@@ -260,6 +260,22 @@ describe("git helpers", () => {
     expect(basename(gi)).toBe(".gitignore");
   });
 
+  it("installs the git hooks with the ignore policy too, for the trailer", async () => {
+    const run = promisify(execFile);
+    await run("git", ["-C", root, "init", "-q"]);
+    await init(
+      root,
+      { name: "P", git: "ignore", retention: "keep", allowSkill: false, language: "auto" },
+      fakeIo(env),
+    );
+    const hook = await readText(join(root, ".git", "hooks", "prepare-commit-msg"));
+    expect(hook).toContain("hook prepare-commit-msg --dir");
+    // Running init again on the ignore project keeps the hooks current.
+    await rm(join(root, ".git", "hooks", "prepare-commit-msg"));
+    await init(root, { allowSkill: false }, fakeIo(env));
+    expect(existsSync(join(root, ".git", "hooks", "prepare-commit-msg"))).toBe(true);
+  });
+
   it("restores the record hook when init runs again on a commit project", async () => {
     const run = promisify(execFile);
     const git = (...args: string[]) => run("git", ["-C", root, ...args]);

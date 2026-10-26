@@ -1,3 +1,4 @@
+import { refreshGitHooks } from "../git-hooks.js";
 import { atomicWriteJson } from "../store/fs.js";
 import { projectPaths } from "../store/paths.js";
 import type { HookContext } from "./run.js";
@@ -17,5 +18,7 @@ export async function onPromptSubmit(ctx: HookContext): Promise<undefined> {
       : { transcriptPath: ctx.input.transcript_path }),
     at: ctx.now,
   });
+  // A plugin update moves the CLI: point the git hooks' blocks at this one.
+  await refreshGitHooks(ctx.root).catch(() => undefined);
   return undefined;
 }

@@ -5,7 +5,12 @@ import type { LineageNode, Session } from "../schema/session.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadProject } from "../store/stores.js";
-import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
+import {
+  attachThoughtTrailers,
+  earliestSessionStart,
+  readCommitThought,
+  readThoughtTrailers,
+} from "../thought.js";
 import { buildFileHistory, type FileSourceSession } from "../view/files.js";
 import { buildMessages } from "../view/lineage.js";
 import type { ViewFile, ViewNode } from "../view/model.js";
@@ -539,7 +544,17 @@ export async function show(opts: ShowOptions): Promise<ShowModel> {
   const sessions = await loadEffectiveSessions(root, opts.io);
   const result = resolveRef(sessions, opts.ref);
   if (result.kind === "invalid") throw new CliError(`invalid ref "${opts.ref}": ${result.reason}`);
-  if (result.kind === "unknown") throw new CliError(result.reason);
+  if (result.kind === "unknown") {
+    // The commit names a thought the record has not caught up with yet.
+    const thought = COMMIT_REF.test(opts.ref)
+      ? await readCommitThought(root, opts.ref, opts.io.env)
+      : undefined;
+    if (thought !== undefined)
+      throw new CliError(
+        `commit ${opts.ref} comes from thought ${thought}, which is not recorded yet; it appears after the next record update`,
+      );
+    throw new CliError(result.reason);
+  }
   if (result.kind === "ambiguous") {
     for (const candidate of result.candidates) {
       opts.io.out(

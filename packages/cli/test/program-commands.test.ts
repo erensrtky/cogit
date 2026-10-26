@@ -216,6 +216,8 @@ describe("commands through the CLI", () => {
     expect(await readFile(join(root, ".git", "hooks", "pre-commit"), "utf8")).toContain(
       "cogit hook pre-commit",
     );
+    await cli("hooks", "install", root);
+    expect(io.lines.at(-1)).toBe("The cogit hook blocks are already current.");
 
     const session = {
       schema: 1,

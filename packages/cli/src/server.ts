@@ -10,6 +10,7 @@ import {
 import type { AddressInfo } from "node:net";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import pkg from "../package.json" with { type: "json" };
 import { defaultAgent } from "./agents/index.js";
 import { buildProject } from "./commands/build.js";
 import { defaultsPrompter, type Io } from "./io.js";
@@ -21,6 +22,9 @@ import { loadConfig, loadRegistry, updateConfig } from "./store/stores.js";
 import { isPanelEditableKey, LIVE_META_NAME, TOKEN_META_NAME } from "./view/model.js";
 import { buildPanel, panelSettings } from "./view/panel.js";
 import { editableSettings } from "./view/settings.js";
+
+/** The CLI's version: a server of another version is not reused (see `ensureServer`). */
+const VERSION: string = pkg.version;
 
 /** A page nobody is looking at is a dead server after this long. */
 export const DEFAULT_IDLE_MS = 30 * 60 * 1000;
@@ -465,6 +469,17 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
         return;
       }
       const url = new URL(req.url ?? "/", `http://${HOST}:${port}`);
+      // `open` of a newer cogit retires a server of another version. Browsers
+      // always send Origin on a POST, so no web page can stop it.
+      if (url.pathname === "/api/stop") {
+        if (req.headers.origin !== undefined) {
+          respond(res, 403, "forbidden");
+          return;
+        }
+        respond(res, 200, "stopping");
+        void close();
+        return;
+      }
       if (url.pathname !== "/api/config") {
         respond(res, 405, "method not allowed");
         return;
@@ -494,7 +509,9 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
         "content-type": "application/json",
         "cache-control": "no-store",
       });
-      res.end(JSON.stringify({ ok: true, name: "cogit", home: globalPaths(env).base }));
+      res.end(
+        JSON.stringify({ ok: true, name: "cogit", home: globalPaths(env).base, version: VERSION }),
+      );
       return;
     }
     const target = await pageTarget(env, url);
@@ -581,6 +598,44 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
 interface HealthBody {
   name?: unknown;
   home?: unknown;
+  version?: unknown;
+}
+
+/** This user's cogit server on the port, with its version; undefined otherwise. */
+async function serverVersion(url: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
+  try {
+    const response = await fetch(`${url}/health`, { signal: AbortSignal.timeout(500) });
+    if (!response.ok) return undefined;
+    const body = (await response.json()) as HealthBody;
+    if (body.name !== "cogit" || body.home !== globalPaths(env).base) return undefined;
+    return typeof body.version === "string" ? body.version : "";
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Asks a server of another cogit version (an upgrade left it running) to stop,
+ * so `open` does not serve pages with old code. A server too old to know the
+ * request keeps running; `open` then falls back to the file.
+ */
+export async function stopStaleServer(url: string, env: NodeJS.ProcessEnv): Promise<boolean> {
+  const version = await serverVersion(url, env);
+  if (version === undefined || version === VERSION) return false;
+  try {
+    const response = await fetch(`${url}/api/stop`, {
+      method: "POST",
+      signal: AbortSignal.timeout(500),
+    });
+    if (!response.ok) return false;
+  } catch {
+    return false;
+  }
+  for (let i = 0; i < 20; i++) {
+    await delay(50);
+    if ((await serverVersion(url, env)) === undefined) return true;
+  }
+  return false;
 }
 
 /**
@@ -592,7 +647,7 @@ export async function checkHealth(url: string, env: NodeJS.ProcessEnv): Promise<
     const response = await fetch(`${url}/health`, { signal: AbortSignal.timeout(500) });
     if (!response.ok) return false;
     const body = (await response.json()) as HealthBody;
-    return body.name === "cogit" && body.home === globalPaths(env).base;
+    return body.name === "cogit" && body.home === globalPaths(env).base && body.version === VERSION;
   } catch {
     return false;
   }
@@ -623,6 +678,8 @@ export interface EnsureServerDeps {
   spawn?: (cli: string, port: number, env: NodeJS.ProcessEnv) => void;
   /** Health probe; tests replace the network with a function. */
   health?: (url: string, env: NodeJS.ProcessEnv) => Promise<boolean>;
+  /** Retires a server of another version before a new one starts. */
+  stopStale?: (url: string, env: NodeJS.ProcessEnv) => Promise<boolean>;
   /** How long to wait for a spawned server before giving up. */
   waitMs?: number;
 }
@@ -644,6 +701,7 @@ export async function ensureServer(
   const base = `http://${HOST}:${serverPort}`;
   const health = deps.health ?? checkHealth;
   if (await health(base, env)) return base;
+  await (deps.stopStale ?? stopStaleServer)(base, env);
 
   const cli = deps.cli ?? process.argv[1] ?? fileURLToPath(import.meta.url);
   (deps.spawn ?? spawnServerProcess)(cli, serverPort, env);
