@@ -1,6 +1,7 @@
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { ChatTurn } from "../src/agents/types.js";
 import {
   agentRecord,
   backfillTail,
@@ -14,7 +15,6 @@ import { messageHash } from "../src/messages.js";
 import type { Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
 import { loadSession } from "../src/store/stores.js";
-import type { ChatTurn } from "../src/transcript.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
 let dir: string;

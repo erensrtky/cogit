@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
+import { type ChatTurn, defaultAgent } from "./agents/index.js";
 import type { LineageNode, Session } from "./schema/session.js";
 import { readConversationStore } from "./store/conversations.js";
-import { type ChatTurn, findTranscript, readConversation } from "./transcript.js";
 
 /**
  * A user message's stable id: `h` plus the first 12 hex of the SHA-256 over the
@@ -63,10 +63,11 @@ export async function readSessionMessages(
   sessionId: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<SessionMessage[] | null> {
-  const file = await findTranscript(sessionId, env);
+  const agent = defaultAgent();
+  const file = await agent.findTranscript(sessionId, env);
   if (file) {
     try {
-      const turns = await readConversation(file);
+      const turns = await agent.readConversation(file);
       if (turns.length > 0) return hashTurns(sessionId, turns);
       const stored = await readConversationStore(root, sessionId);
       if (stored.length > 0) return storedMessages(sessionId, stored);

@@ -1,3 +1,4 @@
+import { defaultAgent } from "../agents/index.js";
 import { branchesOf, type LogBranch } from "../commands/log.js";
 import { isRecorded, readSessionMessages, upgradeSessionIds } from "../messages.js";
 import type { Session } from "../schema/session.js";
@@ -7,11 +8,17 @@ import { loadAllSessions, loadConfig, loadSession } from "../store/stores.js";
 import { buildMessages } from "../view/lineage.js";
 import type { HookContext, HookOutput } from "./run.js";
 
-export const COMPACT_REQUEST =
-  "cogit: this session was compacted and some of its user messages are not in the " +
-  "lineage record yet. Run the /cogit:record skill now; `session show` lists the " +
-  "messages that have no node. It records only what is missing and replies " +
-  '"up to date" when nothing is; do not mention this request otherwise.';
+/** The compaction request, naming the skill the way the agent spells it. */
+export function compactRequestText(skill: string): string {
+  return (
+    "cogit: this session was compacted and some of its user messages are not in the " +
+    `lineage record yet. Run the ${skill} skill now; \`session show\` lists the ` +
+    "messages that have no node. It records only what is missing and replies " +
+    '"up to date" when nothing is; do not mention this request otherwise.'
+  );
+}
+
+export const COMPACT_REQUEST = compactRequestText(defaultAgent().skill);
 
 /**
  * Budget for the handoff context SessionStart injects. The record is meant to
@@ -27,7 +34,8 @@ export function estimateTokens(text: string): number {
 
 /** The bundled CLI, as the agent should spell it in a project without `init`. */
 function cli(ctx: HookContext): string {
-  return `node "${ctx.env.CLAUDE_PLUGIN_ROOT ?? "${CLAUDE_PLUGIN_ROOT}"}/dist/cli.js"`;
+  const root = ctx.env[ctx.agent.pluginRootEnv] ?? `\${${ctx.agent.pluginRootEnv}}`;
+  return `node "${root}/dist/cli.js"`;
 }
 
 /**
@@ -66,16 +74,16 @@ export async function onSessionStart(ctx: HookContext): Promise<HookOutput | und
     const config = await loadConfig(ctx.env);
     // "Don't ask again in this project" lives outside the project.
     if (config.setupHintOff.includes(ctx.root)) return undefined;
-    return additionalContext(setupHint(ctx));
+    return additionalContext(ctx, setupHint(ctx));
   }
   const config = await loadConfig(ctx.env);
   // SessionStart runs inside the chat's startup budget: opt out and it is silent.
   if (!config.startupContext) return undefined;
-  return additionalContext(await startupContext(ctx, config.recordCommit));
+  return additionalContext(ctx, await startupContext(ctx, config.recordCommit));
 }
 
-function additionalContext(text: string): HookOutput {
-  return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } };
+function additionalContext(ctx: HookContext, text: string): HookOutput {
+  return ctx.agent.additionalContext("SessionStart", text);
 }
 
 async function compactRequest(ctx: HookContext): Promise<HookOutput | undefined> {
@@ -90,7 +98,7 @@ async function compactRequest(ctx: HookContext): Promise<HookOutput | undefined>
     recorded = new Set(applyEvents(upgraded.nodes, events).map((node) => node.id));
   }
   if (messages.every((message) => isRecorded(recorded, message))) return undefined;
-  return additionalContext(COMPACT_REQUEST);
+  return additionalContext(ctx, COMPACT_REQUEST);
 }
 
 /** One line of prose, however the record stored it. */

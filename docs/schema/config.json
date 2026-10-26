@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "type": "number",
+      "const": 1
+    },
+    "language": {
+      "default": "auto",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32
+    },
+    "updateEveryTurns": {
+      "default": 5,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "sessionEndCatchUp": {
+      "default": true,
+      "type": "boolean"
+    },
+    "catchUpModel": {
+      "default": "haiku",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "messageSummaries": {
+      "default": false,
+      "type": "boolean"
+    },
+    "startupContext": {
+      "default": true,
+      "type": "boolean"
+    },
+    "serverPort": {
+      "default": 4747,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "gitPolicy": {
+      "default": "commit",
+      "type": "string",
+      "enum": [
+        "ignore",
+        "commit"
+      ]
+    },
+    "shareConversations": {
+      "default": false,
+      "type": "boolean"
+    },
+    "recordCommit": {
+      "default": "ask",
+      "type": "string",
+      "enum": [
+        "ask",
+        "auto",
+        "off"
+      ]
+    },
+    "trailerMaxAgeHours": {
+      "default": 6,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8760
+    },
+    "agents": {
+      "default": [
+        "claude-code"
+      ],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "setupHintOff": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "language",
+    "updateEveryTurns",
+    "sessionEndCatchUp",
+    "catchUpModel",
+    "messageSummaries",
+    "startupContext",
+    "serverPort",
+    "gitPolicy",
+    "shareConversations",
+    "recordCommit",
+    "trailerMaxAgeHours",
+    "agents",
+    "setupHintOff"
+  ],
+  "additionalProperties": false
+}

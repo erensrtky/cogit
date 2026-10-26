@@ -1,6 +1,7 @@
 import { readFile, rm } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { resolve } from "node:path";
+import { defaultAgent } from "../agents/index.js";
 import { commitBetween, findGitRoot, gitUserName } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import {
@@ -28,8 +29,9 @@ import {
   loadSession,
   updateSession,
 } from "../store/stores.js";
-import { countUserLines, excerpt, findTranscript, readsHandoff } from "../transcript.js";
 import { buildProject } from "./build.js";
+
+const agent = defaultAgent();
 
 export async function readStdin(stream: NodeJS.ReadableStream = process.stdin): Promise<string> {
   const chunks: Buffer[] = [];
@@ -356,8 +358,8 @@ export async function sessionShow(
   );
   // A format change would otherwise look like "nothing written yet" forever.
   if (messages && messages.length === 0) {
-    const file = await findTranscript(sessionId, io.env);
-    const userLines = file ? await countUserLines(file).catch(() => 0) : 0;
+    const file = await agent.findTranscript(sessionId, io.env);
+    const userLines = file ? await agent.countUserLines(file).catch(() => 0) : 0;
     if (userLines > 0)
       view.transcriptWarning =
         `the transcript has ${userLines} user line(s) but none read as a message; ` +
@@ -424,7 +426,7 @@ async function newMessages(
       id: message.hash,
       label: labels.get(message.hash) ?? message.label,
       at: message.at,
-      text: excerpt(message.text),
+      text: agent.excerpt(message.text),
       ...(gapMinutes === undefined ? {} : { gapMinutes }),
       ...(message.resumed ? { resumed: true } : {}),
       ...(committed ? { commitBetween: true } : {}),
@@ -496,8 +498,8 @@ async function parentCandidates(
     });
     if (others.length === CANDIDATE_SESSIONS) break;
   }
-  const file = await findTranscript(sessionId, io.env);
-  const handoff = file ? await readsHandoff(file).catch(() => false) : false;
+  const file = await agent.findTranscript(sessionId, io.env);
+  const handoff = file ? await agent.readsHandoff(file).catch(() => false) : false;
   return {
     forMessage: { id: first.hash, label: first.label },
     ...(handoff || CONTINUES.test(first.text) ? { continuesHint: true } : {}),

@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The record format is now an open contract: `docs/format.md` documents the `.cogit/` layout, the session file and events log, the canonical message id, parents/links/branches, the conversation store, `HEAD`, the `Thought:` trailer and schema versioning, with JSON Schemas generated from the zod schemas into `docs/schema/` (`npm run schemas`; a test fails when they drift). Everything Claude Code-specific — finding and reading transcripts, parsing hook payloads, the record skill's slash name and permission rule, transcript retention — now sits behind an `AgentAdapter` in `packages/cli/src/agents/` with one implementation, `claude`; no behaviour change.
+
 ## [0.11.0] - 2026-10-26
 ### Added
 - npm readiness: the README now says what cogit is, shows the map, the four read verbs (`log`, `show`, `blame`, `search`), what git sees, privacy and every setting; the package carries `repository`, `homepage`, `bugs` and keywords, and `prepack` copies the repository README and LICENSE next to `package.json` so the registry page shows them. `npm pack` still ships only the bundled CLI, the plugin manifest, the skill, the hooks and those two files.

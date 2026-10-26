@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { type ChatTurn, defaultAgent } from "../agents/index.js";
 import { CliError, type Io } from "../io.js";
 import { hashTurns, isRecorded, type SessionMessage, upgradeSessionIds } from "../messages.js";
 import type { Session } from "../schema/session.js";
@@ -8,7 +9,6 @@ import { LockBusyError, withLock } from "../store/lock.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadConfig, loadProject, loadSession } from "../store/stores.js";
-import { type ChatTurn, findTranscript, readConversation } from "../transcript.js";
 import { sessionWrite } from "./session.js";
 
 /** How much of one message or reply goes into the prompt. */
@@ -172,9 +172,10 @@ async function missingTurns(
   sessionId: string,
   env: NodeJS.ProcessEnv,
 ): Promise<SessionMessage[]> {
-  const file = await findTranscript(sessionId, env);
+  const agent = defaultAgent();
+  const file = await agent.findTranscript(sessionId, env);
   if (!file) return [];
-  const turns = hashTurns(sessionId, await readConversation(file));
+  const turns = hashTurns(sessionId, await agent.readConversation(file));
   const loaded = await loadSession(root, sessionId);
   let recorded = new Set<string>();
   if (loaded.found && loaded.ok) {

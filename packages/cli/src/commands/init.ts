@@ -1,13 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { basename, resolve } from "node:path";
-import {
-  allowSkill,
-  CLAUDE_DEFAULT_RETENTION,
-  readRetention,
-  readSkillAllowed,
-  SKILL_RULE,
-  setRetention,
-} from "../claude-settings.js";
+import { defaultAgent } from "../agents/index.js";
 import {
   cogitIgnored,
   ensureCogitGitignore,
@@ -28,6 +21,8 @@ import {
   updateProject,
   updateRegistry,
 } from "../store/stores.js";
+
+const agent = defaultAgent();
 
 export interface InitOptions {
   name?: string;
@@ -53,7 +48,7 @@ async function bestEffort(io: Io, what: string, fn: () => Promise<unknown>): Pro
 }
 
 async function askRetention(io: Io, opts: InitOptions): Promise<void> {
-  const current = await readRetention(io.env);
+  const current = await agent.readRetention(io.env);
   if (current === undefined) {
     io.warn("could not read Claude Code settings; transcript retention left unchanged");
     return;
@@ -65,7 +60,7 @@ async function askRetention(io: Io, opts: InitOptions): Promise<void> {
       return;
     }
     const picked = await io.prompt.select(
-      `Claude Code deletes transcripts after ${current} days${current === CLAUDE_DEFAULT_RETENTION ? " (its default)" : ""}. ` +
+      `Claude Code deletes transcripts after ${current} days${current === agent.defaultRetention ? " (its default)" : ""}. ` +
         "Older sessions can then no longer be resumed or backfilled. Keep them longer?",
       [
         { value: "keep", name: `Keep ${current} days` },
@@ -78,15 +73,15 @@ async function askRetention(io: Io, opts: InitOptions): Promise<void> {
     choice = picked === "keep" ? "keep" : Number(picked);
   }
   if (choice === "keep" || choice === current) return;
-  const { file, backup } = await setRetention(choice, io.env, io.now());
+  const { file, backup } = await agent.setRetention(choice, io.env, io.now());
   io.out(`Set cleanupPeriodDays to ${choice} in ${file}${backup ? ` (backup: ${backup})` : ""}.`);
 }
 
 async function askSkillPermission(io: Io, opts: InitOptions): Promise<void> {
-  const allowed = await readSkillAllowed(io.env);
+  const allowed = await agent.readSkillAllowed(io.env);
   if (allowed === undefined) {
     io.warn(
-      `could not read Claude Code permissions; add ${SKILL_RULE} to permissions.allow yourself`,
+      `could not read Claude Code permissions; add ${agent.skillRule} to permissions.allow yourself`,
     );
     return;
   }
@@ -95,15 +90,17 @@ async function askSkillPermission(io: Io, opts: InitOptions): Promise<void> {
     opts.allowSkill ??
     (await io.prompt.confirm(
       "Let the agent update the lineage record without asking each time? " +
-        `(adds ${SKILL_RULE} to your Claude Code permissions)`,
+        `(adds ${agent.skillRule} to your Claude Code permissions)`,
       true,
     ));
   if (!allow) {
-    io.out(`Claude Code will ask before each lineage update; allow ${SKILL_RULE} to stop that.`);
+    io.out(
+      `Claude Code will ask before each lineage update; allow ${agent.skillRule} to stop that.`,
+    );
     return;
   }
-  const { file, backup } = await allowSkill(io.env, io.now());
-  io.out(`Allowed ${SKILL_RULE} in ${file}${backup ? ` (backup: ${backup})` : ""}.`);
+  const { file, backup } = await agent.allowSkill(io.env, io.now());
+  io.out(`Allowed ${agent.skillRule} in ${file}${backup ? ` (backup: ${backup})` : ""}.`);
 }
 
 async function askLanguage(io: Io, opts: InitOptions): Promise<void> {

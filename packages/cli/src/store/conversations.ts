@@ -1,8 +1,8 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { constants, gunzipSync, gzipSync } from "node:zlib";
+import type { ChatTurn, ToolUse } from "../agents/types.js";
 import { redactDeep } from "../redact.js";
-import type { ChatTurn, ToolUse } from "../transcript.js";
 import { projectPaths } from "./paths.js";
 
 /**

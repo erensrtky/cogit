@@ -10,6 +10,7 @@ import {
 import type { AddressInfo } from "node:net";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { defaultAgent } from "./agents/index.js";
 import { buildProject } from "./commands/build.js";
 import { defaultsPrompter, type Io } from "./io.js";
 import { Config } from "./schema/config.js";
@@ -20,7 +21,6 @@ import { loadConfig, loadRegistry, updateConfig } from "./store/stores.js";
 import { isPanelEditableKey, LIVE_META_NAME, TOKEN_META_NAME } from "./view/model.js";
 import { buildPanel, panelSettings } from "./view/panel.js";
 import { editableSettings } from "./view/settings.js";
-import { claudeConfigDir } from "./view/transcripts.js";
 
 /** A page nobody is looking at is a dead server after this long. */
 export const DEFAULT_IDLE_MS = 30 * 60 * 1000;
@@ -264,7 +264,7 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
    */
   function startTranscriptWatch(): void {
     if (transcriptWatcher !== undefined) return;
-    const dir = join(claudeConfigDir(env), "projects");
+    const dir = join(defaultAgent().configDir(env), "projects");
     try {
       transcriptWatcher = watch(dir, { persistent: false, recursive: true }, (_event, name) => {
         if (name === null || !name.toString().endsWith(".jsonl")) return;

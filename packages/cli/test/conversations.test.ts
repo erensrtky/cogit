@@ -1,8 +1,8 @@
 import { readFile, stat, truncate } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import type { ChatTurn } from "../src/agents/types.js";
 import { appendConversationTurns, readConversationStore } from "../src/store/conversations.js";
 import { projectPaths } from "../src/store/paths.js";
-import type { ChatTurn } from "../src/transcript.js";
 import { tempDir } from "./helpers.js";
 
 function turn(uuid: string | undefined, text: string, replies: string[] = []): ChatTurn {

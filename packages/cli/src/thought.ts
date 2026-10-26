@@ -2,13 +2,13 @@ import { execFile } from "node:child_process";
 import { access } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { promisify } from "node:util";
+import { defaultAgent } from "./agents/index.js";
 import { cogitIgnored, findGitRoot } from "./git.js";
 import { messageHash } from "./messages.js";
 import type { Session } from "./schema/session.js";
 import { readSessionHead } from "./session-git.js";
 import { captureDisabled } from "./store/paths.js";
 import { loadConfig } from "./store/stores.js";
-import { findTranscript, readConversation } from "./transcript.js";
 
 const exec = promisify(execFile);
 
@@ -78,13 +78,14 @@ export async function addThoughtTrailer(opts: TrailerOptions): Promise<boolean> 
   // A little clock skew is fine; a cutoff that passed (or a future date) is not.
   if (age > config.trailerMaxAgeHours * 3_600_000 || age < -5 * 60_000) return false;
 
+  const agent = defaultAgent();
   const transcript =
     head.transcriptPath !== undefined && (await readable(head.transcriptPath))
       ? head.transcriptPath
-      : await findTranscript(head.sessionId, env);
+      : await agent.findTranscript(head.sessionId, env);
   if (transcript === null) return false;
 
-  const turns = await readConversation(transcript);
+  const turns = await agent.readConversation(transcript);
   const newest = turns.at(-1);
   if (newest === undefined) return false;
 

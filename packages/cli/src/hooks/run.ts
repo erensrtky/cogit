@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { z } from "zod";
+import { type AgentAdapter, defaultAgent, type HookInput } from "../agents/index.js";
 import { Slug } from "../schema/common.js";
 import { captureDisabled, projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
@@ -10,19 +10,9 @@ import { onSessionEnd } from "./sessionend.js";
 import { onSessionStart } from "./sessionstart.js";
 import { onStop } from "./stop.js";
 
-/** The common fields of a Claude Code hook input we rely on. */
-export const HookInput = z.looseObject({
-  session_id: z.string(),
-  cwd: z.string().optional(),
-  /** Where Claude Code keeps the session's transcript (UserPromptSubmit and friends). */
-  transcript_path: z.string().optional(),
-  stop_hook_active: z.boolean().optional(),
-  /** SessionStart only: `startup`, `resume`, `clear` or `compact`. */
-  source: z.string().optional(),
-});
-export type HookInput = z.infer<typeof HookInput>;
-
 export interface HookContext {
+  /** The agent whose hook this is: its payload format and its record skill. */
+  agent: AgentAdapter;
   input: HookInput;
   sessionId: string;
   /** Where `.cogit/` lives: `CLAUDE_PROJECT_DIR`, else the hook's `cwd`, mapped out of a worktree. */
@@ -83,10 +73,15 @@ export async function runHook(
     if (captureDisabled(env)) return undefined;
     const handler = HANDLERS[event];
     if (!handler) return undefined;
-    const input = HookInput.parse(JSON.parse(stdin));
+    const agent = defaultAgent();
+    const input = agent.parseHookInput(stdin);
+    if (input === undefined) {
+      debug(`cogit ${event} hook: unreadable hook input`);
+      return undefined;
+    }
     if (!Slug.safeParse(input.session_id).success) return undefined;
     // In a linked worktree both point at the worktree; the record lives in the main checkout.
-    const { root } = await resolveProjectRoot(env.CLAUDE_PROJECT_DIR ?? input.cwd ?? ".");
+    const { root } = await resolveProjectRoot(env[agent.projectDirEnv] ?? input.cwd ?? ".");
     const initialized = existsSync(projectPaths(root).project);
     // Before `init` every hook is a no-op except SessionStart, which offers setup;
     // projects are never registered here.
@@ -95,6 +90,7 @@ export async function runHook(
     const startCatchUp = (args: string[]) =>
       (deps.spawnDetached ?? spawnDetachedProcess)(cli, args, env);
     const out = await handler({
+      agent,
       input,
       sessionId: input.session_id,
       root,

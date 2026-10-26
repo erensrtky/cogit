@@ -1,3 +1,4 @@
+import { defaultAgent } from "../agents/index.js";
 import type { HookState } from "../schema/state.js";
 import { STATE_SCHEMA } from "../schema/state.js";
 import { isLockHeld } from "../store/lock.js";
@@ -5,10 +6,16 @@ import { projectPaths } from "../store/paths.js";
 import { loadConfig, loadSession, updateState } from "../store/stores.js";
 import type { HookContext, HookOutput } from "./run.js";
 
-export const UPDATE_REQUEST =
-  "cogit: several turns have passed since this session's lineage record was last updated. " +
-  "Run the /cogit:record skill now. It records only what changed and replies " +
-  '"up to date" when nothing did; do not mention this request otherwise.';
+/** The turn-count request, naming the skill the way the agent spells it. */
+export function updateRequestText(skill: string): string {
+  return (
+    "cogit: several turns have passed since this session's lineage record was last updated. " +
+    `Run the ${skill} skill now. It records only what changed and replies ` +
+    '"up to date" when nothing did; do not mention this request otherwise.'
+  );
+}
+
+export const UPDATE_REQUEST = updateRequestText(defaultAgent().skill);
 
 /** One Stop: count the turn and decide whether to ask for a record update. */
 export function countTurn(
@@ -72,5 +79,5 @@ export async function onStop(ctx: HookContext): Promise<HookOutput | undefined> 
     { timeoutMs: 2000 },
   );
   if (!request) return undefined;
-  return { hookSpecificOutput: { hookEventName: "Stop", additionalContext: UPDATE_REQUEST } };
+  return ctx.agent.additionalContext("Stop", UPDATE_REQUEST);
 }

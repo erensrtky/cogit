@@ -1,13 +1,13 @@
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
+import { claudeConfigDir, collectTranscriptIds } from "../src/agents/claude/transcripts.js";
 import { buildProject } from "../src/commands/build.js";
 import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import type { Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
 import { resumeCommand, shellQuote } from "../src/view/resume.js";
-import { claudeConfigDir, collectTranscriptIds } from "../src/view/transcripts.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
 function session(over: Partial<Session> & { sessionId: string }): Session {

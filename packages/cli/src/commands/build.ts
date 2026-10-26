@@ -1,3 +1,4 @@
+import { type ChatTurn, defaultAgent } from "../agents/index.js";
 import {
   findGitRoot,
   projectFiles,
@@ -27,7 +28,6 @@ import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
 import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
-import { type ChatTurn, displayTurn, excerpt, readConversation } from "../transcript.js";
 import { buildFileHistory, modelSessions } from "../view/files.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
 import type { LineageViewModel, ViewChatTurn, ViewPendingMessage } from "../view/model.js";
@@ -39,7 +39,6 @@ import {
 } from "../view/panel.js";
 import { switcherEntries } from "../view/switcher.js";
 import { TEMPLATE_HTML } from "../view/template.js";
-import { collectTranscripts } from "../view/transcripts.js";
 
 export interface BuildOptions {
   dir: string;
@@ -92,6 +91,7 @@ async function readTranscriptViews(
   root: string,
   io: Io,
 ): Promise<TranscriptViews> {
+  const agent = defaultAgent();
   const chats = new Map<string, ViewChatTurn[]>();
   const pending = new Map<string, ViewPendingMessage[]>();
   const prepared: Session[] = [];
@@ -105,7 +105,7 @@ async function readTranscriptViews(
     let transcript: ChatTurn[] | null = null;
     if (file) {
       try {
-        transcript = await readConversation(file);
+        transcript = await agent.readConversation(file);
       } catch (err) {
         if (recordsMessages)
           io.warn(
@@ -129,7 +129,7 @@ async function readTranscriptViews(
           await appendConversationTurns(
             root,
             session.sessionId,
-            fresh.map((turn) => displayTurn(turn, roots)),
+            fresh.map((turn) => agent.displayTurn(turn, roots)),
           );
         // Turns stored before ids were stable get theirs now, before Claude Code
         // deletes the transcript this hash comes from.
@@ -171,7 +171,7 @@ async function readTranscriptViews(
               replies: kept.replies,
               tools: kept.tools,
             })
-          : toViewTurn(displayTurn(turn, roots));
+          : toViewTurn(agent.displayTurn(turn, roots));
       });
     } else if (stored.length > 0) {
       // No readable transcript: the store is all that is left. Its append-only
@@ -189,7 +189,7 @@ async function readTranscriptViews(
           id: message.hash,
           label: message.label,
           at: message.at,
-          title: excerpt(message.text, PENDING_TITLE_LENGTH) || "(blank message)",
+          title: agent.excerpt(message.text, PENDING_TITLE_LENGTH) || "(blank message)",
         })),
       );
       unrecorded.set(session.sessionId, missing.length);
@@ -267,7 +267,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
     paths.lock("build"),
     async () => {
       const sessions = await loadAllSessions(root, io.warn);
-      const transcripts = await collectTranscripts(io.env);
+      const transcripts = await defaultAgent().collectTranscripts(io.env);
       const views = await readTranscriptViews(sessions, transcripts, root, io);
       // The `Thought:` trailers git holds (Story 9.4) attach commits to the
       // message they carry out, so the map, the file history and `blame` agree

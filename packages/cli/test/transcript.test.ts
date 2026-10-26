@@ -10,7 +10,7 @@ import {
   readConversation,
   readsHandoff,
   readUserMessages,
-} from "../src/transcript.js";
+} from "../src/agents/claude/transcripts.js";
 import { envFor, tempDir } from "./helpers.js";
 
 const at = (m: number) => `2026-10-23T10:${String(m).padStart(2, "0")}:00.000Z`;

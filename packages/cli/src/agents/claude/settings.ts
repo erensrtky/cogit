@@ -1,7 +1,13 @@
 import { constants, copyFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { atomicWriteJson, readJson } from "./store/fs.js";
+import { atomicWriteJson, readJson } from "../../store/fs.js";
+import type { FileChange } from "../types.js";
+
+/**
+ * The parts of Claude Code's own settings cogit touches: transcript retention
+ * and the permission that lets the agent run the record skill without asking.
+ */
 
 /** Claude Code's own default, see the cleanupPeriodDays docs. */
 export const CLAUDE_DEFAULT_RETENTION = 30;
@@ -28,7 +34,7 @@ export async function readRetention(env: NodeJS.ProcessEnv): Promise<number | un
   return typeof days === "number" ? days : CLAUDE_DEFAULT_RETENTION;
 }
 
-/** Lets the agent run the lineage skill without a permission prompt each time. */
+/** Lets the agent run the record skill without a permission prompt each time. */
 export const SKILL_RULE = "Skill(cogit:record)";
 
 function allowList(settings: Record<string, unknown>): unknown[] | undefined {
@@ -55,7 +61,7 @@ async function updateSettings(
   env: NodeJS.ProcessEnv,
   stamp: string,
   fn: (settings: Record<string, unknown>, file: string) => Record<string, unknown>,
-): Promise<{ file: string; backup?: string }> {
+): Promise<FileChange> {
   const file = claudeSettingsPath(env);
   const settings = await readSettings(file);
   if (!settings) throw new Error(`${file} is not a valid JSON object; not changing it`);
@@ -76,17 +82,14 @@ export async function setRetention(
   days: number,
   env: NodeJS.ProcessEnv,
   stamp: string,
-): Promise<{ file: string; backup?: string }> {
+): Promise<FileChange> {
   if (!Number.isInteger(days) || days < 1)
     throw new Error("retention must be a whole number of days, at least 1");
   return updateSettings(env, stamp, (s) => ({ ...s, cleanupPeriodDays: days }));
 }
 
 /** Adds {@link SKILL_RULE} to `permissions.allow` in the user's Claude Code settings. */
-export async function allowSkill(
-  env: NodeJS.ProcessEnv,
-  stamp: string,
-): Promise<{ file: string; backup?: string }> {
+export async function allowSkill(env: NodeJS.ProcessEnv, stamp: string): Promise<FileChange> {
   return updateSettings(env, stamp, (s, file) => {
     const allow = allowList(s);
     if (!allow) throw new Error(`${file} has an unexpected permissions.allow; not changing it`);

@@ -1,18 +1,19 @@
 import { createReadStream } from "node:fs";
 import { access, readdir } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { claudeConfigDir } from "./view/transcripts.js";
+import type { ChatTurn, ToolUse, UserMessage } from "../types.js";
 
-/** One message the user typed, numbered in transcript order. */
-export interface UserMessage {
-  /** `m1`, `m2`, …: the node id the message gets on the map. */
-  id: string;
-  /** When the user sent it, from the transcript. */
-  at: string;
-  text: string;
-  /** A `/clear`, a resume or a new process came between this message and the previous one. */
-  resumed?: boolean;
+/**
+ * Reading Claude Code's transcripts. A session is one JSONL file under
+ * `projects/<encoded cwd>/<id>.jsonl` in the Claude home; every line is an API
+ * or harness record, and only some user lines are messages the user typed.
+ */
+
+/** Where Claude Code keeps its state: `$CLAUDE_CONFIG_DIR` or `~/.claude`. */
+export function claudeConfigDir(env: NodeJS.ProcessEnv = process.env): string {
+  return env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
 }
 
 /**
@@ -40,6 +41,46 @@ export async function findTranscript(
     } catch {}
   }
   return null;
+}
+
+/**
+ * Every transcript under `projects/<encoded>/*.jsonl`, by session id.
+ * Best effort: an unreadable Claude home means "none found", never a failed build.
+ */
+export async function collectTranscripts(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<Map<string, string>> {
+  const found = new Map<string, string>();
+  const projectsDir = join(claudeConfigDir(env), "projects");
+
+  let projectDirs;
+  try {
+    projectDirs = await readdir(projectsDir, { withFileTypes: true });
+  } catch {
+    return found;
+  }
+
+  for (const entry of projectDirs) {
+    if (!entry.isDirectory()) continue;
+    const dir = join(projectsDir, entry.name);
+    let files: string[];
+    try {
+      files = await readdir(dir);
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      if (file.endsWith(".jsonl")) found.set(file.slice(0, -".jsonl".length), join(dir, file));
+    }
+  }
+  return found;
+}
+
+/** Session ids that still have a transcript. */
+export async function collectTranscriptIds(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<Set<string>> {
+  return new Set((await collectTranscripts(env)).keys());
 }
 
 /** Lines Claude Code writes as user turns that the user did not type as a message. */
@@ -85,29 +126,6 @@ export function messageText(line: Record<string, unknown>): string | null {
   return text.trim() === "" ? null : text;
 }
 
-/** What the agent did with tools during one turn, without their output. */
-export interface ToolUse {
-  /** Shell commands run. */
-  commands: number;
-  /** Files written or edited, as the agent named them. */
-  files: string[];
-  /** Any other tool calls (reads, searches, web, subagents…). */
-  other: number;
-}
-
-/** One user message and what the agent wrote back before the next one. */
-export interface ChatTurn extends UserMessage {
-  /** The transcript's uuid for the user line; the key of the conversation store. */
-  uuid?: string;
-  /** The message's stable id (`h…`, Story 8.5); set once the session id is known. */
-  hash?: string;
-  /** The display label (`m1`, `m2`, …); set once the session id is known. */
-  label?: string;
-  /** The agent's written replies, in order; tool output never appears here. */
-  replies: string[];
-  tools: ToolUse;
-}
-
 /** The longest text one chat entry keeps on the map; the rest is cut with a note. */
 export const CHAT_TEXT_LIMIT = 20_000;
 
@@ -116,14 +134,18 @@ function capped(text: string): string {
   return `${text.slice(0, CHAT_TEXT_LIMIT)}\n\n[… ${text.length - CHAT_TEXT_LIMIT} more characters not shown]`;
 }
 
+/** Claude Code's injected reminders, dropped from the text the map shows. */
+function withoutReminders(text: string): string {
+  return text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "");
+}
+
 /**
  * A turn as the map shows it: reminders the harness injected are dropped, paste
  * markers become a plain label, very long text is cut, and edited files are shown
  * relative to the project (or the worktree the session ran in).
  */
 export function displayTurn(turn: ChatTurn, roots: string[]): ChatTurn {
-  const text = turn.text
-    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+  const text = withoutReminders(turn.text)
     .replace(
       /<pasted_content[^>]*>([\s\S]*?)<\/pasted_content[^>]*>/g,
       "\n[Pasted]\n$1\n[/Pasted]\n",
@@ -288,13 +310,13 @@ function oneLine(text: string): string {
  * message is nothing but pastes, which then show as far as the limit allows.
  */
 export function excerpt(text: string, max = EXCERPT_LENGTH): string {
-  const withoutReminders = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, " ");
-  const own = oneLine(withoutReminders.replace(PASTE, " "));
+  const without = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, " ");
+  const own = oneLine(without.replace(PASTE, " "));
   const cleaned =
     own === ""
-      ? `[pasted] ${oneLine([...withoutReminders.matchAll(PASTE)].map((m) => m[1]).join(" "))}`
+      ? `[pasted] ${oneLine([...without.matchAll(PASTE)].map((m) => m[1]).join(" "))}`
       : oneLine(
-          withoutReminders.replace(PASTE, (_, body: string) => {
+          without.replace(PASTE, (_, body: string) => {
             const first = oneLine(body).slice(0, 80);
             return ` [pasted: ${first}…] `;
           }),

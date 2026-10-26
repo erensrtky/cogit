@@ -10,7 +10,7 @@ import {
   readSkillAllowed,
   SKILL_RULE,
   setRetention,
-} from "../src/claude-settings.js";
+} from "../src/agents/claude/settings.js";
 import { init } from "../src/commands/init.js";
 import { cogitGitignore, ensureCogitGitignore, ensureGitignore, findGitRoot } from "../src/git.js";
 import { loadConfig, loadProject, loadRegistry } from "../src/store/stores.js";

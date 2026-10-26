@@ -5,7 +5,7 @@ import { type AddressInfo, createServer as createNetServer } from "node:net";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
-import { readSkillAllowed } from "../src/claude-settings.js";
+import { readSkillAllowed } from "../src/agents/claude/settings.js";
 import { createProgram } from "../src/program.js";
 import { globalPaths } from "../src/store/paths.js";
 import { loadConfig, loadProject } from "../src/store/stores.js";
