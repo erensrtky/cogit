@@ -151,6 +151,20 @@ a.brand:hover .brand-tagline {
   color: var(--text);
 }
 
+/* "← All projects" above a project's name on its map. */
+.back-link {
+  display: inline-block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
 /* The map page: head on top, map fills the rest of the window. */
 main.map-page {
   display: flex;

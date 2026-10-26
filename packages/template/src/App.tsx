@@ -7,7 +7,7 @@ import {
   searchLineage,
   stepHitIndex,
 } from "../../cli/src/view/search.js";
-import { Brand } from "./Brand.js";
+import { BackToPanel, Brand } from "./Brand.js";
 import { formatTime } from "./format.js";
 import { Graph } from "./Graph.js";
 import { type MapSearchState, SearchBox } from "./MapSearch.js";
@@ -62,6 +62,7 @@ export function App({ model }: { model: LineageViewModel }) {
 
         <header className="project">
           <div>
+            <BackToPanel />
             <h1>{model.project.name}</h1>
             <p className="muted">{model.project.path}</p>
           </div>

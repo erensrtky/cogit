@@ -17,7 +17,7 @@ import { type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
 import { type GitLayout, layoutGitGraph } from "./gitLayout.js";
-import { headOf } from "./graph.js";
+import { centreViewport, headOf, type MapPoint } from "./graph.js";
 import type { MapSearchState } from "./MapSearch.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
 import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
@@ -358,7 +358,13 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
         (candidate) => candidate.kind === "message" && candidate.message.id === messageId,
       );
       if (!opening || !row) return null;
-      return { x: opening.left + opening.git.graphWidth / 2, y: opening.top + row.y };
+      // Frame the whole row (lanes and text), not only its dot.
+      return {
+        x: opening.left + opening.git.graphWidth / 2,
+        y: opening.top + row.y,
+        left: opening.left,
+        right: opening.left + opening.git.width,
+      };
     },
     [openings],
   );
@@ -665,9 +671,9 @@ function MapCanvas({
 }: {
   nodes: MapFlowNode[];
   /** Point to centre on at load; null fits the whole graph. */
-  focusRow: { x: number; y: number } | null;
+  focusRow: MapPoint | null;
   /** A user request to centre on a point; a new `key` moves the view again. */
-  jump: { key: number; point: { x: number; y: number } | null } | null;
+  jump: { key: number; point: MapPoint | null } | null;
   /** A search move: the active hit or a pasted hash (Story 8.14). */
   searchJump: { key: number; point: { x: number; y: number } } | null;
   /** A files-view click: the message it opened (Story 8.15). */
@@ -678,18 +684,10 @@ function MapCanvas({
   const { fitView, setViewport } = useReactFlow();
 
   /** Centres the view on a canvas point; does nothing before the canvas exists. */
-  function centre(point: { x: number; y: number }): void {
+  function centre(point: MapPoint): void {
     const canvas = document.querySelector(".react-flow")?.getBoundingClientRect();
     if (!canvas) return;
-    const zoom = 0.9;
-    void setViewport(
-      {
-        zoom,
-        x: canvas.width / 2 - point.x * zoom,
-        y: canvas.height / 2 - point.y * zoom,
-      },
-      { duration: 300 },
-    );
+    void setViewport(centreViewport(point, canvas, 0.9), { duration: 300 });
   }
 
   useEffect(() => {
@@ -730,12 +728,7 @@ function MapCanvas({
     const timer = window.setTimeout(() => {
       const canvas = document.querySelector(".react-flow")?.getBoundingClientRect();
       if (focusRow && canvas) {
-        const zoom = 0.9;
-        void setViewport({
-          zoom,
-          x: canvas.width / 2 - focusRow.x * zoom,
-          y: canvas.height / 2 - focusRow.y * zoom,
-        });
+        void setViewport(centreViewport(focusRow, canvas, 0.9));
         return;
       }
       void fitView({ padding: 0.12, maxZoom: 1, duration: 200 });

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { LineageViewModel, ViewNode } from "../../cli/src/view/model.js";
-import { headOf, messageNeighbors, nodeId, sessionId, toNodeDetail } from "../src/graph.js";
+import {
+  CENTRE_MARGIN,
+  centreViewport,
+  headOf,
+  messageNeighbors,
+  nodeId,
+  sessionId,
+  toNodeDetail,
+} from "../src/graph.js";
 
 const AT = "2026-10-21T10:00:00.000Z";
 
@@ -128,5 +136,30 @@ describe("ids", () => {
   it("prefixes the outline and map keys", () => {
     expect(sessionId("abc")).toBe("session:abc");
     expect(nodeId("session:abc", "m1")).toBe("node:session:abc:m1");
+  });
+});
+
+describe("centreViewport", () => {
+  const canvas = { width: 800, height: 400 };
+
+  it("centres the whole row, not only its dot", () => {
+    // Row from 100 to 700 at zoom 1: its middle (400) lands on the canvas middle.
+    expect(centreViewport({ x: 130, y: 50, left: 100, right: 700 }, canvas, 1)).toEqual({
+      zoom: 1,
+      x: 0,
+      y: 150,
+    });
+  });
+
+  it("starts a row wider than the canvas at the left margin", () => {
+    expect(centreViewport({ x: 130, y: 50, left: 100, right: 1100 }, canvas, 1)).toEqual({
+      zoom: 1,
+      x: CENTRE_MARGIN - 100,
+      y: 150,
+    });
+  });
+
+  it("centres a bare point when the row span is unknown", () => {
+    expect(centreViewport({ x: 100, y: 100 }, canvas, 0.5)).toEqual({ zoom: 0.5, x: 350, y: 150 });
   });
 });

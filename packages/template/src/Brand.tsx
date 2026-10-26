@@ -22,3 +22,16 @@ export function Brand({ home = false }: { home?: boolean }) {
     </a>
   );
 }
+
+/**
+ * The way back from a project's map to the panel, above the project name. Only
+ * a served map has a panel to go back to.
+ */
+export function BackToPanel() {
+  if (!isLivePage()) return null;
+  return (
+    <a className="back-link" href="/">
+      ← All projects
+    </a>
+  );
+}

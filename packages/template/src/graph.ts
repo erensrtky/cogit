@@ -119,3 +119,33 @@ export function messageNeighbors(
   if (index < 0) return { previous: null, next: null };
   return { previous: messages[index - 1] ?? null, next: messages[index + 1] ?? null };
 }
+
+/**
+ * A point the map centres on. `left` and `right` are the canvas span of the
+ * row it belongs to (the lanes plus the message text), so the whole row is
+ * framed, not only the dot.
+ */
+export type MapPoint = { x: number; y: number; left?: number; right?: number };
+
+/** Space kept between the canvas edge and a row too wide to centre. */
+export const CENTRE_MARGIN = 24;
+
+/**
+ * The viewport that puts `point` in the middle of the canvas. A row wider than
+ * the canvas starts at the left edge (plus a margin) instead, so its lanes and
+ * the start of its text stay in view.
+ */
+export function centreViewport(
+  point: MapPoint,
+  canvas: { width: number; height: number },
+  zoom: number,
+): { x: number; y: number; zoom: number } {
+  const y = canvas.height / 2 - point.y * zoom;
+  const { left, right } = point;
+  if (left !== undefined && right !== undefined) {
+    const span = (right - left) * zoom;
+    if (span > canvas.width - 2 * CENTRE_MARGIN) return { zoom, y, x: CENTRE_MARGIN - left * zoom };
+    return { zoom, y, x: canvas.width / 2 - ((left + right) / 2) * zoom };
+  }
+  return { zoom, y, x: canvas.width / 2 - point.x * zoom };
+}

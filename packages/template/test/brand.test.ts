@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
-import { Brand } from "../src/Brand.js";
+import { BackToPanel, Brand } from "../src/Brand.js";
 
 /** A stand-in document: only the live-page meta lookup is read. */
 function fakeDocument(live: boolean): void {
@@ -26,5 +26,20 @@ describe("Brand", () => {
     expect(renderToStaticMarkup(createElement(Brand))).toContain('<a class="brand" href="/"');
     fakeDocument(false);
     expect(renderToStaticMarkup(createElement(Brand))).toContain('<span class="brand"');
+  });
+});
+
+describe("BackToPanel", () => {
+  afterEach(() => {
+    delete (globalThis as { document?: unknown }).document;
+  });
+
+  it("links a served map back to the panel and stays out of a file", () => {
+    fakeDocument(true);
+    expect(renderToStaticMarkup(createElement(BackToPanel))).toBe(
+      '<a class="back-link" href="/">← All projects</a>',
+    );
+    fakeDocument(false);
+    expect(renderToStaticMarkup(createElement(BackToPanel))).toBe("");
   });
 });
