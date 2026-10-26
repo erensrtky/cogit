@@ -12,10 +12,12 @@ import {
 import "@xyflow/react/dist/style.css";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
+import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
 import { type GitLayout, layoutGitGraph } from "./gitLayout.js";
 import { headOf } from "./graph.js";
+import type { MapSearchState } from "./MapSearch.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
 import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
@@ -53,12 +55,32 @@ const GraphActions = createContext<{
 
 /** An opened session: its message graph and where it sits on the canvas. */
 type Opening = { session: ViewSession; git: GitLayout; top: number; left: number };
-type ProjectData = { model: LineageViewModel; graph: SessionGraph; openings: Opening[] };
+type ProjectData = {
+  model: LineageViewModel;
+  graph: SessionGraph;
+  openings: Opening[];
+  /** Message ids to highlight, by session (Story 8.14). */
+  highlights: Map<string, Set<string>>;
+  /** Sessions whose title or status matched; their row is marked. */
+  sessionHits: ReadonlySet<string>;
+  /** The hit the user is on (or a pasted hash), if any. */
+  activeHit: { sessionId: string; messageId: string | null } | null;
+};
 
 type ProjectFlowNode = Node<ProjectData, "project">;
 type MapFlowNode = ProjectFlowNode;
 
-function SessionMessages({ session, git }: { session: ViewSession; git: GitLayout }) {
+function SessionMessages({
+  session,
+  git,
+  highlights,
+  activeHitId,
+}: {
+  session: ViewSession;
+  git: GitLayout;
+  highlights: ReadonlySet<string> | undefined;
+  activeHitId: string | null;
+}) {
   const { selection, openNode, openContinue, unfold } = useContext(GraphActions);
   const own = selection?.sessionId === session.sessionId;
   if (git.rows.length === 0)
@@ -68,6 +90,8 @@ function SessionMessages({ session, git }: { session: ViewSession; git: GitLayou
       git={git}
       selectedId={selection?.type === "node" && own ? selection.nodeId : null}
       activeSegmentId={selection?.type === "node" && own ? (selection.branchId ?? null) : null}
+      highlightIds={highlights}
+      activeHitId={activeHitId}
       onSelect={(row) => openNode(session.sessionId, row.message.id, row.segmentId)}
       onUnfold={unfold}
       onContinue={(continues) => openContinue(continues.sessionId, continues.id)}
@@ -84,18 +108,29 @@ function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
         graph={data.graph}
         selectedSessionId={selection?.sessionId ?? null}
         openIds={openIds}
+        highlightSessionIds={data.sessionHits}
         onOpen={openSession}
         onContinue={openContinue}
       />
-      {data.openings.map((opening) => (
-        <div
-          key={opening.session.sessionId}
-          className="session-open"
-          style={{ top: opening.top, left: opening.left }}
-        >
-          <SessionMessages session={opening.session} git={opening.git} />
-        </div>
-      ))}
+      {data.openings.map((opening) => {
+        const active = data.activeHit;
+        return (
+          <div
+            key={opening.session.sessionId}
+            className="session-open"
+            style={{ top: opening.top, left: opening.left }}
+          >
+            <SessionMessages
+              session={opening.session}
+              git={opening.git}
+              highlights={data.highlights.get(opening.session.sessionId)}
+              activeHitId={
+                active?.sessionId === opening.session.sessionId ? active.messageId : null
+              }
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -158,7 +193,7 @@ function findSession(model: LineageViewModel, id: string): ViewSession | undefin
   return model.unassigned.find((session) => session.sessionId === id);
 }
 
-function Flow({ model }: { model: LineageViewModel }) {
+function Flow({ model, search }: { model: LineageViewModel; search: MapSearchState }) {
   // Read once: a live data swap must not move the page back to the hash target.
   const [initial] = useState(() => readTarget(model));
   useEffect(() => {
@@ -186,6 +221,44 @@ function Flow({ model }: { model: LineageViewModel }) {
 
   const head = headOf(model);
 
+  // Search (Story 8.14): highlight matching messages, open their sessions and
+  // centre the active hit. A pasted hash resolves to one message and shows it
+  // like `show`; a session-level hit centres the session's row instead.
+  const hashHit = search.hash?.kind === "ok" ? search.hash : null;
+  // A live data swap can shrink the hit list under the cursor; clamp instead of
+  // pointing at a row that is no longer there.
+  const activeHit = search.hits[Math.min(search.active, search.hits.length - 1)] ?? null;
+  const searchTarget = useMemo(
+    () =>
+      hashHit !== null
+        ? { sessionId: hashHit.sessionId, messageId: hashHit.messageId }
+        : activeHit === null
+          ? null
+          : { sessionId: activeHit.sessionId, messageId: activeHit.messageId },
+    [hashHit?.sessionId, hashHit?.messageId, activeHit?.sessionId, activeHit?.messageId],
+  );
+  const highlights = useMemo(() => hitMessageIds(search.hits), [search.hits]);
+  const sessionHits = useMemo(
+    () => new Set(search.hits.flatMap((hit) => (hit.messageId === null ? [hit.sessionId] : []))),
+    [search.hits],
+  );
+  const hitSessions = useMemo(() => hitSessionIds(search.hits), [search.hits]);
+
+  // Opening the accordion for every match is what makes the highlights visible.
+  useEffect(() => {
+    if (hitSessions.length === 0) return;
+    setOpenIds((previous) => {
+      let changed = false;
+      const next = new Set(previous);
+      for (const id of hitSessions) {
+        if (next.has(id)) continue;
+        next.add(id);
+        changed = true;
+      }
+      return changed ? next : previous;
+    });
+  }, [hitSessions]);
+
   /** The open drill-down's message, if any. */
   const target = selection?.type === "node" ? selection : null;
 
@@ -195,11 +268,21 @@ function Flow({ model }: { model: LineageViewModel }) {
     for (const sessionId of openIds) {
       const session = findSession(model, sessionId);
       if (!session) continue;
-      const options = {
+      let options = {
         unfolded,
         openAll,
         headId: head?.sessionId === sessionId ? head.messageId : null,
       };
+      // A search hit inside a folded branch must be visible to be highlighted,
+      // so every branch that holds a hit of this session opens.
+      const hitIds = highlights.get(sessionId);
+      if (hitIds !== undefined && hitIds.size > 0) {
+        const folded = layoutGitGraph(session.messages, options);
+        const extra = folded.segments
+          .filter((segment) => segment.ids.some((id) => hitIds.has(id)))
+          .map((segment) => segment.id);
+        if (extra.length > 0) options = { ...options, unfolded: new Set([...unfolded, ...extra]) };
+      }
       let layout = layoutGitGraph(session.messages, options);
       const targetId = target?.sessionId === sessionId ? target.nodeId : null;
       if (
@@ -223,6 +306,7 @@ function Flow({ model }: { model: LineageViewModel }) {
     openIds,
     unfolded,
     openAll,
+    highlights,
     head?.sessionId,
     head?.messageId,
     target?.sessionId,
@@ -273,6 +357,18 @@ function Flow({ model }: { model: LineageViewModel }) {
     [openings],
   );
 
+  /** A search hit's point: its message, or the session's row for a session hit. */
+  const pointOfHit = useCallback(
+    (hit: { sessionId: string; messageId: string | null }) => {
+      if (hit.messageId !== null) return pointOf(hit.sessionId, hit.messageId);
+      const row = sessionGraph.git.rows.find(
+        (candidate) => candidate.kind === "message" && candidate.message.id === hit.sessionId,
+      );
+      return row === undefined ? null : { x: sessionGraph.git.graphWidth / 2, y: row.y };
+    },
+    [pointOf, sessionGraph],
+  );
+
   /** Where the view centres on load: the target message, else the whole map. */
   const focusRow = useMemo(
     () => (initial === null ? null : pointOf(initial.sessionId, initial.messageId)),
@@ -290,6 +386,21 @@ function Flow({ model }: { model: LineageViewModel }) {
         ? null
         : { key: jumps, point: pointOf(leftOff.sessionId, leftOff.messageId) },
     [jumps, leftOff, pointOf],
+  );
+
+  /**
+   * A search move: the step counter changes on every keystroke and on ↑/↓, and
+   * the point may only resolve once the hit's session has opened, so the canvas
+   * waits for both.
+   */
+  const searchPoint = useMemo(
+    () => (searchTarget === null ? null : pointOfHit(searchTarget)),
+    [searchTarget, pointOfHit],
+  );
+  const searchJump = useMemo(
+    () =>
+      search.step === 0 || searchPoint === null ? null : { key: search.step, point: searchPoint },
+    [search.step, searchPoint],
   );
 
   const ensureOpen = useCallback((sessionId: string) => {
@@ -330,6 +441,12 @@ function Flow({ model }: { model: LineageViewModel }) {
     (sessionId: string, messageId: string) => openNode(sessionId, messageId),
     [openNode],
   );
+
+  // A pasted hash opens the message the way clicking it would (`show` for the map).
+  useEffect(() => {
+    if (hashHit === null) return;
+    openNode(hashHit.sessionId, hashHit.messageId);
+  }, [hashHit?.sessionId, hashHit?.messageId, openNode]);
   const unfold = useCallback((segmentId: string) => {
     setUnfolded((previous) => {
       const next = new Set(previous);
@@ -367,10 +484,17 @@ function Flow({ model }: { model: LineageViewModel }) {
         draggable: false,
         connectable: false,
         selectable: false,
-        data: { model, graph: sessionGraph, openings },
+        data: {
+          model,
+          graph: sessionGraph,
+          openings,
+          highlights,
+          sessionHits,
+          activeHit: searchTarget,
+        },
       },
     ];
-  }, [model, sessionGraph, openings]);
+  }, [model, sessionGraph, openings, highlights, sessionHits, searchTarget]);
 
   return (
     <GraphActions.Provider value={actions}>
@@ -445,7 +569,13 @@ function Flow({ model }: { model: LineageViewModel }) {
             {sessionGraph.git.rows.length === 0 ? (
               <p className="graph-status empty">No sessions recorded yet.</p>
             ) : (
-              <MapCanvas nodes={nodes} focusRow={focusRow} jump={jump} fit={fits} />
+              <MapCanvas
+                nodes={nodes}
+                focusRow={focusRow}
+                jump={jump}
+                searchJump={searchJump}
+                fit={fits}
+              />
             )}
             <DrillDown
               model={model}
@@ -469,6 +599,7 @@ function MapCanvas({
   nodes,
   focusRow,
   jump,
+  searchJump,
   fit,
 }: {
   nodes: MapFlowNode[];
@@ -476,10 +607,27 @@ function MapCanvas({
   focusRow: { x: number; y: number } | null;
   /** A user request to centre on a point; a new `key` moves the view again. */
   jump: { key: number; point: { x: number; y: number } | null } | null;
+  /** A search move: the active hit or a pasted hash (Story 8.14). */
+  searchJump: { key: number; point: { x: number; y: number } } | null;
   /** A new value frames the whole map again (after "Fold all"). */
   fit: number;
 }) {
   const { fitView, setViewport } = useReactFlow();
+
+  /** Centres the view on a canvas point; does nothing before the canvas exists. */
+  function centre(point: { x: number; y: number }): void {
+    const canvas = document.querySelector(".react-flow")?.getBoundingClientRect();
+    if (!canvas) return;
+    const zoom = 0.9;
+    void setViewport(
+      {
+        zoom,
+        x: canvas.width / 2 - point.x * zoom,
+        y: canvas.height / 2 - point.y * zoom,
+      },
+      { duration: 300 },
+    );
+  }
 
   useEffect(() => {
     if (fit === 0) return;
@@ -492,19 +640,21 @@ function MapCanvas({
   }, [fit]);
 
   const jumpKey = jump?.key ?? 0;
-  const jumpX = jump?.point?.x;
-  const jumpY = jump?.point?.y;
+  const jumpPoint = jump?.point ?? null;
   useEffect(() => {
-    if (jumpKey === 0 || jumpX === undefined || jumpY === undefined) return;
-    const canvas = document.querySelector(".react-flow")?.getBoundingClientRect();
-    if (!canvas) return;
-    const zoom = 0.9;
-    void setViewport(
-      { zoom, x: canvas.width / 2 - jumpX * zoom, y: canvas.height / 2 - jumpY * zoom },
-      { duration: 300 },
-    );
+    if (jumpKey === 0 || jumpPoint === null) return;
+    centre(jumpPoint);
     // Only a new click moves the view; a live data swap must not.
   }, [jumpKey]);
+
+  // A search step also re-centres when its point only resolves after the hit's
+  // session has opened (`searchJump.key` stays the same in that case).
+  const searchKey = searchJump?.key ?? 0;
+  const searchPoint = searchJump?.point ?? null;
+  useEffect(() => {
+    if (searchKey === 0 || searchPoint === null) return;
+    centre(searchPoint);
+  }, [searchKey, searchPoint]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -546,11 +696,11 @@ function MapCanvas({
 }
 
 /** The project map: sessions at the top, a session's messages in place. */
-export function Graph({ model }: { model: LineageViewModel }) {
+export function Graph({ model, search }: { model: LineageViewModel; search: MapSearchState }) {
   return (
     <section className="lineage-map" aria-label="Project lineage graph">
       <ReactFlowProvider>
-        <Flow model={model} />
+        <Flow model={model} search={search} />
       </ReactFlowProvider>
     </section>
   );

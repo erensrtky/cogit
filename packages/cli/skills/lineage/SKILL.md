@@ -19,6 +19,16 @@ This is the current record for this session (the output of `codelineage session 
 - If `newMessages` is empty and nothing else changed since the record was last
   updated, reply "Lineage is up to date." and stop.
 
+## Looking something up
+
+When the user asks where something was discussed or decided, or gives a word
+rather than a hash, do not guess: run
+`node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" search "<text>" -C "${CLAUDE_PROJECT_DIR}"`.
+It scans message titles, branch summaries, decisions and the stored conversation,
+newest first, with the same matcher as the map's search box. Add `--json` for
+fields, `-n <count>` to limit and `--session <id|prefix>` to narrow. A message
+hash goes to `show`, not `search`.
+
 ## Then send only what is new or changed
 
 Build one JSON object:

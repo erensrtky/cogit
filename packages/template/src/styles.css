@@ -54,6 +54,76 @@ main {
   min-width: 0;
 }
 
+/* Map search (Story 8.14): in the page head, beside the project switcher. */
+.map-search {
+  flex: none;
+  width: 250px;
+}
+
+.map-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  background: #1a1e27;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.map-search-input:focus {
+  outline: 1px solid var(--accent);
+}
+
+.map-search-count {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.map-search-step {
+  flex: none;
+  width: 24px;
+  height: 26px;
+  padding: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  background: #1a1e27;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.map-search-step:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.map-search-step:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.map-search-hint {
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .page-actions {
   display: flex;
   flex-direction: column;
@@ -1175,6 +1245,17 @@ time {
 .git-row.is-selected {
   background: #243040;
   outline: 1px solid var(--accent);
+}
+
+/* Search hits (Story 8.14): every match is marked, the active one more so. */
+.git-row.is-search-hit {
+  background: rgba(224, 175, 104, 0.12);
+  box-shadow: inset 2px 0 0 var(--warn);
+}
+
+.git-row.is-search-active {
+  background: rgba(224, 175, 104, 0.24);
+  outline: 1px solid var(--warn);
 }
 
 .git-more {

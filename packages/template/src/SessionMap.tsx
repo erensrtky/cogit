@@ -39,6 +39,7 @@ function SessionRow({
   epochTitle,
   selected,
   open,
+  searchHit,
   onOpen,
   onContinue,
 }: {
@@ -48,16 +49,26 @@ function SessionRow({
   selected: boolean;
   /** Its messages are open below the row. */
   open: boolean;
+  /** The session's title or status matches the search (Story 8.14). */
+  searchHit: boolean;
   onOpen: (sessionId: string) => void;
   onContinue: (continues: NonNullable<ViewSession["messages"][number]["continues"]>) => void;
 }) {
   const continues = session.messages[0]?.continues;
   const style = { top: row.y - row.height / 2, height: row.height };
   const count = session.messages.length;
+  const className = [
+    "git-row session-row",
+    selected ? "is-selected" : "",
+    open ? "is-open" : "",
+    searchHit ? "is-search-hit" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
     <button
       type="button"
-      className={`git-row session-row${selected ? " is-selected" : ""}${open ? " is-open" : ""}`}
+      className={className}
       style={style}
       aria-expanded={open}
       onClick={(event: MouseEvent) => {
@@ -107,6 +118,7 @@ export function SessionMap({
   graph,
   selectedSessionId,
   openIds,
+  highlightSessionIds,
   onOpen,
   onContinue,
 }: {
@@ -115,6 +127,8 @@ export function SessionMap({
   selectedSessionId: string | null;
   /** Sessions whose messages are open below their rows. */
   openIds: ReadonlySet<string>;
+  /** Sessions whose title or status matched the map search. */
+  highlightSessionIds: ReadonlySet<string>;
   onOpen: (sessionId: string) => void;
   onContinue: (sessionId: string, messageId: string) => void;
 }) {
@@ -213,6 +227,7 @@ export function SessionMap({
               epochTitle={epochTitle}
               selected={selectedSessionId === session.sessionId}
               open={openIds.has(session.sessionId)}
+              searchHit={highlightSessionIds.has(session.sessionId)}
               onOpen={onOpen}
               onContinue={(continues) => onContinue(continues.sessionId, continues.id)}
             />

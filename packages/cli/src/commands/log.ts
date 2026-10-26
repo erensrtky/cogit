@@ -22,6 +22,12 @@ export interface EffectiveSession {
   session: Session;
   /** buildMessages output: labels, parents and links already normalised. */
   messages: ViewNode[];
+  /**
+   * The user messages with their stable ids and conversation text, or null when
+   * neither the transcript nor the conversation store is readable. Search reads
+   * this (Story 8.14); the read verbs do not need it.
+   */
+  turns: SessionMessage[] | null;
 }
 
 /** Every valid session of the project, with the ids and structure the map draws. */
@@ -35,7 +41,7 @@ export async function loadEffectiveSessions(root: string, io: Io): Promise<Effec
     const upgraded = turns ? upgradeSessionIds(session, turns) : session;
     const events = await readEvents(root, session.sessionId);
     const effective: Session = { ...upgraded, nodes: applyEvents(upgraded.nodes, events) };
-    out.push({ session: effective, messages: buildMessages(effective.nodes) });
+    out.push({ session: effective, messages: buildMessages(effective.nodes), turns });
   }
   return out.sort(
     (a, b) =>
@@ -196,25 +202,32 @@ export interface LogOptions {
 }
 
 /**
+ * The sessions a `--session` selector names: an exact id wins, otherwise an
+ * unambiguous prefix. An unknown or ambiguous selector is a user error.
+ */
+export function selectSessions(
+  sessions: readonly EffectiveSession[],
+  prefix: string,
+): EffectiveSession[] {
+  const exact = sessions.filter((entry) => entry.session.sessionId === prefix);
+  const matches =
+    exact.length > 0
+      ? exact
+      : sessions.filter((entry) => entry.session.sessionId.startsWith(prefix));
+  if (matches.length === 0) throw new CliError(`no session matches ${prefix}`);
+  if (matches.length > 1) {
+    const ids = matches.map((entry) => entry.session.sessionId).join(", ");
+    throw new CliError(`"${prefix}" matches ${matches.length} sessions: ${ids}`);
+  }
+  return matches;
+}
+
+/**
  * The log model: sessions newest first, their messages newest first. `--session`
  * takes an exact id or an unambiguous prefix.
  */
 export function buildLog(sessions: EffectiveSession[], opts: LogOptions = {}): LogModel {
-  let selected = sessions;
-  if (opts.session !== undefined) {
-    const prefix = opts.session;
-    const exact = sessions.filter((entry) => entry.session.sessionId === prefix);
-    const matches =
-      exact.length > 0
-        ? exact
-        : sessions.filter((entry) => entry.session.sessionId.startsWith(prefix));
-    if (matches.length === 0) throw new CliError(`no session matches ${prefix}`);
-    if (matches.length > 1) {
-      const ids = matches.map((entry) => entry.session.sessionId).join(", ");
-      throw new CliError(`"${prefix}" matches ${matches.length} sessions: ${ids}`);
-    }
-    selected = matches;
-  }
+  const selected = opts.session === undefined ? sessions : selectSessions(sessions, opts.session);
 
   const ordered = [...selected].sort(
     (a, b) =>

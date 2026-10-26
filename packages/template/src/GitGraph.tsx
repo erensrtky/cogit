@@ -44,6 +44,8 @@ function Row({
   branchTitle,
   selected,
   branchSelected,
+  searchHit,
+  searchActive,
   onSelect,
   onUnfold,
   onContinue,
@@ -52,6 +54,10 @@ function Row({
   branchTitle: string;
   selected: boolean;
   branchSelected: boolean;
+  /** The message matches the search (Story 8.14). */
+  searchHit: boolean;
+  /** The hit the ↑/↓ counter is on. */
+  searchActive: boolean;
   onSelect: (row: GitMessageRow) => void;
   onUnfold: (segmentId: string) => void;
   onContinue: (continues: NonNullable<ViewNode["continues"]>) => void;
@@ -83,10 +89,19 @@ function Row({
   }
 
   const message = row.message;
+  const className = [
+    "git-row",
+    selected ? "is-selected" : "",
+    branchSelected ? "in-branch" : "",
+    searchHit ? "is-search-hit" : "",
+    searchActive ? "is-search-active" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
     <button
       type="button"
-      className={`git-row${selected ? " is-selected" : ""}${branchSelected ? " in-branch" : ""}`}
+      className={className}
       style={style}
       data-message={message.id}
       onClick={(event: MouseEvent) => {
@@ -149,6 +164,8 @@ export function GitGraph({
   git,
   selectedId,
   activeSegmentId,
+  highlightIds,
+  activeHitId,
   onSelect,
   onUnfold,
   onContinue,
@@ -158,6 +175,10 @@ export function GitGraph({
   selectedId: string | null;
   /** Branch the drill-down belongs to. */
   activeSegmentId: string | null;
+  /** Messages that match the map search (Story 8.14); undefined when none. */
+  highlightIds: ReadonlySet<string> | undefined;
+  /** The search hit the counter is on, if it belongs to this session. */
+  activeHitId: string | null;
   onSelect: (row: GitMessageRow) => void;
   onUnfold: (segmentId: string) => void;
   /** Opens the earlier session this message continues, at that message. */
@@ -257,15 +278,16 @@ export function GitGraph({
       <div className="git-rows" style={{ left: git.graphWidth + 8, width: git.rowWidth }}>
         {git.rows.map((row) => {
           const branch = branches.get(row.segmentId);
+          const messageId = row.kind === "message" ? row.message.id : null;
           return (
             <Row
               key={row.kind === "more" ? `${row.segmentId}-more` : row.message.id}
               row={row}
               branchTitle={branch?.branch.title ?? ""}
-              selected={
-                row.kind === "message" && selectedId !== null && row.message.id === selectedId
-              }
+              selected={messageId !== null && selectedId !== null && messageId === selectedId}
               branchSelected={activeSegmentId !== null && row.segmentId === activeSegmentId}
+              searchHit={messageId !== null && highlightIds?.has(messageId) === true}
+              searchActive={messageId !== null && activeHitId !== null && messageId === activeHitId}
               onSelect={onSelect}
               onUnfold={onUnfold}
               onContinue={onContinue}

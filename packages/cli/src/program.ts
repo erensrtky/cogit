@@ -15,6 +15,7 @@ import { type InitOptions, init } from "./commands/init.js";
 import { formatShow, log, show } from "./commands/log.js";
 import { migrateIds } from "./commands/migrate.js";
 import { openPanel, openProject } from "./commands/open.js";
+import { search } from "./commands/search.js";
 import { readStdin, sessionShow, sessionWrite } from "./commands/session.js";
 import { runHook } from "./hooks/run.js";
 import { CliError, type Io, processIo } from "./io.js";
@@ -161,6 +162,34 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
           const model = await show({ dir: opts.dir ?? dir, ref, io, chat: opts.chat !== false });
           if (opts.json === true) io.out(JSON.stringify(model, null, 2));
           else for (const line of formatShow(model)) io.out(line);
+        },
+      ),
+    );
+
+  program
+    .command("search")
+    .description("find recorded messages, branch summaries and conversation text")
+    .argument("<text>", "text to look for")
+    .argument("[dir]", "project directory", ".")
+    .option("-C, --dir <dir>", "project directory (same as the positional)")
+    .option("--session <id>", "only this session (id or prefix)")
+    .option("-n, --number <count>", "at most this many hits", positiveCount)
+    .option("--json", "print JSON instead of text")
+    .action(
+      run(
+        async (
+          text: string,
+          dir: string,
+          opts: { dir?: string; session?: string; number?: number; json?: boolean },
+        ) => {
+          await search({
+            dir: opts.dir ?? dir,
+            io: makeIo(false),
+            text,
+            session: opts.session,
+            limit: opts.number,
+            json: opts.json === true,
+          });
         },
       ),
     );

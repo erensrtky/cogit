@@ -110,7 +110,8 @@ async function startupContext(ctx: HookContext): Promise<string> {
   const header =
     `codelineage records this project's lineage (one node per user message, hanging from the ` +
     `message it reacts to, grouped in sessions with branch summaries). Read it with ` +
-    `\`${command} log -C "${ctx.root}"\` and one message with ` +
+    `\`${command} log -C "${ctx.root}"\`, find where something was discussed with ` +
+    `\`${command} search "<text>" -C "${ctx.root}"\`, and one message with ` +
     `\`${command} show <ref> -C "${ctx.root}"\` (a ref is a message hash, an h+hex prefix of ` +
     `six or more characters, or <session-id>:mN). When the user mentions a message hash or ` +
     `another session's mN, run show before answering.`;
