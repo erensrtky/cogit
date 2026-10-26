@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
+- Map layout and readability: the head and the map share a centred 8-of-12 content column (full width with 16 px gutters below 1100 px), the page itself no longer scrolls so the head stays put and the map fills the rest of the window, and a wheel anywhere on the page — gutters and head included — pans the map (Ctrl+wheel still zooms, Shift+wheel pans horizontally). A message title keeps a minimum width, so the branch and "continues" chips truncate with an ellipsis instead of squeezing it into a one-letter column. Small text (dates, `mN`, counts, "not summarized yet") now reaches WCAG AA contrast, and the map has a light theme for browsers that ask for one.
 - Renamed the product to **cogit** (*Cogito, ergo commit.*): the npm package and `cogit` bin, the Claude Code plugin and its `cogit:record` skill, the project dir `.cogit/`, the global dir `~/.config/cogit`, the env vars `COGIT_HOME` / `COGIT_DISABLE` (the old names still work for one minor version), the map file `map.html` and the page titles. The first cogit command or hook migrates silently: it renames an existing `.codelineage/`, moves `~/.config/codelineage` and fixes the `.gitignore` lines, or leaves both in place and warns once when both directories exist.
 
 ## [0.10.0] - 2026-10-26

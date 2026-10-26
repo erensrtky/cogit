@@ -54,6 +54,13 @@ const LANE_TAIL = 6;
 /** Width reserved for the row text right of the dots. */
 export const ROW_WIDTH = 520;
 const ROW_GAP = 8;
+/**
+ * The narrowest a title may get (Story 9.2). The chips around it shrink or
+ * truncate instead, so a row with a branch label and a "continues" mark never
+ * squeezes its title into a one-letter column. `styles.css` pins the same
+ * value on `.git-title`; a test keeps the two in step.
+ */
+export const TITLE_MIN_WIDTH = 180;
 
 /** How many lane colours the page defines (`--l0` … `--l5`). */
 export const LANE_COLORS = 6;
@@ -269,7 +276,7 @@ export function rowHeight(
     (message.unsummarized ? 116 : 0) +
     // The "↑ continues <session> · m67" mark sits in the row, next to the title.
     (message.continues ? 150 + message.continues.sessionTitle.length * 6.4 : 0);
-  const room = Math.max(120, rowWidth - fixed);
+  const room = Math.max(TITLE_MIN_WIDTH, rowWidth - fixed);
   const titleLines = Math.max(1, Math.ceil((message.title.length * TITLE_CHAR) / room));
   const branchLines = row.first
     ? Math.max(1, Math.ceil((row.branchTitle.length * BRANCH_CHAR) / (BRANCH_MAX - 12)))

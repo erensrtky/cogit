@@ -4,7 +4,7 @@
   --panel: #171a21;
   --line: #2a2f3a;
   --text: #e6e8ee;
-  --muted: #8b93a7;
+  --muted: #9aa3b7;
   --accent: #7aa2f7;
   --warn: #e0af68;
   /* Branch lanes in the git graph (Story 8.2). */
@@ -14,10 +14,86 @@
   --l3: #bb9af7;
   --l4: #7dcfff;
   --l5: #f7768e;
+  /* Surfaces (Story 9.2): named once so a light theme can repaint them. */
+  --raised: #1a1e27;
+  --raised-2: #151922;
+  --row-bg: #12151b;
+  --hover: #1d222c;
+  --active: #243040;
+  --chip-bg: #1c222e;
+  --chip-line: #323b4d;
+  --kind-bg: #242a36;
+  --kind-decision-bg: #2b2440;
+  --kind-decision-text: #c0a8ff;
+  --kind-question-bg: #3a2f1d;
+  --kind-message-bg: #23331d;
+  --kind-message-text: #9ece6a;
+  --missing: #a2abbf;
+  --search-hit-bg: #2b2724;
+  --search-active-bg: #373129;
+  --on-lane: #0f1115;
+  --translucent-panel: rgba(20, 23, 30, 0.97);
+  --translucent-outline: rgba(17, 20, 26, 0.94);
+  --overlay: rgba(5, 7, 10, 0.62);
+  --shadow: rgba(0, 0, 0, 0.5);
+}
+
+/* The same map in a light browser (Story 9.2). Small text keeps WCAG AA in
+   both palettes; `layout.test.ts` computes the ratios. */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #fbfbfd;
+    --panel: #f2f4f8;
+    --line: #d5dae4;
+    --text: #1b2230;
+    --muted: #545e72;
+    --accent: #2957c8;
+    --warn: #8a5300;
+    --l0: #2957c8;
+    --l1: #2f7d32;
+    --l2: #8a5300;
+    --l3: #6f42c1;
+    --l4: #0b6e99;
+    --l5: #b3261e;
+    --raised: #e9edf5;
+    --raised-2: #eef1f7;
+    --row-bg: #f4f6fa;
+    --hover: #e6ebf5;
+    --active: #d9e3f7;
+    --chip-bg: #e8edf5;
+    --chip-line: #c2cbdb;
+    --kind-bg: #e4e8f0;
+    --kind-decision-bg: #ece4ff;
+    --kind-decision-text: #5b3aa8;
+    --kind-question-bg: #fbf0dc;
+    --kind-message-bg: #e7f3e1;
+    --kind-message-text: #2a7430;
+    --missing: #4f586b;
+    --search-hit-bg: #e7e2dc;
+    --search-active-bg: #e1d9cd;
+    --on-lane: #ffffff;
+    --translucent-panel: rgba(255, 255, 255, 0.97);
+    --translucent-outline: rgba(246, 248, 251, 0.96);
+    --overlay: rgba(20, 26, 38, 0.35);
+    --shadow: rgba(20, 30, 50, 0.18);
+  }
 }
 
 * {
   box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* One scroller (Story 9.2): on the map page the map is what moves, not the
+   document; the panel and report pages still scroll normally. */
+body:has(.map-page) {
+  overflow: hidden;
 }
 
 body {
@@ -34,6 +110,47 @@ body {
 
 main {
   padding: 32px 24px 64px;
+}
+
+/* The map page: head on top, map fills the rest of the window. */
+main.map-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px 0 16px;
+}
+
+/* An 8-of-12 content column, centred, with empty gutters on both sides. */
+.map-page .page-head,
+.map-page .lineage-map {
+  width: 66.667%;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.map-page .page-head {
+  flex: none;
+}
+
+.map-page .lineage-map {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 8px;
+  padding: 0;
+}
+
+@media (max-width: 1100px) {
+  main.map-page {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .map-page .page-head,
+  .map-page .lineage-map {
+    width: 100%;
+  }
 }
 
 /* The head spans the window like the map below it. */
@@ -73,7 +190,7 @@ main {
   color: var(--text);
   font: inherit;
   font-size: 13px;
-  background: #1a1e27;
+  background: var(--raised);
   border: 1px solid var(--line);
   border-radius: 7px;
 }
@@ -98,7 +215,7 @@ main {
   color: var(--muted);
   font: inherit;
   font-size: 12px;
-  background: #1a1e27;
+  background: var(--raised);
   border: 1px solid var(--line);
   border-radius: 6px;
   cursor: pointer;
@@ -138,7 +255,7 @@ main {
   color: var(--muted);
   font: inherit;
   font-size: 13px;
-  background: #151922;
+  background: var(--raised-2);
   border: 1px solid var(--line);
   border-radius: 8px;
   cursor: pointer;
@@ -201,19 +318,19 @@ ul {
   color: var(--muted);
   font-size: 13px;
   text-decoration: none;
-  background: #151922;
+  background: var(--raised-2);
   border: 1px solid var(--line);
   border-radius: 8px;
 }
 
 .switcher-tab:hover {
   color: var(--text);
-  border-color: #3b4557;
+  border-color: var(--chip-line);
 }
 
 .switcher-tab.is-current {
   color: var(--text);
-  background: #1d2431;
+  background: var(--active);
   border-color: var(--accent);
 }
 
@@ -263,7 +380,7 @@ ul {
   align-items: flex-start;
   justify-content: center;
   padding: 12vh 16px 32px;
-  background: rgba(5, 7, 10, 0.62);
+  background: var(--overlay);
 }
 
 .switcher-dialog {
@@ -272,7 +389,7 @@ ul {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 60px var(--shadow);
 }
 
 .switcher-input {
@@ -305,7 +422,7 @@ ul {
 }
 
 .switcher-result.is-active {
-  background: #243040;
+  background: var(--active);
   border-color: var(--accent);
 }
 
@@ -361,7 +478,7 @@ ul {
   align-items: flex-start;
   justify-content: center;
   padding: 10vh 16px 32px;
-  background: rgba(5, 7, 10, 0.62);
+  background: var(--overlay);
 }
 
 .settings-dialog {
@@ -372,7 +489,7 @@ ul {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 60px var(--shadow);
 }
 
 .settings-head {
@@ -489,12 +606,20 @@ ul {
   white-space: nowrap;
 }
 
+.map-shell {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .map-toolbar {
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 24px;
+  margin-top: 0;
 }
 
 .map-title {
@@ -533,7 +658,7 @@ body:has(.map-shell.is-expanded) {
 .outline-button {
   padding: 5px 12px;
   color: var(--muted);
-  background: #1a1e27;
+  background: var(--raised);
   border: 1px solid var(--line);
   border-radius: 7px;
   font: inherit;
@@ -550,9 +675,10 @@ body:has(.map-shell.is-expanded) {
 .graph-wrap {
   position: relative;
   display: flex;
-  height: max(480px, calc(100vh - 96px));
+  flex: 1 1 auto;
+  min-height: 0;
   margin-top: 8px;
-  background: #12151b;
+  background: var(--row-bg);
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
@@ -581,7 +707,7 @@ body:has(.map-shell.is-expanded) {
   flex-direction: column;
   width: 270px;
   height: 100%;
-  background: rgba(17, 20, 26, 0.94);
+  background: var(--translucent-outline);
   border-right: 1px solid var(--line);
 }
 
@@ -679,11 +805,11 @@ body:has(.map-shell.is-expanded) {
 }
 
 .outline-item:hover {
-  background: #1d222c;
+  background: var(--hover);
 }
 
 .outline-item.is-active {
-  background: #243040;
+  background: var(--active);
   outline: 1px solid var(--accent);
 }
 
@@ -733,11 +859,11 @@ body:has(.map-shell.is-expanded) {
 }
 
 .file-hit:hover {
-  background: #1d222c;
+  background: var(--hover);
 }
 
 .file-hit.is-active {
-  background: #243040;
+  background: var(--active);
   outline: 1px solid var(--accent);
 }
 
@@ -803,16 +929,20 @@ body:has(.map-shell.is-expanded) {
 }
 
 .session-count {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 /* An epoch is a tag on a session dot, not a box around sessions. */
 .epoch-tag {
   display: inline-flex;
-  flex: none;
+  flex: 0 1 auto;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   max-width: 160px;
   overflow: hidden;
   padding: 1px 6px;
@@ -855,23 +985,23 @@ body:has(.map-shell.is-expanded) {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: #242a36;
+  background: var(--kind-bg);
   color: var(--muted);
 }
 
 .kind.kind-decision {
-  background: #2b2440;
-  color: #c0a8ff;
+  background: var(--kind-decision-bg);
+  color: var(--kind-decision-text);
 }
 
 .kind.kind-question {
-  background: #3a2f1d;
+  background: var(--kind-question-bg);
   color: var(--warn);
 }
 
 .kind.kind-message {
-  background: #23331d;
-  color: #9ece6a;
+  background: var(--kind-message-bg);
+  color: var(--kind-message-text);
 }
 
 .empty,
@@ -890,10 +1020,10 @@ body:has(.map-shell.is-expanded) {
   display: flex;
   flex-direction: column;
   width: min(460px, calc(100% - 24px));
-  background: rgba(20, 23, 30, 0.97);
+  background: var(--translucent-panel);
   border: 1px solid var(--line);
   border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 32px var(--shadow);
 }
 
 .drilldown-head {
@@ -919,7 +1049,7 @@ body:has(.map-shell.is-expanded) {
   font-size: 18px;
   line-height: 1;
   color: var(--muted);
-  background: #1d222c;
+  background: var(--hover);
   border: 1px solid var(--line);
   border-radius: 6px;
   cursor: pointer;
@@ -969,7 +1099,7 @@ body:has(.map-shell.is-expanded) {
 
 /* A commit git no longer has stays listed, greyed (Story 8.8). */
 .drilldown-code code.is-missing {
-  color: #5f6675;
+  color: var(--missing);
   border-style: dashed;
 }
 
@@ -1009,7 +1139,7 @@ body:has(.map-shell.is-expanded) {
   width: 100%;
   padding: 8px 12px;
   color: var(--text);
-  background: #243040;
+  background: var(--active);
   border: 1px solid var(--line);
   border-radius: 7px;
   font: inherit;
@@ -1034,7 +1164,7 @@ body:has(.map-shell.is-expanded) {
   margin: 10px 0 0;
   padding: 8px;
   overflow-x: auto;
-  background: #12151b;
+  background: var(--row-bg);
   border: 1px solid var(--line);
   border-radius: 6px;
   font-size: 12px;
@@ -1168,18 +1298,19 @@ time {
 
   .graph-wrap {
     flex-direction: column;
-    height: auto;
   }
 
   .outline {
     width: 100%;
-    height: 220px;
+    height: 180px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
 
   .graph-canvas {
-    height: 480px;
+    flex: 1;
+    height: auto;
+    min-height: 0;
   }
 }
 
@@ -1196,7 +1327,7 @@ time {
   font: inherit;
   font-size: 12px;
   color: var(--text);
-  background: #1f2430;
+  background: var(--raised);
   border: 1px solid var(--line);
   border-radius: 6px;
   cursor: pointer;
@@ -1228,7 +1359,7 @@ time {
 .message-hash button {
   padding: 3px 8px;
   color: var(--text);
-  background: #243040;
+  background: var(--active);
   border: 1px solid var(--line);
   border-radius: 6px;
   font: inherit;
@@ -1245,11 +1376,11 @@ time {
   padding: 8px 10px;
   border-radius: 8px;
   border-left: 3px solid var(--line);
-  background: #1a1e27;
+  background: var(--raised);
 }
 
 .chat-user {
-  border-left-color: #9ece6a;
+  border-left-color: var(--l1);
 }
 
 .chat-agent {
@@ -1319,26 +1450,26 @@ time {
 }
 
 .git-row:hover {
-  background: #1d222c;
+  background: var(--hover);
 }
 
 .git-row.in-branch {
-  background: rgba(122, 162, 247, 0.06);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
 .git-row.is-selected {
-  background: #243040;
+  background: var(--active);
   outline: 1px solid var(--accent);
 }
 
 /* Search hits (Story 8.14): every match is marked, the active one more so. */
 .git-row.is-search-hit {
-  background: rgba(224, 175, 104, 0.12);
+  background: var(--search-hit-bg);
   box-shadow: inset 2px 0 0 var(--warn);
 }
 
 .git-row.is-search-active {
-  background: rgba(224, 175, 104, 0.24);
+  background: var(--search-active-bg);
   outline: 1px solid var(--warn);
 }
 
@@ -1358,14 +1489,17 @@ time {
 }
 
 .git-branch {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 150px;
   overflow: hidden;
   padding: 1px 6px;
-  color: #0f1115;
+  color: var(--on-lane);
   font-size: 10px;
   font-weight: 600;
   line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   background: var(--accent);
   border-radius: 4px;
 }
@@ -1377,17 +1511,23 @@ time {
   font-size: 11px;
 }
 
+/* The title wins over the chips around it (Story 9.2): it keeps its minimum
+   width and the chips truncate with an ellipsis instead of squeezing it into a
+   one-letter column. Keep `min-width` equal to `TITLE_MIN_WIDTH` in
+   `gitLayout.ts` (a row is laid out tall enough to wrap at that width). */
 .git-title {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: 180px;
   line-height: 16px;
   overflow-wrap: anywhere;
 }
 
 .git-returns {
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
   gap: 4px;
+  min-width: 0;
+  overflow: hidden;
   font-size: 11px;
 }
 
@@ -1395,8 +1535,10 @@ time {
    longer knows the commit. */
 .git-tags {
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
   gap: 4px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .git-tag {
@@ -1405,8 +1547,8 @@ time {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 10px;
   line-height: 15px;
-  background: #1c222e;
-  border: 1px solid #323b4d;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-line);
   border-radius: 3px;
   cursor: pointer;
 }
@@ -1417,13 +1559,14 @@ time {
 }
 
 .git-tag.is-missing {
-  color: #5f6675;
+  color: var(--missing);
   border-style: dashed;
 }
 
 /* "↑ continues <session> · m67": a jump to the earlier session's message. */
 .git-continues {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 220px;
   overflow: hidden;
   padding: 1px 6px;
@@ -1431,12 +1574,12 @@ time {
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border: 1px solid rgba(122, 162, 247, 0.45);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: 4px;
 }
 
 .git-continues:hover {
-  background: rgba(122, 162, 247, 0.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .git-row .left-off,
@@ -1533,5 +1676,5 @@ time {
 }
 
 .session-row.is-open {
-  background: rgba(122, 162, 247, 0.08);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }

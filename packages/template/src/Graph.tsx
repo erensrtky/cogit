@@ -22,6 +22,7 @@ import type { MapSearchState } from "./MapSearch.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
 import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
+import { usePageWheel } from "./scroll.js";
 import { layoutSessionGraph, type SessionGraph } from "./sessionLayout.js";
 
 /**
@@ -195,6 +196,8 @@ function findSession(model: LineageViewModel, id: string): ViewSession | undefin
 }
 
 function Flow({ model, search }: { model: LineageViewModel; search: MapSearchState }) {
+  // One scroller (Story 9.2): a wheel outside the map moves the map.
+  usePageWheel();
   // Read once: a live data swap must not move the page back to the hash target.
   const [initial] = useState(() => readTarget(model));
   useEffect(() => {
@@ -641,6 +644,12 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   );
 }
 
+/** A theme colour for an SVG attribute (the minimap cannot read CSS variables). */
+function cssVar(name: string, fallback: string): string {
+  if (typeof window === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
 /**
  * One React Flow canvas for the whole map. It frames the map once on load (or
  * centres a deep-linked message); opening or closing a session and live data
@@ -747,10 +756,15 @@ function MapCanvas({
       nodesDraggable={false}
       nodesConnectable={false}
       elementsSelectable={false}
-      colorMode="dark"
+      colorMode="system"
     >
       <Background gap={24} size={1} color="#242a36" />
-      <MiniMap pannable zoomable nodeColor={() => "#243040"} />
+      <MiniMap
+        pannable
+        zoomable
+        nodeColor={() => cssVar("--active", "#243040")}
+        maskColor={`${cssVar("--bg", "#0f1115")}b3`}
+      />
       <Controls showInteractive={false} />
     </ReactFlow>
   );

@@ -50,7 +50,7 @@ export function App({ model }: { model: LineageViewModel }) {
   }
 
   return (
-    <main>
+    <main className="map-page">
       <div className="page-head">
         <div className="page-bar">
           <ProjectSwitcher model={model} />
