@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- npm readiness: the README now says what cogit is, shows the map, the four read verbs (`log`, `show`, `blame`, `search`), what git sees, privacy and every setting; the package carries `repository`, `homepage`, `bugs` and keywords, and `prepack` copies the repository README and LICENSE next to `package.json` so the registry page shows them. `npm pack` still ships only the bundled CLI, the plugin manifest, the skill, the hooks and those two files.
+
 ### Changed
 - Activity is message time everywhere: the map's session lanes and the project switcher's last-activity date follow the newest message a session holds, so editing an old record no longer makes it look like it ran until now. The local map server watches Claude Code's transcripts while a map page is open (one recursive, debounced watcher) and rebuilds the map itself, so the page is live without the plugin's Stop hook; the watch closes when the last tab does. The `commitBetween` hint asks git for a commit that actually landed in this repository between the two messages instead of trusting a `git commit` line in the transcript, `blame` takes a `[dir]` positional like `log` and `show`, and `session show` gained `--full` for every recorded message and the parent candidates (the default stays compact). The record-update skill text is about half its former size, cutting the fixed cost of every update.
 

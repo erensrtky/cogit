@@ -3,6 +3,24 @@
   "version": "0.10.0",
   "description": "Git remembers what changed. cogit remembers why.",
   "license": "MIT",
+  "keywords": [
+    "git",
+    "ai",
+    "coding-agent",
+    "claude-code",
+    "history",
+    "lineage",
+    "commit",
+    "context"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sainthardrock/cogit.git"
+  },
+  "homepage": "https://github.com/sainthardrock/cogit#readme",
+  "bugs": {
+    "url": "https://github.com/sainthardrock/cogit/issues"
+  },
   "type": "module",
   "bin": {
     "cogit": "dist/cli.js"
@@ -19,7 +37,7 @@
   "scripts": {
     "prebuild": "node ../../scripts/sync-version.mjs",
     "build": "tsup",
-    "prepack": "node ../../scripts/sync-version.mjs"
+    "prepack": "node ../../scripts/sync-version.mjs && node ../../scripts/copy-docs.mjs"
   },
   "devDependencies": {
     "@inquirer/prompts": "^8.7.4",

@@ -4,45 +4,98 @@
 
 Git remembers what changed. cogit remembers why.
 
-The lineage of your AI coding sessions: every user message hangs from the message
-it reacts to, and the map draws each session as a git graph you can zoom into.
+![The map: sessions, branches and the thoughts behind them](docs/images/map.png)
+
+cogit records every message you send to an AI coding agent as a *thought commit*, with what
+came of it and the message it answered. Code commits point back to the thought through a
+`Thought:` trailer, so `git log` and `cogit log` tell two halves of one story. Your agent reads
+the lineage with `cogit log`, `show`, `blame` and `search`; you read it as a map of sessions,
+branches and decisions.
+
+## Install
+
+```bash
+npm install -g cogit      # the CLI; Node >= 22.13
+npx cogit --help          # or run it without installing
+```
+
+The Claude Code plugin adds the skill that keeps the record and the hooks that maintain it
+(Claude Code 2.1.275 or later):
+
+```text
+/plugin install cogit --marketplace sainthardrock/cogit
+```
 
 ## Quick start
 
 ```bash
-npm install -g cogit
-cogit init          # answer the setup questions in the project you work in
-cogit open          # open the map in the browser
+cd your-project
+cogit init        # asks about git, transcript retention and summary language
+cogit open        # builds the map and serves it on 127.0.0.1
 ```
 
-`init` also installs the Claude Code side: the lineage skill updates the record as
-you work, the hooks rebuild the map after each turn and at the end of a session.
+Then work as usual. The skill updates the record every few turns (`updateEveryTurns`, default
+5) and at session end; the hooks write `.cogit/HEAD`, rebuild the map and, if `recordCommit`
+is `auto`, commit the record. Nothing cogit installs can block a prompt or a commit: every
+hook failure is silent and exits 0.
 
-## Privacy and what travels with the repo
+## Read the lineage
 
-- The skill records decisions and rationale, never raw chat; session files hold
-  titles and summaries only.
-- `init` asks whether to commit the session records and now answers **yes** by
-  default: `.cogit/sessions/` and `project.json` travel with a clone, while
-  `.cogit/.gitignore` keeps local state (`conversations/`, `state/`, `locks/`,
-  `inbox/`, `map.html`, `HEAD`, backups) out. Switch an existing project with
-  `cogit config git commit|ignore`.
-- A git `pre-commit` hook stages the current session's record with the code
-  commit, so a clone keeps the "why". It never creates a record-only commit.
-- The map's Conversation panel needs the real turns, so `build` reads them from
-  Claude Code's local transcript and keeps a copy in
-  `.cogit/conversations/<sessionId>.jsonl.gz`. This store lets the panel keep
-  working after Claude Code deletes the transcript.
-- That copy stays on this machine by default. Turn on `shareConversations`
-  (Settings → Recording, or `cogit config set shareConversations true`) to commit
-  it too; a clone without it says "This conversation is not on this machine".
-- Each session records its author (git `user.name`, else the OS user) on its
-  first write, shown on the map and in `cogit log`.
-- `recordCommit` controls the last messages after the last code commit: `ask`
-  (default) offers a `chore(cogit): record <title>` commit at the next session
-  start, `auto` commits exactly the record paths at session end, `off` does
-  nothing. Both settings are in Settings → Recording.
-- Both the page and the conversation store go through the same redaction pass
-  (common key and token patterns) before anything is written.
-- Claude Code deletes transcripts after `cleanupPeriodDays` (30 days by default).
-  `init` offers to raise it, never silently.
+```bash
+cogit log                     # like git log: messages and branches, newest first
+cogit log --branches          # only the branch summaries
+cogit log --file src/auth.ts  # the thoughts that touched this file
+cogit show h3f9c2a1b4d6       # one message: the turn, what came of it, its commits
+cogit blame src/auth.ts:42    # which recorded message produced this line
+cogit search "refresh token"  # titles, summaries, decisions and the stored conversation
+```
+
+Each takes `[dir]` (or `-C <dir>`), the list verbs take `-n <count>` and `--json`. A message is
+addressed by its hash (`h` plus 12 hex), `<session-id-prefix>:mN`, or — for `show` — a commit
+hash with a `Thought:` trailer.
+
+## What git sees
+
+- `.cogit/sessions/` and `.cogit/project.json` are committed by default, so the record travels
+  with a clone. `cogit config git commit|ignore` switches an existing project; local state
+  (conversations, locks, inbox, map, `HEAD`) is always ignored.
+- A `pre-commit` hook stages the current session's record with your next code commit. It never
+  creates a record-only commit. `recordCommit` decides what happens to messages recorded after
+  the last commit: `ask` (default), `auto` or `off`.
+- A `prepare-commit-msg` hook adds `Thought: h<id>` to a commit it can attribute — skipped for
+  merges and squashes, and when `.cogit/HEAD` is older than `trailerMaxAgeHours`. `build`,
+  `log`, `blame` and the Files view read the trailers back with `git log`.
+
+## Privacy
+
+- The raw conversation stays on this machine. `.cogit/conversations/` holds a local copy of the
+  transcript so the panel keeps working after Claude Code deletes it; `.cogit/.gitignore` keeps
+  it out of git unless `shareConversations` is on.
+- The record holds titles, summaries, decisions and work items — never tool output.
+- A redaction pass for keys and token patterns runs over everything the map writes or shows.
+- Claude Code keeps transcripts for `cleanupPeriodDays` (30 days by default); `init` offers to
+  raise it and never changes it silently.
+
+## Settings
+
+`cogit config get [key]` and `cogit config set <key> <value>`, or **Settings** in the map.
+
+| Key | Default | What it does |
+|---|---|---|
+| `language` | `auto` | Summary language: the conversation's, or a fixed one |
+| `updateEveryTurns` | `5` | Turns between record updates |
+| `sessionEndCatchUp` | `true` | Summarize the last messages when a session ends |
+| `catchUpModel` | `haiku` | Model for the session-end catch-up |
+| `messageSummaries` | `false` | A summary on every message, not just every branch |
+| `startupContext` | `true` | Hand the agent the previous session's lineage at session start |
+| `gitPolicy` | `commit` | Whether new projects commit the record |
+| `shareConversations` | `false` | Commit the raw conversation too |
+| `recordCommit` | `ask` | What to do with messages after the last code commit |
+| `trailerMaxAgeHours` | `6` | How old `.cogit/HEAD` may be for a `Thought:` trailer |
+| `serverPort` | `4747` | Port for the local map server |
+
+## Docs and licence
+
+The design, the data model and the full CLI surface are in
+[specs/codelineage-mvp.md](specs/codelineage-mvp.md), kept up to date with the code. MIT —
+see [LICENSE](LICENSE).

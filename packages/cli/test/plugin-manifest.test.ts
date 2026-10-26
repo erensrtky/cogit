@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const read = async (path: string) =>
@@ -36,6 +36,32 @@ describe("plugin packaging", () => {
         source: { source: "npm", package: pkg.name },
       }),
     ]);
+  });
+
+  it("carries the npm metadata a publish needs", async () => {
+    const pkg = await read("../package.json");
+    // Story 6.1: the registry page comes from these fields alone.
+    expect(pkg.description).toBe("Git remembers what changed. cogit remembers why.");
+    expect(pkg.license).toBe("MIT");
+    expect(pkg.repository).toEqual({
+      type: "git",
+      url: "git+https://github.com/sainthardrock/cogit.git",
+    });
+    expect(pkg.homepage).toBe("https://github.com/sainthardrock/cogit#readme");
+    expect(pkg.bugs).toEqual({ url: "https://github.com/sainthardrock/cogit/issues" });
+    expect(pkg.keywords).toEqual(expect.arrayContaining(["git", "claude-code", "lineage"]));
+  });
+
+  it("keeps a README that shows the map and points at the spec and licence", async () => {
+    const readme = await readFile(new URL("../../../README.md", import.meta.url), "utf8");
+    expect(readme).toContain("![The map");
+    expect(readme).toContain("(docs/images/map.png)");
+    expect(readme).toContain("(specs/codelineage-mvp.md)");
+    expect(readme).toContain("(LICENSE)");
+    // A relative image only renders when the file it names is in the repository.
+    await expect(
+      access(new URL("../../../docs/images/map.png", import.meta.url)),
+    ).resolves.toBeUndefined();
   });
 
   it("ships no runtime dependencies, since the CLI is bundled into one file", async () => {
