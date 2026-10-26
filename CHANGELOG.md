@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.11.0] - 2026-10-26
 ### Added
 - npm readiness: the README now says what cogit is, shows the map, the four read verbs (`log`, `show`, `blame`, `search`), what git sees, privacy and every setting; the package carries `repository`, `homepage`, `bugs` and keywords, and `prepack` copies the repository README and LICENSE next to `package.json` so the registry page shows them. `npm pack` still ships only the bundled CLI, the plugin manifest, the skill, the hooks and those two files.
 
