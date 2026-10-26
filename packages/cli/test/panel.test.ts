@@ -12,7 +12,7 @@ import { DATA_ELEMENT_ID, type PanelViewModel } from "../src/view/model.js";
 import { buildPanel } from "../src/view/panel.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
-const TEMPLATE = `<!doctype html><html><head><title>codelineage — lineage</title></head><body>
+const TEMPLATE = `<!doctype html><html><head><title>cogit — lineage</title></head><body>
     <div id="root"></div>
     <script id="${DATA_ELEMENT_ID}" type="application/json"></script></body></html>`;
 
@@ -111,7 +111,7 @@ describe("buildPanel", () => {
     });
 
     const html = await readFile(globalPaths(env).panel, "utf8");
-    expect(html).toContain("<title>codelineage — panel</title>");
+    expect(html).toContain("<title>cogit — panel</title>");
     expect(embedded(html)).toEqual(model);
   });
 
@@ -184,7 +184,7 @@ describe("panel refresh from build", () => {
   it("turns an unwritable global directory into a warning, not a failed build", async () => {
     const home = join(dir, "home-file");
     await writeFile(home, "not a directory");
-    const badEnv = { ...env, CODELINEAGE_HOME: home };
+    const badEnv = { ...env, COGIT_HOME: home };
     const root = join(dir, "proj");
     await initProject(root, badEnv);
 

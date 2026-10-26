@@ -54,8 +54,7 @@ export async function sessionWrite(
 ): Promise<void> {
   const { root, worktree } = await resolveProjectRoot(opts.dir);
   const project = await loadProject(root);
-  if (!project.found)
-    throw new CliError(`${root} is not initialized; run \`codelineage init\` first`);
+  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
   if (!project.ok) throw new CliError(project.error);
 
   const text = opts.file ? await readFile(opts.file, "utf8") : await stdin();
@@ -81,7 +80,7 @@ export async function sessionWrite(
   if (count > 0) io.warn(`redacted ${count} secret-looking value(s)`);
   if (input.epoch && !project.data.epochs.some((e) => e.id === input.epoch)) {
     io.warn(
-      `epoch "${input.epoch}" is not in project.json; the session shows as unassigned until you run \`codelineage epoch add ${input.epoch} <title>\``,
+      `epoch "${input.epoch}" is not in project.json; the session shows as unassigned until you run \`cogit epoch add ${input.epoch} <title>\``,
     );
   }
 
@@ -122,7 +121,7 @@ export async function sessionWrite(
   try {
     await buildProject({ dir: root, io, quiet: true });
   } catch (err) {
-    io.warn(`could not build lineage.html: ${(err as Error).message}`);
+    io.warn(`could not build map.html: ${(err as Error).message}`);
   }
 }
 

@@ -1,19 +1,19 @@
 ---
-name: lineage
-description: Record or update this session's lineage for codelineage, one node per user message with what came of it, each hanging from the earlier message it reacts to, with a summary at each branch start, plus the goal, open items and what comes next. Use it when the user asks to record the session or its lineage, or when a codelineage hook asks for an update.
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" *) Edit(/${CLAUDE_PROJECT_DIR}/.codelineage/inbox/**)
+name: record
+description: Record or update this session's lineage for cogit, one node per user message with what came of it, each hanging from the earlier message it reacts to, with a summary at each branch start, plus the goal, open items and what comes next. Use it when the user asks to record the session or its lineage, or when a cogit hook asks for an update.
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" *) Edit(/${CLAUDE_PROJECT_DIR}/.cogit/inbox/**)
 ---
 
 # Record this session's lineage
 
-This is the current record for this session (the output of `codelineage session show`):
+This is the current record for this session (the output of `cogit session show`):
 
 !`node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" session show "${CLAUDE_SESSION_ID}" -C "${CLAUDE_PROJECT_DIR}"`
 
 ## First, check the record
 
 - If `initialized` is `false`, reply with exactly this line and stop:
-  "codelineage is not set up in this project yet; run `npx codelineage init` here first."
+  "cogit is not set up in this project yet; run `npx cogit init` here first."
 - If `sessionError` is set, tell the user the session record is unreadable and
   quote the error. Then stop. Never write over it.
 - If `newMessages` is empty and nothing else changed since the record was last

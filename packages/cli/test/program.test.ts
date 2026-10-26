@@ -21,6 +21,6 @@ describe("createProgram", () => {
   });
 
   it("names the binary in help", () => {
-    expect(run(["--help"])).toContain("Usage: codelineage");
+    expect(run(["--help"])).toContain("Usage: cogit");
   });
 });

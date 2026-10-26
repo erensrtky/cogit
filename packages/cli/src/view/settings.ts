@@ -75,13 +75,13 @@ const READ_ONLY: FieldSpec[] = [
   {
     key: "gitPolicy",
     label: "Git policy",
-    help: "Whether captures are committed to git; change it per project with `codelineage config set`.",
+    help: "Whether captures are committed to git; change it per project with `cogit config set`.",
     kind: "text",
   },
   {
     key: "agents",
     label: "Agents",
-    help: "Which agents record lineage; change it with `codelineage config set`.",
+    help: "Which agents record lineage; change it with `cogit config set`.",
     kind: "text",
   },
 ];

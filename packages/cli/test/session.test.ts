@@ -166,9 +166,9 @@ describe("session write", () => {
   });
 
   it("refuses a message of a session that started later", async () => {
-    await mkdir(join(root, ".codelineage", "sessions"), { recursive: true });
+    await mkdir(join(root, ".cogit", "sessions"), { recursive: true });
     await writeFile(
-      join(root, ".codelineage", "sessions", "late.json"),
+      join(root, ".cogit", "sessions", "late.json"),
       JSON.stringify({
         schema: 1,
         sessionId: "late",
@@ -206,8 +206,8 @@ describe("session write", () => {
     await sessionWrite({ dir: root, file: f }, io);
     expect(io.lines).toEqual(["Saved session s2 (0 nodes)"]);
     await expect(sessionWrite({ dir: dir, file: f }, io)).rejects.toThrow(/not initialized/);
-    await mkdir(join(dir, ".codelineage"));
-    await writeFile(join(dir, ".codelineage", "project.json"), "{}");
+    await mkdir(join(dir, ".cogit"));
+    await writeFile(join(dir, ".cogit", "project.json"), "{}");
     await expect(sessionWrite({ dir: dir, file: f }, io)).rejects.toThrow(/schema version/);
   });
 
@@ -235,8 +235,8 @@ describe("session show", () => {
   });
 
   it("reports a corrupt project.json without failing", async () => {
-    await mkdir(join(root, ".codelineage"));
-    await writeFile(join(root, ".codelineage", "project.json"), "{nope");
+    await mkdir(join(root, ".cogit"));
+    await writeFile(join(root, ".cogit", "project.json"), "{nope");
     await sessionShow(root, "s1", io);
     expect(shown()).toMatchObject({ initialized: false, error: expect.stringMatching(/JSON/) });
   });
@@ -255,7 +255,7 @@ describe("session show", () => {
       session: null,
       newMessages: null,
       lastMessages: [],
-      inbox: join(root, ".codelineage", "inbox", "s1.json"),
+      inbox: join(root, ".cogit", "inbox", "s1.json"),
     });
 
     await sessionWrite({ dir: root }, fakeIo(envFor(dir)), async () =>
@@ -538,15 +538,15 @@ ${line("second", 2)}
 
   it("flags an unreadable record instead of hiding it", async () => {
     await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
-    await writeFile(join(root, ".codelineage", "sessions", "s1.json"), "{nope");
+    await writeFile(join(root, ".cogit", "sessions", "s1.json"), "{nope");
     await sessionShow(root, "s1", io);
     expect(shown()).toMatchObject({ session: null, sessionError: expect.stringMatching(/JSON/) });
   });
 
   it("consumes the inbox file after a successful write and keeps it after a failed one", async () => {
     await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
-    const file = join(root, ".codelineage", "inbox", "s1.json");
-    await mkdir(join(root, ".codelineage", "inbox"));
+    const file = join(root, ".cogit", "inbox", "s1.json");
+    await mkdir(join(root, ".cogit", "inbox"));
     await writeFile(file, "{nope");
     await expect(sessionWrite({ dir: root, file, consume: true }, io)).rejects.toThrow(/JSON/);
     expect(existsSync(file)).toBe(true);

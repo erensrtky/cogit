@@ -1,11 +1,11 @@
 {
-  "name": "codelineage",
+  "name": "cogit",
   "version": "0.10.0",
-  "description": "The lineage of your AI coding sessions.",
+  "description": "Git remembers what changed. cogit remembers why.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "codelineage": "dist/cli.js"
+    "cogit": "dist/cli.js"
   },
   "files": [
     "dist",

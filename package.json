@@ -1,5 +1,5 @@
 {
-  "name": "codelineage-monorepo",
+  "name": "cogit-monorepo",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -9,7 +9,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "build": "npm run build -w template && npm run build -w codelineage",
+    "build": "npm run build -w template && npm run build -w cogit",
     "dev:template": "npm run dev -w template",
     "lint": "biome check .",
     "format": "biome check --write .",

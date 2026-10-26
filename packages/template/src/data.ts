@@ -12,13 +12,13 @@ export function parseViewModel(text: string): PageModel {
   try {
     value = JSON.parse(text);
   } catch {
-    throw new Error("The embedded codelineage data is not valid JSON.");
+    throw new Error("The embedded cogit data is not valid JSON.");
   }
   if (typeof value !== "object" || value === null || !("kind" in value)) {
-    throw new Error("The embedded codelineage data is not a view model.");
+    throw new Error("The embedded cogit data is not a view model.");
   }
   if (value.kind !== "lineage" && value.kind !== "panel") {
-    throw new Error(`Unsupported codelineage view: ${String(value.kind)}`);
+    throw new Error(`Unsupported cogit view: ${String(value.kind)}`);
   }
   return value as PageModel;
 }
@@ -34,7 +34,7 @@ export async function loadViewModel(doc: Document = document): Promise<PageModel
     const { fixture } = await import("./fixture.js");
     return fixture;
   }
-  throw new Error("No codelineage data in this page. Run `codelineage build`.");
+  throw new Error("No cogit data in this page. Run `cogit build`.");
 }
 
 /**
@@ -65,7 +65,7 @@ export function pageToken(doc: Document = document): string | null {
  */
 export async function loadSettings(token: string): Promise<Partial<PanelSettings>> {
   const response = await fetch("/api/config", {
-    headers: { "x-codelineage-token": token },
+    headers: { "x-cogit-token": token },
     cache: "no-store",
   });
   if (!response.ok) {
@@ -84,7 +84,7 @@ export async function saveSetting(
 ): Promise<PanelSettings[keyof PanelSettings]> {
   const response = await fetch("/api/config", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-codelineage-token": token },
+    headers: { "content-type": "application/json", "x-cogit-token": token },
     body: JSON.stringify({ key, value }),
   });
   if (!response.ok) {

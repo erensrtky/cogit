@@ -30,7 +30,7 @@ const HOST = "127.0.0.1";
 const LIVE_META = `<meta name="${LIVE_META_NAME}" content="1">`;
 
 /** Header a settings write must carry, with the token from the panel page. */
-export const CONFIG_TOKEN_HEADER = "x-codelineage-token";
+export const CONFIG_TOKEN_HEADER = "x-cogit-token";
 
 /** A settings write is a tiny JSON object; anything larger is not ours. */
 export const CONFIG_BODY_LIMIT = 4096;
@@ -412,7 +412,7 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
         "content-type": "application/json",
         "cache-control": "no-store",
       });
-      res.end(JSON.stringify({ ok: true, name: "codelineage", home: globalPaths(env).base }));
+      res.end(JSON.stringify({ ok: true, name: "cogit", home: globalPaths(env).base }));
       return;
     }
     const target = await pageTarget(env, url);
@@ -498,15 +498,15 @@ interface HealthBody {
 }
 
 /**
- * True when a codelineage server for this user's home answers on the port. The
- * home check keeps two users (or two `CODELINEAGE_HOME`s) apart on one port.
+ * True when a cogit server for this user's home answers on the port. The
+ * home check keeps two users (or two `COGIT_HOME`s) apart on one port.
  */
 export async function checkHealth(url: string, env: NodeJS.ProcessEnv): Promise<boolean> {
   try {
     const response = await fetch(`${url}/health`, { signal: AbortSignal.timeout(500) });
     if (!response.ok) return false;
     const body = (await response.json()) as HealthBody;
-    return body.name === "codelineage" && body.home === globalPaths(env).base;
+    return body.name === "cogit" && body.home === globalPaths(env).base;
   } catch {
     return false;
   }
@@ -526,7 +526,7 @@ export function spawnServerProcess(
   spawnFn(process.execPath, [cli, "serve", "--port", String(port)], {
     detached: true,
     stdio: "ignore",
-    env: { ...env, CODELINEAGE_DISABLE: "1" },
+    env: { ...env, COGIT_DISABLE: "1" },
   }).unref();
 }
 

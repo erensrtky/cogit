@@ -32,7 +32,7 @@ export interface PanelOptions {
  */
 export type CollectedProject = SwitcherSource;
 
-const PANEL_TITLE = "<title>codelineage — panel</title>";
+const PANEL_TITLE = "<title>cogit — panel</title>";
 
 /**
  * The settings both pages embed (Stories 8.9, 8.13). The map needs them for the

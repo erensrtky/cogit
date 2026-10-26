@@ -6,7 +6,7 @@ const read = async (path: string) =>
 
 describe("plugin packaging", () => {
   it("writes a message summary only when the setting is on", async () => {
-    const skill = await readFile(new URL("../skills/lineage/SKILL.md", import.meta.url), "utf8");
+    const skill = await readFile(new URL("../skills/record/SKILL.md", import.meta.url), "utf8");
     // Story 8.9: the branch summary is the outer layer; the per-message summary
     // is off unless the user turns it on, and the skill has to say so.
     expect(skill).toContain("`messageSummaries`");

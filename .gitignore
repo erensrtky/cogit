@@ -56,5 +56,5 @@ ss/
 /qa
 /release
 coverage/
-# codelineage
-/.codelineage/
+# cogit
+/.cogit/

@@ -143,8 +143,8 @@ describe("epoch add", () => {
   it("rejects bad ids and uninitialized or corrupt projects", async () => {
     await expect(epochAdd(root, "../x", "t", fakeIo(env))).rejects.toThrow(/invalid epoch id/);
     await expect(epochAdd(root, "e1", "t", fakeIo(env))).rejects.toThrow(/not initialized/);
-    await mkdir(join(root, ".codelineage"));
-    await writeFile(join(root, ".codelineage", "project.json"), '{"schema":1}');
+    await mkdir(join(root, ".cogit"));
+    await writeFile(join(root, ".cogit", "project.json"), '{"schema":1}');
     await expect(epochAdd(root, "e1", "t", fakeIo(env))).rejects.toThrow(/name/);
   });
 });

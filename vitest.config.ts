@@ -7,7 +7,7 @@ import { defineConfig } from "vitest/config";
  * import to its page plugin, so tests load the same file as a string module.
  */
 const templateAsText: Plugin = {
-  name: "codelineage-template-as-text",
+  name: "cogit-template-as-text",
   enforce: "pre",
   load(id) {
     const file = id.split("?")[0] ?? "";

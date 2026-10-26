@@ -77,12 +77,12 @@ type CopyState = "idle" | "copied" | "failed";
 
 /**
  * The message's stable hash with a copy button (Story 8.10): the user pastes it
- * to the agent, which runs `codelineage show <hash>` for the full record.
+ * to the agent, which runs `cogit show <hash>` for the full record.
  */
 function MessageHash({ value }: { value: string }) {
   const [state, setState] = useState<CopyState>("idle");
   const code = useRef<HTMLElement>(null);
-  const title = `Ask your agent: codelineage show ${value}`;
+  const title = `Ask your agent: cogit show ${value}`;
 
   const copy = (): void => {
     setState("idle");

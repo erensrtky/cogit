@@ -29,7 +29,7 @@ const session = (
 });
 
 /**
- * Dev-only sample data (`npm run dev -w template`). Mirrors the shape `codelineage
+ * Dev-only sample data (`npm run dev -w template`). Mirrors the shape `cogit
  * build` produces: two epochs, three sessions (one unassigned), a branch that
  * folds, a return link and an unrecorded message at the end of a chain.
  */
@@ -37,8 +37,8 @@ export const fixture: LineageViewModel = {
   kind: "lineage",
   schema: 1,
   project: {
-    name: "codelineage",
-    path: "/home/dev/codelineage",
+    name: "cogit",
+    path: "/home/dev/cogit",
     generatedAt: "2026-10-24T12:00:00.000Z",
   },
   status: {
@@ -312,11 +312,11 @@ export const fixture: LineageViewModel = {
   // Story 8.12: the switcher's data, as `build` collects it from the registry.
   switcher: [
     {
-      name: "codelineage",
-      path: "/home/dev/codelineage",
+      name: "cogit",
+      path: "/home/dev/cogit",
       lastActivity: "2026-10-24T11:42:00.000Z",
       leftOff: "Render the fixture through the template and check the single-file build.",
-      lineageUrl: "file:///home/dev/codelineage/.codelineage/lineage.html",
+      lineageUrl: "file:///home/dev/cogit/.cogit/map.html",
       current: true,
     },
     {
@@ -324,7 +324,7 @@ export const fixture: LineageViewModel = {
       path: "/home/dev/start-project",
       lastActivity: "2026-10-23T18:05:00.000Z",
       leftOff: "Write the push commands for the release notes.",
-      lineageUrl: "file:///home/dev/start-project/.codelineage/lineage.html",
+      lineageUrl: "file:///home/dev/start-project/.cogit/map.html",
       current: false,
     },
   ],

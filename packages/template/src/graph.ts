@@ -89,7 +89,7 @@ export function isMessageHash(id: string): boolean {
   return /^h[0-9a-f]{12}$/.test(id);
 }
 
-/** `h3f2a1b8`: what the panel shows and `codelineage show` accepts. */
+/** `h3f2a1b8`: what the panel shows and `cogit show` accepts. */
 export function shortHash(id: string): string {
   return isMessageHash(id) ? id.slice(0, 8) : id;
 }

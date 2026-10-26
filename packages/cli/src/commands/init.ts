@@ -16,6 +16,7 @@ import {
 } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import { readJson } from "../store/fs.js";
+import { migrateProject } from "../store/migrate.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
 import {
   loadConfig,
@@ -137,6 +138,9 @@ export async function register(io: Io, root: string, name: string): Promise<void
 
 export async function init(dir: string, opts: InitOptions, io: Io): Promise<void> {
   const root = resolve(dir);
+  // `init` does not go through `resolveProjectRoot`; migrate here so a
+  // pre-rename project is recognized instead of initialized a second time.
+  await migrateProject(root);
   const existing = await loadProject(root);
   if (existing.found) {
     if (!existing.ok) throw new CliError(`${projectPaths(root).project}: ${existing.error}`);
@@ -156,7 +160,7 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
       (await io.prompt.select<GitPolicy>(
         "This is a git repository. Commit the lineage records?",
         [
-          { value: "ignore", name: "No, keep .codelineage/ out of git (private)" },
+          { value: "ignore", name: "No, keep .cogit/ out of git (private)" },
           { value: "commit", name: "Yes, commit session records (local state stays ignored)" },
         ],
         fallback,
@@ -171,14 +175,14 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
 
   await updateProject(root, (cur) => cur ?? { schema: 1, name, epochs: [] });
   await mkdir(projectPaths(root).sessions, { recursive: true });
-  await bestEffort(io, "could not write .codelineage/.gitignore", () =>
+  await bestEffort(io, "could not write .cogit/.gitignore", () =>
     ensureConversationGitignore(root),
   );
   await register(io, root, name);
 
   io.out(
-    "Conversations are stored in .codelineage/conversations/ (kept out of git, even with the commit policy).",
+    "Conversations are stored in .cogit/conversations/ (kept out of git, even with the commit policy).",
   );
   io.out(`Initialized ${name} in ${projectPaths(root).base}`);
-  io.out("Next: install the Claude Code plugin, then run `codelineage open` after a session.");
+  io.out("Next: install the Claude Code plugin, then run `cogit open` after a session.");
 }

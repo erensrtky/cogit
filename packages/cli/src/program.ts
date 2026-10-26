@@ -20,6 +20,7 @@ import { readStdin, sessionShow, sessionWrite } from "./commands/session.js";
 import { runHook } from "./hooks/run.js";
 import { CliError, type Io, processIo } from "./io.js";
 import { startMapServer } from "./server.js";
+import { takeMigrationWarnings } from "./store/migrate.js";
 import { loadConfig } from "./store/stores.js";
 
 export type IoFactory = (interactive: boolean) => Io;
@@ -49,10 +50,7 @@ export function positiveCount(value: string): number {
 }
 
 export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps = {}): Command {
-  const program = new Command()
-    .name("codelineage")
-    .description(pkg.description)
-    .version(pkg.version);
+  const program = new Command().name("cogit").description(pkg.description).version(pkg.version);
 
   /** Errors meant for the user print as one line and set exit code 1. */
   const run =
@@ -63,16 +61,19 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       } catch (err) {
         if (!(err instanceof CliError)) throw err;
         program.error(`error: ${err.message}`, { exitCode: 1 });
+      } finally {
+        // The 9.1 migration is silent; only a two-directory conflict speaks.
+        for (const line of takeMigrationWarnings()) makeIo(false).warn(line);
       }
     };
 
   program
     .command("init")
-    .description("set up .codelineage/ in a project and register it")
+    .description("set up .cogit/ in a project and register it")
     .argument("[dir]", "project directory", ".")
     .option("--name <name>", "project name")
     .addOption(
-      new Option("--git <policy>", "commit or ignore .codelineage/").choices(["ignore", "commit"]),
+      new Option("--git <policy>", "commit or ignore .cogit/").choices(["ignore", "commit"]),
     )
     .option("--language <lang>", 'summary language: "auto" or a language')
     .option("--retention <days>", 'Claude Code transcript retention, or "keep"', retention)
@@ -90,7 +91,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
 
   program
     .command("build")
-    .description("regenerate .codelineage/lineage.html")
+    .description("regenerate .cogit/map.html")
     .argument("[dir]", "project directory", ".")
     .option("--quiet", "write the map without printing a success line")
     .action(
@@ -288,7 +289,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       run(async (sessionId: string, opts: { dir: string; tail?: boolean }) => {
         if (opts.tail !== true)
           throw new CliError(
-            "backfill of past sessions is not available yet; run `codelineage backfill <session-id> --tail`",
+            "backfill of past sessions is not available yet; run `cogit backfill <session-id> --tail`",
           );
         await backfillTail(opts.dir, sessionId, makeIo(false));
       }),
@@ -326,7 +327,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .description("session records (used by the agent skill)");
   session
     .command("write")
-    .description("merge session JSON from stdin into .codelineage/sessions/")
+    .description("merge session JSON from stdin into .cogit/sessions/")
     .option("-C, --dir <dir>", "project directory", ".")
     .option("-f, --file <file>", "read JSON from a file instead of stdin")
     .option("--consume", "delete the file once the record is saved")

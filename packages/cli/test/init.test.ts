@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -27,11 +28,26 @@ const settingsFile = () => join(dir, "claude", "settings.json");
 const readText = (f: string) => readFile(f, "utf8");
 
 describe("init", () => {
+  it("recognizes a pre-rename .codelineage project and renames it", async () => {
+    await mkdir(join(root, ".codelineage"), { recursive: true });
+    await writeFile(
+      join(root, ".codelineage", "project.json"),
+      `${JSON.stringify({ schema: 1, name: "old", epochs: [] })}\n`,
+    );
+    const io = fakeIo(env);
+
+    await init(root, { retention: "keep" }, io);
+
+    expect(io.lines[0]).toBe(`Already initialized: old (${root})`);
+    expect(await loadProject(root)).toMatchObject({ ok: true, data: { name: "old" } });
+    expect(existsSync(join(root, ".codelineage"))).toBe(false);
+  });
+
   it("creates the project with defaults and registers it", async () => {
     const io = fakeIo(env);
     await init(root, {}, io);
     expect(await loadProject(root)).toMatchObject({ ok: true, data: { name: "proj", epochs: [] } });
-    expect(await readdir(join(root, ".codelineage"))).toContain("sessions");
+    expect(await readdir(join(root, ".cogit"))).toContain("sessions");
     expect(await loadRegistry(env)).toMatchObject({
       ok: true,
       data: { projects: [{ path: root, name: "proj" }] },
@@ -42,17 +58,17 @@ describe("init", () => {
     expect(await readSkillAllowed(env)).toBe(true);
     expect(io.lines.at(-2)).toMatch(/^Initialized proj/);
     // The conversation store stays out of git even when records are committed.
-    expect(await readText(join(root, ".codelineage", ".gitignore"))).toBe("conversations/\n");
+    expect(await readText(join(root, ".cogit", ".gitignore"))).toBe("conversations/\n");
     expect(io.lines).toContain(
-      "Conversations are stored in .codelineage/conversations/ (kept out of git, even with the commit policy).",
+      "Conversations are stored in .cogit/conversations/ (kept out of git, even with the commit policy).",
     );
   });
 
   it("adds the conversation ignore line once", async () => {
-    await mkdir(join(root, ".codelineage"));
+    await mkdir(join(root, ".cogit"));
     expect(await ensureConversationGitignore(root)).toBe(true);
     expect(await ensureConversationGitignore(root)).toBe(false);
-    expect(await readText(join(root, ".codelineage", ".gitignore"))).toBe("conversations/\n");
+    expect(await readText(join(root, ".cogit", ".gitignore"))).toBe("conversations/\n");
   });
 
   it("asks nothing when every answer is given as an option", async () => {
@@ -64,15 +80,15 @@ describe("init", () => {
       io,
     );
     expect((await loadConfig(env)).language).toBe("Turkish");
-    expect(await readText(join(root, ".gitignore"))).toContain("/.codelineage/state/");
+    expect(await readText(join(root, ".gitignore"))).toContain("/.cogit/state/");
   });
 
   it("asks for the git policy in a repo and writes .gitignore", async () => {
     await mkdir(join(root, ".git"));
     const io = fakeIo(env, ["proj", "ignore"]);
     await init(root, {}, io);
-    expect(await readText(join(root, ".gitignore"))).toBe("# codelineage\n/.codelineage/\n");
-    expect(io.lines).toContain("Added to .gitignore: /.codelineage/");
+    expect(await readText(join(root, ".gitignore"))).toBe("# cogit\n/.cogit/\n");
+    expect(io.lines).toContain("Added to .gitignore: /.cogit/");
   });
 
   it("raises transcript retention when asked, keeping other settings", async () => {
@@ -87,7 +103,7 @@ describe("init", () => {
     });
     // two changes in one run keep a single backup holding the original
     const backups = (await readdir(join(dir, "claude"))).filter((f) =>
-      f.startsWith("settings.json.codelineage-bak-"),
+      f.startsWith("settings.json.cogit-bak-"),
     );
     expect(backups).toHaveLength(1);
     expect(JSON.parse(await readText(join(dir, "claude", backups[0] as string)))).toEqual({
@@ -125,9 +141,7 @@ describe("init", () => {
     const io = fakeIo(env);
     await init(root, {}, io);
     expect(io.warnings[0]).toMatch(/retention left unchanged/);
-    expect(io.warnings[1]).toMatch(
-      /add Skill\(codelineage:lineage\) to permissions.allow yourself/,
-    );
+    expect(io.warnings[1]).toMatch(/add Skill\(cogit:record\) to permissions.allow yourself/);
     expect(await readText(settingsFile())).toBe("{oops");
   });
 
@@ -197,8 +211,8 @@ describe("init", () => {
   });
 
   it("refuses a corrupt project.json", async () => {
-    await mkdir(join(root, ".codelineage"));
-    await writeFile(join(root, ".codelineage", "project.json"), "[]");
+    await mkdir(join(root, ".cogit"));
+    await writeFile(join(root, ".cogit", "project.json"), "[]");
     await expect(init(root, {}, fakeIo(env))).rejects.toThrow(/not a JSON object/);
   });
 
@@ -228,10 +242,10 @@ describe("git helpers", () => {
     await writeFile(gi, "node_modules/");
     expect(await ensureGitignore(root, "commit")).toHaveLength(4);
     expect(await ensureGitignore(root, "commit")).toEqual([]);
-    expect(await ensureGitignore(root, "ignore")).toEqual(["/.codelineage/"]);
+    expect(await ensureGitignore(root, "ignore")).toEqual(["/.cogit/"]);
     const text = await readText(gi);
-    expect(text.startsWith("node_modules/\n# codelineage\n")).toBe(true);
-    expect(text.match(/# codelineage/g)).toHaveLength(1);
+    expect(text.startsWith("node_modules/\n# cogit\n")).toBe(true);
+    expect(text.match(/# cogit/g)).toHaveLength(1);
     expect(basename(gi)).toBe(".gitignore");
   });
 });

@@ -1,8 +1,8 @@
 {
-  "name": "codelineage",
-  "displayName": "codelineage",
+  "name": "cogit",
+  "displayName": "cogit",
   "version": "0.10.0",
-  "description": "The lineage of your AI coding sessions: records what each session decided and why, and renders it as a static map.",
+  "description": "Git remembers what changed. cogit remembers why.",
   "author": {
     "name": "Eren Sertkaya"
   },

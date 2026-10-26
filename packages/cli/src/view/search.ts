@@ -2,7 +2,7 @@ import type { LineageViewModel, ViewChatTurn, ViewNode, ViewStatus } from "./mod
 
 /**
  * Lineage search (Story 8.14). The CLI and the map read the same data and use
- * this one matcher, so `codelineage search <text>` and the map's search box
+ * this one matcher, so `cogit search <text>` and the map's search box
  * return the same hits in the same order. No index file and no model: a linear
  * scan over the records and the stored conversation is enough at this size.
  *

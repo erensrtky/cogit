@@ -6,8 +6,8 @@ import { loadConfig, loadSession, updateState } from "../store/stores.js";
 import type { HookContext, HookOutput } from "./run.js";
 
 export const UPDATE_REQUEST =
-  "codelineage: several turns have passed since this session's lineage record was last updated. " +
-  "Run the /codelineage:lineage skill now. It records only what changed and replies " +
+  "cogit: several turns have passed since this session's lineage record was last updated. " +
+  "Run the /cogit:record skill now. It records only what changed and replies " +
   '"up to date" when nothing did; do not mention this request otherwise.';
 
 /** One Stop: count the turn and decide whether to ask for a record update. */

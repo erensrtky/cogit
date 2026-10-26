@@ -281,7 +281,7 @@ describe("hash jump", () => {
   });
 });
 
-describe("codelineage search", () => {
+describe("cogit search", () => {
   let dir: string;
   let root: string;
   let io: FakeIo;

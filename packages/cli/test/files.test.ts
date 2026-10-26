@@ -177,7 +177,7 @@ describe("projectFiles", () => {
   });
 });
 
-describe("codelineage log --file", () => {
+describe("cogit log --file", () => {
   let dir: string;
   let root: string;
   let io: FakeIo;

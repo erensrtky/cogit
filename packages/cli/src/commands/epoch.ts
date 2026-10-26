@@ -9,8 +9,7 @@ export async function epochAdd(dir: string, id: string, title: string, io: Io): 
     throw new CliError(`invalid epoch id "${id}": use letters, digits, _ . -`);
   }
   const project = await loadProject(root);
-  if (!project.found)
-    throw new CliError(`${root} is not initialized; run \`codelineage init\` first`);
+  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
   if (!project.ok) throw new CliError(project.error);
 
   let added = false;

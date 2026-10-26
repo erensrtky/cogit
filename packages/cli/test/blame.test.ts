@@ -36,7 +36,7 @@ describe("parseBlameTarget", () => {
   });
 });
 
-describe("codelineage blame", () => {
+describe("cogit blame", () => {
   let dir: string;
   let root: string;
   let io: FakeIo;

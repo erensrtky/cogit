@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { Slug } from "../schema/common.js";
-import { projectPaths } from "../store/paths.js";
+import { captureDisabled, projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { onSessionEnd } from "./sessionend.js";
 import { onSessionStart } from "./sessionstart.js";
@@ -22,9 +22,9 @@ export type HookInput = z.infer<typeof HookInput>;
 export interface HookContext {
   input: HookInput;
   sessionId: string;
-  /** Where `.codelineage/` lives: `CLAUDE_PROJECT_DIR`, else the hook's `cwd`, mapped out of a worktree. */
+  /** Where `.cogit/` lives: `CLAUDE_PROJECT_DIR`, else the hook's `cwd`, mapped out of a worktree. */
   root: string;
-  /** Whether `.codelineage/project.json` exists; only SessionStart runs without it. */
+  /** Whether `.cogit/project.json` exists; only SessionStart runs without it. */
   initialized: boolean;
   env: NodeJS.ProcessEnv;
   now: string;
@@ -58,7 +58,7 @@ export function spawnDetachedProcess(cli: string, args: string[], env: NodeJS.Pr
   spawn(process.execPath, [cli, ...args], {
     detached: true,
     stdio: "ignore",
-    env: { ...env, CODELINEAGE_DISABLE: "1" },
+    env: { ...env, COGIT_DISABLE: "1" },
   }).unref();
 }
 
@@ -76,7 +76,7 @@ export async function runHook(
   deps: HookDeps = {},
 ): Promise<string | undefined> {
   try {
-    if (env.CODELINEAGE_DISABLE === "1") return undefined;
+    if (captureDisabled(env)) return undefined;
     const handler = HANDLERS[event];
     if (!handler) return undefined;
     const input = HookInput.parse(JSON.parse(stdin));
@@ -101,7 +101,7 @@ export async function runHook(
     });
     return out === undefined ? undefined : JSON.stringify(out);
   } catch (err) {
-    debug(`codelineage ${event} hook: ${(err as Error).message}`);
+    debug(`cogit ${event} hook: ${(err as Error).message}`);
     return undefined;
   }
 }

@@ -43,7 +43,7 @@ function recordPart(record: Session | undefined): string {
 function rules(language: string, messageSummaries: boolean): string {
   const writing = language === "auto" ? "the conversation's language" : language;
   return [
-    "Rules (from the codelineage lineage skill):",
+    "Rules (from the cogit lineage skill):",
     '- Send one "message" node for every message below, with the id exactly as given; skip none, even a short "ok".',
     `- kind is "message". title: a few words in the user's own wording.${
       messageSummaries ? " summary: one or two sentences on what came of it." : ""
@@ -70,7 +70,7 @@ export function catchUpPrompt(
   messageSummaries = false,
 ): string {
   return [
-    "You add the missing part of a codelineage lineage record, a map of the user's messages.",
+    "You add the missing part of a cogit lineage record, a map of the user's messages.",
     "Below are the user's messages that have no node yet, each followed by the agent's written replies and a count of its tool calls.",
     "",
     rules(language, messageSummaries),
@@ -118,7 +118,7 @@ export function agentRecord(text: string): Record<string, unknown> {
 
 /** The headless agent must not fire our own hooks or leave a transcript. */
 export function headlessEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return { ...process.env, ...env, CODELINEAGE_DISABLE: "1" };
+  return { ...process.env, ...env, COGIT_DISABLE: "1" };
 }
 
 function claudeBin(): string {
@@ -185,7 +185,7 @@ async function missingTurns(
 }
 
 /**
- * `codelineage backfill <session-id> --tail`: records the user messages a session
+ * `cogit backfill <session-id> --tail`: records the user messages a session
  * never got to, by running the agent headless with the skill's rules and passing
  * its answer through `session write` (validation, redaction, stamping, build).
  * A busy session lock means another catch-up already runs, which is not an error.
@@ -193,8 +193,7 @@ async function missingTurns(
 export async function backfillTail(dir: string, sessionId: string, io: Io): Promise<void> {
   const { root } = await resolveProjectRoot(dir);
   const project = await loadProject(root);
-  if (!project.found)
-    throw new CliError(`${root} is not initialized; run \`codelineage init\` first`);
+  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
   if (!project.ok) throw new CliError(project.error);
 
   let turns: ChatTurn[] | undefined;

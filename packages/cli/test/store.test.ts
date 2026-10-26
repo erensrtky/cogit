@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { atomicWrite, atomicWriteJson, readJson } from "../src/store/fs.js";
 import { isLockHeld, LockBusyError, withLock } from "../src/store/lock.js";
-import { globalPaths, projectPaths } from "../src/store/paths.js";
+import { captureDisabled, globalPaths, projectPaths } from "../src/store/paths.js";
 import {
   loadConfig,
   loadProject,
@@ -19,25 +19,33 @@ import {
 let dir: string;
 let env: NodeJS.ProcessEnv;
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "codelineage-"));
-  env = { CODELINEAGE_HOME: join(dir, "home") };
+  dir = await mkdtemp(join(tmpdir(), "cogit-"));
+  env = { COGIT_HOME: join(dir, "home") };
 });
 
 const T0 = "2026-10-21T10:00:00.000Z";
 
 describe("paths", () => {
   it("resolves the global dir from env", () => {
-    expect(globalPaths({ CODELINEAGE_HOME: "/x" }).config).toBe("/x/config.json");
-    expect(globalPaths({ XDG_CONFIG_HOME: "/xdg" }).base).toBe("/xdg/codelineage");
-    expect(globalPaths({}).base).toMatch(/\.config\/codelineage$/);
+    expect(globalPaths({ COGIT_HOME: "/x" }).config).toBe("/x/config.json");
+    expect(globalPaths({ XDG_CONFIG_HOME: "/xdg" }).base).toBe("/xdg/cogit");
+    expect(globalPaths({}).base).toMatch(/\.config\/cogit$/);
+  });
+
+  it("still reads the pre-rename names for one minor version", () => {
+    expect(globalPaths({ CODELINEAGE_HOME: "/old" }).config).toBe("/old/config.json");
+    expect(globalPaths({ COGIT_HOME: "/new", CODELINEAGE_HOME: "/old" }).base).toBe("/new");
+    expect(captureDisabled({ CODELINEAGE_DISABLE: "1" })).toBe(true);
+    expect(captureDisabled({ COGIT_DISABLE: "1" })).toBe(true);
+    expect(captureDisabled({ CODELINEAGE_DISABLE: "0", COGIT_DISABLE: "0" })).toBe(false);
   });
 
   it("lays out the project dir", () => {
     const p = projectPaths("/r");
-    expect(p.session("s1")).toBe("/r/.codelineage/sessions/s1.json");
-    expect(p.state("s1")).toBe("/r/.codelineage/state/s1.json");
-    expect(p.lock("project")).toBe("/r/.codelineage/locks/project.lock");
-    expect(p.html).toBe("/r/.codelineage/lineage.html");
+    expect(p.session("s1")).toBe("/r/.cogit/sessions/s1.json");
+    expect(p.state("s1")).toBe("/r/.cogit/state/s1.json");
+    expect(p.lock("project")).toBe("/r/.cogit/locks/project.lock");
+    expect(p.html).toBe("/r/.cogit/map.html");
   });
 });
 

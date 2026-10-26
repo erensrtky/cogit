@@ -22,18 +22,13 @@ export async function findGitRoot(dir: string): Promise<string | undefined> {
   }
 }
 
-const HEADER = "# codelineage";
+const HEADER = "# cogit";
 
 /** Machine-local data that must never be committed, whatever the policy. */
-const ALWAYS = [
-  "/.codelineage/state/",
-  "/.codelineage/locks/",
-  "/.codelineage/inbox/",
-  "/.codelineage/lineage.html",
-];
+const ALWAYS = ["/.cogit/state/", "/.cogit/locks/", "/.cogit/inbox/", "/.cogit/map.html"];
 
 export function gitignoreLines(policy: GitPolicy): string[] {
-  return policy === "ignore" ? ["/.codelineage/"] : ALWAYS;
+  return policy === "ignore" ? ["/.cogit/"] : ALWAYS;
 }
 
 /** Appends the policy's lines to `<root>/.gitignore`, skipping lines already there. */
@@ -50,12 +45,12 @@ export async function ensureGitignore(root: string, policy: GitPolicy): Promise<
 }
 
 /**
- * `.codelineage/.gitignore` keeps the conversation store out of git, even when
- * the user chose to commit `.codelineage/`: the raw chat stays on this machine.
+ * `.cogit/.gitignore` keeps the conversation store out of git, even when
+ * the user chose to commit `.cogit/`: the raw chat stays on this machine.
  * Returns true when the line had to be added; a second call changes nothing.
  */
 export async function ensureConversationGitignore(root: string): Promise<boolean> {
-  const file = join(root, ".codelineage", ".gitignore");
+  const file = join(root, ".cogit", ".gitignore");
   const text = await readFile(file, "utf8").catch(() => "");
   const present = new Set(text.split(/\r?\n/).map((l) => l.trim()));
   if (present.has("conversations/")) return false;

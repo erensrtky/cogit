@@ -7,8 +7,8 @@ import { buildMessages } from "../view/lineage.js";
 import type { HookContext, HookOutput } from "./run.js";
 
 export const COMPACT_REQUEST =
-  "codelineage: this session was compacted and some of its user messages are not in the " +
-  "lineage record yet. Run the /codelineage:lineage skill now; `session show` lists the " +
+  "cogit: this session was compacted and some of its user messages are not in the " +
+  "lineage record yet. Run the /cogit:record skill now; `session show` lists the " +
   "messages that have no node. It records only what is missing and replies " +
   '"up to date" when nothing is; do not mention this request otherwise.';
 
@@ -30,15 +30,15 @@ function cli(ctx: HookContext): string {
 }
 
 /**
- * The setup offer for a project without `.codelineage/`. It only reaches the agent:
+ * The setup offer for a project without `.cogit/`. It only reaches the agent:
  * nothing is set up or registered unless the user asks for it.
  */
 export function setupHint(ctx: HookContext): string {
   return (
-    "codelineage is not set up in this project, so no lineage map is recorded here. " +
+    "cogit is not set up in this project, so no lineage map is recorded here. " +
     "Say this once, in one line, and do not repeat it in later turns. If the user asks " +
     "you to set it up, ask the install questions in the chat (whether to commit " +
-    ".codelineage/, whether to keep transcripts longer, whether the lineage skill may run " +
+    ".cogit/, whether to keep transcripts longer, whether the lineage skill may run " +
     "without asking, and the summary language), then run " +
     `${cli(ctx)} init --yes --git <ignore|commit> --retention <days|keep> --language <lang>` +
     " (add --allow-skill when the user agreed). Never run init or register the project on " +
@@ -108,7 +108,7 @@ function clip(text: string, max: number): string {
 async function startupContext(ctx: HookContext): Promise<string> {
   const command = cli(ctx);
   const header =
-    `codelineage records this project's lineage (one node per user message, hanging from the ` +
+    `cogit records this project's lineage (one node per user message, hanging from the ` +
     `message it reacts to, grouped in sessions with branch summaries). Read it with ` +
     `\`${command} log -C "${ctx.root}"\`, find where something was discussed with ` +
     `\`${command} search "<text>" -C "${ctx.root}"\`, and one message with ` +

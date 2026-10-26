@@ -1,21 +1,21 @@
 import type { BranchSummary, NodeKind } from "../schema/session.js";
 
 /**
- * Serialized contract between `codelineage build` and the HTML template. The
+ * Serialized contract between `cogit build` and the HTML template. The
  * builder fills this shape, JSON-serializes it into the page's data element and
  * the React app in `packages/template` renders it. Keep this file free of runtime
  * dependencies so both sides can import it.
  */
 
 /** Id of the `<script type="application/json">` that carries the model. */
-export const DATA_ELEMENT_ID = "codelineage-data";
+export const DATA_ELEMENT_ID = "cogit-data";
 
 /**
  * Meta tag the local map server injects into the pages it serves. The page
  * subscribes to rebuild events only when it is present, so a `file://` page or
  * the Vite dev server never tries to reach a server that is not there.
  */
-export const LIVE_META_NAME = "codelineage-live";
+export const LIVE_META_NAME = "cogit-live";
 
 /**
  * Meta tag the local map server puts in every page it serves: a random token
@@ -23,11 +23,11 @@ export const LIVE_META_NAME = "codelineage-live";
  * cannot read it, so they cannot post a change even when the host check is
  * bypassed. A `file://` page has no token and its settings stay read-only.
  */
-export const TOKEN_META_NAME = "codelineage-token";
+export const TOKEN_META_NAME = "cogit-token";
 
 /**
  * Settings the panel may change over the local server (Story 8.9). The rest are
- * setup-time or security-adjacent and stay on `codelineage config set`.
+ * setup-time or security-adjacent and stay on `cogit config set`.
  */
 export const PANEL_EDITABLE_KEYS = [
   "messageSummaries",
@@ -249,7 +249,7 @@ export interface LineageViewModel {
 
 /**
  * One message that touched a file (Story 8.15): the file view's row on the map
- * and what `codelineage log --file` prints. `commits` are the commits that
+ * and what `cogit log --file` prints. `commits` are the commits that
  * touched this file; a commit git no longer knows leaves an empty list.
  */
 export interface ViewFileHit {
@@ -309,7 +309,7 @@ export interface PanelSettings {
 
 /**
  * The subset `GET /api/config` returns and a settings modal may change
- * (Story 8.13). Everything else stays on `codelineage config set`.
+ * (Story 8.13). Everything else stays on `cogit config set`.
  */
 export type PanelEditableSettings = Pick<PanelSettings, PanelEditableKey>;
 

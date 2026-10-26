@@ -29,7 +29,7 @@ export async function readRetention(env: NodeJS.ProcessEnv): Promise<number | un
 }
 
 /** Lets the agent run the lineage skill without a permission prompt each time. */
-export const SKILL_RULE = "Skill(codelineage:lineage)";
+export const SKILL_RULE = "Skill(cogit:record)";
 
 function allowList(settings: Record<string, unknown>): unknown[] | undefined {
   const permissions = settings.permissions ?? {};
@@ -62,7 +62,7 @@ async function updateSettings(
   const next = fn(settings, file);
   let backup: string | undefined;
   if (Object.keys(settings).length > 0) {
-    backup = `${file}.codelineage-bak-${stamp.replace(/[:.]/g, "-")}`;
+    backup = `${file}.cogit-bak-${stamp.replace(/[:.]/g, "-")}`;
     await copyFile(file, backup, constants.COPYFILE_EXCL).catch((err: NodeJS.ErrnoException) => {
       if (err.code !== "EEXIST") throw err;
     });

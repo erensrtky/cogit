@@ -16,7 +16,7 @@ import {
 } from "../src/view/switcher.js";
 import { envFor, fakeIo, tempDir } from "./helpers.js";
 
-const TEMPLATE = `<!doctype html><html><head><title>codelineage — lineage</title></head><body>
+const TEMPLATE = `<!doctype html><html><head><title>cogit — lineage</title></head><body>
     <div id="root"></div>
     <script id="${DATA_ELEMENT_ID}" type="application/json"></script></body></html>`;
 
@@ -39,7 +39,7 @@ function collected(overrides: Partial<CollectedProject> & { name: string; path: 
     missing: false,
     lastActivity: null,
     needsUserCount: 0,
-    lineageUrl: `file://${overrides.path}/.codelineage/lineage.html`,
+    lineageUrl: `file://${overrides.path}/.cogit/map.html`,
     leftOff: "",
     ...overrides,
   };
@@ -107,7 +107,7 @@ describe("switcherEntries", () => {
       path: "/work/current",
       lastActivity: "2026-10-24T10:00:00.000Z",
       leftOff: "Where we left off.",
-      lineageUrl: "file:///work/current/.codelineage/lineage.html",
+      lineageUrl: "file:///work/current/.cogit/map.html",
       current: true,
     });
     expect(entries[1]?.current).toBe(false);
@@ -161,8 +161,8 @@ describe("filterSwitcherProjects", () => {
   const projects = switcherEntries(
     [
       collected({
-        name: "codelineage",
-        path: "/work/codelineage",
+        name: "cogit",
+        path: "/work/cogit",
         lastActivity: "2026-10-24T10:00:00.000Z",
         leftOff: "Add the project switcher.",
       }),
@@ -173,11 +173,11 @@ describe("filterSwitcherProjects", () => {
         leftOff: "Write the push commands.",
       }),
     ],
-    "/work/codelineage",
+    "/work/cogit",
   );
 
   it("matches name, path and the left-off line, case-insensitively", () => {
-    expect(filterSwitcherProjects(projects, "CODE").map((p) => p.name)).toEqual(["codelineage"]);
+    expect(filterSwitcherProjects(projects, "COG").map((p) => p.name)).toEqual(["cogit"]);
     expect(filterSwitcherProjects(projects, "start-project").map((p) => p.name)).toEqual([
       "start-project",
     ]);

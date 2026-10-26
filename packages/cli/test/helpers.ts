@@ -6,7 +6,7 @@ import type { Io, Prompter } from "../src/io.js";
 export const T0 = "2026-10-21T10:00:00.000Z";
 
 export async function tempDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "codelineage-"));
+  return mkdtemp(join(tmpdir(), "cogit-"));
 }
 
 export interface FakeIo extends Io {
@@ -49,5 +49,5 @@ export function fakeIo(env: NodeJS.ProcessEnv, answers: string[] = [], strict = 
 }
 
 export function envFor(dir: string): NodeJS.ProcessEnv {
-  return { CODELINEAGE_HOME: join(dir, "home"), CLAUDE_CONFIG_DIR: join(dir, "claude") };
+  return { COGIT_HOME: join(dir, "home"), CLAUDE_CONFIG_DIR: join(dir, "claude") };
 }

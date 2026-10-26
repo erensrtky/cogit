@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Renamed the product to **cogit** (*Cogito, ergo commit.*): the npm package and `cogit` bin, the Claude Code plugin and its `cogit:record` skill, the project dir `.cogit/`, the global dir `~/.config/cogit`, the env vars `COGIT_HOME` / `COGIT_DISABLE` (the old names still work for one minor version), the map file `map.html` and the page titles. The first cogit command or hook migrates silently: it renames an existing `.codelineage/`, moves `~/.config/codelineage` and fixes the `.gitignore` lines, or leaves both in place and warns once when both directories exist.
 
 ## [0.10.0] - 2026-10-26
 ### Added

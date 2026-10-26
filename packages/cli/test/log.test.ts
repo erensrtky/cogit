@@ -40,7 +40,7 @@ function session(over: Partial<Session> & { sessionId: string }): Session {
   };
 }
 
-describe("codelineage log and show", () => {
+describe("cogit log and show", () => {
   let dir: string;
   let root: string;
   let io: FakeIo;

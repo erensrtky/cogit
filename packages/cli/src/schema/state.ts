@@ -4,7 +4,7 @@ import { IsoDate } from "./common.js";
 export const STATE_SCHEMA = 1;
 
 /**
- * Per-session hook state in `.codelineage/state/<id>.json`. It is derived and
+ * Per-session hook state in `.cogit/state/<id>.json`. It is derived and
  * machine-local: losing it only restarts the turn count.
  */
 export const HookState = z.object({

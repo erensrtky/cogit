@@ -191,7 +191,7 @@ function SettingsDialog({
         <p className="muted">
           {canEdit
             ? "A change here applies to new builds and chats."
-            : "Read-only. Open this page with `codelineage open` to change settings, or use `codelineage config set <key> <value>`."}
+            : "Read-only. Open this page with `cogit open` to change settings, or use `cogit config set <key> <value>`."}
         </p>
         {loading ? <p className="settings-help">Reading the current settings…</p> : null}
         {loadError ? <p className="setting-error">{loadError}</p> : null}

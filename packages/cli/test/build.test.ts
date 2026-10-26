@@ -409,7 +409,7 @@ describe("embedViewModel", () => {
   });
 });
 
-describe("codelineage build", () => {
+describe("cogit build", () => {
   let dir: string;
   let root: string;
   let io: FakeIo;
@@ -826,9 +826,7 @@ describe("codelineage build", () => {
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
     expect(model.epochs[0]?.id).toBe("e1");
     expect(io.warnings).toEqual(
-      expect.arrayContaining([
-        expect.stringMatching(/^could not update \.codelineage\/\.gitignore: /),
-      ]),
+      expect.arrayContaining([expect.stringMatching(/^could not update \.cogit\/\.gitignore: /)]),
     );
   });
 
@@ -950,8 +948,8 @@ describe("codelineage build", () => {
     await expect(buildProject({ dir: empty, io, templateHtml: TEMPLATE })).rejects.toThrow(
       /not initialized/,
     );
-    await mkdir(join(empty, ".codelineage"));
-    await writeFile(join(empty, ".codelineage", "project.json"), "{}");
+    await mkdir(join(empty, ".cogit"));
+    await writeFile(join(empty, ".cogit", "project.json"), "{}");
     await expect(buildProject({ dir: empty, io, templateHtml: TEMPLATE })).rejects.toThrow(
       /schema version/,
     );
@@ -977,7 +975,7 @@ describe("codelineage build", () => {
     await mkdir(paths().html);
     await sessionWrite({ dir: root }, io, async () => JSON.stringify({ sessionId: "s1" }));
     expect(io.lines).toEqual(["Saved session s1 (0 nodes)"]);
-    expect(io.warnings.join("\n")).toMatch(/could not build lineage\.html/);
+    expect(io.warnings.join("\n")).toMatch(/could not build map\.html/);
     expect(existsSync(paths().session("s1"))).toBe(true);
   });
 });

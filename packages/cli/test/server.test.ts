@@ -28,7 +28,7 @@ import { loadConfig, updateConfig } from "../src/store/stores.js";
 import { DATA_ELEMENT_ID, LIVE_META_NAME, TOKEN_META_NAME } from "../src/view/model.js";
 import { envFor, fakeIo, tempDir } from "./helpers.js";
 
-const TEMPLATE = `<!doctype html><html><head><title>codelineage</title></head><body><div id="root"></div>
+const TEMPLATE = `<!doctype html><html><head><title>cogit</title></head><body><div id="root"></div>
 <script id="${DATA_ELEMENT_ID}" type="application/json"></script></body></html>`;
 
 const servers: MapServer[] = [];
@@ -121,7 +121,7 @@ function postConfig(
 /** The token the panel page carries; every settings write needs it. */
 async function panelToken(server: MapServer): Promise<string> {
   const page = await request(`${server.url}/`);
-  const match = /<meta name="codelineage-token" content="([^"]+)">/.exec(page.body);
+  const match = /<meta name="cogit-token" content="([^"]+)">/.exec(page.body);
   if (!match?.[1]) throw new Error("panel page has no token");
   return match[1];
 }
@@ -267,7 +267,7 @@ describe("map server", () => {
     expect(reply.status).toBe(200);
     expect(JSON.parse(reply.body)).toEqual({
       ok: true,
-      name: "codelineage",
+      name: "cogit",
       home: globalPaths(env).base,
     });
   });
@@ -542,7 +542,7 @@ describe("spawnServerProcess", () => {
     expect(calls[0]?.[2]).toMatchObject({
       detached: true,
       stdio: "ignore",
-      env: { XDG_CONFIG_HOME: "/home/x", CODELINEAGE_DISABLE: "1" },
+      env: { XDG_CONFIG_HOME: "/home/x", COGIT_DISABLE: "1" },
     });
   });
 });
@@ -565,7 +565,7 @@ describe("ensureServer", () => {
   it("gives up when the port answers as something else", async () => {
     const other = createHttpServer((_req, res) => {
       res.writeHead(404);
-      res.end("not codelineage");
+      res.end("not cogit");
     });
     const port = await listen(other);
     await updateConfig((config) => ({ ...config, serverPort: port }), env);

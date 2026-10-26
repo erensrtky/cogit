@@ -47,17 +47,17 @@ function fakeSpawn(
 
 describe("openerCommand", () => {
   it("picks the opener each platform ships with", () => {
-    expect(openerCommand("darwin", "/p/lineage.html")).toEqual({
+    expect(openerCommand("darwin", "/p/map.html")).toEqual({
       command: "open",
-      args: ["/p/lineage.html"],
+      args: ["/p/map.html"],
     });
-    expect(openerCommand("win32", "/p/lineage.html")).toEqual({
+    expect(openerCommand("win32", "/p/map.html")).toEqual({
       command: "cmd",
-      args: ["/c", "start", "", "/p/lineage.html"],
+      args: ["/c", "start", "", "/p/map.html"],
     });
-    expect(openerCommand("linux", "/p/lineage.html")).toEqual({
+    expect(openerCommand("linux", "/p/map.html")).toEqual({
       command: "xdg-open",
-      args: ["/p/lineage.html"],
+      args: ["/p/map.html"],
     });
   });
 });
@@ -65,13 +65,13 @@ describe("openerCommand", () => {
 describe("launchFile", () => {
   it("resolves true once the opener starts", async () => {
     const calls: string[][] = [];
-    expect(await launchFile("/p/lineage.html", fakeSpawn("spawn", calls))).toBe(true);
-    const { command } = openerCommand(process.platform, "/p/lineage.html");
-    expect(calls).toEqual([[command, "/p/lineage.html"]]);
+    expect(await launchFile("/p/map.html", fakeSpawn("spawn", calls))).toBe(true);
+    const { command } = openerCommand(process.platform, "/p/map.html");
+    expect(calls).toEqual([[command, "/p/map.html"]]);
   });
 
   it("resolves false when the opener binary is missing", async () => {
-    expect(await launchFile("/p/lineage.html", fakeSpawn("error", []))).toBe(false);
+    expect(await launchFile("/p/map.html", fakeSpawn("error", []))).toBe(false);
   });
 });
 

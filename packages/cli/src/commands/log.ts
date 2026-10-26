@@ -10,7 +10,7 @@ import { buildMessages } from "../view/lineage.js";
 import type { ViewFile, ViewNode } from "../view/model.js";
 
 /**
- * `codelineage log` and `codelineage show` (Story 8.10): the CLI's read verbs,
+ * `cogit log` and `cogit show` (Story 8.10): the CLI's read verbs,
  * modelled on `git log` and `git show`. The agent is the main reader, so the
  * output is plain text by default and JSON on request; neither command writes.
  *
@@ -55,8 +55,7 @@ export async function loadEffectiveSessions(root: string, io: Io): Promise<Effec
 export async function openProject(dir: string): Promise<string> {
   const { root } = await resolveProjectRoot(dir);
   const project = await loadProject(root);
-  if (!project.found)
-    throw new CliError(`${root} is not initialized; run \`codelineage init\` first`);
+  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
   if (!project.ok) throw new CliError(project.error);
   return root;
 }
@@ -634,7 +633,7 @@ export interface LogCommandOptions extends LogOptions {
   json?: boolean;
 }
 
-/** `codelineage log [dir]`. */
+/** `cogit log [dir]`. */
 export async function log(opts: LogCommandOptions): Promise<LogModel> {
   const root = await openProject(opts.dir);
   const sessions = await loadEffectiveSessions(root, opts.io);
@@ -684,7 +683,7 @@ export interface FileLogOptions {
 }
 
 /**
- * `codelineage log --file <path>`: the recorded messages that touched a file,
+ * `cogit log --file <path>`: the recorded messages that touched a file,
  * newest first — the CLI side of the map's files view (Story 8.15). Files come
  * from each message's own `files` plus the files of its commits read from git.
  */

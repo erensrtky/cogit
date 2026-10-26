@@ -228,7 +228,7 @@ async function commitInfo(root: string, sessions: Session[]): Promise<CommitInfo
 }
 
 /**
- * Rebuilds `.codelineage/lineage.html` from `project.json` and every session file,
+ * Rebuilds `.cogit/map.html` from `project.json` and every session file,
  * then refreshes the global panel. One unreadable session is a warning, never a
  * failed build; an unwritable global directory only skips the panel.
  */
@@ -236,8 +236,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   const { io } = opts;
   const { root } = await resolveProjectRoot(opts.dir);
   const project = await loadProject(root);
-  if (!project.found)
-    throw new CliError(`${root} is not initialized; run \`codelineage init\` first`);
+  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
   if (!project.ok) throw new CliError(project.error);
   for (const warning of project.warnings) io.warn(warning);
 
@@ -247,7 +246,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   try {
     await ensureConversationGitignore(root);
   } catch (err) {
-    io.warn(`could not update .codelineage/.gitignore: ${(err as Error).message}`);
+    io.warn(`could not update .cogit/.gitignore: ${(err as Error).message}`);
   }
   // The map's switcher (8.12) and the panel read the same project list; collect
   // it once. A broken registry is a warning: it must never fail the map.

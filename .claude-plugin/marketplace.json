@@ -1,11 +1,11 @@
 {
-  "name": "codelineage",
-  "description": "codelineage: the lineage of your AI coding sessions.",
+  "name": "cogit",
+  "description": "cogit: Cogito, ergo commit. Git remembers what changed. cogit remembers why.",
   "owner": { "name": "Eren Sertkaya" },
   "plugins": [
     {
-      "name": "codelineage",
-      "source": { "source": "npm", "package": "codelineage" },
+      "name": "cogit",
+      "source": { "source": "npm", "package": "cogit" },
       "description": "Records what each session decided and why, and renders it as a static map."
     }
   ]

@@ -135,15 +135,15 @@ describe("commands through the CLI", () => {
   it("builds the map through the CLI", async () => {
     await cli("init", root, "--yes", "--retention", "keep");
     await cli("build", root);
-    expect(io.lines.at(-1)).toMatch(/^Wrote .*lineage\.html$/);
-    expect(existsSync(join(root, ".codelineage", "lineage.html"))).toBe(true);
+    expect(io.lines.at(-1)).toMatch(/^Wrote .*map\.html$/);
+    expect(existsSync(join(root, ".cogit", "map.html"))).toBe(true);
   });
 
   it("open builds then launches the map, and the panel without a directory", async () => {
     await cli("init", root, "--yes", "--retention", "keep");
     await cli("open", root);
-    expect(launched).toEqual([join(root, ".codelineage", "lineage.html")]);
-    expect(io.lines.at(-1)).toMatch(/^Opened .*lineage\.html$/);
+    expect(launched).toEqual([join(root, ".cogit", "map.html")]);
+    expect(io.lines.at(-1)).toMatch(/^Opened .*map\.html$/);
     expect(interactive).toEqual([false, false]);
     await cli("open");
     expect(launched).toHaveLength(2);

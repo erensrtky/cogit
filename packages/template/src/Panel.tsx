@@ -18,7 +18,7 @@ export function Panel({ model }: { model: PanelViewModel }) {
       <header className="project">
         <div>
           <h1>Projects</h1>
-          <p className="muted">Every project codelineage knows about.</p>
+          <p className="muted">Every project cogit knows about.</p>
         </div>
         <div className="page-actions">
           <SettingsButton settings={model.settings} />
@@ -32,7 +32,7 @@ export function Panel({ model }: { model: PanelViewModel }) {
       </header>
 
       {model.projects.length === 0 ? (
-        <p className="empty">No projects registered yet. Run `codelineage init` in a project.</p>
+        <p className="empty">No projects registered yet. Run `cogit init` in a project.</p>
       ) : (
         <ul className="panel-grid">
           {model.projects.map((project) => {

@@ -135,23 +135,23 @@ describe("runHook", () => {
     const startup = JSON.parse((await sessionStart("startup")) ?? "");
     expect(startup.hookSpecificOutput.hookEventName).toBe("SessionStart");
     expect(startup.hookSpecificOutput.additionalContext).toContain(
-      "codelineage is not set up in this project",
+      "cogit is not set up in this project",
     );
     expect(startup.hookSpecificOutput.additionalContext).toContain(
       '"${CLAUDE_PLUGIN_ROOT}/dist/cli.js" init --yes',
     );
     const known = JSON.parse(
-      (await sessionStart("resume", { ...env, CLAUDE_PLUGIN_ROOT: "/plugins/codelineage" })) ?? "",
+      (await sessionStart("resume", { ...env, CLAUDE_PLUGIN_ROOT: "/plugins/cogit" })) ?? "",
     );
     expect(known.hookSpecificOutput.additionalContext).toContain(
-      '"/plugins/codelineage/dist/cli.js" init --yes',
+      '"/plugins/cogit/dist/cli.js" init --yes',
     );
     expect(await sessionStart("clear")).toBeUndefined();
-    expect(await sessionStart("startup", { ...env, CODELINEAGE_DISABLE: "1" })).toBeUndefined();
+    expect(await sessionStart("startup", { ...env, COGIT_DISABLE: "1" })).toBeUndefined();
     expect(
       JSON.parse((await sessionStart("startup")) ?? "").hookSpecificOutput.additionalContext,
     ).not.toContain("records this project's lineage");
-    expect(existsSync(join(root, ".codelineage"))).toBe(false);
+    expect(existsSync(join(root, ".cogit"))).toBe(false);
   });
 
   it("replaces the setup offer with the lineage handoff after init", async () => {
@@ -161,7 +161,7 @@ describe("runHook", () => {
       return out.hookSpecificOutput.additionalContext as string;
     };
     // No earlier session yet: only the "how to read it" line.
-    expect(await context("startup")).toContain("codelineage records this project's lineage");
+    expect(await context("startup")).toContain("cogit records this project's lineage");
     expect(await context("resume")).toContain(`log -C "${root}"`);
     expect(await context("clear")).toContain("run show before answering");
   });
@@ -282,7 +282,7 @@ describe("runHook", () => {
 
   it("does nothing before init and creates nothing", async () => {
     expect(await stop()).toBeUndefined();
-    expect(existsSync(join(root, ".codelineage"))).toBe(false);
+    expect(existsSync(join(root, ".cogit"))).toBe(false);
     expect(debug).toEqual([]);
   });
 
@@ -294,6 +294,12 @@ describe("runHook", () => {
       hookSpecificOutput: { hookEventName: "Stop", additionalContext: UPDATE_REQUEST },
     });
     expect(await stop()).toBeUndefined();
+  });
+
+  it("names cogit and its record skill in every message the agent sees", () => {
+    expect(UPDATE_REQUEST).toContain("cogit:");
+    expect(UPDATE_REQUEST).toContain("/cogit:record");
+    expect(COMPACT_REQUEST).toContain("/cogit:record");
   });
 
   it("rebuilds the map after every turn, detached", async () => {
@@ -338,7 +344,7 @@ describe("runHook", () => {
 
   it("replaces an unreadable state file instead of failing every turn", async () => {
     await initialized(1);
-    await mkdir(join(root, ".codelineage", "state"));
+    await mkdir(join(root, ".cogit", "state"));
     await writeFile(projectPaths(root).state("s1"), "{nope");
     expect(await stop()).toBeDefined();
     expect(JSON.parse(await readFile(projectPaths(root).state("s1"), "utf8"))).toMatchObject({
@@ -383,7 +389,7 @@ describe("runHook", () => {
     expect(await sessionStart("compact")).toBeUndefined();
     await transcript([typed("first", 1)]);
     expect(await sessionStart("elsewhere")).toBeUndefined();
-    expect(await sessionStart("compact", { ...env, CODELINEAGE_DISABLE: "1" })).toBeUndefined();
+    expect(await sessionStart("compact", { ...env, COGIT_DISABLE: "1" })).toBeUndefined();
   });
 
   it("stays quiet when the transcript cannot be read", async () => {
@@ -398,7 +404,7 @@ describe("runHook", () => {
   it("stays quiet before init even when the transcript has unrecorded messages", async () => {
     await transcript([typed("first", 1)]);
     expect(await sessionStart("compact")).toBeUndefined();
-    expect(existsSync(join(root, ".codelineage"))).toBe(false);
+    expect(existsSync(join(root, ".cogit"))).toBe(false);
   });
 
   it("ignores transcript lines that are not messages", async () => {
@@ -469,10 +475,12 @@ describe("runHook", () => {
 
   it("stays silent when disabled, for unknown events and for bad input", async () => {
     await initialized(1);
+    expect(await stop({}, { ...env, COGIT_DISABLE: "1" })).toBeUndefined();
+    // The pre-rename switch keeps working for one minor version.
     expect(await stop({}, { ...env, CODELINEAGE_DISABLE: "1" })).toBeUndefined();
     expect(await runHook("nope", "{}", env, T0, (l) => debug.push(l))).toBeUndefined();
     expect(await stop({ session_id: "../x" })).toBeUndefined();
     expect(await runHook("stop", "not json", env, T0, (l) => debug.push(l))).toBeUndefined();
-    expect(debug).toEqual([expect.stringMatching(/^codelineage stop hook: /)]);
+    expect(debug).toEqual([expect.stringMatching(/^cogit stop hook: /)]);
   });
 });

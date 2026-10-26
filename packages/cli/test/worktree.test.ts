@@ -52,9 +52,9 @@ describe("resolveProjectRoot", () => {
     expect((await resolveProjectRoot(join(wt, "src"))).root).toBe(join(main, "src"));
   });
 
-  it("keeps a worktree that has its own committed .codelineage/", async () => {
+  it("keeps a worktree that has its own committed .cogit/", async () => {
     const { wt } = await gitLayout(dir);
-    await mkdir(join(wt, ".codelineage"));
+    await mkdir(join(wt, ".cogit"));
     await writeFile(projectPaths(wt).project, "{}");
     expect(await resolveProjectRoot(wt)).toEqual({
       root: wt,
@@ -95,7 +95,7 @@ describe("commands in a worktree", () => {
 
   it("writes the record to the main checkout and keeps the worktree on it", async () => {
     await sessionWrite({ dir: wt }, fakeIo(env), async () => '{"sessionId":"s1","title":"a"}');
-    expect(existsSync(join(wt, ".codelineage"))).toBe(false);
+    expect(existsSync(join(wt, ".cogit"))).toBe(false);
     const first = await loadSession(main, "s1");
     expect(first.found && first.ok && first.data.worktree).toEqual({ path: wt, branch: "feature" });
 

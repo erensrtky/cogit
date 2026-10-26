@@ -3,7 +3,7 @@ import type { LineageViewModel, ViewFile, ViewFileHit, ViewNode } from "./model.
 /**
  * File history (Story 8.15): which recorded messages touched a file, built from
  * the `files` the agent listed on a message plus the files of the message's
- * commits read from git at build time. `codelineage log --file` and the map's
+ * commits read from git at build time. `cogit log --file` and the map's
  * files view read the same model.
  */
 

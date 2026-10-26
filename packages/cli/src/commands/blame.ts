@@ -9,7 +9,7 @@ import { loadAllSessions, loadProject } from "../store/stores.js";
 import { buildMessages } from "../view/lineage.js";
 
 /**
- * `codelineage blame` (Story 8.8): git knows which commit wrote a line, the
+ * `cogit blame` (Story 8.8): git knows which commit wrote a line, the
  * records know which user message that commit carried out, so the command walks
  * commits → messages and points back at the map.
  */
@@ -68,8 +68,7 @@ export async function blame(opts: BlameOptions): Promise<BlameHit[]> {
   const { io } = opts;
   const { root } = await resolveProjectRoot(opts.dir);
   const project = await loadProject(root);
-  if (!project.found)
-    throw new CliError(`${root} is not initialized; run \`codelineage init\` first`);
+  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
   if (!project.ok) throw new CliError(project.error);
 
   const gitRoot = await findGitRoot(root);

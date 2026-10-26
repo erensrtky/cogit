@@ -142,7 +142,7 @@ const nodeTypes: NodeTypes = {
 
 /**
  * The place a URL asks for. `#s=<sessionId>&m=<messageId>` (Story 8.8:
- * `codelineage blame` prints such a URL) opens that session and message;
+ * `cogit blame` prints such a URL) opens that session and message;
  * `#focus=head` is what the project switcher uses (8.12) — the newest message,
  * i.e. where the work left off. The session opens and the message's drill-down
  * is shown; a message id the record no longer holds opens the session.

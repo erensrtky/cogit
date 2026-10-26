@@ -145,7 +145,7 @@ describe("headless output", () => {
   it("turns capture off in the headless run", () => {
     expect(headlessEnv({ PATH: "/bin" })).toMatchObject({
       PATH: "/bin",
-      CODELINEAGE_DISABLE: "1",
+      COGIT_DISABLE: "1",
     });
   });
 });
@@ -239,8 +239,8 @@ describe("backfill --tail", () => {
   it("refuses an uninitialized or unreadable project", async () => {
     const env = envFor(dir);
     await expect(backfillTail(root, "s1", fakeIo(env))).rejects.toThrow(/not initialized/);
-    await mkdir(join(root, ".codelineage"), { recursive: true });
-    await writeFile(join(root, ".codelineage", "project.json"), "{nope");
+    await mkdir(join(root, ".cogit"), { recursive: true });
+    await writeFile(join(root, ".cogit", "project.json"), "{nope");
     await expect(backfillTail(root, "s1", fakeIo(env))).rejects.toThrow(/invalid JSON/);
   });
 
