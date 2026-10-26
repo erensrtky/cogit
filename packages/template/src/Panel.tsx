@@ -59,7 +59,9 @@ export function Panel({ model }: { model: PanelViewModel }) {
                   </div>
                 </dl>
                 {href ? (
-                  <a href={href}>Open the map →</a>
+                  <a className="card-open" href={href}>
+                    Open the map →
+                  </a>
                 ) : (
                   <p className="empty">Directory not found.</p>
                 )}

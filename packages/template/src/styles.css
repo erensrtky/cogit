@@ -233,9 +233,17 @@ main.map-page {
   gap: 12px;
 }
 
-.page-bar .switcher {
-  flex: 1 1 auto;
-  min-width: 0;
+.page-bar-actions {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* Under the project's name and path: recent projects and Ctrl/Cmd+K. */
+.project .switcher {
+  margin-top: 10px;
+  margin-bottom: 0;
 }
 
 /* Map search (Story 8.14): in the page head, beside the project switcher. */
@@ -1320,6 +1328,23 @@ time {
 
 .card a {
   color: var(--accent);
+}
+
+/* The whole card opens the map: the link stretches over it. */
+.card {
+  position: relative;
+}
+
+.card a.card-open::after {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  content: "";
+}
+
+.card:has(a.card-open):hover {
+  border-color: var(--accent);
+  cursor: pointer;
 }
 
 .settings {

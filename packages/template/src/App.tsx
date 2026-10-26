@@ -55,9 +55,16 @@ export function App({ model }: { model: LineageViewModel }) {
       <div className="page-head">
         <div className="page-bar">
           <Brand />
-          <ProjectSwitcher model={model} />
-          <SearchBox value={query} state={search} onQuery={change} onStep={move} onClear={clear} />
-          <SettingsButton settings={model.settings} />
+          <div className="page-bar-actions">
+            <SearchBox
+              value={query}
+              state={search}
+              onQuery={change}
+              onStep={move}
+              onClear={clear}
+            />
+            <SettingsButton settings={model.settings} />
+          </div>
         </div>
 
         <header className="project">
@@ -65,6 +72,7 @@ export function App({ model }: { model: LineageViewModel }) {
             <BackToPanel />
             <h1>{model.project.name}</h1>
             <p className="muted">{model.project.path}</p>
+            <ProjectSwitcher model={model} />
           </div>
           <div className="meta">
             <span>

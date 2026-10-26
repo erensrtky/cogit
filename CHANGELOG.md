@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - The panel uses the map's centred 8-of-12 column, and every page names the product: "cogit" with its slogan "Cogito, ergo commit." opens the top bar, and on a served map it leads back to the panel.
+- A calmer map head: the top bar holds only "cogit", the search and Settings; the project switcher (recent projects and Ctrl/Cmd+K, its button now "Switch project") sits under the project's name and path. On the panel a click anywhere on a project's card opens its map.
 - A project's map has a visible "← All projects" link above its name, and opening the map, "Left off here", a search step or a file click frame the whole message row (lanes and text) in the middle of the map instead of only its dot, so the message no longer sits off to the right; a row wider than the map starts at its left edge.
 
 ### Fixed

@@ -104,7 +104,7 @@ export function ProjectSwitcher({ model }: { model: LineageViewModel }) {
           }}
           aria-haspopup="dialog"
         >
-          All projects <kbd>{shortcutLabel()}</kbd>
+          Switch project <kbd>{shortcutLabel()}</kbd>
         </button>
       </nav>
 
