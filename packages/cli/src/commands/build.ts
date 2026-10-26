@@ -23,7 +23,12 @@ import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
 import { type ChatTurn, displayTurn, excerpt, readConversation } from "../transcript.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
 import type { LineageViewModel, ViewChatTurn, ViewPendingMessage } from "../view/model.js";
-import { buildPanel, type CollectedProject, collectRegistryProjects } from "../view/panel.js";
+import {
+  buildPanel,
+  type CollectedProject,
+  collectRegistryProjects,
+  panelSettings,
+} from "../view/panel.js";
 import { switcherEntries } from "../view/switcher.js";
 import { TEMPLATE_HTML } from "../view/template.js";
 import { collectTranscripts } from "../view/transcripts.js";
@@ -257,6 +262,9 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         chats: views.chats,
         pending: views.pending,
         commitSubjects: subjects,
+        // Over `file://` the settings modal shows these; a server page reads the
+        // live values instead, so a map built before a change still agrees.
+        settings: panelSettings(config),
         // With the catch-up on, the hook records the tail at session end, so the
         // count would only be a stale warning about work already scheduled.
         unrecorded: config.sessionEndCatchUp ? undefined : views.unrecorded,

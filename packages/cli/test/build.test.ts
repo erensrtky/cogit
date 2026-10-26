@@ -504,6 +504,19 @@ describe("codelineage build", () => {
     expect(embedded(html)).toEqual(model);
   });
 
+  it("embeds the current settings in the map for the file:// modal", async () => {
+    await configSet("messageSummaries", "true", io);
+    const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(model.settings).toMatchObject({
+      messageSummaries: true,
+      startupContext: true,
+      updateEveryTurns: 5,
+      gitPolicy: "ignore",
+      agents: ["claude-code"],
+    });
+    expect(embedded(await readFile(paths().html, "utf8"))).toEqual(model);
+  });
+
   it("puts the conversation of message sessions into the map, never into the record", async () => {
     const folder = join(dir, "claude", "projects", "-proj");
     await mkdir(folder, { recursive: true });

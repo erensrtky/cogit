@@ -139,6 +139,18 @@ function configWrite(
   });
 }
 
+function configRead(
+  server: MapServer,
+  token: string,
+  overrides: Record<string, string> = {},
+): Promise<Reply> {
+  return request(`${server.url}/api/config`, {
+    origin: `http://127.0.0.1:${server.port}`,
+    [CONFIG_TOKEN_HEADER]: token,
+    ...overrides,
+  });
+}
+
 function openEvents(url: string): {
   waitFor: (needle: string, ms?: number) => Promise<boolean>;
   close: () => void;
@@ -305,12 +317,12 @@ describe("map server", () => {
 });
 
 describe("settings write", () => {
-  it("gives the panel a token and leaves maps without one", async () => {
+  it("gives every served page a token", async () => {
     const server = await start();
     const panel = await request(`${server.url}/`);
     expect(panel.body).toContain(`name="${TOKEN_META_NAME}"`);
     const map = await request(mapPageUrl(server.url, root));
-    expect(map.body).not.toContain(`name="${TOKEN_META_NAME}"`);
+    expect(map.body).toContain(`name="${TOKEN_META_NAME}"`);
   });
 
   it("accepts a valid write, stores it and refreshes the panel", async () => {
@@ -454,8 +466,62 @@ describe("settings write", () => {
       [CONFIG_TOKEN_HEADER]: token,
     });
     expect(notJson.status).toBe(400);
-    expect((await request(`${server.url}/api/config`)).status).toBe(404);
+    // A bare GET is not a settings read: it carries no token.
+    expect((await request(`${server.url}/api/config`)).status).toBe(403);
     expect((await loadConfig(env)).language).toBe("auto");
+  });
+});
+
+describe("settings read", () => {
+  it("returns only the editable keys and their current values", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const reply = await configRead(server, token);
+    expect(reply.status).toBe(200);
+    expect(reply.headers["cache-control"]).toBe("no-store");
+    expect(JSON.parse(reply.body)).toEqual({
+      ok: true,
+      settings: {
+        messageSummaries: false,
+        startupContext: true,
+        language: "auto",
+        updateEveryTurns: 5,
+        sessionEndCatchUp: true,
+        catchUpModel: "haiku",
+      },
+    });
+  });
+
+  it("accepts a same-origin GET without an Origin header", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const reply = await request(`${server.url}/api/config`, {
+      [CONFIG_TOKEN_HEADER]: token,
+    });
+    expect(reply.status).toBe(200);
+    expect(JSON.parse(reply.body).settings.updateEveryTurns).toBe(5);
+  });
+
+  it("shows a value changed after the page was built", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const write = await configWrite(server, token, { key: "updateEveryTurns", value: 8 });
+    expect(write.status).toBe(200);
+    const reply = await configRead(server, token);
+    expect(JSON.parse(reply.body).settings.updateEveryTurns).toBe(8);
+  });
+
+  it("rejects a wrong token, a foreign origin and a foreign Host", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    expect((await configRead(server, "nope")).status).toBe(403);
+    expect((await configRead(server, token, { origin: "http://evil.example" })).status).toBe(403);
+    expect((await configRead(server, token, { host: "evil.example:4747" })).status).toBe(403);
+  });
+
+  it("refuses a method other than GET", async () => {
+    const server = await start();
+    expect((await request(`${server.url}/api/config`, {}, "HEAD")).status).toBe(405);
   });
 });
 

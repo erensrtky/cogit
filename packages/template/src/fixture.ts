@@ -51,6 +51,16 @@ export const fixture: LineageViewModel = {
     next: "Render the fixture through the template and check the single-file build.",
     lastActivity: "2026-10-24T11:42:00.000Z",
   },
+  settings: {
+    language: "auto",
+    updateEveryTurns: 5,
+    sessionEndCatchUp: true,
+    catchUpModel: "haiku",
+    messageSummaries: false,
+    startupContext: true,
+    gitPolicy: "ignore",
+    agents: ["claude-code"],
+  },
   epochs: [
     {
       id: "map",

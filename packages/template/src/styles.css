@@ -41,6 +41,44 @@ main {
   margin: 0;
 }
 
+/* Settings button (Story 8.13) sits in the top bar of every page. */
+.page-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-bar .switcher {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.page-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.settings-button {
+  flex: none;
+  margin-left: auto;
+  padding: 6px 12px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  background: #151922;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.settings-button:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
 h1,
 h2,
 h3 {
@@ -242,6 +280,107 @@ ul {
 
 .switcher-none {
   padding: 8px 10px;
+}
+
+/* Settings modal (Story 8.13): one place for every setting, on every page. */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10vh 16px 32px;
+  background: rgba(5, 7, 10, 0.62);
+}
+
+.settings-dialog {
+  width: min(640px, 100%);
+  max-height: 80vh;
+  padding: 18px 20px 22px;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-close {
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.settings-close:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.settings-section {
+  margin-top: 16px;
+}
+
+.settings-section h3 {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-field {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-field:last-child {
+  border-bottom: 0;
+}
+
+.settings-field-text {
+  min-width: 0;
+}
+
+.settings-label {
+  font-size: 14px;
+}
+
+.settings-help {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings-value {
+  flex: none;
+  max-width: 40%;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: right;
+}
+
+.settings-field .setting-form {
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 50%;
 }
 
 .project {
@@ -848,6 +987,29 @@ time {
 
   .meta {
     align-items: flex-start;
+  }
+
+  .page-actions {
+    align-items: flex-start;
+  }
+
+  .page-bar {
+    flex-wrap: wrap;
+  }
+
+  .settings-field {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .settings-field .setting-form {
+    max-width: none;
+    justify-content: flex-start;
+  }
+
+  .settings-value {
+    max-width: none;
+    text-align: left;
   }
 
   .graph-wrap {

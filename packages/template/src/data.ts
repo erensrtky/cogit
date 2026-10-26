@@ -2,6 +2,7 @@ import {
   DATA_ELEMENT_ID,
   LIVE_META_NAME,
   type PageModel,
+  type PanelSettings,
   TOKEN_META_NAME,
 } from "../../cli/src/view/model.js";
 
@@ -57,8 +58,30 @@ export function pageToken(doc: Document = document): string | null {
   return content ? content : null;
 }
 
+/**
+ * The live settings the modal opens with (Story 8.13). The server answers with
+ * only the keys the modal may change, so a map built before a change still
+ * shows the current value.
+ */
+export async function loadSettings(token: string): Promise<Partial<PanelSettings>> {
+  const response = await fetch("/api/config", {
+    headers: { "x-codelineage-token": token },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const text = (await response.text()).trim();
+    throw new Error(text || `could not read settings (HTTP ${response.status})`);
+  }
+  const body = (await response.json()) as { settings?: Partial<PanelSettings> };
+  return body.settings ?? {};
+}
+
 /** One settings write; the server validates the key, the value and the token. */
-export async function saveSetting(key: string, value: unknown, token: string): Promise<void> {
+export async function saveSetting(
+  key: string,
+  value: unknown,
+  token: string,
+): Promise<PanelSettings[keyof PanelSettings]> {
   const response = await fetch("/api/config", {
     method: "POST",
     headers: { "content-type": "application/json", "x-codelineage-token": token },
@@ -68,4 +91,8 @@ export async function saveSetting(key: string, value: unknown, token: string): P
     const text = (await response.text()).trim();
     throw new Error(text || `could not save (HTTP ${response.status})`);
   }
+  const body = (await response.json().catch(() => null)) as {
+    value?: PanelSettings[keyof PanelSettings];
+  } | null;
+  return body?.value ?? (value as PanelSettings[keyof PanelSettings]);
 }

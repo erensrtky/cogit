@@ -4,6 +4,7 @@ import {
   DATA_ELEMENT_ID,
   type LineageViewModel,
   type PageModel,
+  type PanelSettings,
   type StatusCard,
   VIEW_SCHEMA,
   type ViewChatTurn,
@@ -236,6 +237,8 @@ export interface ViewModelInput {
   pending?: ReadonlyMap<string, ViewPendingMessage[]> | undefined;
   /** Commit subjects read from git at build time (Story 8.8). */
   commitSubjects?: ReadonlyMap<string, string> | undefined;
+  /** Settings embedded for the modal's `file://` view (Story 8.13). */
+  settings?: PanelSettings | undefined;
 }
 
 /**
@@ -308,6 +311,7 @@ export function buildViewModel(input: ViewModelInput): LineageViewModel {
     status: statusCard(sessions, input.generatedAt),
     epochs,
     unassigned,
+    ...(input.settings === undefined ? {} : { settings: input.settings }),
   };
 }
 

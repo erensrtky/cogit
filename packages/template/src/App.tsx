@@ -2,6 +2,7 @@ import type { LineageViewModel } from "../../cli/src/view/model.js";
 import { formatTime } from "./format.js";
 import { Graph } from "./Graph.js";
 import { ProjectSwitcher } from "./ProjectSwitcher.js";
+import { SettingsButton } from "./SettingsModal.js";
 
 export function App({ model }: { model: LineageViewModel }) {
   const sessionCount =
@@ -10,7 +11,10 @@ export function App({ model }: { model: LineageViewModel }) {
   return (
     <main>
       <div className="page-head">
-        <ProjectSwitcher model={model} />
+        <div className="page-bar">
+          <ProjectSwitcher model={model} />
+          <SettingsButton settings={model.settings} />
+        </div>
 
         <header className="project">
           <div>

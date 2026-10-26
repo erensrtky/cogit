@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Settings modal on every page: a ⚙ Settings button in the top bar of both the project map and the panel opens the same dialog (close with ×, Esc or a click outside; focus moves into the dialog and back to the button), with one help line per setting and a "Saved" line per change. The panel's old settings box at the bottom is gone. The dialog reads the current values with `GET /api/config` (same Host / Origin / token checks as the write, and only the editable keys), and the local server now puts its per-start token in map pages too, so a map built before a change still shows the current value; over `file://` it shows the values embedded at build time read-only with a hint to use `codelineage open` or `codelineage config set`.
+
 ### Changed
 - Map: the page head spans the window like the map; "Unfold all" opens every session and every folded branch, "Fold all" closes them and frames the whole map again; the outline is open by default.
 

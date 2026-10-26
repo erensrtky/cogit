@@ -18,9 +18,10 @@ export const DATA_ELEMENT_ID = "codelineage-data";
 export const LIVE_META_NAME = "codelineage-live";
 
 /**
- * Meta tag the local map server puts in the panel page: a random token for this
- * server start that a settings write must echo. Other sites cannot read it, so
- * they cannot post a change even when the host check is bypassed.
+ * Meta tag the local map server puts in every page it serves: a random token
+ * for this server start that a settings read or write must echo. Other sites
+ * cannot read it, so they cannot post a change even when the host check is
+ * bypassed. A `file://` page has no token and its settings stay read-only.
  */
 export const TOKEN_META_NAME = "codelineage-token";
 
@@ -232,6 +233,12 @@ export interface LineageViewModel {
    * have no switcher.
    */
   switcher?: ViewSwitcherProject[];
+  /**
+   * Settings embedded at build time (Story 8.13). The settings modal shows them
+   * read-only over `file://`; over the local server it reads the live values
+   * instead. Absent on pages built before 8.13.
+   */
+  settings?: PanelSettings;
 }
 
 /** One project card in the global panel. */
@@ -263,6 +270,12 @@ export interface PanelSettings {
   gitPolicy: "ignore" | "commit";
   agents: string[];
 }
+
+/**
+ * The subset `GET /api/config` returns and a settings modal may change
+ * (Story 8.13). Everything else stays on `codelineage config set`.
+ */
+export type PanelEditableSettings = Pick<PanelSettings, PanelEditableKey>;
 
 export interface PanelViewModel {
   kind: "panel";

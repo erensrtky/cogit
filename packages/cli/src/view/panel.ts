@@ -1,13 +1,13 @@
 import { pathToFileURL } from "node:url";
 import type { Io } from "../io.js";
 import { redactDeep } from "../redact.js";
-import type { RegistryEntry } from "../schema/config.js";
+import type { Config, RegistryEntry } from "../schema/config.js";
 import type { Session } from "../schema/session.js";
 import { atomicWrite, isDirectory } from "../store/fs.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
 import { loadAllSessions, loadConfig, loadRegistry } from "../store/stores.js";
 import { embedViewModel, statusCard } from "./lineage.js";
-import { type PanelViewModel, VIEW_SCHEMA } from "./model.js";
+import { type PanelSettings, type PanelViewModel, VIEW_SCHEMA } from "./model.js";
 import type { SwitcherSource } from "./switcher.js";
 import { TEMPLATE_HTML } from "./template.js";
 
@@ -33,6 +33,24 @@ export interface PanelOptions {
 export type CollectedProject = SwitcherSource;
 
 const PANEL_TITLE = "<title>codelineage — panel</title>";
+
+/**
+ * The settings both pages embed (Stories 8.9, 8.13). The map needs them for the
+ * settings modal over `file://`, the panel for its model; the server reads the
+ * same values live through `GET /api/config`.
+ */
+export function panelSettings(config: Config): PanelSettings {
+  return {
+    language: config.language,
+    updateEveryTurns: config.updateEveryTurns,
+    sessionEndCatchUp: config.sessionEndCatchUp,
+    catchUpModel: config.catchUpModel,
+    messageSummaries: config.messageSummaries,
+    startupContext: config.startupContext,
+    gitPolicy: config.gitPolicy,
+    agents: config.agents,
+  };
+}
 
 /** The title of the newest message in a session, in send order. */
 function lastMessageTitle(session: Session): string {
@@ -159,16 +177,7 @@ export async function buildPanel(opts: PanelOptions): Promise<PanelViewModel> {
     kind: "panel",
     schema: VIEW_SCHEMA,
     generatedAt,
-    settings: {
-      language: config.language,
-      updateEveryTurns: config.updateEveryTurns,
-      sessionEndCatchUp: config.sessionEndCatchUp,
-      catchUpModel: config.catchUpModel,
-      messageSummaries: config.messageSummaries,
-      startupContext: config.startupContext,
-      gitPolicy: config.gitPolicy,
-      agents: config.agents,
-    },
+    settings: panelSettings(config),
     // `leftOff` belongs to the map's switcher; the panel page stays as it was.
     projects: projects.map(({ leftOff: _leftOff, ...project }) => project),
   };

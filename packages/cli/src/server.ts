@@ -16,13 +16,9 @@ import { Config } from "./schema/config.js";
 import { LockBusyError } from "./store/lock.js";
 import { globalPaths, projectPaths } from "./store/paths.js";
 import { loadConfig, loadRegistry, updateConfig } from "./store/stores.js";
-import {
-  isPanelEditableKey,
-  LIVE_META_NAME,
-  type PanelEditableKey,
-  TOKEN_META_NAME,
-} from "./view/model.js";
-import { buildPanel } from "./view/panel.js";
+import { isPanelEditableKey, LIVE_META_NAME, TOKEN_META_NAME } from "./view/model.js";
+import { buildPanel, panelSettings } from "./view/panel.js";
+import { editableSettings } from "./view/settings.js";
 
 /** A page nobody is looking at is a dead server after this long. */
 export const DEFAULT_IDLE_MS = 30 * 60 * 1000;
@@ -50,8 +46,9 @@ export function injectLiveMeta(html: string): string {
 }
 
 /**
- * Carries the per-server token into the served panel page. Only the panel needs
- * it (it is the only page that writes); maps get no token at all.
+ * Carries the per-server token into every page the server serves (Story 8.13):
+ * both the panel and each project map open a settings modal that reads and
+ * writes through `/api/config`.
  */
 export function injectTokenMeta(html: string, token: string): string {
   const meta = `<meta name="${TOKEN_META_NAME}" content="${token}">`;
@@ -83,8 +80,6 @@ interface PageTarget {
   file: string;
   /** Directory to watch: atomic writes replace the file, the directory keeps its name. */
   dir: string;
-  /** Only the panel page gets the settings token. */
-  panel: boolean;
 }
 
 interface WatchedPage {
@@ -121,7 +116,7 @@ async function registeredRoot(env: NodeJS.ProcessEnv, dir: string): Promise<stri
 async function pageTarget(env: NodeJS.ProcessEnv, url: URL): Promise<PageTarget | null> {
   const panel = (): PageTarget => {
     const paths = globalPaths(env);
-    return { file: paths.panel, dir: paths.base, panel: true };
+    return { file: paths.panel, dir: paths.base };
   };
   if (url.pathname === "/") return panel();
   if (url.pathname === "/map" || url.pathname === "/events") {
@@ -131,7 +126,7 @@ async function pageTarget(env: NodeJS.ProcessEnv, url: URL): Promise<PageTarget 
     const root = await registeredRoot(env, raw);
     if (!root) return null;
     const paths = projectPaths(root);
-    return { file: paths.html, dir: paths.base, panel: false };
+    return { file: paths.html, dir: paths.base };
   }
   return null;
 }
@@ -229,6 +224,14 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
     return origin === `http://${HOST}:${port}` || origin === `http://localhost:${port}`;
   }
 
+  /**
+   * A same-origin GET carries no Origin header, so absence is fine; a present
+   * Origin must still be this server (Story 8.13).
+   */
+  function readOriginAllowed(origin: string | undefined, port: number): boolean {
+    return origin === undefined || originAllowed(origin, port);
+  }
+
   async function readLimitedBody(req: IncomingMessage): Promise<string | null> {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -281,8 +284,33 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
   }
 
   /**
-   * `POST /api/config` { key, value }: the panel's only write. Host, Origin,
-   * content type and token all have to match, the key must be one the panel may
+   * `GET /api/config`: the values the settings modal opens with (Story 8.13).
+   * Same Host, Origin and token checks as the write, and only the keys the modal
+   * may change; the setup-time keys never leave the config file.
+   */
+  async function readConfig(
+    req: IncomingMessage,
+    res: ServerResponse,
+    port: number,
+  ): Promise<void> {
+    if (
+      !readOriginAllowed(req.headers.origin, port) ||
+      !tokenMatches(req.headers[CONFIG_TOKEN_HEADER])
+    ) {
+      respond(res, 403, "forbidden");
+      return;
+    }
+    const config = await loadConfig(env);
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify({ ok: true, settings: editableSettings(panelSettings(config)) }));
+  }
+
+  /**
+   * `POST /api/config` { key, value }: the modal's only write. Host, Origin,
+   * content type and token all have to match, the key must be one the modal may
    * change and the value has to pass the config schema. Anything else is a 4xx
    * and the file stays untouched.
    */
@@ -371,6 +399,14 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       return;
     }
     const url = new URL(req.url ?? "/", `http://${HOST}:${port}`);
+    if (url.pathname === "/api/config") {
+      if (req.method !== "GET") {
+        respond(res, 405, "method not allowed");
+        return;
+      }
+      await readConfig(req, res, port);
+      return;
+    }
     if (url.pathname === "/health") {
       res.writeHead(200, {
         "content-type": "application/json",
@@ -417,13 +453,7 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
     });
-    res.end(
-      req.method === "HEAD"
-        ? undefined
-        : target.panel
-          ? injectTokenMeta(injectLiveMeta(html), token)
-          : injectLiveMeta(html),
-    );
+    res.end(req.method === "HEAD" ? undefined : injectTokenMeta(injectLiveMeta(html), token));
   }
 
   await new Promise<void>((done, fail) => {
