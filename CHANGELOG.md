@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.10.0] - 2026-10-26
 ### Added
 - File history: a Files view on the map lists every file a recorded message touched — the paths the agent listed on the message plus the files of its commits read from git at build time — most recently touched first with a count. Opening a file lists the messages that changed it, newest first, with time, short hash, `mN`, the branch and the commits; clicking one opens that message in place on the graph and centres the view on it. `codelineage log --file <path>` prints the same list from the CLI (`--json` prints the model), and a path git knows but no record touched says so plainly.
 - Lineage search: `codelineage search <text> [dir]` scans message titles, notes and decisions, branch summaries, session titles and status, and the stored conversation (never tool output) with a case- and accent-insensitive matcher that folds Turkish letters both ways (`I`, `İ` and `ı` all match; `ş`, `ğ`, `ç`, `ö`, `ü` match their plain forms). Each hit prints its short hash, `mN`, time, session, where it matched (title / branch / conversation / session) and a one-line excerpt, newest first; `-n <count>`, `--session <id|prefix>` and `--json` are there too. The map gets a search box in the page head: Ctrl/Cmd+F focuses it (a second press opens the browser's own find), matching messages are highlighted and their sessions open, a `3 / 12` counter with ↑/↓ (Enter / Shift+Enter) steps through the hits, Esc clears, and pasting a message hash (or a unique `h…` prefix) jumps to it like `show`. The session-start context and the lineage skill now point at `search` for "where did we discuss…".
@@ -21,7 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Map: it opens where the work left off — the newest session unfolds, the page scrolls to the map and the view centres on the newest message, without opening the side panel; a "↧ Left off here" button does the same at any time. A link with `#s=…&m=…` or `#focus=head` still wins.
-
 
 ## [0.9.0] - 2026-10-25
 ### Added
