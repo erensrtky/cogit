@@ -1,8 +1,9 @@
-import { chmod, mkdir, readFile, stat } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { findGitRoot, gitHooksDir } from "./git.js";
 import { stageSessionFiles } from "./session-git.js";
 import { atomicWrite } from "./store/fs.js";
+import { addThoughtTrailer } from "./thought.js";
 
 /**
  * Git hook installation (Story 9.3). cogit never owns a hook file: it adds a
@@ -37,6 +38,17 @@ export function withHookBlock(text: string, block: string): string {
   return `${text}${sep}\n${block}\n`;
 }
 
+/** Removes the marked block and the blank separator `withHookBlock` added. */
+export function withoutHookBlock(text: string): string {
+  const next = text.replace(/# >>> cogit\n[\s\S]*?# <<< cogit\n?/, "");
+  return next.endsWith("\n\n") ? next.slice(0, -1) : next;
+}
+
+/** True when what is left is only the shebang `installGitHook` wrote itself. */
+function onlyGeneratedShebang(text: string): boolean {
+  return text.split("\n").every((line) => line.trim() === "" || line.trim() === "#!/bin/sh");
+}
+
 /**
  * Installs the block into the hook file git actually uses. Returns true when the
  * file changed, false when the block was already current or the repository does
@@ -63,24 +75,74 @@ export async function installGitHook(root: string, event: string): Promise<boole
 }
 
 /**
- * The git-side events cogit answers (Story 9.3). A git hook's stdin is not the
- * Claude Code hook JSON, so these never go through `runHook`.
+ * The git-side events cogit answers (Stories 9.3, 9.4). A git hook's stdin is
+ * not the Claude Code hook JSON, so these never go through `runHook`.
+ * `pre-commit` carries the session record with a code commit; `prepare-commit-msg`
+ * adds the `Thought:` trailer that names the message behind it.
  */
-export const GIT_HOOK_EVENTS = ["pre-commit"] as const;
+export const GIT_HOOK_EVENTS = ["pre-commit", "prepare-commit-msg"] as const;
 export type GitHookEvent = (typeof GIT_HOOK_EVENTS)[number];
 
 export function isGitHookEvent(event: string): event is GitHookEvent {
   return (GIT_HOOK_EVENTS as readonly string[]).includes(event);
 }
 
+/** Installs the cogit block into every hook git would run; returns the events added. */
+export async function installGitHooks(root: string): Promise<GitHookEvent[]> {
+  const installed: GitHookEvent[] = [];
+  for (const event of GIT_HOOK_EVENTS) {
+    if (await installGitHook(root, event)) installed.push(event);
+  }
+  return installed;
+}
+
+/**
+ * Removes only cogit's block from the hooks it installed (Story 9.4): the user's
+ * own lines stay, and a file that held nothing but the shebang cogit wrote is
+ * deleted. Returns the events that changed.
+ */
+export async function uninstallGitHooks(root: string): Promise<GitHookEvent[]> {
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === undefined) return [];
+  const dir = await gitHooksDir(gitRoot);
+  if (dir === undefined) return [];
+  const removed: GitHookEvent[] = [];
+  for (const event of GIT_HOOK_EVENTS) {
+    const file = join(dir, event);
+    const current = await readFile(file, "utf8").catch(() => undefined);
+    if (current === undefined || !current.includes(BLOCK_START)) continue;
+    const next = withoutHookBlock(current);
+    if (onlyGeneratedShebang(next)) await rm(file, { force: true });
+    else await atomicWrite(file, next);
+    removed.push(event);
+  }
+  return removed;
+}
+
 /**
  * Runs one git hook. A git hook that fails would block the user's commit, so the
- * CLI calls this inside its own silence: nothing here throws or prints.
+ * CLI calls this inside its own silence: nothing here throws or prints. `args`
+ * are what the hook script was given (`$@`): for `prepare-commit-msg` the message
+ * file and the commit source.
  */
 export async function runGitHook(
   event: GitHookEvent,
   dir: string,
   env: NodeJS.ProcessEnv = process.env,
+  args: readonly string[] = [],
+  now: Date = new Date(),
 ): Promise<void> {
-  if (event === "pre-commit") await stageSessionFiles(dir, env);
+  if (event === "pre-commit") {
+    await stageSessionFiles(dir, env);
+    return;
+  }
+  const [messageFile, source] = args;
+  if (messageFile === undefined || messageFile === "") return;
+  await addThoughtTrailer({
+    dir,
+    messageFile,
+    ...(source === undefined ? {} : { source }),
+    env,
+    now,
+  });
 }

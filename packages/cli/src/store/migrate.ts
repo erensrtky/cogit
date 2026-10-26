@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile, rename, stat } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
+import { cogitIgnored } from "../git.js";
 import { atomicWrite, atomicWriteJson } from "./fs.js";
 import {
   CONFIG_DIR_NAME,
@@ -87,6 +88,13 @@ export async function migrateProject(root: string): Promise<boolean> {
   if (text !== undefined) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => undefined);
+  }
+  // A project that commits its record gets the git hooks the rename arrived with
+  // (Story 9.4: the `Thought:` trailer). Dynamic import keeps this module — which
+  // every command loads — free of the hook stack; a failure is silence.
+  if (!(await cogitIgnored(dir))) {
+    const { installGitHooks } = await import("../git-hooks.js");
+    await installGitHooks(dir).catch(() => undefined);
   }
   return true;
 }

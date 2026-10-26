@@ -12,6 +12,7 @@ import {
   configSet,
 } from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
+import { hooksUninstall } from "./commands/hooks.js";
 import { type InitOptions, init } from "./commands/init.js";
 import { formatShow, log, logFile, show } from "./commands/log.js";
 import { migrateIds } from "./commands/migrate.js";
@@ -161,8 +162,8 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
 
   program
     .command("show")
-    .description("print one recorded message by hash or <session-id>:mN")
-    .argument("<ref>", "message hash or <session-id-prefix>:mN")
+    .description("print one recorded message by hash, <session-id>:mN or commit hash")
+    .argument("<ref>", "message hash, <session-id-prefix>:mN, or a commit hash")
     .argument("[dir]", "project directory", ".")
     .option("-C, --dir <dir>", "project directory (same as the positional)")
     .option("--no-chat", "leave out the conversation turn")
@@ -372,17 +373,28 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       }),
     );
 
+  const hooks = program
+    .command("hooks")
+    .description("manage the git hooks cogit adds to a project");
+  hooks
+    .command("uninstall")
+    .description("remove only the cogit block from the git hooks it installed")
+    .argument("[dir]", "project directory", ".")
+    .action(run(async (dir: string) => hooksUninstall(dir, makeIo(false))));
+
   // Called by the plugin's hooks.json with the hook input on stdin, and by the
-  // git hooks cogit installs (Story 9.3) with git's arguments. Never fails.
+  // git hooks cogit installs (Stories 9.3, 9.4) with git's arguments. Never fails.
   program
     .command("hook", { hidden: true })
     .argument("<event>", "hook event, e.g. stop, sessionstart, pre-commit")
+    .argument("[args...]", "arguments git passed to its hook: $1, $2, …")
     .option("-C, --dir <dir>", "project directory (git hooks pass theirs)")
-    .action(async (event: string, opts: { dir?: string }) => {
+    .allowExcessArguments(true)
+    .action(async (event: string, args: string[], opts: { dir?: string }) => {
       const io = makeIo(false);
       if (isGitHookEvent(event)) {
         try {
-          await runGitHook(event, opts.dir ?? process.cwd(), io.env);
+          await runGitHook(event, opts.dir ?? process.cwd(), io.env, args, new Date(io.now()));
         } catch {
           // A hook must never block the commit or the session.
         }

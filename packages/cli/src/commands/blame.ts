@@ -6,6 +6,7 @@ import { CliError, type Io } from "../io.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadProject } from "../store/stores.js";
+import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
 import { buildMessages } from "../view/lineage.js";
 
 /**
@@ -95,9 +96,16 @@ export async function blame(opts: BlameOptions): Promise<BlameHit[]> {
     throw new CliError(`git could not read ${opts.target}: ${gitMessage(err)}`);
   }
 
-  const sessions = [...(await loadAllSessions(root, io.warn))].sort(
+  const loaded = [...(await loadAllSessions(root, io.warn))].sort(
     (a, b) => a.startedAt.localeCompare(b.startedAt) || a.sessionId.localeCompare(b.sessionId),
   );
+  // A commit whose message carries a `Thought:` trailer (Story 9.4) belongs to
+  // that message even when the agent's record did not list the hash.
+  const trailers = await readThoughtTrailers(root, {
+    env: io.env,
+    since: earliestSessionStart(loaded),
+  });
+  const sessions = attachThoughtTrailers(loaded, trailers);
   const mapUrl = pathToFileURL(projectPaths(root).html).href;
   const hits: BlameHit[] = [];
   const seen = new Set<string>();

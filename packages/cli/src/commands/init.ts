@@ -16,7 +16,7 @@ import {
   type GitPolicy,
   refreshCogitGitignore,
 } from "../git.js";
-import { installGitHook } from "../git-hooks.js";
+import { installGitHooks } from "../git-hooks.js";
 import { CliError, type Io } from "../io.js";
 import { readJson } from "../store/fs.js";
 import { migrateProject } from "../store/migrate.js";
@@ -141,9 +141,9 @@ export async function register(io: Io, root: string, name: string): Promise<void
 
 /**
  * Applies a policy to the two ignore files and, under `commit`, installs the git
- * pre-commit hook that carries the current session's record (Story 9.3). Each
- * step is best-effort: a read-only `.gitignore` or a repository git will not
- * report hooks for must never fail setup.
+ * hooks that carry the current session's record and link it to the commit
+ * (Stories 9.3, 9.4). Each step is best-effort: a read-only `.gitignore` or a
+ * repository git will not report hooks for must never fail setup.
  */
 async function applyGitPolicy(
   io: Io,
@@ -160,14 +160,12 @@ async function applyGitPolicy(
     ensureCogitGitignore(root, policy, shareConversations),
   );
   if (policy === "commit")
-    await bestEffort(io, "could not install the pre-commit hook", () =>
-      installGitHook(root, "pre-commit"),
-    );
+    await bestEffort(io, "could not install the git hooks", () => installGitHooks(root));
 }
 
 /**
  * Brings an already initialized project up to date: a repository that commits
- * its records gets the new `.cogit/.gitignore` and the hook, without changing the
+ * its records gets the new `.cogit/.gitignore` and the hooks, without changing the
  * policy the user chose at setup.
  */
 async function refreshGitIntegration(io: Io, root: string): Promise<void> {
@@ -175,7 +173,7 @@ async function refreshGitIntegration(io: Io, root: string): Promise<void> {
   await bestEffort(io, "could not refresh the git integration", async () => {
     if (await cogitIgnored(root)) return;
     await refreshCogitGitignore(root, (await loadConfig(io.env)).shareConversations);
-    await installGitHook(root, "pre-commit");
+    await installGitHooks(root);
   });
 }
 

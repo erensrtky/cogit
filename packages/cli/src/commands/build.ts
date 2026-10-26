@@ -26,6 +26,7 @@ import { withLock } from "../store/lock.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
+import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
 import { type ChatTurn, displayTurn, excerpt, readConversation } from "../transcript.js";
 import { buildFileHistory, modelSessions } from "../view/files.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
@@ -268,10 +269,18 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       const sessions = await loadAllSessions(root, io.warn);
       const transcripts = await collectTranscripts(io.env);
       const views = await readTranscriptViews(sessions, transcripts, root, io);
-      const commits = await commitInfo(root, views.sessions);
+      // The `Thought:` trailers git holds (Story 9.4) attach commits to the
+      // message they carry out, so the map, the file history and `blame` agree
+      // even when the agent's record did not list the hash.
+      const trailers = await readThoughtTrailers(root, {
+        env: io.env,
+        since: earliestSessionStart(views.sessions),
+      });
+      const withThoughts = attachThoughtTrailers(views.sessions, trailers);
+      const commits = await commitInfo(root, withThoughts);
       const built = buildViewModel({
         project: project.data,
-        sessions: views.sessions,
+        sessions: withThoughts,
         path: root,
         generatedAt,
         transcripts: new Set(transcripts.keys()),

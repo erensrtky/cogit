@@ -5,6 +5,7 @@ import type { LineageNode, Session } from "../schema/session.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadProject } from "../store/stores.js";
+import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
 import { buildFileHistory, type FileSourceSession } from "../view/files.js";
 import { buildMessages } from "../view/lineage.js";
 import type { ViewFile, ViewNode } from "../view/model.js";
@@ -34,7 +35,13 @@ export interface EffectiveSession {
 /** Every valid session of the project, with the ids and structure the map draws. */
 export async function loadEffectiveSessions(root: string, io: Io): Promise<EffectiveSession[]> {
   const sessions = await loadAllSessions(root, io.warn);
-  const out: EffectiveSession[] = [];
+  // The `Thought:` trailers git already holds (Story 9.4): a commit whose message
+  // names a message belongs to it even when the agent's record left it out.
+  const trailers = await readThoughtTrailers(root, {
+    env: io.env,
+    since: earliestSessionStart(sessions),
+  });
+  const loaded: EffectiveSession[] = [];
   for (const session of sessions) {
     // The transcript (or the conversation store) names old `m1` nodes and holds
     // the hash of each message; a session without either keeps its stored ids.
@@ -42,8 +49,18 @@ export async function loadEffectiveSessions(root: string, io: Io): Promise<Effec
     const upgraded = turns ? upgradeSessionIds(session, turns) : session;
     const events = await readEvents(root, session.sessionId);
     const effective: Session = { ...upgraded, nodes: applyEvents(upgraded.nodes, events) };
-    out.push({ session: effective, messages: buildMessages(effective.nodes), turns });
+    loaded.push({ session: effective, messages: buildMessages(effective.nodes), turns });
   }
+  const withThoughts = attachThoughtTrailers(
+    loaded.map((entry) => entry.session),
+    trailers,
+  );
+  const out = loaded.map((entry, index) => {
+    const session = withThoughts[index] as Session;
+    return session === entry.session
+      ? entry
+      : { ...entry, session, messages: buildMessages(session.nodes) };
+  });
   return out.sort(
     (a, b) =>
       a.session.startedAt.localeCompare(b.session.startedAt) ||
@@ -331,6 +348,13 @@ export type RefResult =
 
 const HASH_REF = /^h[0-9a-f]{6,12}$/;
 const SESSION_LABEL_REF = /^([A-Za-z0-9][A-Za-z0-9_.-]{0,127}):m([1-9][0-9]*)$/;
+/** A raw git commit hash: 7–40 lowercase hex, no `h` prefix (`h…` is a message). */
+const COMMIT_REF = /^[0-9a-f]{7,40}$/;
+
+/** A record may hold seven characters of a hash and git forty; either direction matches. */
+function sameCommit(recorded: string, commit: string): boolean {
+  return commit.startsWith(recorded) || recorded.startsWith(commit);
+}
 
 /**
  * Resolves a `<ref>` against every session. Errors stay data, so the command can
@@ -362,11 +386,40 @@ export function resolveRef(sessions: readonly EffectiveSession[], ref: string): 
     };
   }
 
+  // A commit the `Thought:` trailer (Story 9.4) attached to a message opens that
+  // message: `cogit show <commit-sha>` is the way from code back to the why.
+  if (COMMIT_REF.test(ref)) {
+    const hits = sessions.flatMap((entry) =>
+      entry.messages
+        .filter((message) => (message.commits ?? []).some((hash) => sameCommit(hash, ref)))
+        .map((message) => ({ entry, message })),
+    );
+    if (hits.length === 0)
+      return { kind: "unknown", reason: `no recorded thought for commit ${ref}` };
+    if (hits.length > 1) {
+      return {
+        kind: "ambiguous",
+        candidates: hits.map(({ entry, message }) => ({
+          sessionId: entry.session.sessionId,
+          id: message.id,
+          label: message.label ?? message.id,
+          title: message.title,
+        })),
+      };
+    }
+    const hit = hits[0] as { entry: EffectiveSession; message: ViewNode };
+    return {
+      kind: "ok",
+      hit: { session: hit.entry.session, messages: hit.entry.messages, message: hit.message },
+    };
+  }
+
   const sessionLabel = SESSION_LABEL_REF.exec(ref);
   if (sessionLabel === null)
     return {
       kind: "invalid",
-      reason: "use a message hash (h + 6..12 hex) or <session-id-prefix>:mN",
+      reason:
+        "use a message hash (h + 6..12 hex), <session-id-prefix>:mN, or a commit hash (7..40 hex)",
     };
 
   const prefix = sessionLabel[1] as string;

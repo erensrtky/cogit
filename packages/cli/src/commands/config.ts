@@ -1,5 +1,5 @@
 import { ensureCogitGitignore, ensureGitignore, findGitRoot, type GitPolicy } from "../git.js";
-import { installGitHook } from "../git-hooks.js";
+import { installGitHooks } from "../git-hooks.js";
 import { CliError, type Io } from "../io.js";
 import { Config, type RegistryEntry } from "../schema/config.js";
 import { refreshShareConversations } from "../share.js";
@@ -79,7 +79,7 @@ export async function configGit(dir: string, policy: GitPolicy, io: Io): Promise
   const added = await ensureGitignore(root, policy);
   const config = await loadConfig(io.env);
   await ensureCogitGitignore(root, policy, config.shareConversations);
-  if (policy === "commit") await installGitHook(root, "pre-commit");
+  if (policy === "commit") await installGitHooks(root);
   io.out(`Git policy for ${project.data.name}: ${policy}`);
   if (added.length > 0) io.out(`Added to .gitignore: ${added.join(", ")}`);
 }

@@ -35,6 +35,11 @@ export const Config = z.object({
    * user at the next session start, commit them at session end, or do nothing.
    */
   recordCommit: z.enum(["ask", "auto", "off"]).default("ask"),
+  /**
+   * How long `.cogit/HEAD` stays fresh for the `Thought:` trailer (Story 9.4).
+   * A commit made hours after the last message is probably not that message.
+   */
+  trailerMaxAgeHours: z.int().min(1).max(8760).default(6),
   agents: z.array(z.string().min(1)).default(["claude-code"]),
   /** Project roots ("don't ask again" in this project) where the setup hint stays silent. */
   setupHintOff: z.array(z.string().min(1)).default([]),
