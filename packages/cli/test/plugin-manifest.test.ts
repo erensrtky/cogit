@@ -56,7 +56,7 @@ describe("plugin packaging", () => {
     const readme = await readFile(new URL("../../../README.md", import.meta.url), "utf8");
     expect(readme).toContain("![The map");
     expect(readme).toContain("(docs/images/map.png)");
-    expect(readme).toContain("(specs/codelineage-mvp.md)");
+    expect(readme).toContain("(specs/cogit-mvp.md)");
     expect(readme).toContain("(LICENSE)");
     // A relative image only renders when the file it names is in the repository.
     await expect(

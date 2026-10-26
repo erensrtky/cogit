@@ -1,4 +1,6 @@
-# codelineage — MVP spec
+# cogit — MVP spec
+
+(Formerly named codelineage; renamed to cogit on 2026-10-26.)
 
 Status: Draft · 2026-10-21 (rev. 2: capture verified against hooks docs)
 Tagline: *The lineage of your AI coding sessions.*
@@ -37,10 +39,10 @@ these records into static HTML:
   itself (the message as written and the agent's written replies, tool output
   left out and tool use counted), previous/next message buttons, and a
   `claude --resume <id>` copy button. `build` reads the conversation from the
-  transcript into `lineage.html` only (never committed, see Privacy); session
+  transcript into `map.html` only (never committed, see Privacy); session
   files never hold raw text. A message whose record lists commits shows them as
   small tag chips with the commit subject read from git at build time; a commit
-  git no longer has stays listed and is drawn greyed. `codelineage blame
+  git no longer has stays listed and is drawn greyed. `cogit blame
   <file>[:<line>]` follows git blame (or every commit that touched the file)
   back to the messages that recorded those commits, and prints the map URL that
   opens each message. Records from before messages carried message parents
@@ -59,7 +61,7 @@ these records into static HTML:
   showing the project name, its last activity and where it left off (the newest
   session's `next`, or its last message title). Choosing one opens that project's
   map at its own "left off here" — a page of the same local server over http, the
-  `lineage.html` file over `file://`. A project whose directory is gone is left
+  `map.html` file over `file://`. A project whose directory is gone is left
   out. The data comes from the registry at build time; no model calls.
 
 Sessions are not a separate view. A session is a level of the project tree.
@@ -75,14 +77,14 @@ Sessions are not a separate view. A session is a level of the project tree.
 ## Data model
 
 ```
-<project>/.codelineage/
+<project>/.cogit/
   project.json               # project name, epochs[], schema version
   sessions/<session-id>.json # one file per session (see Concurrency)
   state/<session-id>.json    # hook state: turn counter
   locks/                     # lock files
-  lineage.html               # generated
+  map.html               # generated
 
-~/.config/codelineage/
+~/.config/cogit/
   config.json                # global settings
   projects.json              # registry of project paths
   panel.html                 # generated
@@ -139,14 +141,14 @@ resent node that changed nothing keeps its `touchedAt`. Epochs live in `project.
 A message's stable id is `h` plus the first 12 hex of a SHA-256 over the session
 id, transcript uuid, time and text; `m1`, `m2`, … stay as display labels. A parent
 is not part of the hash, so correcting it never renames a message (unlike git, on
-purpose). `codelineage show` accepts the hash, any unique prefix of at least six
+purpose). `cogit show` accepts the hash, any unique prefix of at least six
 hex characters after the `h`, or `<session-id-prefix>:mN`.
-The agent picks an existing epoch or adds one through the CLI (`codelineage epoch add`),
+The agent picks an existing epoch or adds one through the CLI (`cogit epoch add`),
 which does a locked, atomic write.
 
 **Writes go through the CLI.** The agent never writes session files directly. It
-saves its JSON to `.codelineage/inbox/<session-id>.json` with the Write tool and runs
-`codelineage session write --file <inbox> --consume`, which validates against the
+saves its JSON to `.cogit/inbox/<session-id>.json` with the Write tool and runs
+`cogit session write --file <inbox> --consume`, which validates against the
 schema, runs the redaction pass, merges with the existing file and writes atomically,
 deletes the inbox file, then runs `build` quietly. JSON is not piped through the shell,
 because Claude Code's command checks block heredocs that contain JSON.
@@ -166,21 +168,21 @@ because Claude Code's command checks block heredocs that contain JSON.
 Distributed like OpenViking: a Claude Code plugin that ships `hooks/hooks.json`, a
 skill, and a bundled build of the CLI (single file), so hooks run
 `node ${CLAUDE_PLUGIN_ROOT}/dist/…` with no global install and no `npx` startup cost.
-The `codelineage` npm package is both the standalone CLI and the plugin: it ships
+The `cogit` npm package is both the standalone CLI and the plugin: it ships
 `.claude-plugin/plugin.json` next to `dist/`, and the repository root holds a
-`codelineage` marketplace whose entry installs it with an `npm` source, so no build
+`cogit` marketplace whose entry installs it with an `npm` source, so no build
 output is committed. `plugin.json` carries the package version, because an
 npm-sourced plugin without one resolves to version `unknown` and never updates.
 
 Behavior verified against the Claude Code hooks docs (2026-10-21):
 
-- **Skill `/codelineage:lineage`:** writes or updates this session's record. The skill
+- **Skill `/cogit:record`:** writes or updates this session's record. The skill
   gets its session ID from `${CLAUDE_SESSION_ID}` and injects a compact view of the
-  record with `` !`codelineage session show` ``, so the agent sends only what is new
+  record with `` !`cogit session show` ``, so the agent sends only what is new
   or changed instead of rewriting it. The injected command never fails (an
   uninitialized project is reported in its JSON), because a failing injection aborts
   the whole skill. `allowed-tools` pre-approves exactly the CLI and writes under
-  `.codelineage/inbox/`, so the skill runs without prompts. The user can call it at
+  `.cogit/inbox/`, so the skill runs without prompts. The user can call it at
   any time. Verified end to end with Claude Code 2.1.300: first write, "up to date"
   with no change, and the hint in an uninitialized directory.
 - **Stop hook (the main path):** counts turns per session in `state/`. Every N turns
@@ -194,7 +196,7 @@ Behavior verified against the Claude Code hooks docs (2026-10-21):
   an "up to date" answer is not asked again on the next turn. Verified end to end
   with Claude Code 2.1.300: a request after N turns, the agent runs the skill, the
   record is written. A model-invoked skill that has `allowed-tools` needs permission
-  (`Skill(codelineage:lineage)` in `permissions.allow`); without it the request is
+  (`Skill(cogit:record)` in `permissions.allow`); without it the request is
   denied in `-p` runs and prompts in interactive ones. A plugin cannot grant it to
   itself, so `init` offers to add it to the user settings (install question 3).
 - **Compaction (safety net).** PreCompact output never reaches the model and it cannot
@@ -209,7 +211,7 @@ Behavior verified against the Claude Code hooks docs (2026-10-21):
 - **Session end catch-up.** Messages after the last update have no node when the
   user exits, runs `/clear` or switches with `/resume`. SessionEnd cannot make the
   agent act and plugin hooks get a 1.5 s budget, so the hook only spawns a detached
-  `codelineage backfill <session-id> --tail` and returns. The catch-up reads the
+  `cogit backfill <session-id> --tail` and returns. The catch-up reads the
   transcript, takes the user messages with no node together with the agent's replies
   and actions after each, summarizes them with a headless run by the skill's rules
   and writes them through `session write`. Setting: `sessionEndCatchUp` (`on` by
@@ -231,19 +233,19 @@ Behavior verified against the Claude Code hooks docs (2026-10-21):
   branches are cut first and a line says how many were cut. Setting:
   `startupContext` (on by default; off spends no tokens on it). It replaces
   hand-written handoff files for the common case; existing ones are left alone.
-- **Before `init`:** if `.codelineage/` does not exist, all hooks are no-ops, except
+- **Before `init`:** if `.cogit/` does not exist, all hooks are no-ops, except
   that SessionStart on `startup` or `resume` injects a one-line offer: the agent says
-  codelineage is not set up here and sets it up only when the user asks. Setup happens
+  cogit is not set up here and sets it up only when the user asks. Setup happens
   in the chat: the agent asks the install questions and runs the bundled CLI with
   `init --yes --git … --retention … --language …` (`--allow-skill` only when agreed).
-  Projects are never registered automatically. `codelineage config hint-off [dir]`
+  Projects are never registered automatically. `cogit config hint-off [dir]`
   silences the offer in that project ("don't ask again", stored in the global
   `setupHintOff` list, keyed by the main checkout so a worktree is covered);
-  `codelineage config hint-on [dir]` turns it back on, `--all` everywhere. A plugin
+  `cogit config hint-on [dir]` turns it back on, `--all` everywhere. A plugin
   update reaches a running session only after `/reload-plugins` or a new chat, and
   the offer says so.
-- **Recursion guard:** every headless run started by codelineage (`backfill`,
-  catch-up) sets `CODELINEAGE_DISABLE=1`, and our hooks do nothing when it is set.
+- **Recursion guard:** every headless run started by cogit (`backfill`,
+  catch-up) sets `COGIT_DISABLE=1`, and our hooks do nothing when it is set.
   Users can set it too, to turn capture off for any headless run (for example a
   loop runner). Other plugins' hooks (memory plugins and the like) must not fire in
   these runs either. Verified (Claude Code 2.1.300): headless runs use
@@ -261,29 +263,29 @@ Each update costs agent tokens (the user's subscription or API usage).
 
 | Command | Does |
 |---|---|
-| `codelineage init` | Creates `.codelineage/`, registers the project, asks the install questions |
-| `codelineage build [dir]` | Regenerates `lineage.html` and `panel.html` |
-| `codelineage open [dir]` | Builds, then opens the map (or the panel if no dir is given) through the local map server, starting it in the background if it is not running. The open page refreshes itself whenever the map is rebuilt, keeping the selected branch, unfolded branches, scroll and zoom. Falls back to opening the file when the server cannot start. |
-| `codelineage blame <file>[:<line>]` | Follows git blame (or `git log` for a whole file) back to the messages whose record lists those commits; prints each commit, session, message, summary and the map URL that opens that message. Says so plainly when no record knows the code. |
-| `codelineage log [dir]` | Prints the lineage like `git log --graph --oneline`, newest first: per message its short hash, `mN`, time, title, `↩` returns and commit tags, a branch's first message with the branch title, and a header line per session (title, epoch, time span). `-C <dir>` works instead of the positional, `--session <id\|prefix>` narrows to one session, `-n <count>` limits the messages, `--branches` prints only the branch summaries (title, asked, outcome, open — the compressed view), and `--json` prints the model. Plain text; no colour when not a TTY. |
-| `codelineage show <ref> [dir]` | Prints one message: hash, `mN`, session, time, parent and children (as refs), `links`, the branch it belongs to with that branch's summary, decisions (`decidedBy`, `why`, `alternatives`), agent decisions, work, commits with their git subjects, files, then its conversation turn from the store (`-C <dir>` works instead of the positional; `--no-chat` skips the turn; `--json` prints the model). A `<ref>` is a message hash or any unique prefix of at least six hex characters after the `h`, or `<session-id-prefix>:mN`; an ambiguous prefix lists the candidates and exits non-zero, an unknown one says so plainly. |
-| `codelineage epoch add <id> <title>` | Adds an epoch (locked write) |
-| `codelineage config get/set <key> [value]` | Reads or changes settings |
-| `codelineage config hint-off [dir]` | Stops the SessionStart setup offer in that project ("don't ask again") |
-| `codelineage config hint-on [dir] [--all]` | Shows the setup offer again in that project, or everywhere with `--all` |
-| `codelineage session show <id>` | Prints the compact record the skill injects (epochs, language, status, node ids/titles, inbox path) as JSON. Never fails for an uninitialized project. |
-| `codelineage session write` | Reads session JSON from stdin or `--file` (the skill uses `--file <inbox> --consume`), validates, redacts, merges and writes it under the session lock, then builds. |
-| `codelineage backfill [dir]` | Summarizes past transcripts of that project by running the agent headless, one session at a time. Estimates cost and asks first. Selection: `--pick` (default: lists sessions with date, first prompt and estimated cost), `--last <n>`, `--since <date>`, `--all`. |
-| `codelineage backfill <session-id> --tail` | Summarizes only the user messages of one session that have no node yet. Started by the SessionEnd hook. |
+| `cogit init` | Creates `.cogit/`, registers the project, asks the install questions |
+| `cogit build [dir]` | Regenerates `map.html` and `panel.html` |
+| `cogit open [dir]` | Builds, then opens the map (or the panel if no dir is given) through the local map server, starting it in the background if it is not running. The open page refreshes itself whenever the map is rebuilt, keeping the selected branch, unfolded branches, scroll and zoom. Falls back to opening the file when the server cannot start. |
+| `cogit blame <file>[:<line>]` | Follows git blame (or `git log` for a whole file) back to the messages whose record lists those commits; prints each commit, session, message, summary and the map URL that opens that message. Says so plainly when no record knows the code. |
+| `cogit log [dir]` | Prints the lineage like `git log --graph --oneline`, newest first: per message its short hash, `mN`, time, title, `↩` returns and commit tags, a branch's first message with the branch title, and a header line per session (title, epoch, time span). `-C <dir>` works instead of the positional, `--session <id\|prefix>` narrows to one session, `-n <count>` limits the messages, `--branches` prints only the branch summaries (title, asked, outcome, open — the compressed view), and `--json` prints the model. Plain text; no colour when not a TTY. |
+| `cogit show <ref> [dir]` | Prints one message: hash, `mN`, session, time, parent and children (as refs), `links`, the branch it belongs to with that branch's summary, decisions (`decidedBy`, `why`, `alternatives`), agent decisions, work, commits with their git subjects, files, then its conversation turn from the store (`-C <dir>` works instead of the positional; `--no-chat` skips the turn; `--json` prints the model). A `<ref>` is a message hash or any unique prefix of at least six hex characters after the `h`, or `<session-id-prefix>:mN`; an ambiguous prefix lists the candidates and exits non-zero, an unknown one says so plainly. |
+| `cogit epoch add <id> <title>` | Adds an epoch (locked write) |
+| `cogit config get/set <key> [value]` | Reads or changes settings |
+| `cogit config hint-off [dir]` | Stops the SessionStart setup offer in that project ("don't ask again") |
+| `cogit config hint-on [dir] [--all]` | Shows the setup offer again in that project, or everywhere with `--all` |
+| `cogit session show <id>` | Prints the compact record the skill injects (epochs, language, status, node ids/titles, inbox path) as JSON. Never fails for an uninitialized project. |
+| `cogit session write` | Reads session JSON from stdin or `--file` (the skill uses `--file <inbox> --consume`), validates, redacts, merges and writes it under the session lock, then builds. |
+| `cogit backfill [dir]` | Summarizes past transcripts of that project by running the agent headless, one session at a time. Estimates cost and asks first. Selection: `--pick` (default: lists sessions with date, first prompt and estimated cost), `--last <n>`, `--since <date>`, `--all`. |
+| `cogit backfill <session-id> --tail` | Summarizes only the user messages of one session that have no node yet. Started by the SessionEnd hook. |
 
 ## Install questions (`init` and first plugin run)
 
-1. **Git (only if the directory is a repo):** commit `.codelineage/` or add it to
+1. **Git (only if the directory is a repo):** commit `.cogit/` or add it to
    `.gitignore`? Default: ignore (see Privacy).
 2. **Transcript retention:** Claude Code deletes sessions after 30 days by default
    (`cleanupPeriodDays`). Offer to raise it. Never change it silently. The README
    explains this too.
-3. **Skill permission:** add `Skill(codelineage:lineage)` to `permissions.allow` in
+3. **Skill permission:** add `Skill(cogit:record)` to `permissions.allow` in
    `~/.claude/settings.json` so automatic updates do not prompt every N turns? Default:
    yes. Asked only when the rule is missing; backs the file up first (one backup per
    run, holding the original), refuses a file it cannot parse and prints what it
@@ -303,14 +305,14 @@ default `true`),
 `gitPolicy`, `agents`, `setupHintOff` (project roots where the SessionStart setup
 offer stays silent). The panel may change `language`, `updateEveryTurns`,
 `sessionEndCatchUp`, `catchUpModel`, `messageSummaries` and `startupContext` over the
-local server; everything else stays on `codelineage config set`.
+local server; everything else stays on `cogit config set`.
 
 ## Privacy
 
 - The skill tells the agent never to record secrets, credentials, tokens or personal
   data. It records decisions and rationale, not raw content.
 - `build` runs a redaction pass (common key and token patterns) before writing HTML.
-- The map (`lineage.html`) shows the conversation read from the local transcript. It
+- The map (`map.html`) shows the conversation read from the local transcript. It
   is never committed under any `gitPolicy`, so raw chat stays on the machine that
   already holds the transcript; session files keep only titles and summaries.
 - Default `gitPolicy` is `ignore`, because sharing has to be a deliberate choice.
@@ -324,14 +326,14 @@ local server; everything else stays on `codelineage config set`.
 - **Schema version mismatch:** older files are migrated when read, and newer ones
   trigger a warning.
 - **Project directory moved or deleted:** the panel marks it as missing.
-  `codelineage config` can prune it.
+  `cogit config` can prune it.
 - **Exit and immediate `--resume`:** the catch-up run and the resumed agent may write
   the same session; the session lock plus read → merge → write keeps both changes.
-- **`~/.config/codelineage` not writable** (containers, CI, read-only home): registry
+- **`~/.config/cogit` not writable** (containers, CI, read-only home): registry
   and panel updates are skipped with a warning; project-local writes still work.
 - **Session in a linked git worktree** (`claude -w`, `.claude/worktrees/<name>/`): hook
   `cwd` and `CLAUDE_PROJECT_DIR` both point at the worktree (verified 2026-10-23,
-  Claude Code 2.1.300). With `gitPolicy=ignore` the worktree has no `.codelineage/`, so
+  Claude Code 2.1.300). With `gitPolicy=ignore` the worktree has no `.cogit/`, so
   hooks and every `-C`/`[dir]` command map the worktree to the main checkout by reading
   files only (`.git` → `gitdir` → `commondir`), the way Claude Code itself keeps
   worktree state in the main checkout. With `gitPolicy=commit` the worktree has its own
@@ -344,7 +346,7 @@ local server; everything else stays on `codelineage config set`.
 
 ## Tech stack
 
-- **CLI and hooks:** Node + TypeScript, published to npm (`codelineage`).
+- **CLI and hooks:** Node + TypeScript, published to npm (`cogit`).
 - **HTML:** React + TypeScript, built with Vite and `vite-plugin-singlefile` into one
   template. The CLI embeds the JSON data into that template.
 - **Graph:** React Flow (`@xyflow/react`) for rendering, with its built-in MiniMap;

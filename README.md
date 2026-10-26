@@ -99,5 +99,5 @@ hash with a `Thought:` trailer.
 The record format — `.cogit/` layout, message ids, events, the `Thought:` trailer — is
 [docs/format.md](docs/format.md), with generated JSON Schemas in
 [docs/schema/](docs/schema/). The design and the full CLI surface are in
-[specs/codelineage-mvp.md](specs/codelineage-mvp.md), kept up to date with the code. MIT —
+[specs/cogit-mvp.md](specs/cogit-mvp.md), kept up to date with the code. MIT —
 see [LICENSE](LICENSE).
