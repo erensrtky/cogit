@@ -12,7 +12,7 @@ import {
 } from "./commands/config.js";
 import { epochAdd } from "./commands/epoch.js";
 import { type InitOptions, init } from "./commands/init.js";
-import { formatShow, log, show } from "./commands/log.js";
+import { formatShow, log, logFile, show } from "./commands/log.js";
 import { migrateIds } from "./commands/migrate.js";
 import { openPanel, openProject } from "./commands/open.js";
 import { search } from "./commands/search.js";
@@ -118,6 +118,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .option("--session <id>", "only this session (id or prefix)")
     .option("-n, --number <count>", "at most this many messages", positiveCount)
     .option("--branches", "only the branch summaries (the compressed view)")
+    .option("--file <path>", "only messages that touched this file (its history)")
     .option("--json", "print JSON instead of text")
     .action(
       run(
@@ -128,11 +129,22 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
             session?: string;
             number?: number;
             branches?: boolean;
+            file?: string;
             json?: boolean;
           },
         ) => {
+          const target = opts.dir ?? dir;
+          if (opts.file !== undefined) {
+            await logFile({
+              dir: target,
+              file: opts.file,
+              io: makeIo(false),
+              json: opts.json === true,
+            });
+            return;
+          }
           await log({
-            dir: opts.dir ?? dir,
+            dir: target,
             io: makeIo(false),
             session: opts.session,
             limit: opts.number,

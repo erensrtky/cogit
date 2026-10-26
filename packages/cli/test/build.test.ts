@@ -504,6 +504,53 @@ describe("codelineage build", () => {
     expect(embedded(html)).toEqual(model);
   });
 
+  it("builds the file history from message files and the files of their commits", async () => {
+    await run("git", ["-C", root, "init", "-q"]);
+    await run("git", ["-C", root, "config", "user.email", "t@example.com"]);
+    await run("git", ["-C", root, "config", "user.name", "T"]);
+    await mkdir(join(root, "src"));
+    await writeFile(join(root, "src", "a.ts"), "export const a = 1;\n");
+    await run("git", ["-C", root, "add", "src/a.ts"]);
+    await run("git", ["-C", root, "commit", "-q", "-m", "feat: add a"]);
+    const short = (await run("git", ["-C", root, "rev-parse", "--short", "HEAD"])).stdout.trim();
+
+    await saveSession(
+      "s1",
+      session({
+        sessionId: "s1",
+        title: "one",
+        epoch: "e1",
+        startedAt: "2026-01-02T00:00:00.000Z",
+        nodes: [
+          node("h1", "message", "Write a", null, {
+            at: "2026-01-02T01:00:00.000Z",
+            commits: [short],
+          }),
+          node("h2", "message", "Note it", "h1", {
+            at: "2026-01-02T02:00:00.000Z",
+            files: ["notes.md"],
+          }),
+        ],
+      }),
+    );
+
+    const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+
+    expect(model.files?.map((file) => [file.path, file.count])).toEqual([
+      ["notes.md", 1],
+      ["src/a.ts", 1],
+    ]);
+    expect(model.files?.[1]?.hits[0]).toMatchObject({
+      sessionId: "s1",
+      messageId: "h1",
+      label: "m1",
+      commits: [short],
+    });
+    expect((embedded(await readFile(paths().html, "utf8")) as { files?: unknown }).files).toEqual(
+      model.files,
+    );
+  });
+
   it("embeds the current settings in the map for the file:// modal", async () => {
     await configSet("messageSummaries", "true", io);
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });

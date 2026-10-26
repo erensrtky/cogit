@@ -1,4 +1,10 @@
-import { ensureConversationGitignore, findGitRoot, readCommitSubjects } from "../git.js";
+import {
+  ensureConversationGitignore,
+  findGitRoot,
+  projectFiles,
+  readCommitFiles,
+  readCommitSubjects,
+} from "../git.js";
 import { CliError, type Io } from "../io.js";
 import {
   hashTurns,
@@ -21,6 +27,7 @@ import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
 import { type ChatTurn, displayTurn, excerpt, readConversation } from "../transcript.js";
+import { buildFileHistory, modelSessions } from "../view/files.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
 import type { LineageViewModel, ViewChatTurn, ViewPendingMessage } from "../view/model.js";
 import {
@@ -191,23 +198,33 @@ async function readTranscriptViews(
   return { chats, pending, sessions: prepared, unrecorded };
 }
 
+interface CommitInfo {
+  /** Subject per recorded hash, for the tags and the drill-down (Story 8.8). */
+  subjects: Map<string, string>;
+  /** Project-relative files per recorded hash, for the file history (Story 8.15). */
+  files: Map<string, string[]>;
+}
+
 /**
- * Every commit hash the records list, with its subject read from git, so the
- * message rows can show commit tags and the drill-down can name them (Story
- * 8.8). A project outside git, or a commit git no longer knows, only means
- * fewer subjects; the build never fails for it.
+ * Every commit hash the records list, with its subject and the files it changed
+ * read from git. A project outside git, or a commit git no longer knows, only
+ * means fewer tags and fewer files; the build never fails for it.
  */
-async function commitSubjects(root: string, sessions: Session[]): Promise<Map<string, string>> {
+async function commitInfo(root: string, sessions: Session[]): Promise<CommitInfo> {
   const hashes = new Set<string>();
   for (const session of sessions) {
     for (const node of session.nodes) {
       for (const hash of node.commits ?? []) hashes.add(hash);
     }
   }
-  if (hashes.size === 0) return new Map();
+  if (hashes.size === 0) return { subjects: new Map(), files: new Map() };
   const gitRoot = await findGitRoot(root);
-  if (gitRoot === undefined) return new Map();
-  return await readCommitSubjects(gitRoot, hashes);
+  if (gitRoot === undefined) return { subjects: new Map(), files: new Map() };
+  const [subjects, files] = await Promise.all([
+    readCommitSubjects(gitRoot, hashes),
+    readCommitFiles(gitRoot, hashes),
+  ]);
+  return { subjects, files: projectFiles(gitRoot, root, files) };
 }
 
 /**
@@ -252,7 +269,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       const transcripts = await collectTranscripts(io.env);
       const config = await loadConfig(io.env);
       const views = await readTranscriptViews(sessions, transcripts, root, io);
-      const subjects = await commitSubjects(root, views.sessions);
+      const commits = await commitInfo(root, views.sessions);
       const built = buildViewModel({
         project: project.data,
         sessions: views.sessions,
@@ -261,7 +278,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         transcripts: new Set(transcripts.keys()),
         chats: views.chats,
         pending: views.pending,
-        commitSubjects: subjects,
+        commitSubjects: commits.subjects,
         // Over `file://` the settings modal shows these; a server page reads the
         // live values instead, so a map built before a change still agrees.
         settings: panelSettings(config),
@@ -270,6 +287,9 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         unrecorded: config.sessionEndCatchUp ? undefined : views.unrecorded,
       });
       built.switcher = switcher;
+      // The files view (8.15) unions each message's own files with the files of
+      // its commits, so a message the agent listed no paths for still lands.
+      built.files = buildFileHistory(modelSessions(built), commits.files);
       // The skill already avoids secrets; this is the safety net before rendering.
       const redacted = redactDeep(built);
       if (redacted.count > 0)

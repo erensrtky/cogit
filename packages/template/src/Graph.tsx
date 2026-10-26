@@ -13,6 +13,7 @@ import "@xyflow/react/dist/style.css";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
+import { type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
 import { type GitLayout, layoutGitGraph } from "./gitLayout.js";
@@ -212,6 +213,8 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
   const [openAll, setOpenAll] = useState(false);
   const [showOutline, setShowOutline] = useState(true);
+  // The files view and the outline share the left column, so only one shows.
+  const [showFiles, setShowFiles] = useState(false);
   const { expanded: fullscreen, toggle: toggleFullscreen } = useFullscreen();
   const [focusedId, setFocusedId] = useState<string | null>(() => {
     if (initial === null) return null;
@@ -463,6 +466,27 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     [ensureOpen],
   );
 
+  // A file row (8.15) opens its message exactly like a dot click, and the view
+  // moves to it once the session's layout is in place.
+  const [fileJumps, setFileJumps] = useState(0);
+  const selectFromFiles = useCallback(
+    (target: FilesTarget) => {
+      openNode(target.sessionId, target.messageId);
+      setFileJumps((value) => value + 1);
+    },
+    [openNode],
+  );
+  const filePoint = useMemo(
+    () => (target === null ? null : pointOf(target.sessionId, target.nodeId)),
+    // `pointOf` changes when an opened session's layout changes, which is how a
+    // click that opens a session resolves its point on the next render.
+    [target?.sessionId, target?.nodeId, pointOf],
+  );
+  const fileJump = useMemo(
+    () => (fileJumps === 0 || filePoint === null ? null : { key: fileJumps, point: filePoint }),
+    [fileJumps, filePoint],
+  );
+
   const actions = useMemo(
     () => ({ selection, openIds, openSession: toggleSession, openNode, openContinue, unfold }),
     [selection, openIds, toggleSession, openNode, openContinue, unfold],
@@ -551,13 +575,39 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
             type="button"
             className="outline-button"
             aria-pressed={showOutline}
-            onClick={() => setShowOutline((value) => !value)}
+            onClick={() => {
+              setShowOutline((value) => !value);
+              setShowFiles(false);
+            }}
           >
             {showOutline ? "Hide outline" : "Show outline"}
           </button>
+          <button
+            type="button"
+            className="outline-button"
+            aria-pressed={showFiles}
+            title="Which conversations touched which file"
+            onClick={() => {
+              setShowFiles((value) => !value);
+              setShowOutline(false);
+            }}
+          >
+            {showFiles ? "Hide files" : "Files"}
+          </button>
         </div>
         <div className="graph-wrap">
-          {showOutline ? (
+          {showFiles ? (
+            <FilesView
+              files={model.files}
+              active={
+                selection?.type === "node"
+                  ? { sessionId: selection.sessionId, messageId: selection.nodeId }
+                  : null
+              }
+              onSelect={selectFromFiles}
+              onClose={() => setShowFiles(false)}
+            />
+          ) : showOutline ? (
             <Outline
               model={model}
               activeId={focusedId}
@@ -574,6 +624,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
                 focusRow={focusRow}
                 jump={jump}
                 searchJump={searchJump}
+                fileJump={fileJump}
                 fit={fits}
               />
             )}
@@ -600,6 +651,7 @@ function MapCanvas({
   focusRow,
   jump,
   searchJump,
+  fileJump,
   fit,
 }: {
   nodes: MapFlowNode[];
@@ -609,6 +661,8 @@ function MapCanvas({
   jump: { key: number; point: { x: number; y: number } | null } | null;
   /** A search move: the active hit or a pasted hash (Story 8.14). */
   searchJump: { key: number; point: { x: number; y: number } } | null;
+  /** A files-view click: the message it opened (Story 8.15). */
+  fileJump: { key: number; point: { x: number; y: number } } | null;
   /** A new value frames the whole map again (after "Fold all"). */
   fit: number;
 }) {
@@ -655,6 +709,13 @@ function MapCanvas({
     if (searchKey === 0 || searchPoint === null) return;
     centre(searchPoint);
   }, [searchKey, searchPoint]);
+
+  const fileKey = fileJump?.key ?? 0;
+  const filePoint = fileJump?.point ?? null;
+  useEffect(() => {
+    if (fileKey === 0 || filePoint === null) return;
+    centre(filePoint);
+  }, [fileKey, filePoint]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

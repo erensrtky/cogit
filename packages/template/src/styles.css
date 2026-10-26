@@ -700,6 +700,90 @@ body:has(.map-shell.is-expanded) {
   font-size: 11px;
 }
 
+/* Files view (Story 8.15): the conversations that changed a file. */
+.files-view {
+  width: 330px;
+}
+
+.file-row .file-path {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+}
+
+.file-hits {
+  margin: 0 0 4px;
+  padding: 0 0 0 20px;
+  list-style: none;
+}
+
+.file-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 5px 8px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-hit:hover {
+  background: #1d222c;
+}
+
+.file-hit.is-active {
+  background: #243040;
+  outline: 1px solid var(--accent);
+}
+
+.file-hit-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.file-hit-time {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.file-hash,
+.file-label {
+  flex: none;
+  color: var(--muted);
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+}
+
+.file-hit-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.file-hit-meta {
+  display: flex;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.file-hit-branch,
+.file-hit-commit {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
 /* The map draws its own git graph; React Flow only pans, zooms and frames it. */
 .map-node .git-graph {
   margin: 0;

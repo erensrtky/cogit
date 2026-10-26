@@ -1,12 +1,13 @@
-import { readCommitSubjects } from "../git.js";
+import { findGitRoot, projectFiles, readCommitFiles, readCommitSubjects } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import { readSessionMessages, type SessionMessage, upgradeSessionIds } from "../messages.js";
 import type { LineageNode, Session } from "../schema/session.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadProject } from "../store/stores.js";
+import { buildFileHistory, type FileSourceSession } from "../view/files.js";
 import { buildMessages } from "../view/lineage.js";
-import type { ViewNode } from "../view/model.js";
+import type { ViewFile, ViewNode } from "../view/model.js";
 
 /**
  * `codelineage log` and `codelineage show` (Story 8.10): the CLI's read verbs,
@@ -644,4 +645,76 @@ export async function log(opts: LogCommandOptions): Promise<LogModel> {
   }
   for (const line of formatLog(model, opts.branchesOnly === true)) opts.io.out(line);
   return model;
+}
+
+/**
+ * `./src\a.ts` and `src/a.ts` name the same file; the model stores forward-slash
+ * paths without a leading `./` (Story 8.15).
+ */
+export function normalizeFilePath(file: string): string {
+  return file
+    .replace(/\\/g, "/")
+    .replace(/^(\.\/)+/, "")
+    .replace(/\/+$/, "");
+}
+
+/** The plain-text file history: one line per message, newest first. */
+export function formatFileHistory(file: ViewFile): string[] {
+  const count = `${file.count} message${file.count === 1 ? "" : "s"}`;
+  const lines = [`${file.path}  ${count}  (newest first)`];
+  for (const hit of file.hits) {
+    const parts = [
+      `  ${stamp(hit.at)}  ${shortHash(hit.messageId)}  ${hit.label}  ${oneLine(hit.title)}`,
+    ];
+    parts.push(`  · ${oneLine(hit.sessionTitle)}`);
+    if (hit.branch !== undefined) parts.push(` ╭ ${oneLine(hit.branch)}`);
+    if (hit.commits.length > 0)
+      parts.push(`  [${hit.commits.map((hash) => hash.slice(0, 7)).join(" ")}]`);
+    lines.push(parts.join(""));
+  }
+  return lines;
+}
+
+export interface FileLogOptions {
+  dir: string;
+  /** The file whose history to print, relative to the project. */
+  file: string;
+  io: Io;
+  json?: boolean;
+}
+
+/**
+ * `codelineage log --file <path>`: the recorded messages that touched a file,
+ * newest first — the CLI side of the map's files view (Story 8.15). Files come
+ * from each message's own `files` plus the files of its commits read from git.
+ */
+export async function logFile(opts: FileLogOptions): Promise<ViewFile | null> {
+  const root = await openProject(opts.dir);
+  const sessions = await loadEffectiveSessions(root, opts.io);
+  const hashes = new Set(
+    sessions.flatMap((entry) => entry.messages.flatMap((message) => message.commits ?? [])),
+  );
+  let commitFiles: Map<string, string[]> = new Map();
+  if (hashes.size > 0) {
+    const gitRoot = await findGitRoot(root);
+    if (gitRoot !== undefined)
+      commitFiles = projectFiles(gitRoot, root, await readCommitFiles(gitRoot, hashes));
+  }
+  const sources: FileSourceSession[] = sessions.map(({ session, messages }) => ({
+    sessionId: session.sessionId,
+    title: session.title,
+    messages,
+  }));
+  const wanted = normalizeFilePath(opts.file);
+  const found = buildFileHistory(sources, commitFiles).find((file) => file.path === wanted);
+  if (found === undefined) {
+    opts.io.out(`No recorded message touched ${opts.file}.`);
+    return null;
+  }
+  if (opts.json === true) {
+    opts.io.out(JSON.stringify(found, null, 2));
+    return found;
+  }
+  for (const line of formatFileHistory(found)) opts.io.out(line);
+  return found;
 }

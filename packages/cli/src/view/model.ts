@@ -234,11 +234,47 @@ export interface LineageViewModel {
    */
   switcher?: ViewSwitcherProject[];
   /**
+   * Which conversations touched which file (Story 8.15), most recently touched
+   * first: the union of each message's `files` and the files of its commits,
+   * read from git at build time. Absent on pages built before 8.15.
+   */
+  files?: ViewFile[];
+  /**
    * Settings embedded at build time (Story 8.13). The settings modal shows them
    * read-only over `file://`; over the local server it reads the live values
    * instead. Absent on pages built before 8.13.
    */
   settings?: PanelSettings;
+}
+
+/**
+ * One message that touched a file (Story 8.15): the file view's row on the map
+ * and what `codelineage log --file` prints. `commits` are the commits that
+ * touched this file; a commit git no longer knows leaves an empty list.
+ */
+export interface ViewFileHit {
+  sessionId: string;
+  /** The session's title, or its id when the record has none yet. */
+  sessionTitle: string;
+  messageId: string;
+  /** The message's `mN` label. */
+  label: string;
+  at?: string;
+  title: string;
+  /** The branch the message sits in, when a branch summary starts at or before it. */
+  branch?: string;
+  commits: string[];
+}
+
+/** A file recorded messages touched, most recently touched first. */
+export interface ViewFile {
+  /** Project-relative path (`src/app.ts`). */
+  path: string;
+  /** Messages that touched it, newest first. */
+  hits: ViewFileHit[];
+  count: number;
+  /** Time of the newest hit. */
+  lastAt?: string;
 }
 
 /** One project card in the global panel. */

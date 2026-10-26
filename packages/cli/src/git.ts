@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { promisify } from "node:util";
 import { atomicWrite } from "./store/fs.js";
 
@@ -134,6 +134,115 @@ export async function readCommitSubjects(
         // gone from this repository (rebased away, or another checkout)
       }
     }
+  }
+  return out;
+}
+
+/** One commit with the files it changed, as `git log --name-only` printed it. */
+interface CommitFiles {
+  full: string;
+  short: string;
+  files: string[];
+}
+
+/**
+ * Parses `%x00%H --name-only` output: a NUL-prefixed hash line starts a commit,
+ * the file lines after it belong to that commit until the next hash line.
+ */
+function parseFileSections(stdout: string): CommitFiles[] {
+  const out: CommitFiles[] = [];
+  let current: CommitFiles | null = null;
+  for (const line of stdout.split("\n")) {
+    if (line.startsWith("\0")) {
+      const full = line.slice(1).trim();
+      current = /^[0-9a-f]{40}$/.test(full) ? { full, short: "", files: [] } : null;
+      if (current) out.push(current);
+      continue;
+    }
+    const file = line.trim();
+    if (current !== null && file !== "") current.files.push(file);
+  }
+  return out;
+}
+
+/**
+ * The files each given commit changed, keyed by the hash the record holds
+ * (Story 8.15: the map's file history). Paths are relative to the repository
+ * root. Missing commits and a missing git binary only drop entries, never fail
+ * the build — same policy as `readCommitSubjects`.
+ */
+export async function readCommitFiles(
+  root: string,
+  hashes: Iterable<string>,
+): Promise<Map<string, string[]>> {
+  const wanted = [...new Set(hashes)];
+  const out = new Map<string, string[]>();
+  if (wanted.length === 0) return out;
+
+  const remember = (entries: CommitFiles[]): void => {
+    for (const hash of wanted) {
+      const commit = entries.find(
+        (entry) => entry.full.startsWith(hash) || hash.startsWith(commitShort(entry)),
+      );
+      if (commit && !out.has(hash)) out.set(hash, commit.files);
+    }
+  };
+
+  try {
+    const { stdout } = await exec("git", [
+      "-C",
+      root,
+      "log",
+      "--no-walk=unsorted",
+      "--format=%x00%H",
+      "--name-only",
+      ...wanted,
+    ]);
+    remember(parseFileSections(stdout));
+  } catch {
+    for (const hash of wanted) {
+      try {
+        const { stdout } = await exec("git", [
+          "-C",
+          root,
+          "show",
+          "--format=%x00%H",
+          "--name-only",
+          hash,
+        ]);
+        remember(parseFileSections(stdout));
+      } catch {
+        // gone from this repository (rebased away, or another checkout)
+      }
+    }
+  }
+  return out;
+}
+
+/** A commit's short hash, computed when git printed only the full one. */
+function commitShort(commit: CommitFiles): string {
+  return commit.short === "" ? commit.full.slice(0, 7) : commit.short;
+}
+
+/**
+ * Rebases repository-relative file paths onto the project root and drops the
+ * files outside it, so the map compares commit files with the paths the records
+ * hold (Story 8.15). A project at the repository root passes through unchanged.
+ */
+export function projectFiles(
+  gitRoot: string,
+  root: string,
+  files: ReadonlyMap<string, string[]>,
+): Map<string, string[]> {
+  if (gitRoot === root) return new Map(files);
+  const out = new Map<string, string[]>();
+  for (const [hash, list] of files) {
+    const kept = list.flatMap((file) => {
+      const rel = relative(root, join(gitRoot, file));
+      if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return [];
+      return [rel.split(sep).join("/")];
+    });
+    if (kept.length > 0) out.set(hash, kept);
   }
   return out;
 }

@@ -86,6 +86,7 @@ export const fixture: LineageViewModel = {
             message("m2", "Wire the data contract", "m1", "2026-10-24T09:12:00.000Z", {
               summary: "The page reads the JSON script element and types it once.",
               work: ["Added view/model.ts shared by CLI and template"],
+              files: ["packages/cli/src/view/model.ts", "packages/cli/src/view/lineage.ts"],
             }),
             message("m3", "Read data from the DOM", "m2", "2026-10-24T09:20:00.000Z", {
               summary: "A fetch would break file://; the JSON element survives inlining.",
@@ -99,12 +100,14 @@ export const fixture: LineageViewModel = {
                 { hash: "1a2b3c4", subject: "feat(template): add the dev fixture" },
                 { hash: "9f8e7d6" },
               ],
+              files: ["packages/template/src/fixture.ts"],
             }),
             message("m5", "Check the page in the browser", "m4", "2026-10-24T10:02:00.000Z", {
               summary: "Layout measured; console clean.",
             }),
             message("m6", "Draw nested groups", "m4", "2026-10-24T10:20:00.000Z", {
               summary: "A second branch off the fixture work.",
+              files: ["packages/template/src/Graph.tsx"],
               branch: {
                 title: "Nested groups",
                 asked: "How do epochs, sessions and messages nest?",
@@ -121,6 +124,7 @@ export const fixture: LineageViewModel = {
             }),
             message("m9", "Lineage graph idea", null, "2026-10-24T11:42:00.000Z", {
               summary: "A git graph of the user's messages.",
+              files: ["packages/cli/src/view/files.ts"],
               branch: {
                 title: "Git graph",
                 asked: "What if the map read like a git history?",
@@ -152,6 +156,7 @@ export const fixture: LineageViewModel = {
           [
             message("c1", "Harden session writes", null, "2026-10-20T09:00:00.000Z", {
               summary: "Locked read → merge → write with redaction.",
+              files: ["packages/cli/src/store/stores.ts"],
               branch: {
                 title: "Safe writes",
                 asked: "How do two turns write the same session?",
@@ -198,6 +203,111 @@ export const fixture: LineageViewModel = {
         next: "Ask before implementing.",
       },
     ),
+  ],
+  // Story 8.15: the files view, as `build` unions message files and commit files.
+  files: [
+    {
+      path: "packages/cli/src/view/files.ts",
+      count: 1,
+      lastAt: "2026-10-24T11:42:00.000Z",
+      hits: [
+        {
+          sessionId: "fixture-template",
+          sessionTitle: "Template package and single-file output",
+          messageId: "m9",
+          label: "m9",
+          at: "2026-10-24T11:42:00.000Z",
+          title: "Lineage graph idea",
+          branch: "Git graph",
+          commits: [],
+        },
+      ],
+    },
+    {
+      path: "packages/template/src/Graph.tsx",
+      count: 1,
+      lastAt: "2026-10-24T10:20:00.000Z",
+      hits: [
+        {
+          sessionId: "fixture-template",
+          sessionTitle: "Template package and single-file output",
+          messageId: "m6",
+          label: "m6",
+          at: "2026-10-24T10:20:00.000Z",
+          title: "Draw nested groups",
+          branch: "Nested groups",
+          commits: [],
+        },
+      ],
+    },
+    {
+      path: "packages/template/src/fixture.ts",
+      count: 1,
+      lastAt: "2026-10-24T09:41:00.000Z",
+      hits: [
+        {
+          sessionId: "fixture-template",
+          sessionTitle: "Template package and single-file output",
+          messageId: "m4",
+          label: "m4",
+          at: "2026-10-24T09:41:00.000Z",
+          title: "Build the dev fixture",
+          branch: "Template scaffold",
+          commits: ["1a2b3c4", "9f8e7d6"],
+        },
+      ],
+    },
+    {
+      path: "packages/cli/src/view/model.ts",
+      count: 1,
+      lastAt: "2026-10-24T09:12:00.000Z",
+      hits: [
+        {
+          sessionId: "fixture-template",
+          sessionTitle: "Template package and single-file output",
+          messageId: "m2",
+          label: "m2",
+          at: "2026-10-24T09:12:00.000Z",
+          title: "Wire the data contract",
+          branch: "Template scaffold",
+          commits: [],
+        },
+      ],
+    },
+    {
+      path: "packages/cli/src/view/lineage.ts",
+      count: 1,
+      lastAt: "2026-10-24T09:12:00.000Z",
+      hits: [
+        {
+          sessionId: "fixture-template",
+          sessionTitle: "Template package and single-file output",
+          messageId: "m2",
+          label: "m2",
+          at: "2026-10-24T09:12:00.000Z",
+          title: "Wire the data contract",
+          branch: "Template scaffold",
+          commits: [],
+        },
+      ],
+    },
+    {
+      path: "packages/cli/src/store/stores.ts",
+      count: 1,
+      lastAt: "2026-10-20T09:00:00.000Z",
+      hits: [
+        {
+          sessionId: "fixture-capture",
+          sessionTitle: "Session merge and redaction",
+          messageId: "c1",
+          label: "c1",
+          at: "2026-10-20T09:00:00.000Z",
+          title: "Harden session writes",
+          branch: "Safe writes",
+          commits: [],
+        },
+      ],
+    },
   ],
   // Story 8.12: the switcher's data, as `build` collects it from the registry.
   switcher: [
