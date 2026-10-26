@@ -6,7 +6,12 @@ import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import { configGit, configSet } from "../src/commands/config.js";
 import { sessionAuthor, sessionWrite } from "../src/commands/session.js";
-import { cogitGitignore, ensureGitignore, refreshCogitGitignore } from "../src/git.js";
+import {
+  cogitGitignore,
+  commitBetween,
+  ensureGitignore,
+  refreshCogitGitignore,
+} from "../src/git.js";
 import { hookBlock, installGitHook, withHookBlock } from "../src/git-hooks.js";
 import { runHook } from "../src/hooks/run.js";
 import type { Session } from "../src/schema/session.js";
@@ -75,6 +80,10 @@ describe("the record travels with the repo (Story 9.3)", () => {
     await writeFile(join(root, "a.txt"), "one\n");
     await git("add", "a.txt");
     await git("commit", "-q", "-m", "feat: base");
+  });
+
+  it("treats a missing repository as no commit between two messages (9.5)", async () => {
+    await expect(commitBetween(join(dir, "not-a-repo"), T0, T0)).resolves.toBe(false);
   });
 
   it("parses and rejects the session HEAD", async () => {

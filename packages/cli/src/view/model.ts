@@ -133,7 +133,7 @@ export interface ViewStatus {
 
 /** Status card at the top of the map (merged across sessions). */
 export interface StatusCard extends ViewStatus {
-  /** `updatedAt` of the most recently updated session, or null with no sessions. */
+  /** Time of the newest message across sessions, or null with no sessions. */
   lastActivity: string | null;
 }
 
@@ -209,7 +209,7 @@ export interface ViewEpoch {
 export interface ViewSwitcherProject {
   name: string;
   path: string;
-  /** `updatedAt` of the project's most recently updated session. */
+  /** Time of the project's newest message across its sessions. */
   lastActivity: string | null;
   /** The newest session's `next`, or its last message title when `next` is empty. */
   leftOff: string;

@@ -19,6 +19,25 @@ function time(value: string | undefined): number {
   return Number.isNaN(at) ? Number.NEGATIVE_INFINITY : at;
 }
 
+/**
+ * When the session was last active: its newest message's time, not the record's
+ * `updatedAt` (Story 9.5). Editing an old record must not stretch its lane, and
+ * so its parallel with the sessions that ran alongside it, to now.
+ */
+export function lastMessageTime(session: ViewSession): string {
+  let latest: string | undefined;
+  let at = Number.NEGATIVE_INFINITY;
+  for (const message of session.messages) {
+    if (message.at === undefined) continue;
+    const sent = time(message.at);
+    if (sent > at) {
+      at = sent;
+      latest = message.at;
+    }
+  }
+  return latest ?? session.updatedAt;
+}
+
 /** The session a session hangs from: the one its first message continues. */
 export function sessionParentOf(session: ViewSession, known: ReadonlySet<string>): string | null {
   const other = session.messages[0]?.continues?.sessionId;
@@ -64,7 +83,7 @@ export function layoutSessionGraph(
       id: session.sessionId,
       title: session.title || session.sessionId,
       at: session.startedAt,
-      until: session.updatedAt,
+      until: lastMessageTime(session),
       parent,
     };
   });

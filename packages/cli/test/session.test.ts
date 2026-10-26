@@ -1,7 +1,9 @@
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import { configSet } from "../src/commands/config.js";
 import { epochAdd } from "../src/commands/epoch.js";
@@ -11,6 +13,8 @@ import { messageHash } from "../src/messages.js";
 import { redactDeep, redactText } from "../src/redact.js";
 import { loadSession } from "../src/store/stores.js";
 import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
+
+const run = promisify(execFile);
 
 describe("redactText", () => {
   it.each([
@@ -352,10 +356,33 @@ ${line("second", 2)}
     ]);
   });
 
-  it("hints the gap, a /clear and this session's commits for each new message", async () => {
+  it("hints the gap, a /clear and a real commit between two messages", async () => {
     await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
     const folder = join(dir, "claude", "projects", "-p");
     await mkdir(folder, { recursive: true });
+    // The hint asks git, not the transcript (Story 9.5): a commit that only
+    // mentions `git commit` (or one that failed) is not a commit.
+    const git = async (at: string, ...args: string[]) =>
+      run("git", ["-C", root, ...args], {
+        env: {
+          ...process.env,
+          HOME: dir,
+          GIT_AUTHOR_DATE: at,
+          GIT_COMMITTER_DATE: at,
+        },
+      });
+    await git("2026-10-23T09:00:00.000Z", "init", "-q");
+    await git("2026-10-23T09:00:00.000Z", "config", "user.email", "t@example.com");
+    await git("2026-10-23T09:00:00.000Z", "config", "user.name", "T");
+    await writeFile(join(root, "note.txt"), "x\n");
+    await git("2026-10-23T09:00:00.000Z", "add", "note.txt");
+    await git("2026-10-23T09:00:00.000Z", "commit", "-q", "-m", "chore: initial");
+    // One commit lands between the second and third message, none between the
+    // first and second — although the transcript shows a `git commit` there.
+    await writeFile(join(root, "note.txt"), "y\n");
+    await git("2026-10-23T10:45:00.000Z", "add", "note.txt");
+    await git("2026-10-23T10:45:00.000Z", "commit", "-q", "-m", "feat: between");
+
     const user = (text: string, at: string) =>
       JSON.stringify({
         type: "user",
@@ -396,7 +423,6 @@ ${line("second", 2)}
         at: "2026-10-23T10:30:00.000Z",
         text: "second",
         gapMinutes: 30,
-        commitBetween: true,
       },
       {
         id: hash("2026-10-23T11:00:00.000Z", "third"),
@@ -405,8 +431,51 @@ ${line("second", 2)}
         text: "third",
         gapMinutes: 30,
         resumed: true,
+        commitBetween: true,
       },
     ]);
+  });
+
+  it("is compact by default and prints everything with --full", async () => {
+    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    // An earlier session to hang the first message from, so `candidates` has content.
+    await sessionWrite({ dir: root }, fakeIo(envFor(dir)), async () =>
+      JSON.stringify({
+        sessionId: "s1",
+        title: "Earlier",
+        nodes: [{ id: "m1", kind: "message", title: "Earlier message" }],
+      }),
+    );
+    const folder = join(dir, "claude", "projects", "-p");
+    await mkdir(folder, { recursive: true });
+    const lines = Array.from({ length: 7 }, (_, i) =>
+      JSON.stringify({
+        type: "user",
+        timestamp: `2026-10-23T10:0${i + 1}:00.000Z`,
+        message: { role: "user", content: `message ${i + 1}` },
+      }),
+    );
+    await writeFile(join(folder, "s2.jsonl"), `${lines.join("\n")}\n`);
+    await sessionWrite({ dir: root }, fakeIo(envFor(dir)), async () =>
+      JSON.stringify({
+        sessionId: "s2",
+        title: "Long session",
+        nodes: Array.from({ length: 7 }, (_, i) => ({
+          id: `m${i + 1}`,
+          kind: "message",
+          title: `Message ${i + 1}`,
+        })),
+      }),
+    );
+
+    await sessionShow(root, "s2", io);
+    expect(shown().lastMessages).toHaveLength(5);
+    expect(shown()).not.toHaveProperty("candidates");
+
+    io.lines.length = 0;
+    await sessionShow(root, "s2", io, { full: true });
+    expect(shown().lastMessages).toHaveLength(7);
+    expect(shown().candidates).toMatchObject({ forMessage: { label: "m1" } });
   });
 
   it("treats an unreadable transcript as none and warns about a message id it cannot use", async () => {

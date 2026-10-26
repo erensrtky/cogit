@@ -340,6 +340,31 @@ export async function gitUserName(
   }
 }
 
+/**
+ * True when this repository has a commit made between two moments (Story 9.5).
+ * The transcript only shows that a `git commit` command ran; this asks git
+ * whether one actually landed here, so a failed or other-repository commit is
+ * not a hint. A missing git, an uninitialized repository or bad dates are all
+ * "no commit": a hint must never fail the command it decorates.
+ */
+export async function commitBetween(
+  root: string,
+  from: string,
+  to: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<boolean> {
+  try {
+    const { stdout } = await exec(
+      "git",
+      ["-C", root, "log", "--max-count=1", "--format=%H", `--since=${from}`, `--until=${to}`],
+      { env },
+    );
+    return stdout.trim() !== "";
+  } catch {
+    return false;
+  }
+}
+
 /** The hooks directory git really uses here: `core.hooksPath`, Husky and worktrees included. */
 export async function gitHooksDir(root: string): Promise<string | undefined> {
   try {

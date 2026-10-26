@@ -13,8 +13,6 @@ export interface UserMessage {
   text: string;
   /** A `/clear`, a resume or a new process came between this message and the previous one. */
   resumed?: boolean;
-  /** The agent ran `git commit` between the previous message and this one. */
-  commitBetween?: boolean;
 }
 
 /**
@@ -145,12 +143,6 @@ export function displayTurn(turn: ChatTurn, roots: string[]): ChatTurn {
 
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
-/**
- * `git commit`, also behind options like `-C dir`. A hint, not a decision: a
- * command that merely mentions a commit (`git log --grep commit`) may match.
- */
-const GIT_COMMIT = /(?:^|[\s;&|])git(?:\s+[^\s;&|]+)*\s+commit\b/;
-
 /** A `/clear` written by the user or by the CLI as a local command. */
 const CLEAR = /<command-name>\s*\/clear\s*<\/command-name>/;
 
@@ -186,7 +178,6 @@ export async function readConversation(file: string): Promise<ChatTurn[]> {
   /** Uuids already read, to notice a chain that starts again (a resumed process). */
   const seen = new Set<string>();
   let pendingResume = false;
-  let pendingCommit = false;
   const lines = createInterface({ input: createReadStream(file, "utf8"), crlfDelay: Infinity });
   for await (const raw of lines) {
     // A /clear line is a local command, not a message, but it breaks the thread.
@@ -218,7 +209,6 @@ export async function readConversation(file: string): Promise<ChatTurn[]> {
     const current = turns.at(-1);
     if (line.type === "assistant") {
       if (current) addAssistant(current, line);
-      if (current && hasCommit(line)) pendingCommit = true;
       continue;
     }
     const text = messageText(line);
@@ -232,26 +222,10 @@ export async function readConversation(file: string): Promise<ChatTurn[]> {
       replies: [],
       tools: { commands: 0, files: [], other: 0 },
       ...(!first && pendingResume ? { resumed: true } : {}),
-      ...(!first && pendingCommit ? { commitBetween: true } : {}),
     });
     pendingResume = false;
-    pendingCommit = false;
   }
   return turns;
-}
-
-/** Whether an assistant line ran a `git commit`. */
-function hasCommit(line: Record<string, unknown>): boolean {
-  if (line.isSidechain) return false;
-  const content = (line.message as { content?: unknown } | undefined)?.content;
-  if (!Array.isArray(content)) return false;
-  return content.some(
-    (block) =>
-      block?.type === "tool_use" &&
-      block.name === "Bash" &&
-      typeof block.input?.command === "string" &&
-      GIT_COMMIT.test(block.input.command),
-  );
 }
 
 /**
@@ -272,12 +246,11 @@ export async function readsHandoff(file: string): Promise<boolean> {
 
 /** Reads the user's messages from a transcript, in order. */
 export async function readUserMessages(file: string): Promise<UserMessage[]> {
-  return (await readConversation(file)).map(({ id, at, text, resumed, commitBetween }) => ({
+  return (await readConversation(file)).map(({ id, at, text, resumed }) => ({
     id,
     at,
     text,
     ...(resumed ? { resumed: true } : {}),
-    ...(commitBetween ? { commitBetween: true } : {}),
   }));
 }
 

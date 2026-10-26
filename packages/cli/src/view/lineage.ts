@@ -147,6 +147,36 @@ function byUpdatedAt(a: Session, b: Session): number {
   return timestamp(b.updatedAt) - timestamp(a.updatedAt) || a.sessionId.localeCompare(b.sessionId);
 }
 
+/** The timestamp the session was last active at, and that value as stored. */
+interface Activity {
+  value: string;
+  time: number;
+}
+
+/**
+ * Activity is message time, not record time (Story 9.5): fixing an old record
+ * touches its `updatedAt`, which must not make the session look like it ran
+ * until now. A session with no timed message falls back to `updatedAt`.
+ */
+function lastActivityOf(session: Session): Activity {
+  let value = session.updatedAt;
+  let time = Number.NEGATIVE_INFINITY;
+  for (const node of session.nodes) {
+    if (node.kind !== "message" || node.at === undefined) continue;
+    const at = timestamp(node.at);
+    if (at > time) {
+      time = at;
+      value = node.at;
+    }
+  }
+  return { value, time: time === Number.NEGATIVE_INFINITY ? timestamp(value) : time };
+}
+
+/** When the session was last active; the newest message's time, else `updatedAt`. */
+export function lastActive(session: Session): number {
+  return lastActivityOf(session).time;
+}
+
 function hasStatus(session: Session): boolean {
   const { goal, done, pending, next } = session.status;
   return goal !== "" || next !== "" || done.length > 0 || pending.length > 0;
@@ -157,12 +187,11 @@ function hasStatus(session: Session): boolean {
  * updated session that recorded a status, so a newer session without one does not
  * blank the card; `needsUser` items are merged from every other session active
  * within `ACTIVE_WINDOW_DAYS`, newest first and deduplicated by text. Last
- * activity is the newest session overall. `now` is the build time the window is
- * measured against.
+ * activity is the newest message time across every session (Story 9.5), not the
+ * newest `updatedAt`. `now` is the build time the window is measured against.
  */
 export function statusCard(sessions: Session[], now: string): StatusCard {
   const ordered = [...sessions].sort(byUpdatedAt);
-  const newest = ordered[0];
   const latest = ordered.find(hasStatus);
 
   const pending = (latest?.status.pending ?? []).map((item) => ({ ...item }));
@@ -177,12 +206,19 @@ export function statusCard(sessions: Session[], now: string): StatusCard {
     }
   }
 
+  const activity = ordered
+    .map(lastActivityOf)
+    .reduce<Activity | null>(
+      (best, current) => (best === null || current.time > best.time ? current : best),
+      null,
+    );
+
   return {
     goal: latest?.status.goal ?? "",
     done: latest?.status.done ?? [],
     pending,
     next: latest?.status.next ?? "",
-    lastActivity: newest?.updatedAt ?? null,
+    lastActivity: activity?.value ?? null,
   };
 }
 

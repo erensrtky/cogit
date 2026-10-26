@@ -108,10 +108,11 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .command("blame")
     .description("show which recorded messages produced the code in a file or line")
     .argument("<target>", "file, or file:line")
-    .option("-C, --dir <dir>", "project directory", ".")
+    .argument("[dir]", "project directory", ".")
+    .option("-C, --dir <dir>", "project directory (same as the positional)")
     .action(
-      run(async (target: string, opts: { dir: string }) => {
-        await blame({ dir: opts.dir, target, io: makeIo(false) });
+      run(async (target: string, dir: string, opts: { dir?: string }) => {
+        await blame({ dir: opts.dir ?? dir, target, io: makeIo(false) });
       }),
     );
 
@@ -357,8 +358,11 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .description("print the compact record the agent skill updates, as JSON")
     .argument("<id>", "session id")
     .option("-C, --dir <dir>", "project directory", ".")
+    .option("--full", "print every recorded message and the parent candidates")
     .action(
-      run(async (id: string, opts: { dir: string }) => sessionShow(opts.dir, id, makeIo(false))),
+      run(async (id: string, opts: { dir: string; full?: boolean }) =>
+        sessionShow(opts.dir, id, makeIo(false), { full: opts.full === true }),
+      ),
     );
 
   // Started detached by the SessionEnd hook when `recordCommit` is `auto`.

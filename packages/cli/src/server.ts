@@ -8,7 +8,7 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
-import { basename, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildProject } from "./commands/build.js";
 import { defaultsPrompter, type Io } from "./io.js";
@@ -20,6 +20,7 @@ import { loadConfig, loadRegistry, updateConfig } from "./store/stores.js";
 import { isPanelEditableKey, LIVE_META_NAME, TOKEN_META_NAME } from "./view/model.js";
 import { buildPanel, panelSettings } from "./view/panel.js";
 import { editableSettings } from "./view/settings.js";
+import { claudeConfigDir } from "./view/transcripts.js";
 
 /** A page nobody is looking at is a dead server after this long. */
 export const DEFAULT_IDLE_MS = 30 * 60 * 1000;
@@ -64,6 +65,8 @@ export interface MapServerOptions {
   hostname?: string;
   /** Exit after this long without a connected page (tests use a short one). */
   idleMs?: number;
+  /** Quiet time after the last transcript write before a map rebuild (tests use a short one). */
+  transcriptDebounceMs?: number;
 }
 
 export interface MapServer {
@@ -81,12 +84,16 @@ interface PageTarget {
   file: string;
   /** Directory to watch: atomic writes replace the file, the directory keeps its name. */
   dir: string;
+  /** The registered project the map belongs to; absent for the panel. */
+  root?: string;
 }
 
 interface WatchedPage {
   watcher?: FSWatcher;
   clients: Set<ServerResponse>;
   timer: NodeJS.Timeout | null;
+  /** The project to rebuild while this page has a transcript write (Story 9.5). */
+  root?: string;
 }
 
 function hostAllowed(host: string | undefined, port: number): boolean {
@@ -127,7 +134,7 @@ async function pageTarget(env: NodeJS.ProcessEnv, url: URL): Promise<PageTarget 
     const root = await registeredRoot(env, raw);
     if (!root) return null;
     const paths = projectPaths(root);
-    return { file: paths.html, dir: paths.base };
+    return { file: paths.html, dir: paths.base, root };
   }
   return null;
 }
@@ -147,7 +154,21 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
   const env = opts.env ?? process.env;
   const hostname = opts.hostname ?? HOST;
   const idleMs = opts.idleMs ?? DEFAULT_IDLE_MS;
+  const transcriptDebounceMs = opts.transcriptDebounceMs ?? 1000;
   const pages = new Map<string, WatchedPage>();
+  /** A quiet build IO: rebuilds a page without printing to a terminal nobody watches. */
+  const buildIo: Io = {
+    prompt: defaultsPrompter,
+    out: () => {},
+    warn: () => {},
+    env,
+    now: () => new Date().toISOString(),
+  };
+  /** Watches Claude Code's transcripts while somebody has a map open (9.5). */
+  let transcriptWatcher: FSWatcher | undefined;
+  let transcriptTimer: NodeJS.Timeout | null = null;
+  /** Rebuilds run one after another, so a write during a build is never dropped. */
+  let rebuildQueue: Promise<void> = Promise.resolve();
   /** One random token per server start; the panel page carries it into a write. */
   const token = randomBytes(24).toString("hex");
   let openPages = 0;
@@ -178,10 +199,14 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
     }
   }
 
-  function watched(file: string, dir: string): WatchedPage {
+  function watched(file: string, dir: string, root?: string): WatchedPage {
     const existing = pages.get(file);
     if (existing) return existing;
-    const page: WatchedPage = { clients: new Set(), timer: null };
+    const page: WatchedPage = {
+      clients: new Set(),
+      timer: null,
+      ...(root === undefined ? {} : { root }),
+    };
     try {
       page.watcher = watch(dir, { persistent: false }, (_event, name) => {
         // A null name means "something in here changed" on some platforms.
@@ -205,6 +230,66 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
     page.watcher?.close();
     if (page.timer !== null) clearTimeout(page.timer);
     pages.delete(file);
+  }
+
+  /**
+   * Rebuilds every map somebody is looking at, from the records and the
+   * transcripts. The write itself reaches the page through the page watcher; a
+   * failing project is skipped so one broken record never stops the others.
+   */
+  async function rebuildOpenMaps(): Promise<void> {
+    const roots = new Set<string>();
+    for (const page of pages.values()) {
+      if (page.root !== undefined && page.clients.size > 0) roots.add(page.root);
+    }
+    for (const root of roots) {
+      try {
+        await buildProject({ dir: root, io: buildIo, quiet: true });
+      } catch {
+        // Already a warning where the project is read; keep the page up.
+      }
+    }
+  }
+
+  /** Queues a rebuild behind any running one; the debounce already collapsed the burst. */
+  function queueRebuild(): void {
+    rebuildQueue = rebuildQueue.then(() => rebuildOpenMaps());
+  }
+
+  /**
+   * Follows Claude Code's transcripts while a map page is open (Story 9.5), so
+   * the map is live without the plugin's Stop hook. One recursive watcher over
+   * the Claude projects directory covers every registered project, and a turn's
+   * many writes collapse into one debounced rebuild. No page, no watch.
+   */
+  function startTranscriptWatch(): void {
+    if (transcriptWatcher !== undefined) return;
+    const dir = join(claudeConfigDir(env), "projects");
+    try {
+      transcriptWatcher = watch(dir, { persistent: false, recursive: true }, (_event, name) => {
+        if (name === null || !name.toString().endsWith(".jsonl")) return;
+        if (transcriptTimer !== null) clearTimeout(transcriptTimer);
+        transcriptTimer = setTimeout(() => {
+          transcriptTimer = null;
+          queueRebuild();
+        }, transcriptDebounceMs);
+      });
+    } catch {
+      // No Claude home (or no recursive watch here): the Stop hook still rebuilds.
+      transcriptWatcher = undefined;
+    }
+  }
+
+  function stopTranscriptWatch(): void {
+    transcriptWatcher?.close();
+    transcriptWatcher = undefined;
+    if (transcriptTimer !== null) clearTimeout(transcriptTimer);
+    transcriptTimer = null;
+  }
+
+  /** Whether any project map (not just the panel) still has a viewer. */
+  function mapPagesOpen(): boolean {
+    return [...pages.values()].some((page) => page.root !== undefined && page.clients.size > 0);
   }
 
   const server = createHttpServer((req, res) => {
@@ -254,13 +339,6 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
    * write already landed, so a failed rebuild must not fail the request.
    */
   async function refreshOpenPages(): Promise<void> {
-    const io: Io = {
-      prompt: defaultsPrompter,
-      out: () => {},
-      warn: () => {},
-      env,
-      now: () => new Date().toISOString(),
-    };
     let rebuiltMap = false;
     const registry = await loadRegistry(env);
     if (registry.found && registry.ok) {
@@ -268,7 +346,7 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
         const page = pages.get(projectPaths(entry.path).html);
         if (!page || page.clients.size === 0) continue;
         try {
-          await buildProject({ dir: entry.path, io, quiet: true });
+          await buildProject({ dir: entry.path, io: buildIo, quiet: true });
           rebuiltMap = true;
         } catch {
           // A broken project is already a warning elsewhere; keep serving.
@@ -278,7 +356,7 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
     if (rebuiltMap) return;
     try {
       // `buildProject` rebuilds the panel too; without an open map, do it here.
-      await buildPanel({ env, io });
+      await buildPanel({ env, io: buildIo });
     } catch {
       // An unwritable global directory leaves the old page in place.
     }
@@ -432,15 +510,18 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
         connection: "keep-alive",
       });
       res.write("retry: 1000\n\n");
-      const page = watched(target.file, target.dir);
+      const page = watched(target.file, target.dir, target.root);
       page.clients.add(res);
       res.on("error", () => page.clients.delete(res));
       openPages += 1;
       clearIdle();
+      // The panel does not need the transcripts; a map page does (Story 9.5).
+      if (target.root !== undefined) startTranscriptWatch();
       req.on("close", () => {
         page.clients.delete(res);
         release(target.file, page);
         openPages = Math.max(0, openPages - 1);
+        if (!mapPagesOpen()) stopTranscriptWatch();
         if (openPages === 0) scheduleIdle(idleMs);
       });
       return;
@@ -476,6 +557,7 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
     if (closing) return closing;
     closing = (async () => {
       clearIdle();
+      stopTranscriptWatch();
       for (const page of pages.values()) {
         page.watcher?.close();
         if (page.timer !== null) clearTimeout(page.timer);

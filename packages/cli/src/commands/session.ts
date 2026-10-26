@@ -1,7 +1,7 @@
 import { readFile, rm } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { resolve } from "node:path";
-import { findGitRoot, gitUserName } from "../git.js";
+import { commitBetween, findGitRoot, gitUserName } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import {
   hashesToLabels,
@@ -278,8 +278,18 @@ function structureChanges(
  * worktree that is the worktree, so writes still learn which worktree they came
  * from, while `store` names the main checkout that holds the record. The inbox
  * stays under `dir`, where the skill's edit permission points.
+ *
+ * The output is compact by default, because the skill pays for it on every
+ * update: `lastMessages` keeps the last five and `candidates` only appear while
+ * the first message has no node. `--full` (Story 9.5) asks for every recorded
+ * message and the candidates every time.
  */
-export async function sessionShow(dir: string, sessionId: string, io: Io): Promise<void> {
+export async function sessionShow(
+  dir: string,
+  sessionId: string,
+  io: Io,
+  opts: { full?: boolean } = {},
+): Promise<void> {
   if (!Slug.safeParse(sessionId).success) throw new CliError(`invalid session id: ${sessionId}`);
   const given = resolve(dir);
   const { root } = await resolveProjectRoot(given);
@@ -326,17 +336,24 @@ export async function sessionShow(dir: string, sessionId: string, io: Io): Promi
   const recorded = recordedIdsOf(effective);
   if (messages) {
     view.messageCount = messages.length;
-    view.newMessages = newMessages(messages, recorded, labels);
-    // Only the session's first message can continue an earlier session (8.6).
+    view.newMessages = await newMessages(messages, recorded, labels, root, io.env);
+    // Only the session's first message can continue an earlier session (8.6), so
+    // the expensive other-session scan only runs while that message is unrecorded
+    // (`--full` asks for it every time, for debugging and backfill).
+    const first = messages[0];
     const candidates =
-      messages.length > 0 && !isRecorded(recorded, messages[0] as SessionMessage)
-        ? await parentCandidates(root, sessionId, messages[0] as SessionMessage, io)
+      first !== undefined && (opts.full === true || !isRecorded(recorded, first))
+        ? await parentCandidates(root, sessionId, first, io)
         : null;
     if (candidates) view.candidates = candidates;
   } else {
     view.newMessages = null;
   }
-  view.lastMessages = lastMessages(effective, labels);
+  view.lastMessages = lastMessages(
+    effective,
+    labels,
+    opts.full === true ? Number.POSITIVE_INFINITY : LAST_MESSAGES,
+  );
   // A format change would otherwise look like "nothing written yet" forever.
   if (messages && messages.length === 0) {
     const file = await findTranscript(sessionId, io.env);
@@ -376,32 +393,44 @@ const LAST_MESSAGES = 5;
 /**
  * The user's messages with no node yet, with the cheap hints the agent uses to
  * decide a parent: the gap since the previous message, a `/clear` or resume in
- * between, and a commit this session made between them. Hints, not rules. `id`
- * is the stable id the record keeps; `label` is the `m1` the user reads.
+ * between, and a commit made in this repository between them. Hints, not rules.
+ * `id` is the stable id the record keeps; `label` is the `m1` the user reads.
+ *
+ * `commitBetween` asks git, not the transcript: the transcript only shows that a
+ * `git commit` command ran, which was true even when it failed or committed in
+ * another repository (Story 9.5).
  */
-function newMessages(
+async function newMessages(
   messages: SessionMessage[],
   recorded: ReadonlySet<string>,
   labels: ReadonlyMap<string, string>,
-): Record<string, unknown>[] {
-  return messages
-    .map((message, i) => {
-      const previous = i > 0 ? messages[i - 1] : undefined;
-      const gapMinutes = previous
-        ? Math.max(0, Math.round((Date.parse(message.at) - Date.parse(previous.at)) / 60_000))
-        : undefined;
-      return { message, gapMinutes };
-    })
-    .filter(({ message }) => !isRecorded(recorded, message))
-    .map(({ message, gapMinutes }) => ({
+  root: string,
+  env: NodeJS.ProcessEnv,
+): Promise<Record<string, unknown>[]> {
+  const gitRoot = await findGitRoot(root);
+  const out: Record<string, unknown>[] = [];
+  for (const [i, message] of messages.entries()) {
+    if (isRecorded(recorded, message)) continue;
+    const previous = i > 0 ? messages[i - 1] : undefined;
+    const gapMinutes =
+      previous === undefined
+        ? undefined
+        : Math.max(0, Math.round((Date.parse(message.at) - Date.parse(previous.at)) / 60_000));
+    const committed =
+      previous !== undefined &&
+      gitRoot !== undefined &&
+      (await commitBetween(gitRoot, previous.at, message.at, env));
+    out.push({
       id: message.hash,
       label: labels.get(message.hash) ?? message.label,
       at: message.at,
       text: excerpt(message.text),
       ...(gapMinutes === undefined ? {} : { gapMinutes }),
       ...(message.resumed ? { resumed: true } : {}),
-      ...(message.commitBetween ? { commitBetween: true } : {}),
-    }));
+      ...(committed ? { commitBetween: true } : {}),
+    });
+  }
+  return out;
 }
 
 /** How many earlier sessions and messages `session show` offers for a parent. */
@@ -480,6 +509,7 @@ async function parentCandidates(
 function lastMessages(
   session: Session | null,
   labels: ReadonlyMap<string, string>,
+  limit: number,
 ): { id: string; label?: string; title: string; parent: string | null }[] {
   if (!session) return [];
   /** Send-order position from the label; a node without one keeps its stored place. */
@@ -490,7 +520,7 @@ function lastMessages(
   const messages = session.nodes
     .filter((n) => n.kind === "message")
     .sort((a, b) => position(a.id) - position(b.id))
-    .slice(-LAST_MESSAGES);
+    .slice(-limit);
   return messages.map(({ id, title, parent }) => {
     const label = labels.get(id);
     return { id, ...(label === undefined ? {} : { label }), title, parent };

@@ -360,6 +360,23 @@ describe("statusCard", () => {
     expect(statusCard(sessions, "also-broken").pending).toEqual([]);
   });
 
+  it("takes last activity from the newest message, not an edited record's updatedAt", () => {
+    const sessions = [
+      // The old record was edited after this session ran; its messages are old.
+      session({
+        sessionId: "edited-old",
+        updatedAt: "2026-10-21T00:00:00.000Z",
+        nodes: [node("h1", "message", "Old", null, { at: "2026-09-01T00:00:00.000Z" })],
+      }),
+      session({
+        sessionId: "current",
+        updatedAt: "2026-10-19T00:00:00.000Z",
+        nodes: [node("h1", "message", "New", null, { at: "2026-10-20T00:00:00.000Z" })],
+      }),
+    ];
+    expect(statusCard(sessions, NOW).lastActivity).toBe("2026-10-20T00:00:00.000Z");
+  });
+
   it("skips a newer session without a status but keeps its time as last activity", () => {
     const sessions = [
       session({

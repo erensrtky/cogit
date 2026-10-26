@@ -7,12 +7,12 @@ function at(minutes: number): string {
   return new Date(Date.UTC(2026, 9, 24, 10, minutes)).toISOString();
 }
 
-function message(id: string, continues?: ViewNode["continues"]): ViewNode {
+function message(id: string, minutes: number, continues?: ViewNode["continues"]): ViewNode {
   return {
     id,
     kind: "message",
     title: id,
-    at: at(0),
+    at: at(minutes),
     ...(continues ? { parent: null, continues } : {}),
   };
 }
@@ -34,6 +34,7 @@ function session(
     messages: [
       message(
         "h1",
+        updatedAt,
         continues
           ? {
               sessionId: continues.sessionId,
@@ -118,6 +119,18 @@ describe("layoutSessionGraph", () => {
     const graph = layoutSessionGraph(modelOf(chain));
     expect(graph.git.rows).toHaveLength(7);
     expect(graph.git.rows.every((row) => row.kind === "message")).toBe(true);
+  });
+
+  it("ends a lane at its newest message, not at an edited record's updatedAt", () => {
+    // a's record was touched at minute 200, but its only message was sent at 10.
+    const edited: ViewSession = {
+      ...session("a", 0, 200),
+      messages: [message("h1", 10)],
+    };
+    const graph = layoutSessionGraph(modelOf([edited, session("b", 30, 60)]));
+    // b started while a was still running only if the lane ran to 200; with the
+    // message time the lane ends at 10 and b reuses it.
+    expect(graph.git.segments.map((segment) => segment.lane)).toEqual([0, 0]);
   });
 
   it("marks the most recently updated session as HEAD", () => {

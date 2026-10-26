@@ -6,7 +6,7 @@ import type { Session } from "../schema/session.js";
 import { atomicWrite, isDirectory } from "../store/fs.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
 import { loadAllSessions, loadConfig, loadRegistry } from "../store/stores.js";
-import { embedViewModel, statusCard } from "./lineage.js";
+import { embedViewModel, lastActive, statusCard } from "./lineage.js";
 import { type PanelSettings, type PanelViewModel, VIEW_SCHEMA } from "./model.js";
 import type { SwitcherSource } from "./switcher.js";
 import { TEMPLATE_HTML } from "./template.js";
@@ -58,19 +58,6 @@ export function panelSettings(config: Config): PanelSettings {
 function lastMessageTitle(session: Session): string {
   const messages = session.nodes.filter((node) => node.kind === "message");
   return messages[messages.length - 1]?.title ?? "";
-}
-
-/** When the session's newest message was sent; its `updatedAt` when no message has a time. */
-function lastActive(session: Session): number {
-  let last = Number.NEGATIVE_INFINITY;
-  for (const node of session.nodes) {
-    if (node.kind !== "message" || node.at === undefined) continue;
-    const at = Date.parse(node.at);
-    if (!Number.isNaN(at) && at > last) last = at;
-  }
-  if (last !== Number.NEGATIVE_INFINITY) return last;
-  const updated = Date.parse(session.updatedAt);
-  return Number.isNaN(updated) ? Number.NEGATIVE_INFINITY : updated;
 }
 
 /**

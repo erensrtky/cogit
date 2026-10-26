@@ -120,9 +120,11 @@ describe("commands through the CLI", () => {
     );
   });
 
-  it("runs session show for the skill", async () => {
+  it("runs session show for the skill, with --full for the long output", async () => {
     await cli("init", root, "--yes", "--retention", "keep");
     await cli("session", "show", "s1", "-C", root);
+    expect(JSON.parse(io.lines.at(-1) ?? "")).toMatchObject({ initialized: true, session: null });
+    await cli("session", "show", "s1", "--full", "-C", root);
     expect(JSON.parse(io.lines.at(-1) ?? "")).toMatchObject({ initialized: true, session: null });
   });
 

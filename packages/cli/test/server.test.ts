@@ -49,8 +49,13 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
 });
 
-async function start(idleMs = 5000): Promise<MapServer> {
-  const server = await startMapServer({ env, port: 0, idleMs });
+async function start(idleMs = 5000, transcriptDebounceMs?: number): Promise<MapServer> {
+  const server = await startMapServer({
+    env,
+    port: 0,
+    idleMs,
+    ...(transcriptDebounceMs === undefined ? {} : { transcriptDebounceMs }),
+  });
   servers.push(server);
   return server;
 }
@@ -284,6 +289,29 @@ describe("map server", () => {
     try {
       expect(await events.waitFor("retry: 1000")).toBe(true);
       await atomicWrite(projectPaths(root).html, "replaced");
+      expect(await events.waitFor("event: change")).toBe(true);
+    } finally {
+      events.close();
+    }
+  });
+
+  it("rebuilds an open map when Claude Code writes a transcript (9.5)", async () => {
+    const folder = join(env.CLAUDE_CONFIG_DIR as string, "projects", "-proj");
+    await mkdir(folder, { recursive: true });
+    const server = await start(5000, 20);
+    const events = openEvents(`${server.url}/events?dir=${encodeURIComponent(root)}`);
+    try {
+      expect(await events.waitFor("retry: 1000")).toBe(true);
+      // The write is in the Claude home, not in `.cogit/`, so only the new
+      // transcript watch can produce the rebuild that reaches the page.
+      await writeFile(
+        join(folder, "s1.jsonl"),
+        `${JSON.stringify({
+          type: "user",
+          timestamp: "2026-10-24T10:00:00.000Z",
+          message: { role: "user", content: "hello" },
+        })}\n`,
+      );
       expect(await events.waitFor("event: change")).toBe(true);
     } finally {
       events.close();

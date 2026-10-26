@@ -106,6 +106,12 @@ describe("cogit blame", () => {
     expect(io.lines[0]).toContain("Parse the file");
   });
 
+  it("takes the project directory as a positional, like log and show (9.5)", async () => {
+    const program = createProgram(() => io);
+    await program.parseAsync(["blame", "a.txt:1", root], { from: "user" });
+    expect(io.lines[0]).toContain("Parse the file");
+  });
+
   it("accepts a file without a line and searches every commit that touched it", async () => {
     const hits = await blame({ dir: root, target: "a.txt", io });
     expect(hits.map((hit) => hit.title)).toEqual(["Parse the file"]);
