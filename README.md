@@ -45,7 +45,7 @@ hook failure is silent and exits 0.
 cogit log                     # like git log: messages and branches, newest first
 cogit log --branches          # only the branch summaries
 cogit log --file src/auth.ts  # the thoughts that touched this file
-cogit show h3f9c2a1b4d6       # one message: the turn, what came of it, its commits
+cogit show h3f9c2a1b4d6e      # one message: the turn, what came of it, its commits
 cogit blame src/auth.ts:42    # which recorded message produced this line
 cogit search "refresh token"  # titles, summaries, decisions and the stored conversation
 ```
