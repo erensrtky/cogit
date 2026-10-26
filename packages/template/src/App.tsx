@@ -7,6 +7,7 @@ import {
   searchLineage,
   stepHitIndex,
 } from "../../cli/src/view/search.js";
+import { Brand } from "./Brand.js";
 import { formatTime } from "./format.js";
 import { Graph } from "./Graph.js";
 import { type MapSearchState, SearchBox } from "./MapSearch.js";
@@ -53,6 +54,7 @@ export function App({ model }: { model: LineageViewModel }) {
     <main className="map-page">
       <div className="page-head">
         <div className="page-bar">
+          <Brand />
           <ProjectSwitcher model={model} />
           <SearchBox value={query} state={search} onQuery={change} onStep={move} onClear={clear} />
           <SettingsButton settings={model.settings} />

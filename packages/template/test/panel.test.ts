@@ -31,5 +31,7 @@ describe("Panel", () => {
     expect(html).toContain("Settings");
     expect(html).not.toContain('aria-label="Settings"');
     expect(html).not.toContain("Read-only; change them with");
+    expect(html).toContain('<main class="panel-page">');
+    expect(html).toContain('class="brand"');
   });
 });

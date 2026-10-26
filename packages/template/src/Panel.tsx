@@ -1,4 +1,5 @@
 import type { PanelProject, PanelViewModel } from "../../cli/src/view/model.js";
+import { Brand } from "./Brand.js";
 import { isLivePage } from "./data.js";
 import { formatTime } from "./format.js";
 import { SettingsButton } from "./SettingsModal.js";
@@ -14,7 +15,10 @@ function mapHref(project: PanelProject): string | null {
 
 export function Panel({ model }: { model: PanelViewModel }) {
   return (
-    <main>
+    <main className="panel-page">
+      <div className="page-bar">
+        <Brand home />
+      </div>
       <header className="project">
         <div>
           <h1>Projects</h1>

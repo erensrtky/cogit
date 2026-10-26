@@ -112,6 +112,45 @@ main {
   padding: 32px 24px 64px;
 }
 
+/* The panel uses the same centred 8-of-12 column as the map. */
+main.panel-page {
+  width: 66.667%;
+  margin-right: auto;
+  margin-left: auto;
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.panel-page .page-bar {
+  margin-bottom: 20px;
+}
+
+/* The product name, first in the top bar of every page. */
+.brand {
+  display: inline-flex;
+  flex: none;
+  flex-direction: column;
+  align-self: center;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-decoration: none;
+}
+
+.brand-tagline {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+a.brand:hover .brand-tagline {
+  color: var(--text);
+}
+
 /* The map page: head on top, map fills the rest of the window. */
 main.map-page {
   display: flex;
@@ -158,6 +197,12 @@ main.map-page {
   .map-page .page-head,
   .map-page .lineage-map {
     width: 100%;
+  }
+
+  main.panel-page {
+    width: 100%;
+    padding-right: 16px;
+    padding-left: 16px;
   }
 }
 

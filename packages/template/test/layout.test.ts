@@ -76,6 +76,12 @@ describe("map layout (Story 9.2)", () => {
     expect(narrow).toMatch(/\.map-page \.page-head,[\s\S]*?width:\s*100%/);
   });
 
+  it("puts the panel in the same 8-of-12 column", () => {
+    expect(value("main.panel-page", "width")).toBe("66.667%");
+    const narrow = css.match(/@media \(max-width: 1100px\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+    expect(narrow).toMatch(/main\.panel-page\s*\{[^}]*width:\s*100%[^}]*padding-right:\s*16px/);
+  });
+
   it("gives the page one scroller: the map fills the rest of the window", () => {
     expect(value("html, body, #root", "height")).toBe("100%");
     expect(declarations("body:has(.map-page)")).toMatch(/overflow:\s*hidden/);
