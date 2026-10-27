@@ -1,8 +1,12 @@
+<p align="center"><img src="docs/images/cogit-mark.svg" width="96" alt="cogit"></p>
+
 # cogit
 
 **Cogito, ergo commit.**
 
 Git remembers what changed. cogit remembers why.
+
+<p align="center"><img src="docs/images/cogit-descartes.jpg" width="360" alt="René Descartes with git branches running through his hair"><br><sub>After Frans Hals, <i>Portrait of René Descartes</i> (c. 1649).</sub></p>
 
 ![The map: sessions, branches and the thoughts behind them](docs/images/map.png)
 
