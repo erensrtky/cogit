@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -580,6 +581,24 @@ describe("runHook", () => {
   it("starts the detached child with capture disabled", () => {
     // /dev/null exits at once; this exercises the real spawn path without a CLI.
     expect(() => spawnDetachedProcess("/dev/null", [], env)).not.toThrow();
+  });
+
+  it("appends the detached child's output to the log, starting over once it is large", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "cogit-log-"));
+    const script = join(dir, "child.mjs");
+    await writeFile(script, 'console.log("out"); console.error("err");\n');
+    const log = join(dir, "state", "detached.log");
+    await mkdir(join(dir, "state"));
+    await writeFile(log, "x".repeat(300 * 1024));
+    spawnDetachedProcess(script, ["side", "run"], env, log);
+    await expect.poll(() => readFile(log, "utf8"), { timeout: 5000 }).toMatch(/err\n/);
+    const text = await readFile(log, "utf8");
+    expect(text).not.toContain("xxx");
+    expect(text).toMatch(/^\n--- \S+ side run\n/);
+    expect(text).toContain("out\n");
+    // A log that cannot be opened (its parent is a file) still starts the child.
+    expect(() => spawnDetachedProcess("/dev/null", [], env, join(script, "log"))).not.toThrow();
+    await rm(dir, { recursive: true, force: true });
   });
 
   it("stays silent when disabled, for unknown events and for bad input", async () => {

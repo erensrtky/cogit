@@ -40,6 +40,8 @@ export function projectPaths(root: string) {
     readState: join(base, "state", "read.json"),
     /** Inbox rows the user dismissed, per session (Story 11.1); also local. */
     inboxState: join(base, "state", "inbox.json"),
+    /** What the detached hook children (build, side run) printed; local, capped. */
+    detachedLog: join(base, "state", "detached.log"),
     locks: join(base, "locks"),
     /** Where the skill drops session JSON for `session write --file`. */
     inbox: (id: string) => join(base, "inbox", `${id}.json`),

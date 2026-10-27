@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- What the detached hook runs (the map build, the side model) print goes to `.cogit/state/detached.log` (local, never committed, starts over past 256 KB); a failed side run used to leave no trace.
 
 ## [0.15.0] - 2026-10-27
 ### Added
