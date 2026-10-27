@@ -153,8 +153,9 @@ a.brand:hover .brand-tagline {
 
 /* "← All projects" above a project's name on its map. */
 .back-link {
-  display: inline-block;
-  margin-bottom: 4px;
+  display: block;
+  width: fit-content;
+  margin-top: 8px;
   color: var(--muted);
   font-size: 13px;
   text-decoration: none;

@@ -24,7 +24,7 @@ export function Brand({ home = false }: { home?: boolean }) {
 }
 
 /**
- * The way back from a project's map to the panel, above the project name. Only
+ * The way back from a project's map to the panel, under the project switcher. Only
  * a served map has a panel to go back to.
  */
 export function BackToPanel() {

@@ -69,10 +69,10 @@ export function App({ model }: { model: LineageViewModel }) {
 
         <header className="project">
           <div>
-            <BackToPanel />
             <h1>{model.project.name}</h1>
             <p className="muted">{model.project.path}</p>
             <ProjectSwitcher model={model} />
+            <BackToPanel />
           </div>
           <div className="meta">
             <span>
