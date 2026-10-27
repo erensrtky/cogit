@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.17.1] - 2026-10-27
 ### Fixed
 - The project lives at github.com/erensrtky/cogit: the plugin install command, the marketplace `cogit init` writes for a team, the package links and the docs point there.
 
