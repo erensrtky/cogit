@@ -15,8 +15,8 @@ export const SessionEvent = z.object({
   msg: Slug,
   /** The parent for `parent` (null = a new root), the other message for link/unlink. */
   target: MessageRef.nullable(),
-  /** Who made the change: the agent's record, or the user correcting it. */
-  by: z.enum(["agent", "user"]).default("agent"),
+  /** Who made the change: the agent's record, the side model, or the user. */
+  by: z.enum(["agent", "user", "side"]).default("agent"),
 });
 
 export type SessionEvent = z.infer<typeof SessionEvent>;

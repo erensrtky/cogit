@@ -215,7 +215,7 @@ describe("stores", () => {
   });
 
   it("returns default config and persists changes", async () => {
-    expect((await loadConfig(env)).updateEveryTurns).toBe(5);
+    expect((await loadConfig(env)).updateEveryTurns).toBe(15);
     await updateConfig((c) => ({ ...c, updateEveryTurns: 3 }), env);
     expect((await loadConfig(env)).updateEveryTurns).toBe(3);
   });

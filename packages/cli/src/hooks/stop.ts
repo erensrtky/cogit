@@ -17,23 +17,46 @@ export function updateRequestText(skill: string): string {
 
 export const UPDATE_REQUEST = updateRequestText(defaultAgent().skill);
 
-/** One Stop: count the turn and decide whether to ask for a record update. */
+export interface TurnOptions {
+  /** How often the side model records (Story 12.1); absent: the agent-only mode. */
+  sideEveryTurns?: number;
+  /** False in `side` mode: the main agent is never asked by a hook. */
+  askAgent?: boolean;
+  /** Who wrote the record last, so a side write does not reset the agent's count. */
+  lastRecordedBy?: "agent" | "side";
+}
+
+export interface TurnPlan {
+  state: HookState;
+  request: boolean;
+  side: boolean;
+}
+
+/** One Stop: count the turn and decide who records (Story 12.1). */
 export function countTurn(
   state: HookState | undefined,
   recordUpdatedAt: string | null,
   everyTurns: number,
-): { state: HookState; request: boolean } {
+  opts: TurnOptions = {},
+): TurnPlan {
   const cur: HookState = state ?? {
     schema: STATE_SCHEMA,
     turns: 0,
     turnsSinceUpdate: 0,
     recordUpdatedAt,
+    turnsSinceSide: 0,
     notedFiles: [],
   };
-  // The record changed since the last Stop (the skill ran), so count from here.
-  const since = cur.recordUpdatedAt === recordUpdatedAt ? cur.turnsSinceUpdate : 0;
-  const turnsSinceUpdate = since + 1;
-  const request = turnsSinceUpdate >= everyTurns;
+  // A change the agent made (the skill ran) restarts its count. A change the
+  // side model made does not: otherwise side runs would starve the agent's
+  // every-N-turns request in mixed mode.
+  const changed = cur.recordUpdatedAt !== recordUpdatedAt;
+  const agentChanged = changed && opts.lastRecordedBy !== "side";
+  const turnsSinceUpdate = (agentChanged ? 0 : cur.turnsSinceUpdate) + 1;
+  const request = (opts.askAgent ?? true) && turnsSinceUpdate >= everyTurns;
+  // Any change means the record is current, so the side model may wait again.
+  const turnsSinceSide = (changed ? 0 : cur.turnsSinceSide) + 1;
+  const side = opts.sideEveryTurns !== undefined && turnsSinceSide >= opts.sideEveryTurns;
   return {
     state: {
       ...cur,
@@ -41,8 +64,10 @@ export function countTurn(
       // Reset on a request too, so an "up to date" answer is not asked again next turn.
       turnsSinceUpdate: request ? 0 : turnsSinceUpdate,
       recordUpdatedAt,
+      turnsSinceSide: side ? 0 : turnsSinceSide,
     },
     request,
+    side,
   };
 }
 
@@ -66,19 +91,30 @@ export async function onStop(ctx: HookContext): Promise<HookOutput | undefined> 
   const config = await loadConfig(ctx.env);
   const record = await loadSession(root, sessionId);
   const recordUpdatedAt = record.found && record.ok ? record.data.updatedAt : null;
+  const lastRecordedBy = record.found && record.ok ? record.data.lastRecordedBy : undefined;
 
   let request = false;
+  let side = false;
   // A busy lock means another hook is on it; skipping one count is harmless.
   await updateState(
     root,
     sessionId,
     (cur) => {
-      const next = countTurn(cur, recordUpdatedAt, config.updateEveryTurns);
+      const next = countTurn(cur, recordUpdatedAt, config.updateEveryTurns, {
+        // In agent mode the side model runs only at session end (Story 12.1).
+        ...(config.recorder === "agent" ? {} : { sideEveryTurns: config.sideEveryTurns }),
+        askAgent: config.recorder !== "side",
+        ...(lastRecordedBy === undefined ? {} : { lastRecordedBy }),
+      });
       request = next.request;
+      side = next.side;
       return next.state;
     },
     { timeoutMs: 2000 },
   );
+  // The side run records outside the chat: detached, behind the session lock,
+  // and it never prints into the conversation.
+  if (side) ctx.spawnDetached(["backfill", sessionId, "--tail", "-C", root]);
   if (!request) return undefined;
   return ctx.agent.additionalContext("Stop", UPDATE_REQUEST);
 }

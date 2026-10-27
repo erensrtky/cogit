@@ -73,6 +73,117 @@ describe("session write", () => {
     await epochAdd(root, "e2e", "E2E", fakeIo(envFor(dir)));
   });
 
+  describe("side recording (Story 12.1)", () => {
+    const side = (json: unknown) =>
+      sessionWrite({ dir: root, by: "side" }, io, async () => JSON.stringify(json));
+    const stored = async () => {
+      const loaded = await loadSession(root, "s1");
+      if (!loaded.found || !loaded.ok) throw new Error("no record");
+      return loaded.data;
+    };
+    const node = async (id: string) => (await stored()).nodes.find((n) => n.id === id);
+
+    it("fills empty fields and never overwrites the agent's notes", async () => {
+      await write({
+        sessionId: "s1",
+        nodes: [
+          { id: "m1", kind: "message", parent: null, title: "Ship it", summary: "agent words" },
+        ],
+      });
+      await side({
+        sessionId: "s1",
+        nodes: [
+          {
+            id: "m1",
+            kind: "message",
+            title: "side title",
+            summary: "side words",
+            work: ["did the thing"],
+          },
+        ],
+      });
+      const m1 = await node("m1");
+      expect(m1).toMatchObject({
+        title: "Ship it",
+        summary: "agent words",
+        work: ["did the thing"],
+        by: { work: "side" },
+      });
+      expect((await stored()).lastRecordedBy).toBe("side");
+    });
+
+    it("lets the side model fill a field the agent left empty", async () => {
+      await write({
+        sessionId: "s1",
+        nodes: [{ id: "m1", kind: "message", parent: null, title: "Ask" }],
+      });
+      await side({
+        sessionId: "s1",
+        nodes: [{ id: "m1", kind: "message", title: "Ask again", why: "side reason" }],
+      });
+      await side({
+        sessionId: "s1",
+        nodes: [{ id: "m1", kind: "message", title: "Ask again", why: "side reason 2" }],
+      });
+      const m1 = await node("m1");
+      // Side owns why now, so it may correct its own text; the agent's title stays.
+      expect(m1).toMatchObject({ title: "Ask", why: "side reason 2", by: { why: "side" } });
+    });
+
+    it("keeps an agent correction when a later side run disagrees", async () => {
+      await side({
+        sessionId: "s1",
+        nodes: [
+          { id: "m1", kind: "message", parent: null, title: "One" },
+          { id: "m2", kind: "message", parent: "m1", title: "Two" },
+        ],
+      });
+      expect((await node("m2"))?.parent).toBe("m1");
+      // The side model may still correct its own parent.
+      await side({
+        sessionId: "s1",
+        nodes: [{ id: "m2", kind: "message", parent: null, title: "Two" }],
+      });
+      expect((await node("m2"))?.parent).toBeNull();
+      // The agent puts it back; the next side run must not undo that.
+      await write({
+        sessionId: "s1",
+        nodes: [{ id: "m2", kind: "message", parent: "m1", title: "Two" }],
+      });
+      await side({
+        sessionId: "s1",
+        nodes: [{ id: "m2", kind: "message", parent: null, title: "Two" }],
+      });
+      expect((await node("m2"))?.parent).toBe("m1");
+    });
+
+    it("removes the side mark when the agent rewrites a field", async () => {
+      await side({
+        sessionId: "s1",
+        nodes: [{ id: "m1", kind: "message", parent: null, title: "side title", why: "side why" }],
+      });
+      expect((await node("m1"))?.by).toEqual({ title: "side", why: "side" });
+      // The agent takes the title; the side model still owns `why`.
+      await write({
+        sessionId: "s1",
+        nodes: [{ id: "m1", kind: "message", title: "agent title" }],
+      });
+      expect((await node("m1"))?.by).toEqual({ why: "side" });
+      await side({
+        sessionId: "s1",
+        nodes: [{ id: "m1", kind: "message", title: "side again", why: "side why 2" }],
+      });
+      expect((await node("m1"))?.title).toBe("agent title");
+      expect((await node("m1"))?.why).toBe("side why 2");
+      // The agent takes the last field too: no marks left.
+      await write({
+        sessionId: "s1",
+        nodes: [{ id: "m1", kind: "message", title: "agent title", why: "agent why" }],
+      });
+      expect((await node("m1"))?.by).toBeUndefined();
+    });
+  });
+
   it("creates and then merges a session", async () => {
     await write({
       sessionId: "s1",

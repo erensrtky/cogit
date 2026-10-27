@@ -108,7 +108,10 @@ describe("Project and Config schemas", () => {
     expect(Project.parse({ schema: 1, name: "p" }).epochs).toEqual([]);
     expect(Config.parse({ schema: 1 })).toMatchObject({
       language: "auto",
-      updateEveryTurns: 5,
+      updateEveryTurns: 15,
+      recorder: "mixed",
+      sideModel: "haiku",
+      sideEveryTurns: 5,
       sessionEndCatchUp: true,
       gitPolicy: "commit",
       shareConversations: false,

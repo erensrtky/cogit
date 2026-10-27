@@ -6,12 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Recording modes (`recorder`): `mixed` (the default) records with a small side model every `sideEveryTurns` turns outside the chat and asks the main agent every `updateEveryTurns`; `agent` keeps the agent writing its own record; `side` never interrupts the agent. The side model runs detached behind the session lock, writes message nodes, titles, parents and user decisions, and never overwrites a field the main agent wrote (per-field ownership, and the agent's parent corrections survive later side runs). `sideModel` (renamed from `catchUpModel`, which is still read and migrated) names the model. Every setting gains a "?" in the panel with a plain-language explanation — what it does, when to change it, what it costs — and `cogit config --help` prints the same text.
 - A logo: the c of cogito drawn as a git lane with commits, with a branch that leaves and merges back (`docs/images/cogit-mark.svg`). It heads the README and is the browser tab icon of the map and the panel, which used to ask the server for a missing `favicon.ico`. Under the slogan the README shows Descartes, after the Frans Hals portrait, with git branches running through his hair.
 
 - `cogit init` can set the project up for a team (`--project-settings`): it enables the plugin in the project's `.claude/settings.json` and adds a hook that stops the first message of an interactive session that started without the plugin, once per session, with the install command. Headless `claude -p` runs pass through.
 - The README states what recording costs: about 3–7% of a session's tokens in measured sessions.
 
 ### Changed
+- The main agent's record interval defaults to 15 turns (was 5), and the side model records every 5 turns in between; the README states the measured cost of each mode (about 1–2% of a session with the mixed default, 3–7% with `recorder: agent`).
 - The "Your turn" inbox: each row closes with an × in its top-right corner (hidden until the agent writes in that session again), rows of different projects carry their own lane colour on the left, and on a project's map the inbox starts folded to one "Your turn" line so it no longer pushes the map off the page.
 
 ## [0.14.0] - 2026-10-27

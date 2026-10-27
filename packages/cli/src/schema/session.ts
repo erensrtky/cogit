@@ -73,6 +73,13 @@ export const LineageNode = z.object({
   work: z.array(z.string().min(1).max(300)).max(20).optional(),
   /** For a message: choices the agent made on its own along the way. */
   agentDecisions: z.array(AgentDecision).max(10).optional(),
+  /**
+   * Who wrote each optional field (Story 12.1): the main agent or the side
+   * model. A missing entry means the agent (every record written before the
+   * split was the agent's). The merge lets the side model fill a field only
+   * when it is empty or already the side model's own.
+   */
+  by: z.record(z.string().max(40), z.enum(["agent", "side"])).optional(),
   /** When `session write` first added this node; set by the CLI, never by the agent. */
   addedAt: IsoDate.optional(),
   /** When `session write` last added or changed this node; set by the CLI, never by the agent. */
@@ -120,6 +127,11 @@ export const Session = z.object({
    * on the first write (Story 9.3). Old records have none.
    */
   author: z.string().min(1).max(200).optional(),
+  /**
+   * Who wrote the record last (Story 12.1): the Stop hook counts the main
+   * agent's turns separately when the side model keeps writing in between.
+   */
+  lastRecordedBy: z.enum(["agent", "side"]).optional(),
 });
 
 /** In input, a missing parent keeps the stored one (null for a new node). */
@@ -127,6 +139,7 @@ export const LineageNodeInput = LineageNode.omit({
   addedAt: true,
   touchedAt: true,
   change: true,
+  by: true,
 }).extend({
   parent: MessageRef.nullable().optional(),
 });
@@ -145,6 +158,7 @@ export const SessionInput = z.object({
 });
 
 export type LineageNode = z.infer<typeof LineageNode>;
+export type LineageNodeInput = z.infer<typeof LineageNodeInput>;
 export type BranchSummary = z.infer<typeof BranchSummary>;
 export type AgentDecision = z.infer<typeof AgentDecision>;
 export type Status = z.infer<typeof Status>;

@@ -7,10 +7,28 @@ export const Config = z.object({
   schema: z.literal(CONFIG_SCHEMA),
   /** "auto" = the conversation's language, otherwise a fixed language name or code. */
   language: z.string().min(1).max(32).default("auto"),
-  updateEveryTurns: z.int().min(1).max(100).default(5),
+  /**
+   * How often the main agent is asked to record (Story 12.1). The default is the
+   * mixed mode's interval: the side model records in between, so the agent can
+   * check in rarely.
+   */
+  updateEveryTurns: z.int().min(1).max(100).default(15),
   sessionEndCatchUp: z.boolean().default(true),
-  /** Model for the headless catch-up (SessionEnd) and, later, backfill. */
-  catchUpModel: z.string().trim().min(1).max(64).default("haiku"),
+  /**
+   * Who writes the record (Story 12.1): the main agent (`agent`), both (`mixed`,
+   * the default: a side model often, the agent rarely), or only the side model
+   * (`side`, the agent is never interrupted).
+   */
+  recorder: z.enum(["agent", "mixed", "side"]).default("mixed"),
+  /** Model the side runs use: the headless catch-up and the periodic records. */
+  sideModel: z.string().trim().min(1).max(64).default("haiku"),
+  /** How often the side model records, in turns (Story 12.1). */
+  sideEveryTurns: z.int().min(1).max(100).default(5),
+  /**
+   * @deprecated Renamed to `sideModel` in Story 12.1. Still read once and
+   * migrated, so a config written before the rename keeps its model.
+   */
+  catchUpModel: z.string().trim().min(1).max(64).optional(),
   /**
    * Whether the agent writes a per-message `summary`. Off by default: the branch
    * summary is the outer layer and the drill-down already shows the reply.
@@ -76,3 +94,20 @@ export const Registry = z.object({
 export type Config = z.infer<typeof Config>;
 export type RegistryEntry = z.infer<typeof RegistryEntry>;
 export type Registry = z.infer<typeof Registry>;
+
+/** The side model's default, named so the rename below can spot an untouched value. */
+export const DEFAULT_SIDE_MODEL = "haiku";
+
+/**
+ * Reads a config written before Story 12.1: `catchUpModel` became `sideModel`.
+ * The old key is dropped, so the next write stores only the new name. An
+ * explicit new name wins; the plain default yields to the old one.
+ */
+export function migrateConfig(config: Config): Config {
+  if (config.catchUpModel === undefined) return config;
+  const { catchUpModel, ...rest } = config;
+  return {
+    ...rest,
+    sideModel: config.sideModel === DEFAULT_SIDE_MODEL ? catchUpModel : config.sideModel,
+  };
+}

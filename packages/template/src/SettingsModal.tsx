@@ -17,6 +17,35 @@ import { isLivePage, loadSettings, pageToken, saveSetting } from "./data.js";
 
 type SettingValue = PanelSettings[keyof PanelSettings];
 
+/**
+ * The "?" next to a setting's label (Story 12.1): a plain-language answer to
+ * "what is this, when do I change it, what does it cost", closed by default so
+ * the modal stays short.
+ */
+function FieldDetails({ id, field }: { id: string; field: SettingField }) {
+  const [open, setOpen] = useState(false);
+  const detailId = `${id}-details`;
+  return (
+    <>
+      <button
+        type="button"
+        className="settings-why"
+        aria-expanded={open}
+        aria-controls={detailId}
+        aria-label={`What does ${field.label} do?`}
+        onClick={() => setOpen((wasOpen) => !wasOpen)}
+      >
+        ?
+      </button>
+      {open ? (
+        <p className="settings-details" id={detailId}>
+          {field.details}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 interface EditableProps {
   id: string;
   field: SettingField;
@@ -74,9 +103,10 @@ function EditableSetting({ id, field, value, token, onSaved }: EditableProps) {
   return (
     <div className="settings-field">
       <div className="settings-field-text">
-        <label className="settings-label" htmlFor={id}>
-          {field.label}
-        </label>
+        <span className="settings-label">
+          <label htmlFor={id}>{field.label}</label>
+          <FieldDetails id={id} field={field} />
+        </span>
         <p className="settings-help" id={`${id}-help`}>
           {field.help}
         </p>
@@ -93,6 +123,22 @@ function EditableSetting({ id, field, value, token, onSaved }: EditableProps) {
               edited();
             }}
           />
+        ) : field.kind === "select" ? (
+          <select
+            id={id}
+            value={draft}
+            aria-describedby={`${id}-help`}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              edited();
+            }}
+          >
+            {(field.options ?? []).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         ) : (
           <input
             id={id}
@@ -214,7 +260,10 @@ function SettingsDialog({
               ) : (
                 <div key={field.key} className="settings-field">
                   <div className="settings-field-text">
-                    <span className="settings-label">{field.label}</span>
+                    <span className="settings-label">
+                      {field.label}
+                      <FieldDetails id={id} field={field} />
+                    </span>
                     <p className="settings-help" id={`${id}-help`}>
                       {field.help}
                     </p>

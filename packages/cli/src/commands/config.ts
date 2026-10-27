@@ -18,6 +18,14 @@ export const CONFIG_KEYS = Object.keys(Config.shape).filter((k) => k !== "schema
   "schema"
 >[];
 
+/** Keys `cogit config` lists; `catchUpModel` is only an accepted old alias (12.1). */
+export const LISTED_CONFIG_KEYS = CONFIG_KEYS.filter((k) => k !== "catchUpModel");
+
+/** `catchUpModel` was renamed to `sideModel` (Story 12.1); both names keep working. */
+function canonicalKey(key: string): string {
+  return key === "catchUpModel" ? "sideModel" : key;
+}
+
 function assertKey(key: string): asserts key is (typeof CONFIG_KEYS)[number] {
   if (!(CONFIG_KEYS as string[]).includes(key)) {
     throw new CliError(`unknown key "${key}"; one of: ${CONFIG_KEYS.join(", ")}`);
@@ -42,11 +50,12 @@ function parseValue(key: string, raw: string): unknown {
 export async function configGet(key: string | undefined, io: Io): Promise<void> {
   const config = await loadConfig(io.env);
   if (key === undefined) {
-    for (const k of CONFIG_KEYS) io.out(`${k} = ${JSON.stringify(config[k])}`);
+    for (const k of LISTED_CONFIG_KEYS) io.out(`${k} = ${JSON.stringify(config[k])}`);
     return;
   }
   assertKey(key);
-  io.out(JSON.stringify(config[key]));
+  const name = canonicalKey(key);
+  io.out(JSON.stringify(config[name as keyof Config]));
 }
 
 export async function configSet(key: string, raw: string, io: Io): Promise<void> {
@@ -56,11 +65,12 @@ export async function configSet(key: string, raw: string, io: Io): Promise<void>
   if (!next.success) {
     throw new CliError(`invalid value for ${key}: ${next.error.issues[0]?.message ?? "rejected"}`);
   }
-  await updateConfig((c) => ({ ...c, [key]: next.data[key] }), io.env);
+  const name = canonicalKey(key);
+  await updateConfig((c) => ({ ...c, [name]: next.data[key] }), io.env);
   // Sharing the raw chat changes the project ignore files, not just the config.
-  if (key === "shareConversations")
+  if (name === "shareConversations")
     await refreshShareConversations(io.env, next.data.shareConversations);
-  io.out(`${key} = ${JSON.stringify(next.data[key])}`);
+  io.out(`${name} = ${JSON.stringify(next.data[key])}`);
 }
 
 /**

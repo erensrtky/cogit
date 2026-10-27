@@ -47,6 +47,21 @@ export async function appendEvents(
   return events.length;
 }
 
+/**
+ * Messages whose latest parent event was written by the side model (Story
+ * 12.1). A side run may correct those parents, and only those: a parent the
+ * main agent wrote stays put.
+ */
+export function sideOwnedParents(events: readonly SessionEvent[]): Set<string> {
+  const owners = new Map<string, SessionEvent["by"]>();
+  for (const event of events) {
+    if (event.type === "parent") owners.set(event.msg, event.by);
+  }
+  const owned = new Set<string>();
+  for (const [msg, by] of owners) if (by === "side") owned.add(msg);
+  return owned;
+}
+
 export interface Structure {
   parent: string | null;
   links: string[];

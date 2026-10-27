@@ -81,10 +81,12 @@ describe("buildPanel", () => {
       schema: 1,
       generatedAt: T0,
       settings: {
+        recorder: "mixed",
         language: "auto",
         updateEveryTurns: 7,
+        sideEveryTurns: 5,
         sessionEndCatchUp: true,
-        catchUpModel: "haiku",
+        sideModel: "haiku",
         messageSummaries: false,
         startupContext: true,
         tryBeforeNotes: true,

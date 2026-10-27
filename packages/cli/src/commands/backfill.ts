@@ -38,25 +38,42 @@ function recordPart(record: Session | undefined): string {
   const lines = record.nodes.map(
     (node) => `- ${node.id} (${node.kind}) parent=${node.parent ?? "null"}: ${node.title}`,
   );
-  return `The record so far (reuse these topic ids):\n${lines.join("\n")}`;
+  return `The record so far (reuse these ids; a parent is an earlier message):\n${lines.join("\n")}`;
 }
 
-function rules(language: string, messageSummaries: boolean): string {
+/** Who runs the side model and how much of the record it may write (Story 12.1). */
+export type RecordMode = "agent" | "mixed" | "side";
+
+/**
+ * The recording rules, in line with `skills/record/SKILL.md`. In `mixed` mode
+ * this is the periodic side run: messages, titles, parents and user decisions
+ * only, because the main agent owns the status, the branch summaries and its
+ * own decisions.
+ */
+function rules(language: string, messageSummaries: boolean, recorder: RecordMode): string {
   const writing = language === "auto" ? "the conversation's language" : language;
-  return [
+  const lines = [
     "Rules (from the cogit lineage skill):",
     '- Send one "message" node for every message below, with the id exactly as given; skip none, even a short "ok".',
     `- kind is "message". title: a few words in the user's own wording.${
       messageSummaries ? " summary: one or two sentences on what came of it." : ""
     }`,
-    '- parent: the id of the topic it belongs to. Reuse a topic id from the record below; otherwise add a "phase" topic with a short slug id and parent null.',
+    "- parent: an earlier message id, or null when the message starts a new thread; never a topic or phase node.",
+    "- Back to an older thread: that message is the parent and the previous one goes in links (at most 5). Unsure: use the previous message.",
     '- When the message itself made a decision (the user asked for it, picked an option or approved a proposal): decidedBy ("user" or "agreed"), the reason in why, and the options not taken in alternatives [{"option": "...", "why": "..."}].',
-    '- The agent\'s work goes inside the message node that caused it, never in nodes of its own: work (short items), agentDecisions ([{"title": "...", "why": "...", "alternatives": [...]}]), commits (short hashes) and files (a few paths).',
+    '- The agent\'s work belongs inside the message node that caused it, never in nodes of its own: work (short items), agentDecisions ([{"title": "...", "why": "...", "alternatives": [...]}]) only for technical choices with a reason — never for proposals or work items — commits (short hashes) and files (a few paths).',
+    "- Write a branch summary ({title, asked, outcome, open}) on the first message of a branch when the branch ends.",
     '- Never send "at"; the CLI takes each message\'s time from the transcript.',
     "- Replace the whole status (goal, done, pending [{text, needsUser}], next) when it changed; otherwise leave it out.",
     "- Record decisions and reasons, never secrets, credentials, personal data, file contents or command output.",
     `- Write titles and text in ${writing}; JSON keys stay in English.`,
-  ].join("\n");
+  ];
+  if (recorder === "mixed") {
+    lines.push(
+      "- This is a periodic background run: send only message nodes with their titles, parents and user decisions. Do not send status, branch summaries or agentDecisions; the main agent owns those.",
+    );
+  }
+  return lines.join("\n");
 }
 
 /**
@@ -69,12 +86,13 @@ export function catchUpPrompt(
   sessionId: string,
   language: string,
   messageSummaries = false,
+  recorder: RecordMode = "agent",
 ): string {
   return [
     "You add the missing part of a cogit lineage record, a map of the user's messages.",
     "Below are the user's messages that have no node yet, each followed by the agent's written replies and a count of its tool calls.",
     "",
-    rules(language, messageSummaries),
+    rules(language, messageSummaries, recorder),
     "",
     recordPart(record),
     "",
@@ -220,10 +238,19 @@ export async function backfillTail(dir: string, sessionId: string, io: Io): Prom
   const config = await loadConfig(io.env);
   const loaded = await loadSession(root, sessionId);
   const record = loaded.found && loaded.ok ? loaded.data : undefined;
-  const prompt = catchUpPrompt(turns, record, sessionId, config.language, config.messageSummaries);
-  const stdout = await runClaude(prompt, config.catchUpModel, io.env);
+  const prompt = catchUpPrompt(
+    turns,
+    record,
+    sessionId,
+    config.language,
+    config.messageSummaries,
+    config.recorder,
+  );
+  const stdout = await runClaude(prompt, config.sideModel, io.env);
   const payload = { ...agentRecord(resultText(stdout)), sessionId };
-  await sessionWrite({ dir: root }, io, async () => JSON.stringify(payload));
+  // Story 12.1: a side run fills empty fields and new nodes; it never rewrites
+  // what the main agent wrote.
+  await sessionWrite({ dir: root, by: "side" }, io, async () => JSON.stringify(payload));
   // The session end wrote the last messages after the last code commit; auto
   // mode commits exactly those record files now (Story 9.3).
   await maybeAutoCommit(root, sessionId, io.env);

@@ -28,6 +28,7 @@ import { startMapServer } from "./server.js";
 import { maybeAutoCommit } from "./session-git.js";
 import { takeMigrationWarnings } from "./store/migrate.js";
 import { loadConfig } from "./store/stores.js";
+import { configHelpLines } from "./view/settings.js";
 
 export type IoFactory = (interactive: boolean) => Io;
 
@@ -320,7 +321,11 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .helpGroup("Set up:")
     .addHelpText(
       "after",
-      examples("cogit config get language", "cogit config set updateEveryTurns 3"),
+      `${examples(
+        "cogit config get language",
+        "cogit config set recorder mixed",
+        "cogit config set sideEveryTurns 3",
+      )}\n\nSettings (the same explanations the panel's ? shows):\n${configHelpLines().join("\n")}`,
     );
   config
     .command("get")
@@ -416,10 +421,14 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .option("-C, --dir <dir>", "project directory", ".")
     .option("-f, --file <file>", "read JSON from a file instead of stdin")
     .option("--consume", "delete the file once the record is saved")
+    .option("--by <who>", "who writes: agent (default) or side (fills only empty fields)")
     .action(
-      run(async (opts: { dir: string; file?: string; consume?: boolean }) =>
-        sessionWrite(opts, makeIo(false)),
-      ),
+      run(async (opts: { dir: string; file?: string; consume?: boolean; by?: string }) => {
+        if (opts.by !== undefined && opts.by !== "agent" && opts.by !== "side")
+          throw new CliError('--by must be "agent" or "side"');
+        const { by, ...rest } = opts;
+        await sessionWrite({ ...rest, ...(by === undefined ? {} : { by }) }, makeIo(false));
+      }),
     );
   session
     .command("show")

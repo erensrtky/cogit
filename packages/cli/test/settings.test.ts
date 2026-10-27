@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CONFIG_SCHEMA, Config } from "../src/schema/config.js";
 import { PANEL_EDITABLE_KEYS } from "../src/view/model.js";
 import {
+  configHelpLines,
   DEFAULT_SETTINGS,
   editableSettings,
   formatSetting,
@@ -13,10 +14,12 @@ describe("settings model", () => {
   it("keeps the defaults in step with the config schema", () => {
     const parsed = Config.parse({ schema: CONFIG_SCHEMA });
     expect(DEFAULT_SETTINGS).toEqual({
+      recorder: parsed.recorder,
       language: parsed.language,
       updateEveryTurns: parsed.updateEveryTurns,
+      sideEveryTurns: parsed.sideEveryTurns,
       sessionEndCatchUp: parsed.sessionEndCatchUp,
-      catchUpModel: parsed.catchUpModel,
+      sideModel: parsed.sideModel,
       messageSummaries: parsed.messageSummaries,
       startupContext: parsed.startupContext,
       tryBeforeNotes: parsed.tryBeforeNotes,
@@ -49,6 +52,8 @@ describe("settings model", () => {
     for (const field of fields) {
       expect(field.label).not.toBe("");
       expect(field.help.length).toBeGreaterThan(10);
+      // Every field has the longer plain-language "?" text (Story 12.1).
+      expect(field.details.length).toBeGreaterThan(field.help.length);
       expect(field.editable).toBe((PANEL_EDITABLE_KEYS as readonly string[]).includes(field.key));
     }
   });
@@ -62,17 +67,31 @@ describe("settings model", () => {
   it("returns only the editable keys with their current values", () => {
     const settings = { ...DEFAULT_SETTINGS, language: "tr", updateEveryTurns: 8 };
     expect(editableSettings(settings)).toEqual({
+      recorder: "mixed",
       messageSummaries: false,
       startupContext: true,
       tryBeforeNotes: true,
       language: "tr",
       updateEveryTurns: 8,
+      sideEveryTurns: 5,
       sessionEndCatchUp: true,
-      catchUpModel: "haiku",
+      sideModel: "haiku",
       shareConversations: false,
       recordCommit: "ask",
     });
     expect(Object.keys(editableSettings(settings)).sort()).toEqual([...PANEL_EDITABLE_KEYS].sort());
+  });
+
+  it("prints the same long explanations in `cogit config --help` (Story 12.1)", () => {
+    const lines = configHelpLines();
+    expect(lines.length).toBe(PANEL_EDITABLE_KEYS.length + 2);
+    const text = lines.join("\n");
+    for (const field of settingsSections(true).flatMap((section) => section.fields)) {
+      expect(text).toContain(field.details);
+    }
+    // The recording-mode explanation states the measured trade-off plainly.
+    expect(text).toContain("1–2%");
+    expect(text).toContain("5%");
   });
 
   it("formats a read-only value for the modal", () => {

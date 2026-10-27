@@ -30,13 +30,15 @@ export const TOKEN_META_NAME = "cogit-token";
  * setup-time or security-adjacent and stay on `cogit config set`.
  */
 export const PANEL_EDITABLE_KEYS = [
+  "recorder",
   "messageSummaries",
   "startupContext",
   "tryBeforeNotes",
   "language",
   "updateEveryTurns",
+  "sideEveryTurns",
   "sessionEndCatchUp",
-  "catchUpModel",
+  "sideModel",
   "shareConversations",
   "recordCommit",
 ] as const;
@@ -371,10 +373,15 @@ export interface PanelProject {
  * local server (over `file://` everything stays read-only).
  */
 export interface PanelSettings {
+  /** Who records: the main agent, both, or only a small side model (Story 12.1). */
+  recorder: "agent" | "mixed" | "side";
   language: string;
   updateEveryTurns: number;
+  /** How often the side model records, in turns (Story 12.1). */
+  sideEveryTurns: number;
   sessionEndCatchUp: boolean;
-  catchUpModel: string;
+  /** Model the side runs and the session-end catch-up use (Story 12.1). */
+  sideModel: string;
   messageSummaries: boolean;
   startupContext: boolean;
   /**

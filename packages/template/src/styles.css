@@ -631,7 +631,38 @@ ul {
 }
 
 .settings-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
+}
+
+/* The "?" behind a setting's plain-language explanation (Story 12.1). */
+.settings-why {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.settings-why[aria-expanded="true"] {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.settings-details {
+  max-width: 46ch;
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .settings-help {
@@ -2159,7 +2190,8 @@ time {
 }
 
 .setting-form input[type="text"],
-.setting-form input[type="number"] {
+.setting-form input[type="number"],
+.setting-form select {
   width: 150px;
   padding: 3px 6px;
   color: var(--text);

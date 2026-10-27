@@ -13,7 +13,7 @@
       "maxLength": 32
     },
     "updateEveryTurns": {
-      "default": 5,
+      "default": 15,
       "type": "integer",
       "minimum": 1,
       "maximum": 100
@@ -22,8 +22,28 @@
       "default": true,
       "type": "boolean"
     },
-    "catchUpModel": {
+    "recorder": {
+      "default": "mixed",
+      "type": "string",
+      "enum": [
+        "agent",
+        "mixed",
+        "side"
+      ]
+    },
+    "sideModel": {
       "default": "haiku",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "sideEveryTurns": {
+      "default": 5,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "catchUpModel": {
       "type": "string",
       "minLength": 1,
       "maxLength": 64
@@ -109,7 +129,9 @@
     "language",
     "updateEveryTurns",
     "sessionEndCatchUp",
-    "catchUpModel",
+    "recorder",
+    "sideModel",
+    "sideEveryTurns",
     "messageSummaries",
     "startupContext",
     "serverPort",

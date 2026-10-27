@@ -15,6 +15,8 @@ export const HookState = z.object({
   turnsSinceUpdate: z.number().int().min(0).default(0),
   /** The record's `updatedAt` when the hook last looked; a change resets the count. */
   recordUpdatedAt: IsoDate.nullable().default(null),
+  /** Turns since the side model last recorded (Story 12.1). */
+  turnsSinceSide: z.number().int().min(0).default(0),
   /**
    * Project-relative files the PreToolUse hook has already told this session
    * about (Story 10.4): the "tried before" note is once per file per session,

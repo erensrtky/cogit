@@ -57,6 +57,7 @@ function emptyState(): HookState {
     turns: 0,
     turnsSinceUpdate: 0,
     recordUpdatedAt: null,
+    turnsSinceSide: 0,
     notedFiles: [],
   };
 }

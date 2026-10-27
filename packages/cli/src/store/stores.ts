@@ -1,7 +1,7 @@
 import type { Dirent } from "node:fs";
 import { readdir } from "node:fs/promises";
 import type { z } from "zod";
-import { CONFIG_SCHEMA, Config, Registry } from "../schema/config.js";
+import { CONFIG_SCHEMA, Config, migrateConfig, Registry } from "../schema/config.js";
 import { PROJECT_SCHEMA, Project } from "../schema/project.js";
 import { SESSION_SCHEMA, Session } from "../schema/session.js";
 import { HookState, STATE_SCHEMA } from "../schema/state.js";
@@ -157,7 +157,7 @@ export const updateSession = (
 
 export const loadConfig = async (env?: NodeJS.ProcessEnv): Promise<Config> => {
   const cur = await load(globalPaths(env).config, Config, CONFIG_SCHEMA);
-  return cur.found && cur.ok ? cur.data : Config.parse({ schema: CONFIG_SCHEMA });
+  return migrateConfig(cur.found && cur.ok ? cur.data : Config.parse({ schema: CONFIG_SCHEMA }));
 };
 
 export const updateConfig = (
@@ -171,7 +171,7 @@ export const updateConfig = (
     `${g.config}.lock`,
     Config,
     CONFIG_SCHEMA,
-    (cur) => fn(cur ?? Config.parse({ schema: CONFIG_SCHEMA })),
+    (cur) => migrateConfig(fn(migrateConfig(cur ?? Config.parse({ schema: CONFIG_SCHEMA })))),
     opts,
   );
 };

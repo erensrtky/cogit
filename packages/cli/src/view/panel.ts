@@ -59,10 +59,12 @@ const PANEL_TITLE = "<title>cogit — panel</title>";
  */
 export function panelSettings(config: Config): PanelSettings {
   return {
+    recorder: config.recorder,
     language: config.language,
     updateEveryTurns: config.updateEveryTurns,
+    sideEveryTurns: config.sideEveryTurns,
     sessionEndCatchUp: config.sessionEndCatchUp,
-    catchUpModel: config.catchUpModel,
+    sideModel: config.sideModel,
     messageSummaries: config.messageSummaries,
     startupContext: config.startupContext,
     tryBeforeNotes: config.tryBeforeNotes,

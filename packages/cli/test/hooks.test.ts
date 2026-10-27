@@ -45,6 +45,38 @@ describe("countTurn", () => {
       recordUpdatedAt: "2026-10-21T10:05:00.000Z",
     });
   });
+
+  it("does not let a side-model write restart the agent's count (12.1)", () => {
+    const first = countTurn(undefined, "2026-10-21T10:00:00.000Z", 3).state;
+    expect(first.turnsSinceUpdate).toBe(1);
+    // The side model recorded; the agent's count keeps going.
+    const afterSide = countTurn(first, "2026-10-21T10:01:00.000Z", 3, {
+      lastRecordedBy: "side",
+      sideEveryTurns: 2,
+    });
+    expect(afterSide.state.turnsSinceUpdate).toBe(2);
+    expect(afterSide.state.turnsSinceSide).toBe(1);
+    const third = countTurn(afterSide.state, "2026-10-21T10:01:00.000Z", 3, {
+      lastRecordedBy: "side",
+      sideEveryTurns: 2,
+    });
+    expect(third.request).toBe(true);
+    expect(third.side).toBe(true);
+  });
+
+  it("never asks the agent in side mode and asks the side model on its turns", () => {
+    let state: ReturnType<typeof countTurn>["state"] | undefined;
+    const requests: boolean[] = [];
+    const sides: boolean[] = [];
+    for (let i = 0; i < 3; i++) {
+      const next = countTurn(state, null, 1, { askAgent: false, sideEveryTurns: 2 });
+      state = next.state;
+      requests.push(next.request);
+      sides.push(next.side);
+    }
+    expect(requests).toEqual([false, false, false]);
+    expect(sides).toEqual([false, true, false]);
+  });
 });
 
 describe("session start handoff", () => {
@@ -309,6 +341,35 @@ describe("runHook", () => {
     await initialized(10);
     expect(await stop()).toBeUndefined();
     expect(spawned).toEqual([["/plugin/dist/cli.js", "build", root, "--quiet"]]);
+  });
+
+  it("runs the side model on its own turns in mixed mode (Story 12.1)", async () => {
+    await initialized(10);
+    await configSet("recorder", "mixed", fakeIo(env));
+    await configSet("sideEveryTurns", "2", fakeIo(env));
+    expect(await stop()).toBeUndefined();
+    expect(spawned.filter((args) => args[1] === "backfill")).toEqual([]);
+    expect(await stop()).toBeUndefined();
+    expect(spawned.filter((args) => args[1] === "backfill")).toEqual([
+      ["/plugin/dist/cli.js", "backfill", "s1", "--tail", "-C", root],
+    ]);
+  });
+
+  it("never asks the agent in side mode, only the side model (Story 12.1)", async () => {
+    await initialized(1);
+    await configSet("recorder", "side", fakeIo(env));
+    await configSet("sideEveryTurns", "2", fakeIo(env));
+    expect(await stop()).toBeUndefined();
+    expect(await stop()).toBeUndefined();
+    expect(spawned.filter((args) => args[1] === "backfill")).toHaveLength(1);
+  });
+
+  it("leaves the side model to session end in agent mode (Story 12.1)", async () => {
+    await initialized(1);
+    await configSet("recorder", "agent", fakeIo(env));
+    expect(await stop()).toBeDefined();
+    expect(await stop()).toBeDefined();
+    expect(spawned.filter((args) => args[1] === "backfill")).toEqual([]);
   });
 
   it("skips the rebuild while a build or the session write holds the lock", async () => {

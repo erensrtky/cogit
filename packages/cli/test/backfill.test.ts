@@ -58,6 +58,7 @@ process.stdin.on("data", (chunk) => { input += chunk; });
 process.stdin.on("end", async () => {
   const fs = await import("node:fs");
   fs.writeFileSync(${JSON.stringify(join(dir, "prompt.txt"))}, input);
+  fs.writeFileSync(${JSON.stringify(join(dir, "argv.json"))}, JSON.stringify(process.argv.slice(2)));
   process.stdout.write(JSON.stringify({ type: "result", subtype: "success", result: ${JSON.stringify(result)} }));
 });`;
 }
@@ -126,6 +127,22 @@ describe("catchUpPrompt", () => {
     expect(prompt).toContain("1 command(s), 1 file(s) edited, 2 other tool call(s)");
     expect(prompt).toContain("the conversation's language");
   });
+
+  it("keeps the side prompt in line with the skill (Story 12.1)", () => {
+    const prompt = catchUpPrompt([turn], undefined, "s1", "auto");
+    expect(prompt).toContain("never a topic or phase node");
+    expect(prompt).toContain("branch summary");
+    expect(prompt).toContain("only for technical choices with a reason");
+    expect(prompt).toContain("decidedBy");
+    // The periodic mixed run writes messages and user decisions only.
+    const mixed = catchUpPrompt([turn], undefined, "s1", "auto", false, "mixed");
+    expect(mixed).toContain("periodic background run");
+    expect(mixed).toContain("Do not send status, branch summaries or agentDecisions");
+    const side = catchUpPrompt([turn], undefined, "s1", "auto", false, "side");
+    expect(side).not.toContain("periodic background run");
+    const agent = catchUpPrompt([turn], undefined, "s1", "auto", false, "agent");
+    expect(agent).not.toContain("periodic background run");
+  });
 });
 
 describe("headless output", () => {
@@ -171,6 +188,12 @@ describe("backfill --tail", () => {
       summary: "Recorded it",
     });
     expect(io.lines).toContain("Saved session s1 (3 nodes)");
+    // A backfill is a side run: the Stop hook counts its writes separately (12.1).
+    expect(saved?.lastRecordedBy).toBe("side");
+    // The side model setting names the model the headless run uses.
+    expect(JSON.parse(await readFile(join(dir, "argv.json"), "utf8"))).toEqual(
+      expect.arrayContaining(["--model", "haiku"]),
+    );
 
     const prompt = await readFile(join(dir, "prompt.txt"), "utf8");
     expect(prompt).toContain("USER: second");

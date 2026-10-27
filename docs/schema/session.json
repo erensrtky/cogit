@@ -299,6 +299,20 @@
               "additionalProperties": false
             }
           },
+          "by": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "agent",
+                "side"
+              ]
+            }
+          },
           "addedAt": {
             "type": "string",
             "format": "date-time",
@@ -374,6 +388,13 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 200
+    },
+    "lastRecordedBy": {
+      "type": "string",
+      "enum": [
+        "agent",
+        "side"
+      ]
     }
   },
   "required": [

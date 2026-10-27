@@ -1,6 +1,7 @@
 import { parseMessageRef } from "./common.js";
 import {
   type LineageNode,
+  type LineageNodeInput,
   MESSAGE_ID,
   SESSION_SCHEMA,
   type Session,
@@ -26,6 +27,75 @@ export interface MergeOptions {
    * earlier (Story 8.6). Anything else is refused like an unknown parent.
    */
   crossTargets?: ReadonlySet<string>;
+  /** Who is writing (Story 12.1): the main agent (default) or the side model. */
+  by?: "agent" | "side";
+  /**
+   * Messages whose latest parent event was written by the side model (Story
+   * 12.1). The side model may correct only those parents, so an agent's
+   * correction is never undone by a later side run.
+   */
+  sideOwnsParent?: ReadonlySet<string>;
+}
+
+/**
+ * The fields the side model may fill (Story 12.1). Structure (parent, links) is
+ * handled separately because an agent correction must survive the next side run.
+ */
+const SIDE_FIELDS = [
+  "title",
+  "summary",
+  "why",
+  "decidedBy",
+  "alternatives",
+  "commits",
+  "files",
+  "branch",
+  "work",
+  "agentDecisions",
+] as const;
+
+type SideField = (typeof SIDE_FIELDS)[number];
+
+/** A field the side model may fill: missing, empty text or an empty list. */
+function isEmptyValue(value: unknown): boolean {
+  return (
+    value === undefined ||
+    value === null ||
+    value === "" ||
+    (Array.isArray(value) && value.length === 0)
+  );
+}
+
+/**
+ * Merges one side-model node into the stored one: a field is written only when
+ * empty or already the side model's, so the agent's notes are never overwritten.
+ */
+function mergeSide(prev: LineageNode, input: LineageNodeInput): LineageNode {
+  const next: LineageNode = { ...prev };
+  const marks: Record<string, "side"> = {};
+  for (const field of SIDE_FIELDS) {
+    const value = input[field];
+    if (value === undefined || (!isEmptyValue(prev[field]) && prev.by?.[field] !== "side")) {
+      continue;
+    }
+    (next as unknown as Record<SideField, unknown>)[field] = value;
+    marks[field] = "side";
+  }
+  return Object.keys(marks).length === 0 ? prev : { ...next, by: { ...(prev.by ?? {}), ...marks } };
+}
+
+/** The agent wrote these fields now, so the side model may no longer replace them. */
+function agentMarks(prev: LineageNode | undefined, input: LineageNodeInput): LineageNode["by"] {
+  const marks = { ...(prev?.by ?? {}) };
+  for (const field of SIDE_FIELDS) if (input[field] !== undefined) delete marks[field];
+  return Object.keys(marks).length > 0 ? marks : undefined;
+}
+
+/** A new node from the side model: every field it sent is its own to correct. */
+function sideMarks(input: LineageNodeInput): LineageNode["by"] {
+  const marks: Record<string, "side"> = {};
+  for (const field of SIDE_FIELDS) if (input[field] !== undefined) marks[field] = "side";
+  return Object.keys(marks).length > 0 ? marks : undefined;
 }
 
 /**
@@ -69,9 +139,26 @@ export function mergeSession(
   }
   const label = (id: string): string => opts.labels?.get(id) ?? id;
   const messageWarnings: string[] = [];
+  const side = opts.by === "side";
   for (const { parent, links, ...n } of input.nodes ?? []) {
     const prev = nodes.get(n.id);
     const own = n.kind === "message" ? (recorded.get(n.id) ?? null) : null;
+    if (side && prev) {
+      // The side model fills notes but never rewrites the agent's: it may only
+      // correct a parent it wrote itself (Story 12.1).
+      const merged = mergeSide(prev, n);
+      const nextParent =
+        parent !== undefined && own !== null && (opts.sideOwnsParent?.has(n.id) ?? false)
+          ? checkParent(n.id, parent, own, recorded, messageWarnings, label, opts.crossTargets)
+          : (prev.parent ?? null);
+      const next: LineageNode = { ...merged, parent: nextParent };
+      nodes.set(n.id, {
+        ...next,
+        addedAt: prev.addedAt,
+        touchedAt: sameNode(prev, next) ? prev.touchedAt : now,
+      });
+      continue;
+    }
     const nextParent =
       parent !== undefined && own !== null
         ? checkParent(n.id, parent, own, recorded, messageWarnings, label, opts.crossTargets)
@@ -88,10 +175,13 @@ export function mergeSession(
       parent: nextParent,
       ...(nextLinks === undefined ? {} : { links: nextLinks }),
     };
+    const marks = side ? sideMarks(n) : agentMarks(prev, n);
     // Nodes recorded before these stamps existed keep no addedAt: their order stays as stored.
     const addedAt = prev ? prev.addedAt : now;
     nodes.set(n.id, {
       ...next,
+      // An explicit undefined clears a previous side mark: the agent owns it now.
+      by: marks,
       ...(addedAt === undefined ? {} : { addedAt }),
       touchedAt: prev && sameNode(prev, next) ? prev.touchedAt : now,
     });

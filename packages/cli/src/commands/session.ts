@@ -18,7 +18,13 @@ import { parseMessageRef, Slug } from "../schema/common.js";
 import type { SessionEvent } from "../schema/events.js";
 import { mergeSession } from "../schema/merge.js";
 import { MESSAGE_ID, type Session, SessionInput } from "../schema/session.js";
-import { appendEvents, applyEvents, readEvents, seedEvents } from "../store/events.js";
+import {
+  appendEvents,
+  applyEvents,
+  readEvents,
+  seedEvents,
+  sideOwnedParents,
+} from "../store/events.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import {
@@ -64,6 +70,11 @@ export interface SessionWriteOptions {
   file?: string;
   /** Delete `file` once the record is saved; a failed write keeps it for a retry. */
   consume?: boolean;
+  /**
+   * Who is writing (Story 12.1): the main agent (default) or the side model.
+   * The side model may only fill empty fields and correct its own parents.
+   */
+  by?: "agent" | "side";
 }
 
 /**
@@ -123,13 +134,16 @@ export async function sessionWrite(
     const upgraded = cur && messages ? upgradeSessionIds(cur, messages) : cur;
     const events = await readEvents(root, input.sessionId);
     const base = upgraded ? { ...upgraded, nodes: applyEvents(upgraded.nodes, events) } : undefined;
+    const by = opts.by ?? "agent";
     const merged = mergeSession(base, input, io.now(), {
       ...(messages ? { order: messageOrder(messages) } : {}),
       labels: hashesToLabels(messages),
       crossTargets,
+      by,
+      sideOwnsParent: sideOwnedParents(events),
     });
     warnings = merged.warnings;
-    const changes = structureChanges(merged.session, base, io.now());
+    const changes = structureChanges(merged.session, base, io.now(), by);
     // The first structural change on an old record seeds the facts it already
     // holds, so replaying the file from then on gives the same graph.
     const seed =
@@ -139,8 +153,10 @@ export async function sessionWrite(
     await appendEvents(root, input.sessionId, [...seed, ...changes]);
     // A write from the main checkout (e.g. after a resume) keeps the stored worktree.
     const stored = worktree ? { ...merged.session, worktree } : merged.session;
+    // Story 12.1: the Stop hook tells an agent write from a side one.
+    const stamped = { ...stored, lastRecordedBy: by };
     // Story 9.3: the first write stamps who recorded the session.
-    return stored.author === undefined && author !== undefined ? { ...stored, author } : stored;
+    return stamped.author === undefined && author !== undefined ? { ...stamped, author } : stamped;
   });
   for (const w of warnings) io.warn(w);
   if (opts.file && opts.consume) await rm(opts.file, { force: true });
@@ -241,6 +257,7 @@ function structureChanges(
   merged: Session,
   before: Session | undefined,
   at: string,
+  by: "agent" | "side" = "agent",
 ): SessionEvent[] {
   const previous = new Map(
     (before?.nodes ?? [])
@@ -253,15 +270,15 @@ function structureChanges(
     const old = previous.get(node.id) ?? { parent: null, links: [] };
     const parent = node.parent ?? null;
     if (parent !== old.parent)
-      events.push({ at, type: "parent", msg: node.id, target: parent, by: "agent" });
+      events.push({ at, type: "parent", msg: node.id, target: parent, by });
     const links = node.links ?? [];
     for (const link of links) {
       if (!old.links.includes(link))
-        events.push({ at, type: "link", msg: node.id, target: link, by: "agent" });
+        events.push({ at, type: "link", msg: node.id, target: link, by });
     }
     for (const link of old.links) {
       if (!links.includes(link))
-        events.push({ at, type: "unlink", msg: node.id, target: link, by: "agent" });
+        events.push({ at, type: "unlink", msg: node.id, target: link, by });
     }
   }
   return events;

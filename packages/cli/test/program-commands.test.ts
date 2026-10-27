@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { readSkillAllowed } from "../src/agents/claude/settings.js";
 import { createProgram } from "../src/program.js";
 import { globalPaths } from "../src/store/paths.js";
-import { loadConfig, loadProject } from "../src/store/stores.js";
+import { loadConfig, loadProject, loadSession } from "../src/store/stores.js";
 import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
 
 let dir: string;
@@ -164,6 +164,23 @@ describe("commands through the CLI", () => {
     expect(JSON.parse(io.lines.at(-1) ?? "")).toMatchObject({ initialized: true, session: null });
     await cli("session", "show", "s1", "--full", "-C", root);
     expect(JSON.parse(io.lines.at(-1) ?? "")).toMatchObject({ initialized: true, session: null });
+  });
+
+  it("marks a session write as a side run and rejects an unknown writer (Story 12.1)", async () => {
+    await cli("init", root, "--yes", "--retention", "keep");
+    const file = join(dir, "write.json");
+    await writeFile(
+      file,
+      JSON.stringify({
+        sessionId: "s1",
+        nodes: [{ id: "m1", kind: "message", parent: null, title: "One" }],
+      }),
+    );
+    await cli("session", "write", "-C", root, "--file", file, "--by", "side");
+    const loaded = await loadSession(root, "s1");
+    expect(loaded.found && loaded.ok ? loaded.data.lastRecordedBy : undefined).toBe("side");
+    const err = await cli("session", "write", "-C", root, "--by", "robot");
+    expect(err).toContain('--by must be "agent" or "side"');
   });
 
   it("runs a hook from stdin and prints its output", async () => {

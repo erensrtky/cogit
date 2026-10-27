@@ -547,13 +547,15 @@ describe("settings read", () => {
     expect(JSON.parse(reply.body)).toEqual({
       ok: true,
       settings: {
+        recorder: "mixed",
         messageSummaries: false,
         startupContext: true,
         tryBeforeNotes: true,
         language: "auto",
-        updateEveryTurns: 5,
+        updateEveryTurns: 15,
+        sideEveryTurns: 5,
         sessionEndCatchUp: true,
-        catchUpModel: "haiku",
+        sideModel: "haiku",
         shareConversations: false,
         recordCommit: "ask",
       },
@@ -567,7 +569,7 @@ describe("settings read", () => {
       [CONFIG_TOKEN_HEADER]: token,
     });
     expect(reply.status).toBe(200);
-    expect(JSON.parse(reply.body).settings.updateEveryTurns).toBe(5);
+    expect(JSON.parse(reply.body).settings.updateEveryTurns).toBe(15);
   });
 
   it("shows a value changed after the page was built", async () => {

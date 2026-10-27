@@ -67,9 +67,11 @@ Then work as usual. The skill updates the record every few turns (`updateEveryTu
 is `auto`, commit the record. Nothing in the plugin can block a prompt or a commit: every
 hook failure is silent and exits 0.
 
-The record is written by the session's own agent, so it costs tokens: in our sessions it added
-about 3–7% to a session's token cost, more in short ones. Raise `updateEveryTurns` to record
-less often.
+By default (`recorder: mixed`) a small side model records every few turns outside the chat and
+the session's own agent only checks in every 15 turns, which cost us about 1–2% of a session's
+tokens. With `recorder: agent` the agent writes the record itself, which added about 3–7% to a
+session's token cost in our sessions, more in short ones; `recorder: side` never interrupts the
+agent at all. In any mode, raise the turn counts to record less often.
 
 If you agree to the team setup, `init` also writes the project's `.claude/settings.json`
 (commit it to share): it turns the plugin on for everyone who opens the repository, and adds a
@@ -176,10 +178,12 @@ under `gitPolicy: ignore` the description says the hashes resolve only on the au
 
 | Key | Default | What it does |
 |---|---|---|
+| `recorder` | `mixed` | Who records: a side model and the agent (`mixed`), the agent only (`agent`), or the side model only (`side`) |
 | `language` | `auto` | Summary language: the conversation's, or a fixed one |
-| `updateEveryTurns` | `5` | Turns between record updates |
+| `updateEveryTurns` | `15` | Turns between the main agent's record updates |
+| `sideEveryTurns` | `5` | Turns between the side model's background records |
 | `sessionEndCatchUp` | `true` | Summarize the last messages when a session ends |
-| `catchUpModel` | `haiku` | Model for the session-end catch-up |
+| `sideModel` | `haiku` | Model for the side records and the session-end catch-up |
 | `messageSummaries` | `false` | A summary on every message, not just every branch |
 | `startupContext` | `true` | Hand the agent the previous session's lineage at session start |
 | `tryBeforeNotes` | `true` | Tell the agent, before an edit, what earlier thoughts rejected for that file |
