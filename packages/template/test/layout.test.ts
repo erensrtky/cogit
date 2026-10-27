@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { rowHeight, TITLE_MIN_WIDTH } from "../src/gitLayout.js";
+import { ROW_HEIGHT, rowHeight, TAGS_PER_LINE, TITLE_MIN_WIDTH } from "../src/gitLayout.js";
 import { shouldForwardWheel } from "../src/scroll.js";
 
 /**
@@ -113,6 +113,17 @@ describe("map layout (Story 9.2)", () => {
       head: false,
     });
     expect(height).toBeGreaterThanOrEqual(12 + Math.ceil((120 * 6.4) / TITLE_MIN_WIDTH) * 16);
+  });
+
+  it("wraps commit tags below each other instead of clipping them", () => {
+    expect(declarations(".git-tags")).toMatch(/flex-wrap:\s*wrap/);
+    expect(declarations(".git-tags")).not.toMatch(/overflow:\s*hidden/);
+    expect(declarations(".git-tag")).toMatch(/flex:\s*none/);
+    const row = { first: false, branchTitle: "", returns: 0, head: false };
+    const message = { id: "x", label: "m28", title: "short" };
+    expect(rowHeight(message, { ...row, tags: TAGS_PER_LINE })).toBe(ROW_HEIGHT);
+    // A third tag starts a second line, so the row grows to hold it.
+    expect(rowHeight(message, { ...row, tags: TAGS_PER_LINE + 1 })).toBeGreaterThan(ROW_HEIGHT);
   });
 });
 

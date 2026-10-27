@@ -1634,17 +1634,21 @@ time {
 }
 
 /* Commit tags on a message row (Story 8.8): a short hash, greyed when git no
-   longer knows the commit. */
+   longer knows the commit. Two hashes a line; more wrap below instead of being
+   cut off (`TAGS_PER_LINE` in `gitLayout.ts`). */
 .git-tags {
   display: flex;
-  flex: 0 1 auto;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 4px;
-  min-width: 0;
-  overflow: hidden;
+  max-width: 112px;
 }
 
 .git-tag {
+  flex: none;
   padding: 0 4px;
+  white-space: nowrap;
   color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 10px;

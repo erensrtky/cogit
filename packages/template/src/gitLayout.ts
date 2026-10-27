@@ -253,6 +253,13 @@ const TITLE_LINE = 16;
 const BRANCH_CHAR = 6;
 const BRANCH_LINE = 14;
 const BRANCH_MAX = 150;
+/**
+ * Commit tags stand in a block of at most this many per line and wrap below
+ * instead of being clipped; keep in step with `.git-tags` in `styles.css`.
+ */
+export const TAGS_PER_LINE = 2;
+const TAG_WIDTH = 56;
+const TAG_LINE = 18;
 /** Padding, the time column and the gaps around it. */
 const ROW_FIXED = 106;
 
@@ -271,7 +278,7 @@ export function rowHeight(
     (message.label ?? message.id).length * 7 +
     (row.first ? BRANCH_MAX + 8 : 0) +
     row.returns * 44 +
-    row.tags * 62 +
+    Math.min(row.tags, TAGS_PER_LINE) * TAG_WIDTH +
     (row.head ? 92 : 0) +
     (message.unsummarized ? 116 : 0) +
     // The "↑ continues <session> · m67" mark sits in the row, next to the title.
@@ -281,7 +288,11 @@ export function rowHeight(
   const branchLines = row.first
     ? Math.max(1, Math.ceil((row.branchTitle.length * BRANCH_CHAR) / (BRANCH_MAX - 12)))
     : 1;
-  return Math.max(ROW_HEIGHT, 12 + Math.max(titleLines * TITLE_LINE, branchLines * BRANCH_LINE));
+  const tagLines = Math.ceil(row.tags / TAGS_PER_LINE);
+  return Math.max(
+    ROW_HEIGHT,
+    12 + Math.max(titleLines * TITLE_LINE, branchLines * BRANCH_LINE, tagLines * TAG_LINE),
+  );
 }
 
 /** Parent ids that point forward, at themselves or outside the session become roots. */

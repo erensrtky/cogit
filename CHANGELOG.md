@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A project's map has a visible "← All projects" link above its name, and opening the map, "Left off here", a search step or a file click frame the whole message row (lanes and text) in the middle of the map instead of only its dot, so the message no longer sits off to the right; a row wider than the map starts at its left edge.
 
 ### Fixed
+- A message row's commit tags wrap two to a line instead of being cut off at the row's edge, and the row grows to hold them.
 - The git hooks work without a `cogit` on PATH (a plugin-only install): the hook block falls back to the CLI that installed it, run with `node`, and does nothing — no "command not found" — when neither is there; each prompt points an existing block at the current CLI, so a plugin update does not break it. `cogit hooks install` adds or refreshes the blocks by hand.
 - The `Thought:` trailer is added in every project, also when the record stays out of git, so `blame` and `show <sha>` follow the exact link locally; only the record staging follows the commit policy. `init`, `cogit config git` and the rename migration install the hooks for both policies.
 - The first code commit carries `.cogit/project.json` and `.cogit/.gitignore` with the session record, so a clone gets the project and the local-state rules, not only the sessions.
