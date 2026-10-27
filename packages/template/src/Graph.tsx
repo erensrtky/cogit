@@ -518,6 +518,19 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     if (hashHit === null) return;
     openNode(hashHit.sessionId, hashHit.messageId);
   }, [hashHit?.sessionId, hashHit?.messageId, openNode]);
+  // An inbox row (Story 11.1) links to a message in this same page, so the hash
+  // changes without a reload; open it the way opening the page there would.
+  useEffect(() => {
+    function onHashChange(): void {
+      const target = readTarget(model);
+      if (target === null) return;
+      ensureOpen(target.sessionId);
+      if (target.messageId !== undefined) openNode(target.sessionId, target.messageId);
+      document.querySelector(".lineage-map")?.scrollIntoView({ block: "start" });
+    }
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [model, ensureOpen, openNode]);
   const unfold = useCallback((segmentId: string) => {
     setUnfolded((previous) => {
       const next = new Set(previous);

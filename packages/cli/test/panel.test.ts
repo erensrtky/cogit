@@ -114,6 +114,25 @@ describe("buildPanel", () => {
           unreadBigCount: 0,
         },
       ],
+      // Story 11.1: the record's `needsUser` item is a row on its own signal.
+      inbox: [
+        {
+          projectName: "alpha",
+          projectPath: alpha,
+          mapUrl: pathToFileURL(projectPaths(alpha).html).href,
+          sessionId: "s1",
+          sessionTitle: "s1",
+          signal: "record",
+          at: T0,
+          goal: "",
+          lastDecision: "",
+          pending: [
+            { text: "decide", needsUser: true },
+            { text: "later", needsUser: false },
+          ],
+          transcriptAvailable: false,
+        },
+      ],
     });
 
     const html = await readFile(globalPaths(env).panel, "utf8");

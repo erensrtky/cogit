@@ -243,6 +243,36 @@ export interface ViewSwitcherProject {
   current: boolean;
 }
 
+/**
+ * One row of the "your turn" inbox (Story 11.1): a session across the registered
+ * projects whose transcript ends with the agent's turn, or whose record has
+ * pending items flagged `needsUser`. The two signals stay apart: `signal` says
+ * which put the row there, and a record-only row carries no `lastMessage`.
+ */
+export interface ViewInboxRow {
+  projectName: string;
+  projectPath: string;
+  /** `file://` URL of the project's map; ignored by a page the server serves. */
+  mapUrl: string;
+  sessionId: string;
+  /** The session's title, or its id when the record has none yet. */
+  sessionTitle: string;
+  /** `turn` when the transcript ends with the agent, `record` for `needsUser`. */
+  signal: "turn" | "record" | "both";
+  /** Newest signal time (ISO): the agent's last turn, else the record's activity. */
+  at: string;
+  /** The agent's last written message, first ~300 characters, verbatim. */
+  lastMessage?: string;
+  /** Where-were-we, as the record wrote it; the page labels it as the record's. */
+  goal: string;
+  lastDecision: string;
+  pending: ViewPendingItem[];
+  /** The session's newest message id, for opening the map at it. */
+  messageId?: string;
+  /** False when the transcript is gone, so resume cannot work. */
+  transcriptAvailable: boolean;
+}
+
 export interface LineageViewModel {
   kind: "lineage";
   schema: typeof VIEW_SCHEMA;
@@ -279,6 +309,11 @@ export interface LineageViewModel {
    * a rebuild embeds the new list.
    */
   read?: string[];
+  /**
+   * The "your turn" inbox for this project only (Story 11.1). Absent on pages
+   * built before it; a project's map never carries another project's rows.
+   */
+  inbox?: ViewInboxRow[];
 }
 
 /**
@@ -368,6 +403,11 @@ export interface PanelViewModel {
   settings: PanelSettings;
   /** Registry order. */
   projects: PanelProject[];
+  /**
+   * Every project's "your turn" rows, oldest first (Story 11.1). Absent on
+   * pages built before it.
+   */
+  inbox?: ViewInboxRow[];
 }
 
 /** Either page the template can render; the embedded data decides which. */

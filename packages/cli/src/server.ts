@@ -17,6 +17,7 @@ import { diffTooLarge, isDiffSha, readCommitDiff } from "./diff.js";
 import { defaultsPrompter, type Io } from "./io.js";
 import { Config } from "./schema/config.js";
 import { refreshShareConversations } from "./share.js";
+import { dismissInboxSession } from "./store/inbox-state.js";
 import { LockBusyError } from "./store/lock.js";
 import { globalPaths, projectPaths } from "./store/paths.js";
 import { setMessageRead } from "./store/read-state.js";
@@ -590,6 +591,75 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
     res.end(JSON.stringify({ ok: true, id, read }));
   }
 
+  /**
+   * `POST /api/inbox/dismiss` { dir, sessionId, at } (Story 11.1): the inbox's
+   * dismiss button. It writes the project's local state file, and the turn time
+   * is stored so a newer agent turn brings the row back. Same Host, Origin,
+   * content-type and token checks as a read mark, and `dir` must be registered.
+   */
+  async function writeInboxDismiss(
+    req: IncomingMessage,
+    res: ServerResponse,
+    port: number,
+  ): Promise<void> {
+    if (
+      !originAllowed(req.headers.origin, port) ||
+      !tokenMatches(req.headers[CONFIG_TOKEN_HEADER])
+    ) {
+      respond(res, 403, "forbidden");
+      return;
+    }
+    const type = req.headers["content-type"];
+    if (
+      typeof type !== "string" ||
+      type.split(";")[0]?.trim().toLowerCase() !== "application/json"
+    ) {
+      respond(res, 415, "content-type must be application/json");
+      return;
+    }
+    const body = await readLimitedBody(req);
+    if (body === null) {
+      respond(res, 413, "request body too large");
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      respond(res, 400, "invalid JSON");
+      return;
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      respond(res, 400, "expected a JSON object");
+      return;
+    }
+    const { dir, sessionId, at } = parsed as Record<string, unknown>;
+    if (typeof dir !== "string" || typeof sessionId !== "string" || typeof at !== "string") {
+      respond(res, 400, "expected { dir, sessionId, at }");
+      return;
+    }
+    if (!/^[A-Za-z0-9._:-]{1,128}$/.test(sessionId) || Number.isNaN(Date.parse(at))) {
+      respond(res, 400, "sessionId or at is not valid");
+      return;
+    }
+    const root = await registeredRoot(env, dir);
+    if (root === null) {
+      respond(res, 403, "not a registered project");
+      return;
+    }
+    try {
+      await dismissInboxSession(root, sessionId, at);
+    } catch {
+      respond(res, 500, "could not write the inbox state");
+      return;
+    }
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify({ ok: true, sessionId, at }));
+  }
+
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const port = (server.address() as AddressInfo | null)?.port ?? opts.port;
     if (req.method === "POST") {
@@ -611,6 +681,10 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       }
       if (url.pathname === "/api/read") {
         await writeRead(req, res, port);
+        return;
+      }
+      if (url.pathname === "/api/inbox/dismiss") {
+        await writeInboxDismiss(req, res, port);
         return;
       }
       if (url.pathname !== "/api/config") {

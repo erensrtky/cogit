@@ -28,6 +28,7 @@ import {
   stopStaleServer,
 } from "../src/server.js";
 import { atomicWrite } from "../src/store/fs.js";
+import { readInboxDismissed } from "../src/store/inbox-state.js";
 import { globalPaths, projectPaths } from "../src/store/paths.js";
 import { readReadState } from "../src/store/read-state.js";
 import { loadConfig, updateConfig } from "../src/store/stores.js";
@@ -808,6 +809,80 @@ describe("read marks (10.3)", () => {
     // A directory where the state file belongs makes the write fail.
     await mkdir(projectPaths(root).readState, { recursive: true });
     const reply = await readWrite(server, token, { dir: root, id: ID, read: true });
+    expect(reply.status).toBe(500);
+  });
+});
+
+describe("inbox dismiss endpoint (Story 11.1)", () => {
+  const AT = "2026-10-21T10:00:00.000Z";
+  const SESSION = "3f2b1c4d-0000-4000-8000-000000000001";
+
+  function dismissWrite(
+    server: MapServer,
+    token: string,
+    payload: unknown,
+    overrides: Record<string, string> = {},
+  ): Promise<Reply> {
+    return postConfig(`${server.url}/api/inbox/dismiss`, JSON.stringify(payload), {
+      origin: `http://127.0.0.1:${server.port}`,
+      [CONFIG_TOKEN_HEADER]: token,
+      ...overrides,
+    });
+  }
+
+  it("stores the dismissed turn for a registered project", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const reply = await dismissWrite(server, token, { dir: root, sessionId: SESSION, at: AT });
+    expect(reply.status).toBe(200);
+    expect(JSON.parse(reply.body)).toEqual({ ok: true, sessionId: SESSION, at: AT });
+    expect([...(await readInboxDismissed(root))]).toEqual([[SESSION, AT]]);
+  });
+
+  it("refuses a foreign project, a bad payload, a bad token and a bad body", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const good = { dir: root, sessionId: SESSION, at: AT };
+    expect(
+      (await dismissWrite(server, token, { ...good, dir: join(dir, "elsewhere") })).status,
+    ).toBe(403);
+    expect((await dismissWrite(server, "nope", good)).status).toBe(403);
+    expect((await dismissWrite(server, token, good, { "content-type": "text/plain" })).status).toBe(
+      415,
+    );
+    expect(
+      (await dismissWrite(server, token, { dir: root, sessionId: "bad id!", at: AT })).status,
+    ).toBe(400);
+    expect(
+      (await dismissWrite(server, token, { dir: root, sessionId: SESSION, at: "x" })).status,
+    ).toBe(400);
+    expect((await dismissWrite(server, token, { dir: root, at: AT })).status).toBe(400);
+    expect((await dismissWrite(server, token, [])).status).toBe(400);
+    expect(
+      (
+        await postConfig(`${server.url}/api/inbox/dismiss`, "{oops", {
+          origin: `http://127.0.0.1:${server.port}`,
+          [CONFIG_TOKEN_HEADER]: token,
+        })
+      ).status,
+    ).toBe(400);
+    expect((await dismissWrite(server, token, { ...good, pad: "x".repeat(5000) })).status).toBe(
+      413,
+    );
+    expect(
+      (
+        await dismissWrite(server, token, good, {
+          origin: "http://evil.example",
+        })
+      ).status,
+    ).toBe(403);
+  });
+
+  it("answers 500 instead of crashing when the state cannot be written", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    await mkdir(projectPaths(root).inboxState, { recursive: true });
+    const reply = await dismissWrite(server, token, { dir: root, sessionId: SESSION, at: AT });
     expect(reply.status).toBe(500);
   });
 });

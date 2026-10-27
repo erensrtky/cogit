@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { type ChatTurn, defaultAgent } from "../agents/index.js";
 import {
   type CommitChange,
@@ -37,8 +38,9 @@ import { buildViewModel, embedViewModel } from "../view/lineage.js";
 import type { LineageViewModel, ViewChatTurn, ViewPendingMessage } from "../view/model.js";
 import {
   buildPanel,
-  type CollectedProject,
-  collectRegistryProjects,
+  collectInboxForProject,
+  collectRegistryData,
+  type PanelData,
   panelSettings,
 } from "../view/panel.js";
 import { switcherEntries } from "../view/switcher.js";
@@ -260,13 +262,13 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   // The map's switcher (8.12) and the panel read the same project list; collect
   // it once. A broken registry is a warning: it must never fail the map.
   const generatedAt = io.now();
-  let panelProjects: CollectedProject[] = [];
+  let panelData: PanelData = { projects: [], inbox: [] };
   try {
-    panelProjects = await collectRegistryProjects(io.env, generatedAt, io.warn, root);
+    panelData = await collectRegistryData(io.env, generatedAt, io.warn, root);
   } catch (err) {
     io.warn(`could not read the project list: ${(err as Error).message}`);
   }
-  const switcher = switcherEntries(panelProjects, root);
+  const switcher = switcherEntries(panelData.projects, root);
 
   // The Stop hook skips a turn while this lock is held, and a second build waits
   // for the first instead of interleaving reads and writes of the same files.
@@ -308,6 +310,21 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       });
       built.switcher = switcher;
       built.read = [...read].sort();
+      // Story 11.1: the map head carries this project's rows only. The panel
+      // already collected them from the registry; a project outside it (a
+      // broken registry, a hand-made directory) is read here instead.
+      const registered = panelData.projects.some(
+        (candidate) => resolve(candidate.path) === resolve(root),
+      );
+      built.inbox = registered
+        ? panelData.inbox.filter((row) => resolve(row.projectPath) === resolve(root))
+        : await collectInboxForProject(
+            { name: project.data.name, path: root },
+            views.sessions,
+            transcripts,
+            config,
+            generatedAt,
+          );
       // The files view (8.15) unions each message's own files with the files of
       // its commits, so a message the agent listed no paths for still lands.
       built.files = buildFileHistory(modelSessions(built), commits.files);
@@ -331,7 +348,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       env: io.env,
       io,
       templateHtml: opts.templateHtml ?? TEMPLATE_HTML,
-      projects: panelProjects,
+      data: panelData,
     });
   } catch (err) {
     io.warn(`could not build panel.html: ${(err as Error).message}`);

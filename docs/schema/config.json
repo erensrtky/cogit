@@ -79,6 +79,12 @@
       "default": true,
       "type": "boolean"
     },
+    "inboxMaxAgeDays": {
+      "default": 7,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3650
+    },
     "agents": {
       "default": [
         "claude-code"
@@ -113,6 +119,7 @@
     "trailerMaxAgeHours",
     "bigChangeLines",
     "tryBeforeNotes",
+    "inboxMaxAgeDays",
     "agents",
     "setupHintOff"
   ],

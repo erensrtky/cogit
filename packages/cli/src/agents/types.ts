@@ -43,6 +43,20 @@ export interface ChatTurn extends UserMessage {
   tools: ToolUse;
 }
 
+/**
+ * How a transcript ends (Story 11.1): the deterministic "your turn" signal.
+ * The agent wrote after the newest user message, or that message is still
+ * waiting for an answer. Who asked what is never guessed from the text.
+ */
+export interface LastTurn {
+  /** `agent` when the agent wrote after the newest user message; else `user`. */
+  speaker: "agent" | "user";
+  /** Time of the last agent line (`agent`) or of the newest user message (`user`). */
+  at: string;
+  /** The agent's last written text, verbatim (empty for a `user` tail). */
+  text: string;
+}
+
 /** The fields of a hook payload cogit relies on, however the agent names them. */
 export interface HookInput {
   session_id: string;
@@ -106,6 +120,11 @@ export interface AgentAdapter {
   readConversation(file: string): Promise<ChatTurn[]>;
   /** Whether the transcript shows the agent reading a handoff file (Story 8.6). */
   readsHandoff(file: string): Promise<boolean>;
+  /**
+   * Who spoke last (Story 11.1), read from the end of the transcript. Null when
+   * no user message was ever typed there.
+   */
+  readLastTurn(file: string): Promise<LastTurn | null>;
   /** Counts user-role lines, to tell "no messages" from "unreadable format". */
   countUserLines(file: string): Promise<number>;
   /** A turn as the map shows it: injected text removed, long text cut, paths relative. */

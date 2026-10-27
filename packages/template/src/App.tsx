@@ -10,6 +10,7 @@ import {
 import { BackToPanel, Brand } from "./Brand.js";
 import { formatTime } from "./format.js";
 import { Graph } from "./Graph.js";
+import { Inbox } from "./Inbox.js";
 import { type MapSearchState, SearchBox } from "./MapSearch.js";
 import { ProjectSwitcher } from "./ProjectSwitcher.js";
 import { SettingsButton } from "./SettingsModal.js";
@@ -81,6 +82,9 @@ export function App({ model }: { model: LineageViewModel }) {
             <span className="muted">generated {formatTime(model.project.generatedAt)}</span>
           </div>
         </header>
+
+        {/* Story 11.1: only this project's rows, same as the panel's inbox. */}
+        <Inbox rows={model.inbox ?? []} />
       </div>
 
       <Graph model={model} search={search} />

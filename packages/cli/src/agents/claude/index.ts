@@ -17,6 +17,7 @@ import {
   excerpt,
   findTranscript,
   readConversation,
+  readLastTurn,
   readsHandoff,
 } from "./transcripts.js";
 
@@ -41,6 +42,7 @@ export const claude: AgentAdapter = {
   collectTranscriptIds,
   readConversation,
   readsHandoff,
+  readLastTurn,
   countUserLines,
   displayTurn,
   excerpt,

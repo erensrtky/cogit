@@ -19,6 +19,7 @@ export type {
   ChatTurn,
   FileChange,
   HookInput,
+  LastTurn,
   ToolUse,
   UserMessage,
 } from "./types.js";

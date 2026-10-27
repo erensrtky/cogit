@@ -2,6 +2,7 @@ import type { PanelProject, PanelViewModel } from "../../cli/src/view/model.js";
 import { Brand } from "./Brand.js";
 import { isLivePage } from "./data.js";
 import { formatTime } from "./format.js";
+import { Inbox } from "./Inbox.js";
 import { SettingsButton } from "./SettingsModal.js";
 
 /**
@@ -36,6 +37,9 @@ export function Panel({ model }: { model: PanelViewModel }) {
           </div>
         </div>
       </header>
+
+      {/* Story 11.1: sessions waiting on the user, across every project. */}
+      <Inbox rows={model.inbox ?? []} />
 
       {model.projects.length === 0 ? (
         <p className="empty">No projects registered yet. Run `cogit init` in a project.</p>

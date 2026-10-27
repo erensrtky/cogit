@@ -99,6 +99,29 @@ export async function saveRead(
 }
 
 /**
+ * Dismisses one inbox row (Story 11.1). The state lives in the project's
+ * `.cogit/state/`, so this needs the local server; over `file://` the row
+ * stays hidden for the open page only. The turn time is what was dismissed, so
+ * a newer agent turn brings the row back.
+ */
+export async function saveDismiss(
+  dir: string,
+  sessionId: string,
+  at: string,
+  token: string,
+): Promise<void> {
+  const response = await fetch("/api/inbox/dismiss", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-cogit-token": token },
+    body: JSON.stringify({ dir, sessionId, at }),
+  });
+  if (!response.ok) {
+    const text = (await response.text()).trim();
+    throw new Error(text || `could not dismiss the row (HTTP ${response.status})`);
+  }
+}
+
+/**
  * One commit's patch for the message details (Story 10.5). Only the local
  * server answers this; over `file://` the diff rows do not expand.
  */

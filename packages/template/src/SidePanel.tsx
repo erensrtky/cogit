@@ -7,6 +7,7 @@ import type {
   ViewSession,
 } from "../../cli/src/view/model.js";
 import { resumeCommand } from "../../cli/src/view/resume.js";
+import { type CopyState, copyText } from "./clipboard.js";
 import { parseSubject, splitPath, typeColour } from "./codeRefs.js";
 import { DiffView } from "./DiffView.js";
 import { isLivePage, pageToken } from "./data.js";
@@ -22,6 +23,7 @@ import {
   toNodeDetail,
 } from "./graph.js";
 import type { OutlineTarget } from "./Outline.js";
+import { ResumeButton } from "./ResumeButton.js";
 
 /**
  * What the drill-down shows: a message (with the branch it belongs to) or a
@@ -44,40 +46,6 @@ function findSession(model: LineageViewModel, sessionId: string): ViewSession | 
 function findMessage(session: ViewSession, id: string): ViewNode | undefined {
   return session.messages.find((message) => message.id === id);
 }
-
-/**
- * `navigator.clipboard` is unavailable or rejected in some `file://` contexts,
- * so fall back to the hidden-textarea + `execCommand("copy")` path.
- * Returns false when both fail, letting the caller select the text instead.
- */
-export async function copyText(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    // fall through to the legacy path
-  }
-
-  try {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.top = "-1000px";
-    area.style.opacity = "0";
-    document.body.appendChild(area);
-    area.select();
-    const copied = document.execCommand("copy");
-    area.remove();
-    return copied;
-  } catch {
-    return false;
-  }
-}
-
-type CopyState = "idle" | "copied" | "failed";
 
 /**
  * The message's stable hash with a copy button (Story 8.10): the user pastes it
@@ -123,7 +91,6 @@ function MessageHash({ value }: { value: string }) {
 }
 
 function ResumeRow({ model, session }: { model: LineageViewModel; session: ViewSession }) {
-  const [state, setState] = useState<CopyState>("idle");
   const code = useRef<HTMLElement>(null);
   const command = resumeCommand(model.project.path, session.sessionId);
 
@@ -138,35 +105,22 @@ function ResumeRow({ model, session }: { model: LineageViewModel; session: ViewS
     );
   }
 
-  const copy = (): void => {
-    setState("idle");
-    void copyText(command).then((ok) => {
-      if (ok) {
-        setState("copied");
-        return;
-      }
-      // Last resort: select the command so the user can press Ctrl+C.
-      const element = code.current;
-      if (element) {
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        const selection = window.getSelection();
-        selection?.removeAllRanges();
-        selection?.addRange(range);
-      }
-      setState("failed");
-    });
-  };
-
   return (
     <div className="resume">
-      <button type="button" className="resume-button" onClick={copy}>
-        Copy resume command
-      </button>
-      {state === "copied" ? <p className="muted resume-note">Copied.</p> : null}
-      {state === "failed" ? (
-        <p className="muted resume-note">Copy failed — press Ctrl+C to copy.</p>
-      ) : null}
+      {/* Last resort on a failed copy: selecting the command allows Ctrl+C. */}
+      <ResumeButton
+        projectPath={model.project.path}
+        sessionId={session.sessionId}
+        onFailed={() => {
+          const element = code.current;
+          if (!element) return;
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+        }}
+      />
       <pre className="resume-command">
         <code ref={code}>{command}</code>
       </pre>

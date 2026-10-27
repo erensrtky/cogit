@@ -1552,6 +1552,146 @@ time {
   font-size: 12px;
 }
 
+/* "Your turn" inbox (Story 11.1): the panel above its cards, the map head for
+   this project. Rows are ordered oldest first, so the longest wait is on top. */
+.inbox {
+  margin: 20px 0 8px;
+}
+
+.inbox h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.inbox-count {
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.inbox-rows {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inbox-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+}
+
+.inbox-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.inbox-project {
+  font-weight: 600;
+}
+
+.inbox-session {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.inbox-age {
+  margin-left: auto;
+  padding: 1px 8px;
+  color: var(--accent);
+  font-size: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.inbox-age.is-record {
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+.inbox-message {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.inbox-signal,
+.inbox-where {
+  margin: 0;
+  font-size: 12px;
+}
+
+.inbox-where {
+  color: var(--text);
+}
+
+.inbox-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.inbox-actions a {
+  color: var(--accent);
+}
+
+/* The shared resume button fills its side-panel column; an inbox row wants a
+   compact control next to the link and Dismiss. */
+.inbox-actions .resume-button {
+  width: auto;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.inbox-actions .resume-note {
+  margin: 0;
+  font-size: 12px;
+}
+
+.inbox-resume-command {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 6px 8px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.inbox-dismiss {
+  margin-left: auto;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.inbox-dismiss:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.inbox-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
 /* Global panel: one card per registered project. */
 .panel-grid {
   display: grid;

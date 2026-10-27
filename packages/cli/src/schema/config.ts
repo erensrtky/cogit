@@ -52,6 +52,11 @@ export const Config = z.object({
    * the record, never a rule; off means silence.
    */
   tryBeforeNotes: z.boolean().default(true),
+  /**
+   * How many days a session stays in the "your turn" inbox (Story 11.1). Older
+   * sessions are hidden; nothing is deleted.
+   */
+  inboxMaxAgeDays: z.int().min(1).max(3650).default(7),
   agents: z.array(z.string().min(1)).default(["claude-code"]),
   /** Project roots ("don't ask again" in this project) where the setup hint stays silent. */
   setupHintOff: z.array(z.string().min(1)).default([]),

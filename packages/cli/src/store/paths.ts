@@ -38,6 +38,8 @@ export function projectPaths(root: string) {
      * policies).
      */
     readState: join(base, "state", "read.json"),
+    /** Inbox rows the user dismissed, per session (Story 11.1); also local. */
+    inboxState: join(base, "state", "inbox.json"),
     locks: join(base, "locks"),
     /** Where the skill drops session JSON for `session write --file`. */
     inbox: (id: string) => join(base, "inbox", `${id}.json`),

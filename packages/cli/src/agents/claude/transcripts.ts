@@ -1,9 +1,9 @@
 import { createReadStream } from "node:fs";
-import { access, readdir } from "node:fs/promises";
+import { access, type FileHandle, open, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import type { ChatTurn, ToolUse, UserMessage } from "../types.js";
+import type { ChatTurn, LastTurn, ToolUse, UserMessage } from "../types.js";
 
 /**
  * Reading Claude Code's transcripts. A session is one JSONL file under
@@ -248,6 +248,132 @@ export async function readConversation(file: string): Promise<ChatTurn[]> {
     pendingResume = false;
   }
   return turns;
+}
+
+/**
+ * How many bytes from the end of a transcript `readLastTurn` reads first
+ * (Story 11.1). The last turn is nearly always in here; a longer turn makes the
+ * reader walk further back a window at a time.
+ */
+export const LAST_TURN_TAIL_BYTES = 256 * 1024;
+
+/** What scanning a transcript for its ending keeps. */
+interface TurnState {
+  /** A user message was typed somewhere in the scanned window. */
+  userSeen: boolean;
+  userAt: string | null;
+  /** The last agent text line after the newest user message. */
+  agentAt: string | null;
+  agentText: string | null;
+}
+
+/** Reads a byte range from an open file, however many reads the OS needs. */
+async function readRange(handle: FileHandle, start: number, end: number): Promise<Buffer> {
+  const buffer = Buffer.allocUnsafe(end - start);
+  let offset = 0;
+  // A POSIX read may return less than asked; `end` is inside the file, so this
+  // loop cannot stall at zero.
+  while (offset < buffer.length) {
+    const { bytesRead } = await handle.read(buffer, offset, buffer.length - offset, start + offset);
+    offset += bytesRead;
+  }
+  return buffer.subarray(0, offset);
+}
+
+/**
+ * Applies the lines of one transcript stretch to the tail state. A user line is
+ * a message only when {@link messageText} says the user typed it, so tool
+ * results and injected reminders leave the turn alone; an assistant line with
+ * written text is the agent's reply. A new user message starts a new turn.
+ */
+function scanLastTurn(raw: string, state: TurnState): void {
+  for (const line of raw.split("\n")) {
+    const user = line.includes('"type":"user"');
+    if (!user && !line.includes('"type":"assistant"')) continue;
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (parsed.type === "user") {
+      if (messageText(parsed) === null || typeof parsed.timestamp !== "string") continue;
+      state.userSeen = true;
+      state.userAt = parsed.timestamp;
+      state.agentAt = null;
+      state.agentText = null;
+      continue;
+    }
+    if (parsed.type !== "assistant" || parsed.isSidechain) continue;
+    const content = (parsed.message as { content?: unknown } | undefined)?.content;
+    if (!Array.isArray(content)) continue;
+    const texts = content
+      .filter(
+        (block): block is { type: "text"; text: string } =>
+          block?.type === "text" && typeof block.text === "string" && block.text.trim() !== "",
+      )
+      .map((block) => block.text);
+    if (texts.length === 0 || typeof parsed.timestamp !== "string") continue;
+    state.agentAt = parsed.timestamp;
+    state.agentText = texts.join("\n");
+  }
+}
+
+/** Whether one downloaded window holds a user message, without keeping its state. */
+function containsUserMessage(raw: string): boolean {
+  const probe: TurnState = { userSeen: false, userAt: null, agentAt: null, agentText: null };
+  scanLastTurn(raw, probe);
+  return probe.userSeen;
+}
+
+/**
+ * Who spoke last, read from the end of the transcript (Story 11.1). The state is
+ * the last user message plus the agent's last written reply after it: the agent
+ * wrote last means it is the user's turn, the user wrote last means the agent is
+ * still working (or has not started). Null when no user message was typed.
+ *
+ * Reads the last {@link LAST_TURN_TAIL_BYTES} first and walks back only as far
+ * as the newest user message, so a panel over every project does not reread
+ * whole transcripts. Unreadable files are the caller's to handle.
+ */
+export async function readLastTurn(file: string): Promise<LastTurn | null> {
+  const handle = await open(file, "r");
+  try {
+    const { size } = await handle.stat();
+    if (size === 0) return null;
+    // Windows are kept newest first, then joined in file order and decoded once,
+    // so a multi-byte character split by a window edge is still intact.
+    const windows: Buffer[] = [];
+    let end = size;
+    let start = 0;
+    let found = false;
+    let text = "";
+    while (end > 0) {
+      start = Math.max(0, end - LAST_TURN_TAIL_BYTES);
+      windows.unshift(await readRange(handle, start, end));
+      text = Buffer.concat(windows).toString("utf8");
+      // A window that starts mid-file starts mid-line; that line is complete in
+      // the newer window it continues into, so only the first partial goes.
+      if (start > 0) {
+        const newline = text.indexOf("\n");
+        text = newline === -1 ? "" : text.slice(newline + 1);
+      }
+      if (containsUserMessage(text)) {
+        found = true;
+        break;
+      }
+      end = start;
+    }
+    // No user message anywhere: a transcript the user never typed into.
+    if (!found) return null;
+    const state: TurnState = { userSeen: false, userAt: null, agentAt: null, agentText: null };
+    scanLastTurn(text, state);
+    if (state.userAt === null) return null;
+    if (state.agentAt === null) return { speaker: "user", at: state.userAt, text: "" };
+    return { speaker: "agent", at: state.agentAt, text: state.agentText ?? "" };
+  } finally {
+    await handle.close();
+  }
 }
 
 /**
