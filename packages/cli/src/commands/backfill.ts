@@ -225,11 +225,11 @@ export async function backfillTail(dir: string, sessionId: string, io: Io): Prom
     );
   } catch (err) {
     if (!(err instanceof LockBusyError)) throw err;
-    io.out(`catch-up already running for ${sessionId}`);
+    io.out(`the side model is already recording ${sessionId}`);
     return;
   }
   if (turns.length === 0) {
-    io.out(`session ${sessionId} has nothing to catch up`);
+    io.out(`session ${sessionId} has nothing left to record`);
     // Story 9.3: `recordCommit: auto` still commits what an earlier update wrote.
     await maybeAutoCommit(root, sessionId, io.env);
     return;

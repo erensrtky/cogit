@@ -97,7 +97,7 @@ function SessionRow({
         {count} message{count === 1 ? "" : "s"}
       </span>
       {session.unrecordedMessages ? (
-        <span className="muted unrecorded" title="The SessionEnd catch-up is off">
+        <span className="muted unrecorded" title="The side model at session end is off">
           {session.unrecordedMessages} not recorded
         </span>
       ) : null}

@@ -163,8 +163,8 @@ function SessionSummary({ model, session }: { model: LineageViewModel; session: 
         {session.unrecordedMessages ? (
           <Field label="Not recorded">
             {session.unrecordedMessages} message
-            {session.unrecordedMessages === 1 ? "" : "s"} not recorded (the SessionEnd catch-up is
-            off)
+            {session.unrecordedMessages === 1 ? "" : "s"} not recorded (the side model at session
+            end is off)
           </Field>
         ) : null}
       </dl>

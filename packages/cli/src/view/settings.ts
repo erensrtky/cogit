@@ -124,20 +124,21 @@ const EDITABLE: FieldSpec[] = [
   },
   {
     key: "sessionEndCatchUp",
-    label: "Catch up on session end",
-    help: "Record the unrecorded messages when a session ends.",
+    label: "Side model at session end",
+    help: "When a session ends, the side model records the messages still unrecorded.",
     details:
-      "When a session ends, record whatever nobody got to. It runs outside the chat, so it " +
-      "does not spend the session's tokens.",
+      "When a session ends, the side model records whatever nobody got to. It runs outside " +
+      "the chat, so it does not spend the session's tokens.",
     kind: "boolean",
   },
   {
     key: "sideModel",
-    label: "Catch-up model",
-    help: "Model the catch-up and the background records use to summarize.",
+    label: "Side model",
+    help: "The small model that records outside the chat.",
     details:
-      "The small model the background recorder and the session-end catch-up run. Haiku is " +
-      "cheap and good enough for titles, parents and short decisions.",
+      "The small model behind every side record: every few turns in mixed mode, all the " +
+      "time in side mode, and at session end. Haiku is cheap and good enough for titles, " +
+      "parents and short decisions.",
     kind: "text",
   },
   {
@@ -164,10 +165,11 @@ const READ_ONLY: FieldSpec[] = [
   {
     key: "gitPolicy",
     label: "Git policy",
-    help: "Whether captures are committed to git; change it per project with `cogit config git`.",
+    help: "What `cogit init` offers a new project: commit the record to git, or ignore it.",
     details:
-      "Whether the record is committed to git with the code, so a reviewer can follow it, or " +
-      "kept out of the repository. It is set per project when you initialize it.",
+      "Only the default for new projects: each project answers it during `cogit init`. " +
+      "`cogit config git` shows the current project's policy and `cogit config git commit` " +
+      "or `ignore` switches it.",
     kind: "text",
   },
   {
@@ -184,16 +186,14 @@ const READ_ONLY: FieldSpec[] = [
 /**
  * One section today, "Recording", so later groups slot in without a redesign.
  * Over `file://` (`canEdit` false) the editable fields still appear, read-only,
- * with the build-time values.
+ * with the build-time values. The CLI-only settings (`READ_ONLY`) stay out of
+ * the panel: they are per project or have one choice, so `cogit config` shows them.
  */
 export function settingsSections(canEdit: boolean): SettingsSection[] {
   return [
     {
       title: "Recording",
-      fields: [
-        ...EDITABLE.map((field) => ({ ...field, editable: canEdit })),
-        ...READ_ONLY.map((field) => ({ ...field, editable: false })),
-      ],
+      fields: EDITABLE.map((field) => ({ ...field, editable: canEdit })),
     },
   ];
 }

@@ -4,7 +4,7 @@ import { userInfo } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
-import { configGit, configSet } from "../src/commands/config.js";
+import { configGit, configGitShow, configSet } from "../src/commands/config.js";
 import { hooksInstall, hooksUninstall } from "../src/commands/hooks.js";
 import { sessionAuthor, sessionWrite } from "../src/commands/session.js";
 import {
@@ -270,8 +270,17 @@ describe("ignore files and git hooks", () => {
     expect(hook).toContain("cogit hook pre-commit --dir");
     expect(await readFile(projectPaths(root).project, "utf8")).toContain('"proj"');
 
+    await configGitShow(root, io);
     await configGit(root, "ignore", io);
     await expect(readFile(join(root, ".gitignore"), "utf8")).resolves.toBe("# cogit\n/.cogit/\n");
+    await configGitShow(root, io);
+    expect(io.lines.filter((line) => line.startsWith("Git policy"))).toEqual([
+      "Git policy for proj: commit",
+      "Git policy for proj: commit",
+      "Git policy for proj: ignore",
+      "Git policy for proj: ignore",
+    ]);
+    await expect(configGitShow(join(root, "nowhere"), io)).rejects.toThrow(/not initialized/);
     // Switching policy never deletes a record.
     await expect(readFile(projectPaths(root).project, "utf8")).resolves.toContain('"proj"');
   });

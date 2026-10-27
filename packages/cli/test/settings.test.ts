@@ -40,27 +40,23 @@ describe("settings model", () => {
     });
   });
 
-  it("has one section with every field and edits only the allow-listed keys over http", () => {
+  it("has one section with the editable fields only; CLI-only settings stay off the panel", () => {
     const sections = settingsSections(true);
     expect(sections.map((section) => section.title)).toEqual(["Recording"]);
     const fields = sections[0]?.fields ?? [];
-    expect(fields.map((field) => field.key)).toEqual([
-      ...PANEL_EDITABLE_KEYS,
-      "gitPolicy",
-      "agents",
-    ]);
+    expect(fields.map((field) => field.key)).toEqual([...PANEL_EDITABLE_KEYS]);
     for (const field of fields) {
       expect(field.label).not.toBe("");
       expect(field.help.length).toBeGreaterThan(10);
       // Every field has the longer plain-language "?" text (Story 12.1).
       expect(field.details.length).toBeGreaterThan(field.help.length);
-      expect(field.editable).toBe((PANEL_EDITABLE_KEYS as readonly string[]).includes(field.key));
+      expect(field.editable).toBe(true);
     }
   });
 
   it("shows everything read-only over file://", () => {
     const fields = settingsSections(false).flatMap((section) => section.fields);
-    expect(fields).toHaveLength(PANEL_EDITABLE_KEYS.length + 2);
+    expect(fields).toHaveLength(PANEL_EDITABLE_KEYS.length);
     expect(fields.every((field) => !field.editable)).toBe(true);
   });
 

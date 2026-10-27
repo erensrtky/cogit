@@ -6,6 +6,7 @@ import { buildProject } from "./commands/build.js";
 import {
   configGet,
   configGit,
+  configGitShow,
   configHintOff,
   configHintOn,
   configPrune,
@@ -338,11 +339,12 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .action(run(async (key: string, value: string) => configSet(key, value, makeIo(false))));
   config
     .command("git")
-    .description("commit or ignore this project's session records (story 9.3)")
-    .argument("<policy>", "commit or ignore")
+    .description("show, or switch to commit or ignore, this project's session records (story 9.3)")
+    .argument("[policy]", "commit or ignore; without it, shows the current policy")
     .argument("[dir]", "project directory", ".")
     .action(
-      run(async (policy: string, dir: string) => {
+      run(async (policy: string | undefined, dir: string) => {
+        if (policy === undefined) return configGitShow(dir, makeIo(false));
         if (policy !== "commit" && policy !== "ignore")
           throw new CliError(`invalid git policy "${policy}"; use commit or ignore`);
         await configGit(dir, policy, makeIo(false));

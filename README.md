@@ -183,7 +183,7 @@ under `gitPolicy: ignore` the description says the hashes resolve only on the au
 | `updateEveryTurns` | `15` | Turns between the main agent's record updates |
 | `sideEveryTurns` | `5` | Turns between the side model's background records |
 | `sessionEndCatchUp` | `true` | Summarize the last messages when a session ends |
-| `sideModel` | `haiku` | Model for the side records and the session-end catch-up |
+| `sideModel` | `haiku` | The side model: records every few turns outside the chat and at session end |
 | `messageSummaries` | `false` | A summary on every message, not just every branch |
 | `startupContext` | `true` | Hand the agent the previous session's lineage at session start |
 | `tryBeforeNotes` | `true` | Tell the agent, before an edit, what earlier thoughts rejected for that file |

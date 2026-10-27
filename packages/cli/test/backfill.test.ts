@@ -207,7 +207,7 @@ describe("backfill --tail", () => {
     await initialized(env);
     const io = fakeIo(env);
     await backfillTail(root, "s1", io);
-    expect(io.lines).toEqual(["session s1 has nothing to catch up"]);
+    expect(io.lines).toEqual(["session s1 has nothing left to record"]);
 
     await transcript([typed("first", 1)]);
     await sessionWrite({ dir: root }, fakeIo(env), async () =>
@@ -215,7 +215,7 @@ describe("backfill --tail", () => {
     );
     const again = fakeIo(env);
     await backfillTail(root, "s1", again);
-    expect(again.lines).toEqual(["session s1 has nothing to catch up"]);
+    expect(again.lines).toEqual(["session s1 has nothing left to record"]);
   });
 
   it("exits quietly when another catch-up holds the session lock", async () => {
@@ -228,7 +228,7 @@ describe("backfill --tail", () => {
 
     const io = fakeIo(env);
     await backfillTail(root, "s1", io);
-    expect(io.lines).toEqual(["catch-up already running for s1"]);
+    expect(io.lines).toEqual(["the side model is already recording s1"]);
     expect(await record()).toBeUndefined();
   });
 

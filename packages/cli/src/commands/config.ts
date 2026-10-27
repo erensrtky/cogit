@@ -1,4 +1,10 @@
-import { ensureCogitGitignore, ensureGitignore, findGitRoot, type GitPolicy } from "../git.js";
+import {
+  cogitIgnored,
+  ensureCogitGitignore,
+  ensureGitignore,
+  findGitRoot,
+  type GitPolicy,
+} from "../git.js";
 import { installGitHooks } from "../git-hooks.js";
 import { CliError, type Io } from "../io.js";
 import { Config, type RegistryEntry } from "../schema/config.js";
@@ -71,6 +77,16 @@ export async function configSet(key: string, raw: string, io: Io): Promise<void>
   if (name === "shareConversations")
     await refreshShareConversations(io.env, next.data.shareConversations);
   io.out(`${name} = ${JSON.stringify(next.data[key])}`);
+}
+
+/** `cogit config git` without a policy: what this project does now, read from its `.gitignore`. */
+export async function configGitShow(dir: string, io: Io): Promise<void> {
+  const { root } = await resolveProjectRoot(dir);
+  const project = await loadProject(root);
+  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
+  if (!project.ok) throw new CliError(project.error);
+  const policy: GitPolicy = (await cogitIgnored(root)) ? "ignore" : "commit";
+  io.out(`Git policy for ${project.data.name}: ${policy}`);
 }
 
 /**

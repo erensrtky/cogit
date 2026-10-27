@@ -139,7 +139,7 @@ describe("commands through the CLI", () => {
     await cli("init", root, "--yes", "--retention", "keep");
     expect(await cli("backfill", "s1")).toMatch(/--tail/);
     expect(await cli("backfill", "s1", "--tail", "-C", root)).toBe("");
-    expect(io.lines.at(-1)).toBe("session s1 has nothing to catch up");
+    expect(io.lines.at(-1)).toBe("session s1 has nothing left to record");
   });
 
   it("runs session write from a file", async () => {
@@ -298,6 +298,8 @@ describe("commands through the CLI", () => {
     expect((await git("log", "-1", "--format=%s")).trim()).toBe("chore(cogit): record CLI session");
 
     expect(await cli("config", "git", "nope")).toMatch(/^error: invalid git policy "nope"/);
+    // Without a policy it reports the current one instead of refusing.
+    expect(await cli("config", "git")).not.toMatch(/invalid git policy/);
     expect(await cli("config", "git", "ignore", root)).toBe("");
     expect(await readFile(join(root, ".gitignore"), "utf8")).toBe("# cogit\n/.cogit/\n");
   });
