@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import {
   type ClientRequest,
@@ -9,6 +10,7 @@ import {
 } from "node:http";
 import { type AddressInfo, createServer as createNetServer } from "node:net";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import pkg from "../package.json" with { type: "json" };
 import { buildProject } from "../src/commands/build.js";
@@ -807,5 +809,142 @@ describe("read marks (10.3)", () => {
     await mkdir(projectPaths(root).readState, { recursive: true });
     const reply = await readWrite(server, token, { dir: root, id: ID, read: true });
     expect(reply.status).toBe(500);
+  });
+});
+
+describe("commit diff endpoint (Story 10.5)", () => {
+  const run = promisify(execFile);
+
+  const git = async (...args: string[]): Promise<string> => {
+    const { stdout } = await run("git", ["-C", root, ...args], {
+      env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", HOME: dir },
+    });
+    return stdout;
+  };
+
+  const commit = async (message: string): Promise<string> => {
+    await git("add", "-A");
+    await git("commit", "-q", "-m", message);
+    return (await git("rev-parse", "HEAD")).trim();
+  };
+
+  function diffRequest(
+    server: MapServer,
+    token: string,
+    params: Record<string, string | undefined>,
+    overrides: Record<string, string> = {},
+  ): Promise<Reply> {
+    const url = new URL(`${server.url}/api/diff`);
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined) url.searchParams.set(key, value);
+    }
+    return request(url.toString(), {
+      origin: `http://127.0.0.1:${server.port}`,
+      [CONFIG_TOKEN_HEADER]: token,
+      ...overrides,
+    });
+  }
+
+  beforeEach(async () => {
+    await git("init", "-q");
+    await git("config", "user.email", "t@example.com");
+    await git("config", "user.name", "Tester");
+    await writeFile(join(root, "a.txt"), "one\n");
+    await commit("feat: base");
+  });
+
+  it("serves one commit's patch and limits it to a file", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    await writeFile(join(root, "a.txt"), "two\n");
+    const sha = await commit("fix: two");
+
+    const full = await diffRequest(server, token, { dir: root, commit: sha });
+    expect(full.status).toBe(200);
+    expect(full.headers["content-type"]).toContain("application/json");
+    const body = JSON.parse(full.body) as { ok: boolean; text: string };
+    expect(body.ok).toBe(true);
+    expect(body.text).toContain("diff --git a/a.txt b/a.txt");
+    expect(body.text).toContain("+two");
+
+    const only = await diffRequest(server, token, {
+      dir: root,
+      commit: sha.slice(0, 7),
+      file: "a.txt",
+    });
+    expect(only.status).toBe(200);
+    expect((JSON.parse(only.body) as { text: string }).text).toContain("+two");
+  });
+
+  it("rejects a bad hash, an unknown commit and a file outside the commit", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    await writeFile(join(root, "a.txt"), "two\n");
+    const sha = await commit("fix: two");
+
+    expect((await diffRequest(server, token, { commit: "abcdef0" })).status).toBe(400);
+    expect((await diffRequest(server, token, { dir: root })).status).toBe(400);
+    expect((await diffRequest(server, token, { dir: root, commit: "abc" })).status).toBe(400);
+    const head = await request(
+      `${server.url}/api/diff?dir=${encodeURIComponent(root)}&commit=abcdef0`,
+      { origin: `http://127.0.0.1:${server.port}`, [CONFIG_TOKEN_HEADER]: token },
+      "HEAD",
+    );
+    expect(head.status).toBe(405);
+    expect(
+      (
+        await diffRequest(server, token, {
+          dir: root,
+          commit: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+        })
+      ).status,
+    ).toBe(404);
+    const file = await diffRequest(server, token, { dir: root, commit: sha, file: "a.txt.bak" });
+    expect(file.status).toBe(400);
+    expect(file.body).toContain("file is not part of this commit");
+  });
+
+  it("requires a registered project, the token and this origin", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    expect((await diffRequest(server, token, { dir, commit: "abcdef0" })).status).toBe(403);
+    expect((await diffRequest(server, "", { dir: root, commit: "abcdef0" })).status).toBe(403);
+    expect(
+      (
+        await diffRequest(
+          server,
+          token,
+          { dir: root, commit: "abcdef0" },
+          { origin: "http://evil.example" },
+        )
+      ).status,
+    ).toBe(403);
+  });
+
+  it("answers not-a-git-repository for a registered project without git", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const plain = join(dir, "plain");
+    await mkdir(plain);
+    await init(plain, { name: "plain", retention: "keep", language: "auto" }, fakeIo(env));
+    const reply = await diffRequest(server, token, { dir: plain, commit: "abcdef0" });
+    expect(reply.status).toBe(404);
+    expect(reply.body).toContain("not a git repository");
+  });
+
+  it("answers a one-line notice past the size cap", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const line = "x".repeat(100);
+    await writeFile(
+      join(root, "big.txt"),
+      `${Array.from({ length: 5000 }, () => line).join("\n")}\n`,
+    );
+    const sha = await commit("feat: big");
+    const reply = await diffRequest(server, token, { dir: root, commit: sha });
+    expect(reply.status).toBe(200);
+    const body = JSON.parse(reply.body) as { text: string };
+    expect(body.text).toContain("diff too large");
+    expect(body.text).toContain(`git show ${sha}`);
   });
 });

@@ -98,6 +98,30 @@ export async function saveRead(
   }
 }
 
+/**
+ * One commit's patch for the message details (Story 10.5). Only the local
+ * server answers this; over `file://` the diff rows do not expand.
+ */
+export async function loadDiff(
+  dir: string,
+  commit: string,
+  file: string | undefined,
+  token: string,
+): Promise<string> {
+  const params = new URLSearchParams({ dir, commit });
+  if (file !== undefined) params.set("file", file);
+  const response = await fetch(`/api/diff?${params.toString()}`, {
+    headers: { "x-cogit-token": token },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const text = (await response.text()).trim();
+    throw new Error(text || `could not read the diff (HTTP ${response.status})`);
+  }
+  const body = (await response.json().catch(() => null)) as { text?: unknown } | null;
+  return typeof body?.text === "string" ? body.text : "";
+}
+
 /** One settings write; the server validates the key, the value and the token. */
 export async function saveSetting(
   key: string,

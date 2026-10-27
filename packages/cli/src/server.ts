@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import pkg from "../package.json" with { type: "json" };
 import { defaultAgent } from "./agents/index.js";
 import { buildProject } from "./commands/build.js";
+import { diffTooLarge, isDiffSha, readCommitDiff } from "./diff.js";
 import { defaultsPrompter, type Io } from "./io.js";
 import { Config } from "./schema/config.js";
 import { refreshShareConversations } from "./share.js";
@@ -109,6 +110,13 @@ function respond(res: ServerResponse, status: number, body: string): void {
   // A stream that already started (the event endpoint) can only be ended.
   if (!res.headersSent) res.writeHead(status, { "content-type": "text/plain; charset=utf-8" });
   res.end(body);
+}
+
+/** An API answer as JSON; the diff endpoint's body is text, so it needs this. */
+function respondJson(res: ServerResponse, status: number, body: unknown): void {
+  if (!res.headersSent)
+    res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
+  res.end(JSON.stringify(body));
 }
 
 /** The root of a registered project, or null when the request names another path. */
@@ -393,6 +401,61 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
   }
 
   /**
+   * `GET /api/diff?dir&commit[&file]` (Story 10.5): one commit's patch for the
+   * message details. Read-only, a registered project only, and the same Origin
+   * and token checks as the settings read. A bad or unknown hash is a 4xx, and
+   * an oversized patch comes back as a one-line notice instead of the bytes.
+   */
+  async function readDiff(
+    req: IncomingMessage,
+    res: ServerResponse,
+    port: number,
+    url: URL,
+  ): Promise<void> {
+    if (
+      !readOriginAllowed(req.headers.origin, port) ||
+      !tokenMatches(req.headers[CONFIG_TOKEN_HEADER])
+    ) {
+      respond(res, 403, "forbidden");
+      return;
+    }
+    const dir = url.searchParams.get("dir");
+    const commit = url.searchParams.get("commit");
+    const file = url.searchParams.get("file") || undefined;
+    if (!dir) {
+      respond(res, 400, "dir is required");
+      return;
+    }
+    if (commit === null || !isDiffSha(commit)) {
+      respond(res, 400, "commit must be 7–40 hex characters");
+      return;
+    }
+    const root = await registeredRoot(env, dir);
+    if (root === null) {
+      respond(res, 403, "not a registered project");
+      return;
+    }
+    const result = await readCommitDiff(root, commit, file);
+    if (!result.ok) {
+      if (result.reason === "file-not-in-commit") {
+        respond(res, 400, "file is not part of this commit");
+        return;
+      }
+      if (result.reason === "unknown-commit") {
+        respond(res, 404, "commit not found");
+        return;
+      }
+      if (result.reason === "no-git") {
+        respond(res, 404, "not a git repository");
+        return;
+      }
+      respondJson(res, 200, { ok: true, text: diffTooLarge(commit) });
+      return;
+    }
+    respondJson(res, 200, { ok: true, text: result.text });
+  }
+
+  /**
    * `POST /api/config` { key, value }: the modal's only write. Host, Origin,
    * content type and token all have to match, the key must be one the modal may
    * change and the value has to pass the config schema. Anything else is a 4xx
@@ -566,6 +629,14 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       return;
     }
     const url = new URL(req.url ?? "/", `http://${HOST}:${port}`);
+    if (url.pathname === "/api/diff") {
+      if (req.method !== "GET") {
+        respond(res, 405, "method not allowed");
+        return;
+      }
+      await readDiff(req, res, port, url);
+      return;
+    }
     if (url.pathname === "/api/config") {
       if (req.method !== "GET") {
         respond(res, 405, "method not allowed");

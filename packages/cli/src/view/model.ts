@@ -56,6 +56,12 @@ export interface ViewCommit {
   hash: string;
   /** The commit's subject; absent when git no longer knows the commit. */
   subject?: string;
+  /**
+   * Project-relative files the commit changed (Story 10.5), so a file row can
+   * ask for the diff of the commit that touched it. Absent on pages built
+   * before 10.5 and for commits git no longer knows.
+   */
+  files?: string[];
 }
 
 /**

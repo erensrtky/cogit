@@ -25,6 +25,7 @@ export function buildMessages(
   nodes: LineageNode[],
   pending: ViewPendingMessage[] = [],
   commitSubjects?: ReadonlyMap<string, string>,
+  commitFiles?: ReadonlyMap<string, string[]>,
 ): ViewNode[] {
   const recorded = nodes.filter((node) => node.kind === "message");
   // One row per message in send order; unrecorded messages are part of the same
@@ -109,7 +110,12 @@ export function buildMessages(
           ? {
               commitTags: node.commits.map((hash) => {
                 const subject = commitSubjects?.get(hash);
-                return subject === undefined ? { hash } : { hash, subject };
+                const files = commitFiles?.get(hash);
+                return {
+                  hash,
+                  ...(subject === undefined ? {} : { subject }),
+                  ...(files === undefined ? {} : { files }),
+                };
               }),
             }
           : {}),
@@ -235,6 +241,7 @@ function toViewSession(
   unrecorded?: number,
   pending?: ViewPendingMessage[],
   commitSubjects?: ReadonlyMap<string, string>,
+  commitFiles?: ReadonlyMap<string, string[]>,
 ): ViewSession {
   return {
     sessionId: session.sessionId,
@@ -245,7 +252,7 @@ function toViewSession(
     startedAt: session.startedAt,
     updatedAt: session.updatedAt,
     status: session.status,
-    messages: buildMessages(session.nodes, pending, commitSubjects),
+    messages: buildMessages(session.nodes, pending, commitSubjects, commitFiles),
     // Undefined means the caller did not ask (fixtures, unit tests); then the
     // record is shown as resumable rather than pretending the transcript is gone.
     transcriptAvailable: transcripts === undefined ? true : transcripts.has(session.sessionId),
@@ -276,6 +283,8 @@ export interface ViewModelInput {
   pending?: ReadonlyMap<string, ViewPendingMessage[]> | undefined;
   /** Commit subjects read from git at build time (Story 8.8). */
   commitSubjects?: ReadonlyMap<string, string> | undefined;
+  /** Project-relative files per commit, for the diff rows (Story 10.5). */
+  commitFiles?: ReadonlyMap<string, string[]> | undefined;
   /** Settings embedded for the modal's `file://` view (Story 8.13). */
   settings?: PanelSettings | undefined;
 }
@@ -329,6 +338,7 @@ export function buildViewModel(input: ViewModelInput): LineageViewModel {
       input.unrecorded?.get(session.sessionId),
       input.pending?.get(session.sessionId),
       input.commitSubjects,
+      input.commitFiles,
     );
     const bucket = session.epoch === null ? undefined : buckets.get(session.epoch);
     (bucket ?? unassigned).push(view);

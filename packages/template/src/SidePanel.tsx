@@ -8,7 +8,8 @@ import type {
 } from "../../cli/src/view/model.js";
 import { resumeCommand } from "../../cli/src/view/resume.js";
 import { parseSubject, splitPath, typeColour } from "./codeRefs.js";
-import { isLivePage } from "./data.js";
+import { DiffView } from "./DiffView.js";
+import { isLivePage, pageToken } from "./data.js";
 import { formatTime, kindLabel } from "./format.js";
 import { layoutGitGraph } from "./gitLayout.js";
 import {
@@ -411,6 +412,9 @@ function NodeDetails({
   readError: string | null;
 }) {
   const session = findSession(model, node.sessionId);
+  // Diffs are read from the local server (Story 10.5); a `file://` map has no
+  // git endpoint, and the rows say so once instead of failing on every click.
+  const live = typeof document !== "undefined" && isLivePage() && pageToken() !== null;
   return (
     <>
       <MessageNav session={session} node={node} onNavigate={onNavigate} />
@@ -516,7 +520,14 @@ function NodeDetails({
               const tag = node.commitTags?.find((candidate) => candidate.hash === commit);
               const missing = node.commitTags !== undefined && tag?.subject === undefined;
               return (
-                <CommitItem key={commit} hash={commit} subject={tag?.subject} missing={missing} />
+                <CommitItem
+                  key={commit}
+                  hash={commit}
+                  subject={tag?.subject}
+                  missing={missing}
+                  root={model.project.path}
+                  expandable={live && !missing}
+                />
               );
             })}
           </ul>
@@ -529,16 +540,26 @@ function NodeDetails({
           </h3>
           <ul className="file-list">
             {node.files.map((file) => {
-              const { dir, name } = splitPath(file);
+              // The newest commit that touched the file; a file only the record
+              // lists has no patch to open.
+              const owner = [...(node.commitTags ?? [])]
+                .reverse()
+                .find((tag) => tag.files?.includes(file));
               return (
-                <li key={file} title={file}>
-                  <span className="file-name">{name}</span>
-                  {dir ? <span className="file-dir">{dir}</span> : null}
-                </li>
+                <FileItem
+                  key={file}
+                  file={file}
+                  root={model.project.path}
+                  commit={owner?.hash}
+                  expandable={live && owner !== undefined}
+                />
               );
             })}
           </ul>
         </section>
+      ) : null}
+      {!live && (node.commits?.length || node.files?.length) ? (
+        <p className="muted">Open with `cogit open` to see diffs.</p>
       ) : null}
       {node.kind === "message" ? <Conversation session={session} id={node.nodeId} /> : null}
       <dl className="drilldown-meta">
@@ -574,21 +595,27 @@ function NodeDetails({
 /**
  * One commit of a message: the short hash, the Conventional Commits type as a
  * coloured badge, the scope and the description. A commit git no longer has
- * stays listed, greyed (Story 8.8).
+ * stays listed, greyed (Story 8.8). On a live page the row opens the patch the
+ * commit carries (Story 10.5).
  */
 function CommitItem({
   hash,
   subject,
   missing,
+  root,
+  expandable,
 }: {
   hash: string;
   subject: string | undefined;
   missing: boolean;
+  root: string;
+  expandable: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   const parsed = subject === undefined ? undefined : parseSubject(subject);
   const lane = parsed?.type === undefined ? undefined : typeColour(parsed.type);
-  return (
-    <li className={missing ? "commit-item is-missing" : "commit-item"} title={hash}>
+  const content = (
+    <>
       <code className="commit-hash">{hash.slice(0, 7)}</code>
       {parsed?.type ? (
         <span
@@ -601,6 +628,67 @@ function CommitItem({
       ) : null}
       {parsed?.scope ? <span className="commit-scope">{parsed.scope}</span> : null}
       <span className="commit-subject">{parsed ? parsed.text : "not in this repository"}</span>
+      {expandable ? <span className="diff-caret">{open ? "−" : "+"}</span> : null}
+    </>
+  );
+  return (
+    <li className={missing ? "commit-item is-missing" : "commit-item"} title={hash}>
+      {expandable ? (
+        <button
+          type="button"
+          className="commit-row"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          {content}
+        </button>
+      ) : (
+        <div className="commit-row">{content}</div>
+      )}
+      {open ? <DiffView dir={root} commit={hash} /> : null}
+    </li>
+  );
+}
+
+/**
+ * One file of a message's changes (Story 10.5). It opens the patch of the
+ * commit that touched it; a file only the record lists stays a plain row.
+ */
+function FileItem({
+  file,
+  root,
+  commit,
+  expandable,
+}: {
+  file: string;
+  root: string;
+  commit: string | undefined;
+  expandable: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const { dir, name } = splitPath(file);
+  const content = (
+    <>
+      <span className="file-name">{name}</span>
+      {dir ? <span className="file-dir">{dir}</span> : null}
+      {expandable ? <span className="diff-caret">{open ? "−" : "+"}</span> : null}
+    </>
+  );
+  return (
+    <li title={file}>
+      {expandable && commit !== undefined ? (
+        <button
+          type="button"
+          className="file-row"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          {content}
+        </button>
+      ) : (
+        <div className="file-row">{content}</div>
+      )}
+      {open && commit !== undefined ? <DiffView dir={root} commit={commit} file={file} /> : null}
     </li>
   );
 }

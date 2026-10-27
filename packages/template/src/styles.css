@@ -31,6 +31,11 @@
   --missing: #a2abbf;
   --search-hit-bg: #2b2724;
   --search-active-bg: #373129;
+  /* Diff lines in the message details (Story 10.5). */
+  --diff-add-bg: #16301c;
+  --diff-add-text: #b7f0c0;
+  --diff-remove-bg: #3a1d23;
+  --diff-remove-text: #ffc4cc;
   --on-lane: #0f1115;
   --translucent-panel: rgba(20, 23, 30, 0.97);
   --translucent-outline: rgba(17, 20, 26, 0.94);
@@ -72,6 +77,10 @@
     --missing: #4f586b;
     --search-hit-bg: #e7e2dc;
     --search-active-bg: #e1d9cd;
+    --diff-add-bg: #e2f5e4;
+    --diff-add-text: #145c22;
+    --diff-remove-bg: #fbe4e6;
+    --diff-remove-text: #8a1c26;
     --on-lane: #ffffff;
     --translucent-panel: rgba(255, 255, 255, 0.97);
     --translucent-outline: rgba(246, 248, 251, 0.96);
@@ -1198,15 +1207,33 @@ h3 .count {
   overflow: hidden;
 }
 
-.commit-item {
+.commit-item,
+.file-list li {
+  background: var(--row-bg);
+}
+
+.commit-row {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
+  width: 100%;
   padding: 7px 10px;
+  color: inherit;
+  font: inherit;
   font-size: 13px;
   line-height: 18px;
-  background: var(--row-bg);
+  text-align: left;
+  background: none;
+  border: 0;
+}
+
+button.commit-row {
+  cursor: pointer;
+}
+
+button.commit-row:hover {
+  background: var(--hover);
 }
 
 .commit-item + .commit-item,
@@ -1267,15 +1294,27 @@ h3 .count {
   font-style: italic;
 }
 
-.file-list li {
+.file-row {
   display: flex;
   align-items: baseline;
   gap: 8px;
   min-width: 0;
+  width: 100%;
   padding: 5px 10px;
+  color: inherit;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
-  background: var(--row-bg);
+  text-align: left;
+  background: none;
+  border: 0;
+}
+
+button.file-row {
+  cursor: pointer;
+}
+
+button.file-row:hover {
+  background: var(--hover);
 }
 
 .file-name {
@@ -1290,6 +1329,153 @@ h3 .count {
   color: var(--muted);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A commit or file row that opens its patch (Story 10.5). */
+.diff-caret {
+  flex: none;
+  margin-left: auto;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.diff-view {
+  padding: 8px 10px 10px;
+  overflow-x: hidden;
+  background: var(--raised-2);
+  border-top: 1px solid var(--line);
+}
+
+.diff-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.diff-loading {
+  margin: 6px 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.diff-patch + .diff-patch {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.diff-file {
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.diff-meta {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.diff-hunk {
+  margin: 6px 0 2px;
+  padding: 2px 6px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  background: var(--chip-bg);
+  border-radius: 4px;
+}
+
+.diff-row {
+  display: flex;
+  align-items: baseline;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 16px;
+}
+
+.diff-no {
+  flex: none;
+  width: 34px;
+  padding-right: 4px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+}
+
+.diff-mark {
+  flex: none;
+  width: 14px;
+  text-align: center;
+}
+
+.diff-text {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-add {
+  color: var(--diff-add-text);
+  background: var(--diff-add-bg);
+}
+
+.diff-remove {
+  color: var(--diff-remove-text);
+  background: var(--diff-remove-bg);
+}
+
+.diff-context {
+  color: var(--text);
+}
+
+.diff-note {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.diff-note-line {
+  display: block;
+  padding: 2px 6px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+/* Side by side: two line-number columns, each cell keeps its own tint. */
+.diff-side-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px minmax(0, 1fr);
+}
+
+.diff-side-row .diff-note-line {
+  grid-column: 1 / -1;
+}
+
+.diff-side-no {
+  width: auto;
+  padding: 0 4px;
+}
+
+.diff-cell {
+  min-width: 0;
+  padding: 0 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-cell.is-empty {
+  background: var(--bg);
+  opacity: 0.55;
 }
 
 .drilldown-meta {

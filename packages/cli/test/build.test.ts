@@ -58,6 +58,18 @@ function session(over: Partial<Session> & { sessionId: string }): Session {
 }
 
 describe("buildMessages", () => {
+  it("carries each commit's files, so a file row can open its patch (10.5)", () => {
+    const [tagged] = buildMessages(
+      [node("m1", "message", "M", null, { commits: ["abc1234"] })],
+      [],
+      new Map([["abc1234", "feat: x"]]),
+      new Map([["abc1234", ["a.ts"]]]),
+    );
+    expect(tagged?.commitTags).toEqual([{ hash: "abc1234", subject: "feat: x", files: ["a.ts"] }]);
+    const [bare] = buildMessages([node("m1", "message", "M", null, { commits: ["abc1234"] })]);
+    expect(bare?.commitTags).toEqual([{ hash: "abc1234" }]);
+  });
+
   it("carries message detail into the view and drops empty lists", () => {
     const [m] = buildMessages([
       node("m1", "message", "M", null, {
@@ -659,7 +671,7 @@ describe("cogit build", () => {
 
     const first = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
     expect(first.epochs[0]?.sessions[0]?.messages[0]?.commitTags).toEqual([
-      { hash: short, subject: "feat: first commit" },
+      { hash: short, subject: "feat: first commit", files: ["a.txt"] },
     ]);
 
     // One hash git does not know makes the batched lookup fail; the per-hash
@@ -674,7 +686,7 @@ describe("cogit build", () => {
     );
     const second = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
     expect(second.epochs[0]?.sessions[0]?.messages[0]?.commitTags).toEqual([
-      { hash: short, subject: "feat: first commit" },
+      { hash: short, subject: "feat: first commit", files: ["a.txt"] },
       { hash: "0000000" },
     ]);
   });

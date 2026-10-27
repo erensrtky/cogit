@@ -298,6 +298,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         chats: views.chats,
         pending: views.pending,
         commitSubjects: commits.subjects,
+        commitFiles: commits.files,
         // Over `file://` the settings modal shows these; a server page reads the
         // live values instead, so a map built before a change still agrees.
         settings: panelSettings(config),

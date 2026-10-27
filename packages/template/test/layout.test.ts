@@ -142,6 +142,9 @@ describe("small text contrast (Story 9.2)", () => {
     ["warn", "kind-question-bg"],
     ["kind-message-text", "kind-message-bg"],
     ["kind-decision-text", "kind-decision-bg"],
+    // Diff lines in the message details (Story 10.5).
+    ["diff-add-text", "diff-add-bg"],
+    ["diff-remove-text", "diff-remove-bg"],
   ];
 
   it("declares a light theme besides the dark default", () => {
