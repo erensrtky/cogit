@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CONFIG_SCHEMA, Config } from "../src/schema/config.js";
 import { PANEL_EDITABLE_KEYS } from "../src/view/model.js";
 import {
+  CLI_ONLY,
   configHelpLines,
   DEFAULT_SETTINGS,
   editableSettings,
@@ -80,7 +81,7 @@ describe("settings model", () => {
 
   it("prints the same long explanations in `cogit config --help` (Story 12.1)", () => {
     const lines = configHelpLines();
-    expect(lines.length).toBe(PANEL_EDITABLE_KEYS.length + 2);
+    expect(lines.length).toBe(PANEL_EDITABLE_KEYS.length + CLI_ONLY.length);
     const text = lines.join("\n");
     for (const field of settingsSections(true).flatMap((section) => section.fields)) {
       expect(text).toContain(field.details);

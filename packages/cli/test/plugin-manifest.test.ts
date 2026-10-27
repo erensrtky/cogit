@@ -1,4 +1,4 @@
-import { access, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const read = async (path: string) =>
@@ -52,11 +52,11 @@ describe("plugin packaging", () => {
     expect(pkg.keywords).toEqual(expect.arrayContaining(["git", "claude-code", "lineage"]));
   });
 
-  it("keeps a README that shows the map and points at the spec and licence", async () => {
+  it("keeps a README that shows the map and points at the guide and licence", async () => {
     const readme = await readFile(new URL("../../../README.md", import.meta.url), "utf8");
     expect(readme).toContain("![The map");
     expect(readme).toContain("(docs/images/map.png)");
-    expect(readme).toContain("(specs/cogit-mvp.md)");
+    expect(readme).toContain("(docs/guide/getting-started.md)");
     expect(readme).toContain("(LICENSE)");
     // A relative image only renders when the file it names is in the repository.
     await expect(
@@ -64,19 +64,27 @@ describe("plugin packaging", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("points every relative README link at a file that exists (Story 10.2)", async () => {
-    const readme = await readFile(new URL("../../../README.md", import.meta.url), "utf8");
-    const root = new URL("../../../", import.meta.url);
-    const links = [...readme.matchAll(/!?\[[^\]]*\]\(([^)\s]+)\)/g)]
-      .map((match) => match[1] ?? "")
-      .filter((href) => href !== "" && !/^[a-z]+:/i.test(href) && !href.startsWith("#"));
-    expect(links.length).toBeGreaterThan(0);
-    for (const href of links) {
-      await expect(
-        access(new URL(href.replace(/#.*$/, ""), root)),
-        `README links to ${href}`,
-      ).resolves.toBeUndefined();
+  it("points every relative link of the README and the guide at a file that exists", async () => {
+    const guide = new URL("../../../docs/guide/", import.meta.url);
+    const pages = [
+      new URL("../../../README.md", import.meta.url),
+      ...(await readdir(guide)).filter((f) => f.endsWith(".md")).map((f) => new URL(f, guide)),
+    ];
+    let checked = 0;
+    for (const page of pages) {
+      const text = await readFile(page, "utf8");
+      const links = [...text.matchAll(/!?\[[^\]]*\]\(([^)\s]+)\)/g)]
+        .map((match) => match[1] ?? "")
+        .filter((href) => href !== "" && !/^[a-z]+:/i.test(href) && !href.startsWith("#"));
+      for (const href of links) {
+        await expect(
+          access(new URL(href.replace(/#.*$/, ""), page)),
+          `${page.pathname} links to ${href}`,
+        ).resolves.toBeUndefined();
+        checked += 1;
+      }
     }
+    expect(checked).toBeGreaterThan(10);
   });
 
   it("ships no runtime dependencies, since the CLI is bundled into one file", async () => {

@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- A user guide in `docs/guide/`: getting started, the map, reading the lineage, pull requests, teams and git, recording and cost, privacy, settings and troubleshooting. The README is now a short page with a feature list that links into it. `docs/guide/settings.md` is generated from the same texts as the panel's "?", and a test fails when it drifts.
+- `cogit config --help` also explains the settings only the CLI changes: inbox age, big change, trailer age and server port, besides git policy and agents.
+
 ### Changed
 - `cogit init` needs a git repository and says to run `git init` first: the record is tied to commits (`Thought:` trailers, `blame`, `why`, `pr`) and travels through git, so outside a repository only half of cogit worked. The setup offer at session start stays quiet outside a repository.
 

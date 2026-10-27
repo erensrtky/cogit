@@ -38,7 +38,7 @@ export interface SettingsSection {
   fields: SettingField[];
 }
 
-interface FieldSpec {
+export interface FieldSpec {
   key: keyof PanelSettings;
   label: string;
   help: string;
@@ -161,7 +161,16 @@ const EDITABLE: FieldSpec[] = [
   },
 ];
 
-const READ_ONLY: FieldSpec[] = [
+/** A setting only `cogit config` changes: per project, set up once, or rarely touched. */
+export interface CliSetting {
+  key: string;
+  label: string;
+  help: string;
+  details: string;
+}
+
+/** The settings the panel leaves out; `cogit config --help` and the guide explain them. */
+export const CLI_ONLY: CliSetting[] = [
   {
     key: "gitPolicy",
     label: "Git policy",
@@ -170,7 +179,6 @@ const READ_ONLY: FieldSpec[] = [
       "Only the default for new projects: each project answers it during `cogit init`. " +
       "`cogit config git` shows the current project's policy and `cogit config git commit` " +
       "or `ignore` switches it.",
-    kind: "text",
   },
   {
     key: "agents",
@@ -178,17 +186,51 @@ const READ_ONLY: FieldSpec[] = [
     help: "Which agents record lineage; change it with `cogit config set`.",
     details:
       "Which AI agents in this project should record what they are asked and what they " +
-      "decide. Change it with a config command or when you set the project up.",
-    kind: "text",
+      "decide. Claude Code is the only one today.",
+  },
+  {
+    key: "inboxMaxAgeDays",
+    label: "Inbox age",
+    help: 'Days a waiting session stays in the "Your turn" inbox.',
+    details:
+      "A session that waits on you longer than this leaves the inbox. It is hidden, not " +
+      "deleted: the map still has it.",
+  },
+  {
+    key: "bigChangeLines",
+    label: "Big change",
+    help: "Lines of code after which a message counts as a big change on the map.",
+    details:
+      "Messages whose commits changed at least this many lines get a quiet highlight in " +
+      "the unread list. It never hides or ranks anything by itself.",
+  },
+  {
+    key: "trailerMaxAgeHours",
+    label: "Trailer age",
+    help: "How old the last message may be for a commit to get its `Thought:` trailer.",
+    details:
+      "A commit made hours after the last message is probably not about that message, so " +
+      "past this age the commit gets no trailer instead of a wrong one.",
+  },
+  {
+    key: "serverPort",
+    label: "Server port",
+    help: "Port of the local map server on 127.0.0.1.",
+    details: "Change it only when another program already uses the port.",
   },
 ];
 
 /**
  * One section today, "Recording", so later groups slot in without a redesign.
  * Over `file://` (`canEdit` false) the editable fields still appear, read-only,
- * with the build-time values. The CLI-only settings (`READ_ONLY`) stay out of
- * the panel: they are per project or have one choice, so `cogit config` shows them.
+ * with the build-time values. The CLI-only settings (`CLI_ONLY`) stay out of
+ * the panel: they are per project, set up once or rarely touched.
  */
+/** The panel's settings in their order, for the guide. */
+export function panelSettingFields(): readonly FieldSpec[] {
+  return EDITABLE;
+}
+
 export function settingsSections(canEdit: boolean): SettingsSection[] {
   return [
     {
@@ -200,7 +242,7 @@ export function settingsSections(canEdit: boolean): SettingsSection[] {
 
 /** The long plain-language text of one setting, for `cogit config --help`. */
 export function configHelpLines(): string[] {
-  return [...EDITABLE, ...READ_ONLY].map(
+  return [...EDITABLE, ...CLI_ONLY].map(
     (field) => `  ${field.key}\n    ${field.label}: ${field.help}\n    ${field.details}`,
   );
 }
