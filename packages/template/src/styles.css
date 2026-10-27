@@ -657,12 +657,29 @@ ul {
   border-color: var(--muted);
 }
 
+.settings-why-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Floats below the "?" so opening it never pushes the rows around. */
 .settings-details {
-  max-width: 46ch;
-  margin: 6px 0 0;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: -8px;
+  z-index: 5;
+  width: max-content;
+  max-width: min(46ch, calc(100vw - 64px));
+  padding: 8px 10px;
   color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 18%);
   font-size: 12px;
+  font-weight: normal;
   line-height: 1.5;
+  white-space: normal;
 }
 
 .settings-help {

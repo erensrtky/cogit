@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - What the detached hook runs (the map build, the side model) print goes to `.cogit/state/detached.log` (local, never committed, starts over past 256 KB); a failed side run used to leave no trace.
 
+### Changed
+- A setting's "?" explanation now floats over the settings on hover, keyboard focus or tap, instead of opening inside the row and pushing the rest of the list down.
+
 ## [0.15.0] - 2026-10-27
 ### Added
 - Recording modes (`recorder`): `mixed` (the default) records with a small side model every `sideEveryTurns` turns outside the chat and asks the main agent every `updateEveryTurns`; `agent` keeps the agent writing its own record; `side` never interrupts the agent. The side model runs detached behind the session lock, writes message nodes, titles, parents and user decisions, and never overwrites a field the main agent wrote (per-field ownership, and the agent's parent corrections survive later side runs). `sideModel` (renamed from `catchUpModel`, which is still read and migrated) names the model. Every setting gains a "?" in the panel with a plain-language explanation — what it does, when to change it, what it costs — and `cogit config --help` prints the same text.

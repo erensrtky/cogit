@@ -19,30 +19,49 @@ type SettingValue = PanelSettings[keyof PanelSettings];
 
 /**
  * The "?" next to a setting's label (Story 12.1): a plain-language answer to
- * "what is this, when do I change it, what does it cost", closed by default so
- * the modal stays short.
+ * "what is this, when do I change it, what does it cost". It floats over the
+ * modal on hover or keyboard focus, so nothing below it moves; a tap pins it on
+ * a touch screen, and Escape or leaving closes it.
  */
 function FieldDetails({ id, field }: { id: string; field: SettingField }) {
-  const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const open = hovered || pinned;
   const detailId = `${id}-details`;
   return (
-    <>
+    <span
+      className="settings-why-wrap"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => {
+        setHovered(false);
+        setPinned(false);
+      }}
+    >
       <button
         type="button"
         className="settings-why"
         aria-expanded={open}
-        aria-controls={detailId}
+        aria-describedby={open ? detailId : undefined}
         aria-label={`What does ${field.label} do?`}
-        onClick={() => setOpen((wasOpen) => !wasOpen)}
+        onFocus={() => setPinned(true)}
+        onBlur={() => setPinned(false)}
+        onClick={() => setPinned((wasPinned) => !wasPinned)}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape" || !open) return;
+          // Close the bubble, not the modal around it.
+          event.stopPropagation();
+          setHovered(false);
+          setPinned(false);
+        }}
       >
         ?
       </button>
       {open ? (
-        <p className="settings-details" id={detailId}>
+        <span className="settings-details" id={detailId} role="tooltip">
           {field.details}
-        </p>
+        </span>
       ) : null}
-    </>
+    </span>
   );
 }
 
