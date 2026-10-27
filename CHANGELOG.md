@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.13.0] - 2026-10-27
 ### Added
 - A message's details show the change itself: every commit row and every changed-file row opens git's own patch (`GET /api/diff` runs `git show --format= --patch --no-color`, registered projects only, capped at about 400 KB), unified by default with line numbers on both sides, removed lines red and added lines green, and a "Side by side" toggle remembered for that viewer. Binary files read "binary file changed", a commit git no longer has stays a plain greyed row, and a map opened as a file (`file://`) says to use `cogit open` instead of failing on every click.
 - `cogit why <file>` follows file → the commits that touched it → their `Thought:` messages → the decisions and rejected alternatives those thoughts recorded, newest first, each with its message hash and date. A Claude Code `PreToolUse` hook on Edit/Write/MultiEdit adds the same information to the agent's context before it writes a file: once per file per session, at most five options and about 600 characters, the rest pointing at `cogit why`; the note never blocks or changes the call, and any failure is silent (`tryBeforeNotes`, on by default, off in Settings). The lookup is exact; the wording is the record's summary.
