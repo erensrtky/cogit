@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.15.0] - 2026-10-27
 ### Added
 - Recording modes (`recorder`): `mixed` (the default) records with a small side model every `sideEveryTurns` turns outside the chat and asks the main agent every `updateEveryTurns`; `agent` keeps the agent writing its own record; `side` never interrupts the agent. The side model runs detached behind the session lock, writes message nodes, titles, parents and user decisions, and never overwrites a field the main agent wrote (per-field ownership, and the agent's parent corrections survive later side runs). `sideModel` (renamed from `catchUpModel`, which is still read and migrated) names the model. Every setting gains a "?" in the panel with a plain-language explanation — what it does, when to change it, what it costs — and `cogit config --help` prints the same text.
 - A logo: the c of cogito drawn as a git lane with commits, with a branch that leaves and merges back (`docs/images/cogit-mark.svg`). It heads the README and is the browser tab icon of the map and the panel, which used to ask the server for a missing `favicon.ico`. Under the slogan the README shows Descartes, after the Frans Hals portrait, with git branches running through his hair.
