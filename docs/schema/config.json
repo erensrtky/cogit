@@ -100,7 +100,7 @@
       "type": "boolean"
     },
     "inboxMaxAgeDays": {
-      "default": 7,
+      "default": 1,
       "type": "integer",
       "minimum": 1,
       "maximum": 3650

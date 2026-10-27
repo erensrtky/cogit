@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The README states what recording costs: about 3–7% of a session's tokens in measured sessions.
 
 ### Changed
+- The "Your turn" inbox is quieter: `inboxMaxAgeDays` now defaults to 1 day (a config that already holds a value keeps it), and a row shows the agent's last message as plain text — bold, inline code, headings, list markers and links are stripped and line breaks stay — so no `**` or backticks reach the page.
 - The main agent's record interval defaults to 15 turns (was 5), and the side model records every 5 turns in between; the README states the measured cost of each mode (about 1–2% of a session with the mixed default, 3–7% with `recorder: agent`).
 - The "Your turn" inbox: each row closes with an × in its top-right corner (hidden until the agent writes in that session again), rows of different projects carry their own lane colour on the left, and on a project's map the inbox starts folded to one "Your turn" line so it no longer pushes the map off the page.
 

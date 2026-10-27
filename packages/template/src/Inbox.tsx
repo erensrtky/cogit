@@ -9,8 +9,9 @@ import { ResumeButton } from "./ResumeButton.js";
  * The "your turn" inbox (Story 11.1): one row per session whose transcript ends
  * with the agent, or whose record has `needsUser` items. The two signals stay
  * apart — the turn is a transcript fact, the record summary is labelled as the
- * record's — and the agent's last message is shown verbatim so the user judges
- * it, never a guess about whether it asked a question.
+ * record's — and the agent's last message is shown as plain text (Markdown
+ * stripped, Story 12.2) so the user judges it, never a guess about whether it
+ * asked a question.
  */
 
 /** The map of the row's project, opened at the session's newest message. */

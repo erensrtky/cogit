@@ -15,6 +15,7 @@ import {
   INBOX_MESSAGE_LIMIT,
   type InboxCandidate,
   inboxRows,
+  stripMarkdown,
   timeSince,
 } from "../src/view/inbox.js";
 import { DATA_ELEMENT_ID, type PanelViewModel } from "../src/view/model.js";
@@ -297,6 +298,61 @@ describe("inboxRows", () => {
     expect(row?.lastMessage?.endsWith("…")).toBe(true);
     expect(row?.pending).toEqual([{ text: "decide", needsUser: true }]);
   });
+
+  it("shows the agent's message as plain text, never its Markdown", async () => {
+    const [row] = inboxRows(
+      [candidate({ turn: { at: at(10), text: "**Done** — `npm test` is green." } })],
+      new Map(),
+      now,
+      7,
+    );
+    expect(row?.lastMessage).toBe("Done — npm test is green.");
+  });
+});
+
+describe("stripMarkdown", () => {
+  it("strips bold, italic, code and unclosed markers", () => {
+    expect(stripMarkdown("**bold** and __also bold__")).toBe("bold and also bold");
+    expect(stripMarkdown("~~gone~~")).toBe("gone");
+    expect(stripMarkdown("run `npm test` and ``npm run build``")).toBe(
+      "run npm test and npm run build",
+    );
+    expect(stripMarkdown("**open and `unclosed")).toBe("open and unclosed");
+    expect(stripMarkdown("**bold *and italic***")).toBe("bold and italic");
+  });
+
+  it("keeps a glob or an underscore name, which is text rather than emphasis", () => {
+    expect(stripMarkdown("*.ts and snake_case stay")).toBe("*.ts and snake_case stay");
+  });
+
+  it("turns links and images into their text", () => {
+    expect(stripMarkdown("see [the docs](https://example.com/a) now")).toBe("see the docs now");
+    expect(stripMarkdown("![a diagram](x.png)")).toBe("a diagram");
+    expect(stripMarkdown("[ref link][r] and <https://example.com>")).toBe(
+      "ref link and https://example.com",
+    );
+  });
+
+  it("strips headings, quote and list markers and task boxes", () => {
+    expect(stripMarkdown("## Title ##")).toBe("Title");
+    expect(stripMarkdown("#hashtag is not a heading")).toBe("#hashtag is not a heading");
+    expect(stripMarkdown("> quoted\n> > nested")).toBe("quoted\nnested");
+    expect(stripMarkdown("- one\n* two\n1. three\n2) four")).toBe("one\ntwo\nthree\nfour");
+    expect(stripMarkdown("- [ ] todo\n- [x] done")).toBe("todo\ndone");
+    expect(stripMarkdown("---")).toBe("");
+  });
+
+  it("keeps line breaks readable and drops fenced-code fences", () => {
+    expect(stripMarkdown("first\nsecond\n\n\nafter a gap")).toBe("first\nsecond\n\nafter a gap");
+    expect(stripMarkdown("before\n```ts\nconst a = 1;\n```\nafter")).toBe(
+      "before\n\nconst a = 1;\n\nafter",
+    );
+  });
+
+  it("never builds HTML from the message", () => {
+    // The stripper returns text; the page renders it as a text node.
+    expect(stripMarkdown("<b>hi</b>")).toBe("<b>hi</b>");
+  });
 });
 
 describe("timeSince", () => {
@@ -480,19 +536,20 @@ describe("panel and map inbox", () => {
     expect(model.inbox?.map((row) => row.sessionId)).toEqual(["sb", "sa"]);
   });
 
-  it("honours inboxMaxAgeDays from the config", async () => {
+  it("honours inboxMaxAgeDays from the config, one day by default", async () => {
     const root = join(dir, "old");
     await initProject(root, env);
+    // Three days before the panel's clock (T0): past the default, inside a week.
     await writeTranscript(env, "s1", [
       userLine("Old", "2026-10-18T10:00:00.000Z"),
       agentLine("Old reply", "2026-10-18T10:05:00.000Z"),
     ]);
     await writeSession(root, { sessionId: "s1", at: "2026-10-18T10:00:00.000Z" });
     let model = await buildPanel({ env, io: fakeIo(env), templateHtml: TEMPLATE });
-    expect(model.inbox?.map((row) => row.sessionId)).toEqual(["s1"]);
-    await configSet("inboxMaxAgeDays", "1", fakeIo(env));
-    model = await buildPanel({ env, io: fakeIo(env), templateHtml: TEMPLATE });
     expect(model.inbox).toEqual([]);
+    await configSet("inboxMaxAgeDays", "7", fakeIo(env));
+    model = await buildPanel({ env, io: fakeIo(env), templateHtml: TEMPLATE });
+    expect(model.inbox?.map((row) => row.sessionId)).toEqual(["s1"]);
   });
 
   it("keeps another project's rows off the map", async () => {

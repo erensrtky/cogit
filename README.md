@@ -190,6 +190,7 @@ under `gitPolicy: ignore` the description says the hashes resolve only on the au
 | `gitPolicy` | `commit` | Whether new projects commit the record |
 | `shareConversations` | `false` | Commit the raw conversation too |
 | `recordCommit` | `ask` | What to do with messages after the last code commit |
+| `inboxMaxAgeDays` | `1` | Days a waiting session stays in the "Your turn" inbox; older ones are hidden, not deleted |
 | `trailerMaxAgeHours` | `6` | How old `.cogit/HEAD` may be for a `Thought:` trailer |
 | `serverPort` | `4747` | Port for the local map server |
 

@@ -116,6 +116,7 @@ describe("Project and Config schemas", () => {
       gitPolicy: "commit",
       shareConversations: false,
       recordCommit: "ask",
+      inboxMaxAgeDays: 1,
     });
   });
 });

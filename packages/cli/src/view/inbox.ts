@@ -20,7 +20,7 @@ export interface InboxCandidate {
   mapUrl: string;
   sessionId: string;
   sessionTitle: string;
-  /** The agent's last turn, when the transcript ends with it. */
+  /** The agent's last turn, when the transcript ends with it; `text` is raw Markdown. */
   turn: { at: string; text: string } | null;
   /** The newest time the record knows about, for a record-only row. */
   lastActivity: string | null;
@@ -50,6 +50,70 @@ function parsed(iso: string | null): number {
 /** First `limit` characters of a message, with an ellipsis when it was cut. */
 export function clipMessage(text: string, limit = INBOX_MESSAGE_LIMIT): string {
   return text.length <= limit ? text : `${text.slice(0, limit - 1)}…`;
+}
+
+/** Lines that are markup for a reader of the rendered message, not its words. */
+const FENCE = /^\s{0,3}(?:`{3,}|~{3,})/;
+const HEADING = /^\s{0,3}#{1,6}(?:\s+|$)/;
+const HEADING_CLOSE = /\s+#+\s*$/;
+const QUOTE = /^(?:\s{0,3}>\s?)+/;
+const RULE = /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/;
+const LIST = /^\s{0,3}(?:[-*+]|\d{1,9}[.)])\s+/;
+const TASK = /^\[[ xX]\]\s+/;
+
+/** Inline markers: links keep their text, code its content, emphasis its words. */
+function stripInline(line: string): string {
+  let text = line;
+  // Images first, so their alt text survives the link rule as words.
+  text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1");
+  text = text.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+  text = text.replace(/\[([^\]]+)\]\[[^\]]*\]/g, "$1");
+  text = text.replace(/<(https?:\/\/[^>\s]+)>/g, "$1");
+  // Inline code keeps what it quotes; paired or not, the backticks are markup.
+  text = text.replace(/`+/g, "");
+  // Strongest first, so nested emphasis unwinds inside out.
+  text = text.replace(/(\*\*\*|___)(?=\S)([\s\S]*?\S)\1/g, "$2");
+  text = text.replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, "$2");
+  text = text.replace(/~~(?=\S)([\s\S]*?\S)~~/g, "$1");
+  // A single marker only when it pairs around words; `*.ts` and `snake_case`
+  // are text, not emphasis.
+  text = text.replace(/(^|[^\w*])\*(?=\S)([^*\n]*?\S)\*(?![\w*])/g, "$1$2");
+  text = text.replace(/(^|[^\w_])_(?=\S)([^_\n]*?\S)_(?![\w_])/g, "$1$2");
+  // Unclosed double markers are markup too (a turn cut mid-word still reads).
+  text = text.replace(/\*\*/g, "").replace(/~~/g, "");
+  return text;
+}
+
+function stripLine(line: string): string {
+  if (RULE.test(line)) return "";
+  let text = line.replace(HEADING, "").replace(QUOTE, "");
+  text = text.replace(LIST, "").replace(TASK, "");
+  return stripInline(text.replace(HEADING_CLOSE, ""));
+}
+
+/**
+ * The agent's last message as plain text for a row (Story 12.2). A chat turn is
+ * written in Markdown, but a row needs the words, not the markup: bold, inline
+ * code, headings, list markers and links are stripped and line breaks stay.
+ * Fenced code keeps its lines. The result is a string, never HTML — the page
+ * renders it as text.
+ */
+export function stripMarkdown(text: string): string {
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  const out: string[] = [];
+  let inFence = false;
+  for (const line of lines) {
+    if (FENCE.test(line)) {
+      inFence = !inFence;
+      out.push("");
+      continue;
+    }
+    out.push(inFence ? line : stripLine(line));
+  }
+  return out
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /**
@@ -92,7 +156,7 @@ export function inboxRows(
       signal,
       at,
       ...(turnAt !== null && candidate.turn !== null
-        ? { lastMessage: clipMessage(candidate.turn.text) }
+        ? { lastMessage: clipMessage(stripMarkdown(candidate.turn.text)) }
         : {}),
       goal: candidate.goal,
       lastDecision: candidate.lastDecision,

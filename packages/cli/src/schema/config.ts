@@ -71,10 +71,13 @@ export const Config = z.object({
    */
   tryBeforeNotes: z.boolean().default(true),
   /**
-   * How many days a session stays in the "your turn" inbox (Story 11.1). Older
-   * sessions are hidden; nothing is deleted.
+   * How many days a session stays in the "your turn" inbox (Stories 11.1,
+   * 12.2). One day by default: the inbox is for work that is still fresh, not
+   * an archive. Raise it to keep rows longer. A config that holds an older value
+   * keeps it; only the default changed. Older sessions are hidden, nothing is
+   * deleted.
    */
-  inboxMaxAgeDays: z.int().min(1).max(3650).default(7),
+  inboxMaxAgeDays: z.int().min(1).max(3650).default(1),
   agents: z.array(z.string().min(1)).default(["claude-code"]),
   /** Project roots ("don't ask again" in this project) where the setup hint stays silent. */
   setupHintOff: z.array(z.string().min(1)).default([]),

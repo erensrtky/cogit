@@ -263,7 +263,10 @@ export interface ViewInboxRow {
   signal: "turn" | "record" | "both";
   /** Newest signal time (ISO): the agent's last turn, else the record's activity. */
   at: string;
-  /** The agent's last written message, first ~300 characters, verbatim. */
+  /**
+   * The agent's last written message as plain text (Markdown stripped), first
+   * ~300 characters (Story 12.2).
+   */
   lastMessage?: string;
   /** Where-were-we, as the record wrote it; the page labels it as the record's. */
   goal: string;
