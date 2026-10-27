@@ -6,6 +6,7 @@ import type {
   ViewSession,
 } from "../../cli/src/view/model.js";
 import { resumeCommand } from "../../cli/src/view/resume.js";
+import { parseSubject, splitPath, typeColour } from "./codeRefs.js";
 import { formatTime, kindLabel } from "./format.js";
 import { layoutGitGraph } from "./gitLayout.js";
 import {
@@ -463,36 +464,38 @@ function NodeDetails({
           </ul>
         </section>
       ) : null}
-      {node.commits?.length || node.files?.length ? (
+      {node.commits?.length ? (
         <section>
-          <h3>In the code</h3>
-          {node.commits?.length ? (
-            <p className="drilldown-code">
-              {node.commits.map((commit) => {
-                const tag = node.commitTags?.find((candidate) => candidate.hash === commit);
-                const missing = node.commitTags !== undefined && tag?.subject === undefined;
-                return (
-                  <code
-                    key={commit}
-                    className={missing ? "is-missing" : undefined}
-                    title={missing ? "commit not in this repository" : undefined}
-                  >
-                    {commit}
-                    {tag?.subject === undefined ? "" : ` ${tag.subject}`}
-                  </code>
-                );
-              })}
-            </p>
-          ) : null}
-          {node.files?.length ? (
-            <ul className="drilldown-list">
-              {node.files.map((file) => (
-                <li key={file}>
-                  <code>{file}</code>
+          <h3>
+            Commits <span className="count">{node.commits.length}</span>
+          </h3>
+          <ul className="commit-list">
+            {node.commits.map((commit) => {
+              const tag = node.commitTags?.find((candidate) => candidate.hash === commit);
+              const missing = node.commitTags !== undefined && tag?.subject === undefined;
+              return (
+                <CommitItem key={commit} hash={commit} subject={tag?.subject} missing={missing} />
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+      {node.files?.length ? (
+        <section>
+          <h3>
+            Changed files <span className="count">{node.files.length}</span>
+          </h3>
+          <ul className="file-list">
+            {node.files.map((file) => {
+              const { dir, name } = splitPath(file);
+              return (
+                <li key={file} title={file}>
+                  <span className="file-name">{name}</span>
+                  {dir ? <span className="file-dir">{dir}</span> : null}
                 </li>
-              ))}
-            </ul>
-          ) : null}
+              );
+            })}
+          </ul>
         </section>
       ) : null}
       {node.kind === "message" ? <Conversation session={session} id={node.nodeId} /> : null}
@@ -523,6 +526,40 @@ function NodeDetails({
       </dl>
       {session ? <ResumeRow model={model} session={session} /> : null}
     </>
+  );
+}
+
+/**
+ * One commit of a message: the short hash, the Conventional Commits type as a
+ * coloured badge, the scope and the description. A commit git no longer has
+ * stays listed, greyed (Story 8.8).
+ */
+function CommitItem({
+  hash,
+  subject,
+  missing,
+}: {
+  hash: string;
+  subject: string | undefined;
+  missing: boolean;
+}) {
+  const parsed = subject === undefined ? undefined : parseSubject(subject);
+  const lane = parsed?.type === undefined ? undefined : typeColour(parsed.type);
+  return (
+    <li className={missing ? "commit-item is-missing" : "commit-item"} title={hash}>
+      <code className="commit-hash">{hash.slice(0, 7)}</code>
+      {parsed?.type ? (
+        <span
+          className="commit-type"
+          style={lane === undefined ? undefined : { background: `var(--l${lane})` }}
+        >
+          {parsed.type}
+          {parsed.breaking ? "!" : ""}
+        </span>
+      ) : null}
+      {parsed?.scope ? <span className="commit-scope">{parsed.scope}</span> : null}
+      <span className="commit-subject">{parsed ? parsed.text : "not in this repository"}</span>
+    </li>
   );
 }
 

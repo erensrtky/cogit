@@ -1176,16 +1176,119 @@ body:has(.map-shell.is-expanded) {
   margin-top: 4px;
 }
 
-.drilldown-code {
+/* Commits and changed files of a message. */
+h3 .count {
+  margin-left: 4px;
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--chip-bg);
+  border-radius: 8px;
+}
+
+.commit-list,
+.file-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.commit-item {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   gap: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  line-height: 18px;
+  background: var(--row-bg);
+}
+
+.commit-item + .commit-item,
+.file-list li + li {
+  border-top: 1px solid var(--line);
+}
+
+.commit-hash {
+  flex: none;
+  padding: 0 5px;
+  color: var(--accent);
+  font-size: 11px;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-line);
+  border-radius: 4px;
+}
+
+.commit-type {
+  flex: none;
+  padding: 0 6px;
+  color: var(--on-lane);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+.commit-scope {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.commit-scope::before {
+  content: "(";
+}
+
+.commit-scope::after {
+  content: ")";
+}
+
+.commit-subject {
+  flex: 1 1 180px;
+  min-width: 0;
 }
 
 /* A commit git no longer has stays listed, greyed (Story 8.8). */
-.drilldown-code code.is-missing {
+.commit-item.is-missing .commit-hash {
   color: var(--missing);
   border-style: dashed;
+}
+
+.commit-item.is-missing .commit-subject {
+  color: var(--missing);
+  font-style: italic;
+}
+
+.file-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  background: var(--row-bg);
+}
+
+.file-name {
+  flex: none;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.file-dir {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .drilldown-meta {
