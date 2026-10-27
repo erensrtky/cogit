@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { formatChange, isBigChange } from "../../cli/src/view/change.js";
 import type {
   LineageViewModel,
   ViewChatTurn,
@@ -7,6 +8,7 @@ import type {
 } from "../../cli/src/view/model.js";
 import { resumeCommand } from "../../cli/src/view/resume.js";
 import { parseSubject, splitPath, typeColour } from "./codeRefs.js";
+import { isLivePage } from "./data.js";
 import { formatTime, kindLabel } from "./format.js";
 import { layoutGitGraph } from "./gitLayout.js";
 import {
@@ -392,11 +394,21 @@ function NodeDetails({
   node,
   branchId,
   onNavigate,
+  read,
+  onToggleRead,
+  bigChangeLines,
+  readError,
 }: {
   model: LineageViewModel;
   node: NodeDetail;
   branchId?: string | undefined;
   onNavigate: ((target: OutlineTarget) => void) | undefined;
+  /** The user marked this message read (Story 10.3). */
+  read: boolean;
+  onToggleRead: ((id: string, read: boolean) => void) | undefined;
+  bigChangeLines: number;
+  /** A failed write of the read mark, shown and not swallowed. */
+  readError: string | null;
 }) {
   const session = findSession(model, node.sessionId);
   return (
@@ -404,6 +416,36 @@ function NodeDetails({
       <MessageNav session={session} node={node} onNavigate={onNavigate} />
       {node.kind === "message" && isMessageHash(node.nodeId) ? (
         <MessageHash value={node.nodeId} />
+      ) : null}
+      {node.kind === "message" && node.change ? (
+        <section>
+          <h3>Code landed</h3>
+          <p>
+            <span
+              className={`git-change${
+                !read && isBigChange(node.change, bigChangeLines) ? " is-big" : ""
+              }`}
+            >
+              {formatChange(node.change)}
+            </span>{" "}
+            after this message.
+          </p>
+          <button
+            type="button"
+            className="read-toggle"
+            aria-pressed={read}
+            disabled={onToggleRead === undefined}
+            onClick={() => onToggleRead?.(node.nodeId, !read)}
+          >
+            {read ? "Mark as unread" : "Mark as read"}
+          </button>
+          {typeof document !== "undefined" && isLivePage() ? null : (
+            <p className="muted">
+              Saved under .cogit/state by `cogit open`; this page keeps it only while open.
+            </p>
+          )}
+          {readError === null ? null : <p className="error">{readError}</p>}
+        </section>
       ) : null}
       {session ? <BranchDetails session={session} branchId={branchId} /> : null}
       {node.summary ? (
@@ -620,12 +662,21 @@ export function DrillDown({
   selection,
   onClose,
   onNavigate,
+  read = false,
+  onToggleRead,
+  bigChangeLines = 300,
+  readError = null,
 }: {
   model: LineageViewModel;
   selection: Selection | null;
   onClose: () => void;
   /** Moves the selection to another node and reveals it on the map. */
   onNavigate?: (target: OutlineTarget) => void;
+  /** Whether the selected message is marked read (Story 10.3). */
+  read?: boolean;
+  onToggleRead?: ((id: string, read: boolean) => void) | undefined;
+  bigChangeLines?: number;
+  readError?: string | null;
 }) {
   useEffect(() => {
     if (!selection) return;
@@ -680,6 +731,10 @@ export function DrillDown({
           node={node}
           branchId={selection.branchId}
           onNavigate={onNavigate}
+          read={read}
+          onToggleRead={onToggleRead}
+          bigChangeLines={bigChangeLines}
+          readError={readError}
         />
       </div>
     </aside>

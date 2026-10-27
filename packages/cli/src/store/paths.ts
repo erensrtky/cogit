@@ -32,6 +32,12 @@ export function projectPaths(root: string) {
     conversations: join(base, "conversations"),
     conversation: (id: string) => join(base, "conversations", `${id}.jsonl.gz`),
     state: (id: string) => join(base, "state", `${id}.json`),
+    /**
+     * Which messages this user has marked read (Story 10.3). Local per-user
+     * state: never committed, never shared (`state/` stays ignored by both
+     * policies).
+     */
+    readState: join(base, "state", "read.json"),
     locks: join(base, "locks"),
     /** Where the skill drops session JSON for `session write --file`. */
     inbox: (id: string) => join(base, "inbox", `${id}.json`),

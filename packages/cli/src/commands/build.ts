@@ -1,5 +1,6 @@
 import { type ChatTurn, defaultAgent } from "../agents/index.js";
 import {
+  type CommitChange,
   findGitRoot,
   projectFiles,
   readCommitFiles,
@@ -16,6 +17,7 @@ import {
 } from "../messages.js";
 import { redactDeep } from "../redact.js";
 import type { Session } from "../schema/session.js";
+import { readProjectChanges } from "../store/changes.js";
 import {
   appendConversationHashes,
   appendConversationTurns,
@@ -25,9 +27,11 @@ import { applyEvents, readEvents } from "../store/events.js";
 import { atomicWrite } from "../store/fs.js";
 import { withLock } from "../store/lock.js";
 import { projectPaths } from "../store/paths.js";
+import { readReadState } from "../store/read-state.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
 import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
+import { attachChanges } from "../view/change.js";
 import { buildFileHistory, modelSessions } from "../view/files.js";
 import { buildViewModel, embedViewModel } from "../view/lineage.js";
 import type { LineageViewModel, ViewChatTurn, ViewPendingMessage } from "../view/model.js";
@@ -204,6 +208,8 @@ interface CommitInfo {
   subjects: Map<string, string>;
   /** Project-relative files per recorded hash, for the file history (Story 8.15). */
   files: Map<string, string[]>;
+  /** Numstat totals per recorded hash, for "how much code landed" (Story 10.3). */
+  changes: Map<string, CommitChange>;
 }
 
 /**
@@ -218,14 +224,15 @@ async function commitInfo(root: string, sessions: Session[]): Promise<CommitInfo
       for (const hash of node.commits ?? []) hashes.add(hash);
     }
   }
-  if (hashes.size === 0) return { subjects: new Map(), files: new Map() };
+  if (hashes.size === 0) return { subjects: new Map(), files: new Map(), changes: new Map() };
   const gitRoot = await findGitRoot(root);
-  if (gitRoot === undefined) return { subjects: new Map(), files: new Map() };
-  const [subjects, files] = await Promise.all([
+  if (gitRoot === undefined) return { subjects: new Map(), files: new Map(), changes: new Map() };
+  const [subjects, files, changes] = await Promise.all([
     readCommitSubjects(gitRoot, hashes),
     readCommitFiles(gitRoot, hashes),
+    readProjectChanges(root, hashes),
   ]);
-  return { subjects, files: projectFiles(gitRoot, root, files) };
+  return { subjects, files: projectFiles(gitRoot, root, files), changes };
 }
 
 /**
@@ -278,9 +285,13 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       });
       const withThoughts = attachThoughtTrailers(views.sessions, trailers);
       const commits = await commitInfo(root, withThoughts);
+      // Story 10.3: each message carries the numstat totals of its linked
+      // commits. A project outside git simply has no numbers to show.
+      const withChanges = attachChanges(withThoughts, commits.changes);
+      const read = await readReadState(root);
       const built = buildViewModel({
         project: project.data,
-        sessions: withThoughts,
+        sessions: withChanges,
         path: root,
         generatedAt,
         transcripts: new Set(transcripts.keys()),
@@ -295,6 +306,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         unrecorded: config.sessionEndCatchUp ? undefined : views.unrecorded,
       });
       built.switcher = switcher;
+      built.read = [...read].sort();
       // The files view (8.15) unions each message's own files with the files of
       // its commits, so a message the agent listed no paths for still lands.
       built.files = buildFileHistory(modelSessions(built), commits.files);

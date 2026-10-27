@@ -29,6 +29,8 @@ export interface GitNode {
   continues?: ViewNode["continues"];
   commits?: string[] | undefined;
   commitTags?: ViewNode["commitTags"];
+  /** Numstat totals of the linked commits (Story 10.3). */
+  change?: ViewNode["change"];
   unsummarized?: true | undefined;
   /**
    * When the item stops occupying its lane, as a timestamp. Session level only:

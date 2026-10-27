@@ -17,6 +17,8 @@ export type NodeDetail = {
   alternatives?: ViewNode["alternatives"];
   commits?: string[];
   commitTags?: ViewNode["commitTags"];
+  /** Numstat totals of the linked commits (Story 10.3). */
+  change?: ViewNode["change"];
   files?: string[];
   work?: ViewNode["work"];
   agentDecisions?: ViewNode["agentDecisions"];

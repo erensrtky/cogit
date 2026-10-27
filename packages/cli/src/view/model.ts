@@ -57,6 +57,17 @@ export interface ViewCommit {
   subject?: string;
 }
 
+/**
+ * The code a message landed, from git (Story 10.3): lines added and removed
+ * plus the number of distinct files its commits touched. Facts only — cogit
+ * never reads the message to decide whether it looks big.
+ */
+export interface ViewChange {
+  added: number;
+  removed: number;
+  files: number;
+}
+
 export interface ViewNode {
   /** Stable id (`h…`); the key of the node, never shown to the user. */
   id: string;
@@ -86,6 +97,12 @@ export interface ViewNode {
   decidedBy?: "user" | "agent" | "agreed";
   alternatives?: { option: string; why: string }[];
   commits?: string[];
+  /**
+   * How much code landed after this message (Story 10.3), read from git's
+   * numstat for the commits linked to it. Absent when no commit is linked: the
+   * map shows nothing rather than a misleading zero.
+   */
+  change?: ViewChange;
   /**
    * `commits` with their subjects (Story 8.8); the map draws them as small tag
    * chips. A tag without a subject is a commit git no longer has, drawn greyed.
@@ -249,6 +266,12 @@ export interface LineageViewModel {
    * instead. Absent on pages built before 8.13.
    */
   settings?: PanelSettings;
+  /**
+   * Message ids the user marked read (Story 10.3), from `.cogit/state/read.json`
+   * at build time. Local state: the page toggles it through the local server and
+   * a rebuild embeds the new list.
+   */
+  read?: string[];
 }
 
 /**
@@ -293,6 +316,11 @@ export interface PanelProject {
   needsUserCount: number;
   /** `file://` URL of the project's map; null when the directory is gone. */
   lineageUrl: string | null;
+  /**
+   * Unread messages whose commits crossed `bigChangeLines` (Story 10.3), the
+   * same number the map's unread view lists. Absent on pages built before 10.3.
+   */
+  unreadBigCount?: number;
 }
 
 /**
@@ -311,6 +339,8 @@ export interface PanelSettings {
   recordCommit: "ask" | "auto" | "off";
   gitPolicy: "ignore" | "commit";
   agents: string[];
+  /** A message whose linked commits crossed this many lines counts as big (10.3). */
+  bigChangeLines: number;
 }
 
 /**

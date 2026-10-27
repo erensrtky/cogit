@@ -1888,3 +1888,77 @@ time {
 .session-row.is-open {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
+
+/* Story 10.3: how much code landed after a message. Facts from git only. */
+.git-change {
+  flex: none;
+  padding: 0 4px;
+  white-space: nowrap;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  line-height: 15px;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-line);
+  border-radius: 3px;
+}
+
+/* Unread and above the threshold: a quiet mark, not an alarm. */
+.git-row.is-unread-big {
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--warn) 55%, transparent);
+}
+
+.git-change.is-big {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+}
+
+.unread-view .unread-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.unread-view .unread-label {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.unread-view .unread-title {
+  flex: 1 1 140px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unread-view .unread-session,
+.unread-view .unread-when {
+  flex: 0 1 auto;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unread-view .unread-row.is-big {
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--warn) 55%, transparent);
+}
+
+.read-toggle {
+  padding: 3px 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.read-toggle[aria-pressed="true"] {
+  color: var(--muted);
+  border-style: dashed;
+}

@@ -77,6 +77,18 @@ export const LineageNode = z.object({
   addedAt: IsoDate.optional(),
   /** When `session write` last added or changed this node; set by the CLI, never by the agent. */
   touchedAt: IsoDate.optional(),
+  /**
+   * Numstat totals of the node's commits, attached at read time from git
+   * (Story 10.3). Never stored in the record: it is derived, so the record
+   * stays small and the numbers stay current after a rebase.
+   */
+  change: z
+    .object({
+      added: z.number().int().min(0),
+      removed: z.number().int().min(0),
+      files: z.number().int().min(0),
+    })
+    .optional(),
 });
 
 export const PendingItem = z.object({
@@ -111,7 +123,11 @@ export const Session = z.object({
 });
 
 /** In input, a missing parent keeps the stored one (null for a new node). */
-export const LineageNodeInput = LineageNode.omit({ addedAt: true, touchedAt: true }).extend({
+export const LineageNodeInput = LineageNode.omit({
+  addedAt: true,
+  touchedAt: true,
+  change: true,
+}).extend({
   parent: MessageRef.nullable().optional(),
 });
 

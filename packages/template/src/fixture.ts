@@ -62,6 +62,7 @@ export const fixture: LineageViewModel = {
     recordCommit: "ask",
     gitPolicy: "ignore",
     agents: ["claude-code"],
+    bigChangeLines: 300,
   },
   epochs: [
     {

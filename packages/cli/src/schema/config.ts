@@ -40,6 +40,12 @@ export const Config = z.object({
    * A commit made hours after the last message is probably not that message.
    */
   trailerMaxAgeHours: z.int().min(1).max(8760).default(6),
+  /**
+   * An unread message whose commits changed at least this many lines gets the
+   * quiet "a lot landed here" highlight on the map (Story 10.3). A threshold,
+   * not a judgement: it never hides or ranks anything by itself.
+   */
+  bigChangeLines: z.int().min(1).max(1_000_000).default(300),
   agents: z.array(z.string().min(1)).default(["claude-code"]),
   /** Project roots ("don't ask again" in this project) where the setup hint stays silent. */
   setupHintOff: z.array(z.string().min(1)).default([]),

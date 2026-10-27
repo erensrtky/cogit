@@ -18,6 +18,7 @@ import { Config } from "./schema/config.js";
 import { refreshShareConversations } from "./share.js";
 import { LockBusyError } from "./store/lock.js";
 import { globalPaths, projectPaths } from "./store/paths.js";
+import { setMessageRead } from "./store/read-state.js";
 import { loadConfig, loadRegistry, updateConfig } from "./store/stores.js";
 import { isPanelEditableKey, LIVE_META_NAME, TOKEN_META_NAME } from "./view/model.js";
 import { buildPanel, panelSettings } from "./view/panel.js";
@@ -461,6 +462,71 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
     void refreshOpenPages();
   }
 
+  /**
+   * `POST /api/read` { dir, id, read } (Story 10.3): the map's read toggle. It
+   * writes only the project's local state file; the page updates itself, and
+   * the next rebuild embeds the new list. Same Host, Origin, content-type and
+   * token checks as a settings write, and `dir` must be a registered project.
+   */
+  async function writeRead(req: IncomingMessage, res: ServerResponse, port: number): Promise<void> {
+    if (
+      !originAllowed(req.headers.origin, port) ||
+      !tokenMatches(req.headers[CONFIG_TOKEN_HEADER])
+    ) {
+      respond(res, 403, "forbidden");
+      return;
+    }
+    const type = req.headers["content-type"];
+    if (
+      typeof type !== "string" ||
+      type.split(";")[0]?.trim().toLowerCase() !== "application/json"
+    ) {
+      respond(res, 415, "content-type must be application/json");
+      return;
+    }
+    const body = await readLimitedBody(req);
+    if (body === null) {
+      respond(res, 413, "request body too large");
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      respond(res, 400, "invalid JSON");
+      return;
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      respond(res, 400, "expected a JSON object");
+      return;
+    }
+    const { dir, id, read } = parsed as Record<string, unknown>;
+    if (typeof dir !== "string" || typeof id !== "string" || typeof read !== "boolean") {
+      respond(res, 400, "expected { dir, id, read }");
+      return;
+    }
+    if (!/^h[0-9a-f]{12}$/.test(id)) {
+      respond(res, 400, "id must be a message id (h plus 12 hex)");
+      return;
+    }
+    const root = await registeredRoot(env, dir);
+    if (root === null) {
+      respond(res, 403, "not a registered project");
+      return;
+    }
+    try {
+      await setMessageRead(root, id, read);
+    } catch {
+      respond(res, 500, "could not write the read state");
+      return;
+    }
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify({ ok: true, id, read }));
+  }
+
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const port = (server.address() as AddressInfo | null)?.port ?? opts.port;
     if (req.method === "POST") {
@@ -478,6 +544,10 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
         }
         respond(res, 200, "stopping");
         void close();
+        return;
+      }
+      if (url.pathname === "/api/read") {
+        await writeRead(req, res, port);
         return;
       }
       if (url.pathname !== "/api/config") {

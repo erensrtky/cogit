@@ -103,6 +103,8 @@ export function buildMessages(
         ...(node.decidedBy === undefined ? {} : { decidedBy: node.decidedBy }),
         ...(node.alternatives?.length ? { alternatives: node.alternatives } : {}),
         ...(node.commits?.length ? { commits: node.commits } : {}),
+        // Story 10.3: the numstat totals the build attached to the record node.
+        ...(node.change === undefined ? {} : { change: node.change }),
         ...(node.commits?.length
           ? {
               commitTags: node.commits.map((hash) => {

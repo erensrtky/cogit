@@ -11,8 +11,10 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { unreadViewMessages } from "../../cli/src/view/change.js";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
+import { pageToken, saveRead } from "./data.js";
 import { type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
@@ -24,6 +26,7 @@ import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
 import { usePageWheel } from "./scroll.js";
 import { layoutSessionGraph, type SessionGraph } from "./sessionLayout.js";
+import { UnreadView } from "./UnreadView.js";
 
 /**
  * The project map (Story 8.7). The sessions are a git graph, one dot each;
@@ -42,6 +45,10 @@ const OPEN_EMPTY = 36;
 const GraphActions = createContext<{
   selection: Selection | null;
   openIds: ReadonlySet<string>;
+  /** Message ids the user marked read (Story 10.3). */
+  readIds: ReadonlySet<string>;
+  /** Unread messages at or above this many lines get the quiet highlight. */
+  bigChangeLines: number;
   openSession: (sessionId: string) => void;
   openNode: (sessionId: string, messageId: string, branchId?: string) => void;
   openContinue: (sessionId: string, messageId: string) => void;
@@ -49,6 +56,8 @@ const GraphActions = createContext<{
 }>({
   selection: null,
   openIds: new Set(),
+  readIds: new Set(),
+  bigChangeLines: 300,
   openSession: () => {},
   openNode: () => {},
   openContinue: () => {},
@@ -83,7 +92,8 @@ function SessionMessages({
   highlights: ReadonlySet<string> | undefined;
   activeHitId: string | null;
 }) {
-  const { selection, openNode, openContinue, unfold } = useContext(GraphActions);
+  const { selection, readIds, bigChangeLines, openNode, openContinue, unfold } =
+    useContext(GraphActions);
   const own = selection?.sessionId === session.sessionId;
   if (git.rows.length === 0)
     return <p className="graph-status empty">No messages recorded in this session yet.</p>;
@@ -94,6 +104,8 @@ function SessionMessages({
       activeSegmentId={selection?.type === "node" && own ? (selection.branchId ?? null) : null}
       highlightIds={highlights}
       activeHitId={activeHitId}
+      readIds={readIds}
+      bigChangeLines={bigChangeLines}
       onSelect={(row) => openNode(session.sessionId, row.message.id, row.segmentId)}
       onUnfold={unfold}
       onContinue={(continues) => openContinue(continues.sessionId, continues.id)}
@@ -216,9 +228,56 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
   const [openAll, setOpenAll] = useState(false);
   const [showOutline, setShowOutline] = useState(true);
-  // The files view and the outline share the left column, so only one shows.
+  // The files, unread and outline views share the left column; only one shows.
   const [showFiles, setShowFiles] = useState(false);
+  const [showUnread, setShowUnread] = useState(false);
   const { expanded: fullscreen, toggle: toggleFullscreen } = useFullscreen();
+  // Story 10.3: the read marks the page was built with. A live rebuild refreshes
+  // them; the toggle updates this set at once so the row answers the click.
+  const [readIds, setReadIds] = useState<ReadonlySet<string>>(() => new Set(model.read ?? []));
+  const [readError, setReadError] = useState<string | null>(null);
+  useEffect(() => {
+    setReadIds(new Set(model.read ?? []));
+  }, [model]);
+  const bigChangeLines = model.settings?.bigChangeLines ?? 300;
+  const toggleRead = useCallback(
+    (id: string, next: boolean) => {
+      setReadError(null);
+      setReadIds((previous) => {
+        const copy = new Set(previous);
+        if (next) copy.add(id);
+        else copy.delete(id);
+        return copy;
+      });
+      // Over `file://` there is no server to write to; the mark lasts for this
+      // open page only, which is what the toggle's title says.
+      const token = pageToken();
+      if (token === null) return;
+      void saveRead(model.project.path, id, next, token).catch((err: unknown) => {
+        setReadError(err instanceof Error ? err.message : String(err));
+        setReadIds((previous) => {
+          const copy = new Set(previous);
+          if (next) copy.delete(id);
+          else copy.add(id);
+          return copy;
+        });
+      });
+    },
+    [model.project.path],
+  );
+  const unread = useMemo(
+    () =>
+      unreadViewMessages(
+        [...model.epochs.flatMap((epoch) => epoch.sessions), ...model.unassigned],
+        readIds,
+      ),
+    [model, readIds],
+  );
+  const unreadBig = useMemo(
+    () =>
+      unread.filter((message) => message.change.added + message.change.removed >= bigChangeLines),
+    [unread, bigChangeLines],
+  );
   const [focusedId, setFocusedId] = useState<string | null>(() => {
     if (initial === null) return null;
     if (initial.messageId === undefined) return `session:${initial.sessionId}`;
@@ -497,8 +556,17 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   );
 
   const actions = useMemo(
-    () => ({ selection, openIds, openSession: toggleSession, openNode, openContinue, unfold }),
-    [selection, openIds, toggleSession, openNode, openContinue, unfold],
+    () => ({
+      selection,
+      openIds,
+      readIds,
+      bigChangeLines,
+      openSession: toggleSession,
+      openNode,
+      openContinue,
+      unfold,
+    }),
+    [selection, openIds, readIds, bigChangeLines, toggleSession, openNode, openContinue, unfold],
   );
 
   const nodes = useMemo<MapFlowNode[]>(() => {
@@ -599,13 +667,41 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
             onClick={() => {
               setShowFiles((value) => !value);
               setShowOutline(false);
+              setShowUnread(false);
             }}
           >
             {showFiles ? "Hide files" : "Files"}
           </button>
+          <button
+            type="button"
+            className="outline-button"
+            aria-pressed={showUnread}
+            title="Unread messages with commits, most code first"
+            onClick={() => {
+              setShowUnread((value) => !value);
+              setShowOutline(false);
+              setShowFiles(false);
+            }}
+          >
+            {showUnread
+              ? "Hide unread"
+              : `Unread${unreadBig.length > 0 ? ` (${unreadBig.length})` : ""}`}
+          </button>
         </div>
         <div className="graph-wrap">
-          {showFiles ? (
+          {showUnread ? (
+            <UnreadView
+              messages={unread}
+              bigChangeLines={bigChangeLines}
+              active={
+                selection?.type === "node"
+                  ? { sessionId: selection.sessionId, messageId: selection.nodeId }
+                  : null
+              }
+              onSelect={selectFromFiles}
+              onClose={() => setShowUnread(false)}
+            />
+          ) : showFiles ? (
             <FilesView
               files={model.files}
               active={
@@ -642,6 +738,10 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
               selection={selection}
               onClose={() => setSelection(null)}
               onNavigate={selectFromOutline}
+              read={selection?.type === "node" ? readIds.has(selection.nodeId) : false}
+              onToggleRead={toggleRead}
+              bigChangeLines={bigChangeLines}
+              readError={readError}
             />
           </div>
         </div>

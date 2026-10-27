@@ -130,6 +130,7 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   recordCommit: "ask",
   gitPolicy: "commit",
   agents: ["claude-code"],
+  bigChangeLines: 300,
 };
 
 export function withDefaults(settings: Partial<PanelSettings> | undefined): PanelSettings {

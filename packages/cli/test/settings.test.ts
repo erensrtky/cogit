@@ -23,6 +23,7 @@ describe("settings model", () => {
       recordCommit: parsed.recordCommit,
       gitPolicy: parsed.gitPolicy,
       agents: parsed.agents,
+      bigChangeLines: parsed.bigChangeLines,
     });
   });
 

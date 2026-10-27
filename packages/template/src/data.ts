@@ -76,6 +76,28 @@ export async function loadSettings(token: string): Promise<Partial<PanelSettings
   return body.settings ?? {};
 }
 
+/**
+ * Marks one message read or unread (Story 10.3). The state lives in the
+ * project's `.cogit/state/`, so this needs the local server; over `file://` the
+ * page has no token and the toggle stays local to the open page.
+ */
+export async function saveRead(
+  dir: string,
+  id: string,
+  read: boolean,
+  token: string,
+): Promise<void> {
+  const response = await fetch("/api/read", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-cogit-token": token },
+    body: JSON.stringify({ dir, id, read }),
+  });
+  if (!response.ok) {
+    const text = (await response.text()).trim();
+    throw new Error(text || `could not save the read mark (HTTP ${response.status})`);
+  }
+}
+
 /** One settings write; the server validates the key, the value and the token. */
 export async function saveSetting(
   key: string,

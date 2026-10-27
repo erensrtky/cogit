@@ -91,6 +91,7 @@ describe("buildPanel", () => {
         recordCommit: "ask",
         gitPolicy: "commit",
         agents: ["claude-code"],
+        bigChangeLines: 300,
       },
       projects: [
         {
@@ -100,6 +101,7 @@ describe("buildPanel", () => {
           lastActivity: T0,
           needsUserCount: 1,
           lineageUrl: pathToFileURL(projectPaths(alpha).html).href,
+          unreadBigCount: 0,
         },
         {
           name: "beta",
@@ -108,6 +110,7 @@ describe("buildPanel", () => {
           lastActivity: null,
           needsUserCount: 0,
           lineageUrl: null,
+          unreadBigCount: 0,
         },
       ],
     });
@@ -144,6 +147,7 @@ describe("buildPanel", () => {
         lastActivity: null,
         needsUserCount: 0,
         lineageUrl: pathToFileURL(projectPaths(root).html).href,
+        unreadBigCount: 0,
       },
     ]);
     expect(io.warnings.join("\n")).toMatch(/^skipping project .*ENOTDIR/);
@@ -194,5 +198,46 @@ describe("panel refresh from build", () => {
     await buildProject({ dir: root, io, templateHtml: TEMPLATE });
     expect(existsSync(projectPaths(root).html)).toBe(true);
     expect(io.warnings.join("\n")).toMatch(/could not build panel\.html/);
+  });
+});
+
+describe("panel card unread count (10.3)", () => {
+  it("keeps the card at zero when the read state cannot be read", async () => {
+    const dir = await tempDir();
+    const env = envFor(dir);
+    const root = join(dir, "proj");
+    const paths = projectPaths(root);
+    const session = {
+      schema: 1,
+      sessionId: "s1",
+      agent: "claude-code",
+      title: "t",
+      epoch: null,
+      startedAt: T0,
+      updatedAt: T0,
+      status: { goal: "", done: [], pending: [], next: "" },
+      nodes: [
+        {
+          id: "h111111111111",
+          parent: null,
+          kind: "message",
+          title: "Big",
+          at: T0,
+          commits: ["abcdef1"],
+        },
+      ],
+    };
+    await mkdir(paths.sessions, { recursive: true });
+    await writeFile(paths.project, JSON.stringify({ schema: 1, name: "proj", epochs: [] }));
+    await writeFile(paths.session("s1"), JSON.stringify(session));
+    // A directory where read.json belongs: reading it is an error, not "empty".
+    await mkdir(paths.readState, { recursive: true });
+    await write(
+      globalPaths(env).registry,
+      JSON.stringify({ schema: 1, projects: [{ path: root, name: "proj", addedAt: T0 }] }),
+    );
+
+    const model = await buildPanel({ env, io: fakeIo(env), templateHtml: TEMPLATE });
+    expect(model.projects[0]?.unreadBigCount).toBe(0);
   });
 });

@@ -273,6 +273,111 @@ export async function readCommitFiles(
   return out;
 }
 
+/** A commit with its numstat totals and the files it changed. */
+export interface CommitChange {
+  /** The full hash, so two recorded hashes of one commit count once. */
+  full: string;
+  added: number;
+  removed: number;
+  /** Repository-relative paths, in git's order (a binary file counts as one). */
+  files: string[];
+}
+
+interface ChangeSection {
+  full: string;
+  added: number;
+  removed: number;
+  files: string[];
+}
+
+/**
+ * Parses `%x00%H` + `--numstat` output: a NUL-prefixed hash line starts a
+ * commit, `added\tremoved\tpath` lines follow until the next hash. A binary file
+ * prints `-` for both counts; it still counts as a file touched.
+ */
+function parseChangeSections(stdout: string): ChangeSection[] {
+  const out: ChangeSection[] = [];
+  let current: ChangeSection | null = null;
+  for (const line of stdout.split("\n")) {
+    if (line.startsWith("\0")) {
+      const full = line.slice(1).trim();
+      current = /^[0-9a-f]{40}$/.test(full) ? { full, added: 0, removed: 0, files: [] } : null;
+      if (current) out.push(current);
+      continue;
+    }
+    if (current === null) continue;
+    const parts = line.split("\t");
+    if (parts.length < 3) continue;
+    const [added, removed, ...rest] = parts;
+    const path = rest.join("\t").trim();
+    if (path === "") continue;
+    current.added += Number.parseInt(added ?? "", 10) || 0;
+    current.removed += Number.parseInt(removed ?? "", 10) || 0;
+    current.files.push(path);
+  }
+  return out;
+}
+
+/**
+ * Lines added and removed, plus the files changed, for each given commit
+ * (Story 10.3: how much code landed after a message). Keyed by the hash the
+ * record holds; a commit git no longer knows is left out, never an error —
+ * same policy as `readCommitSubjects` and `readCommitFiles`.
+ */
+export async function readCommitChanges(
+  root: string,
+  hashes: Iterable<string>,
+): Promise<Map<string, CommitChange>> {
+  const wanted = [...new Set(hashes)];
+  const out = new Map<string, CommitChange>();
+  if (wanted.length === 0) return out;
+
+  const remember = (entries: ChangeSection[]): void => {
+    for (const hash of wanted) {
+      const commit = entries.find(
+        (entry) => entry.full.startsWith(hash) || hash.startsWith(entry.full.slice(0, 7)),
+      );
+      if (commit && !out.has(hash))
+        out.set(hash, {
+          full: commit.full,
+          added: commit.added,
+          removed: commit.removed,
+          files: commit.files,
+        });
+    }
+  };
+
+  try {
+    const { stdout } = await exec("git", [
+      "-C",
+      root,
+      "log",
+      "--no-walk=unsorted",
+      "--format=%x00%H",
+      "--numstat",
+      ...wanted,
+    ]);
+    remember(parseChangeSections(stdout));
+  } catch {
+    for (const hash of wanted) {
+      try {
+        const { stdout } = await exec("git", [
+          "-C",
+          root,
+          "show",
+          "--format=%x00%H",
+          "--numstat",
+          hash,
+        ]);
+        remember(parseChangeSections(stdout));
+      } catch {
+        // gone from this repository (rebased away, or another checkout)
+      }
+    }
+  }
+  return out;
+}
+
 /** A commit's short hash, computed when git printed only the full one. */
 function commitShort(commit: CommitFiles): string {
   return commit.short === "" ? commit.full.slice(0, 7) : commit.short;
