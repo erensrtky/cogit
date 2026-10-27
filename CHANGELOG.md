@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - A logo: the c of cogito drawn as a git lane with commits, with a branch that leaves and merges back (`docs/images/cogit-mark.svg`). It heads the README and is the browser tab icon of the map and the panel, which used to ask the server for a missing `favicon.ico`. Under the slogan the README shows Descartes, after the Frans Hals portrait, with git branches running through his hair.
 
+- `cogit init` can set the project up for a team (`--project-settings`): it enables the plugin in the project's `.claude/settings.json` and adds a hook that stops the first message of an interactive session that started without the plugin, once per session, with the install command. Headless `claude -p` runs pass through.
+- The README states what recording costs: about 3–7% of a session's tokens in measured sessions.
+
 ### Changed
 - The "Your turn" inbox: each row closes with an × in its top-right corner (hidden until the agent writes in that session again), rows of different projects carry their own lane colour on the left, and on a project's map the inbox starts folded to one "Your turn" line so it no longer pushes the map off the page.
 

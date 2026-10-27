@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   allowSkill,
+  readProjectSetup,
   readRetention,
   readSkillAllowed,
   SKILL_RULE,
@@ -30,6 +31,15 @@ const settingsFile = () => join(dir, "claude", "settings.json");
 const readText = (f: string) => readFile(f, "utf8");
 
 describe("init", () => {
+  it("leaves project settings it cannot read alone and says so", async () => {
+    await mkdir(join(root, ".claude"));
+    await writeFile(join(root, ".claude", "settings.json"), "{ not json");
+    const io = fakeIo(env);
+    await init(root, { name: "p", retention: "keep", allowSkill: false, language: "auto" }, io);
+    expect(io.warnings.join("\n")).toMatch(/could not read the project's Claude Code settings/);
+    expect(await readText(join(root, ".claude", "settings.json"))).toBe("{ not json");
+  });
+
   it("recognizes a pre-rename .codelineage project and renames it", async () => {
     await mkdir(join(root, ".codelineage"), { recursive: true });
     await writeFile(
@@ -55,8 +65,9 @@ describe("init", () => {
       data: { projects: [{ path: root, name: "proj" }] },
     });
     expect((await loadConfig(env)).language).toBe("auto");
-    // not a git repo: name, retention, skill permission and language were asked
-    expect(io.asked).toHaveLength(4);
+    // not a git repo: name, retention, skill permission, project settings and language
+    expect(io.asked).toHaveLength(5);
+    expect(await readProjectSetup(root)).toBe(true);
     expect(await readSkillAllowed(env)).toBe(true);
     expect(io.lines.at(-2)).toMatch(/^Initialized proj/);
     // Outside a git repository there is nothing to ignore and no hook to install.
@@ -81,7 +92,14 @@ describe("init", () => {
     const io = fakeIo(env, [], true);
     await init(
       root,
-      { name: "P", git: "commit", retention: "keep", allowSkill: false, language: "Turkish" },
+      {
+        name: "P",
+        git: "commit",
+        retention: "keep",
+        allowSkill: false,
+        projectSettings: false,
+        language: "Turkish",
+      },
       io,
     );
     expect((await loadConfig(env)).language).toBe("Turkish");
@@ -125,20 +143,20 @@ describe("init", () => {
     const io = fakeIo(env);
     await init(root, {}, io);
     expect(io.lines).toContain("Claude Code keeps transcripts for 365 days.");
-    expect(io.asked).toHaveLength(3);
+    expect(io.asked).toHaveLength(4);
   });
 
   it("applies a retention option without asking, and skips an unchanged one", async () => {
     await init(
       root,
-      { name: "p", retention: 90, allowSkill: false, language: "auto" },
+      { name: "p", retention: 90, allowSkill: false, projectSettings: false, language: "auto" },
       fakeIo(env, [], true),
     );
     expect(await readRetention(env)).toBe(90);
     const again = join(dir, "other");
     await mkdir(again);
     const io = fakeIo(env, [], true);
-    await init(again, { name: "o", retention: 90, allowSkill: false }, io);
+    await init(again, { name: "o", retention: 90, allowSkill: false, projectSettings: false }, io);
     expect(io.lines.some((l) => l.includes("cleanupPeriodDays"))).toBe(false);
   });
 
@@ -153,7 +171,7 @@ describe("init", () => {
   });
 
   it("asks which fixed language on the first run only", async () => {
-    await init(root, {}, fakeIo(env, ["proj", "keep", "yes", "fixed", "Turkish"]));
+    await init(root, {}, fakeIo(env, ["proj", "keep", "yes", "yes", "fixed", "Turkish"]));
     expect((await loadConfig(env)).language).toBe("Turkish");
     const second = join(dir, "second");
     await mkdir(second);

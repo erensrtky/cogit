@@ -82,6 +82,11 @@ export async function runHook(
       return undefined;
     }
     if (!Slug.safeParse(input.session_id).success) return undefined;
+    // The project's guard hook looks for this mark (agents/claude/settings.ts).
+    if (handler === onSessionStart)
+      await agent
+        .markLive(input.session_id)
+        .catch((err: Error) => debug(`cogit mark: ${err.message}`));
     // In a linked worktree both point at the worktree; the record lives in the main checkout.
     const { root } = await resolveProjectRoot(env[agent.projectDirEnv] ?? input.cwd ?? ".");
     const initialized = existsSync(projectPaths(root).project);

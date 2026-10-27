@@ -32,6 +32,8 @@ export interface InitOptions {
   retention?: number | "keep";
   /** Allow the lineage skill in Claude Code's user settings; undefined asks. */
   allowSkill?: boolean;
+  /** Enable the plugin and the guard in the project's shared settings; undefined asks. */
+  projectSettings?: boolean;
 }
 
 /** Below this, init offers to raise Claude Code's transcript retention. */
@@ -101,6 +103,27 @@ async function askSkillPermission(io: Io, opts: InitOptions): Promise<void> {
   }
   const { file, backup } = await agent.allowSkill(io.env, io.now());
   io.out(`Allowed ${agent.skillRule} in ${file}${backup ? ` (backup: ${backup})` : ""}.`);
+}
+
+async function askProjectSettings(io: Io, root: string, opts: InitOptions): Promise<void> {
+  const done = await agent.readProjectSetup(root);
+  if (done === undefined) {
+    io.warn("could not read the project's Claude Code settings; leaving them unchanged");
+    return;
+  }
+  if (done) return;
+  const add =
+    opts.projectSettings ??
+    (await io.prompt.confirm(
+      "Turn the plugin on for everyone who opens this project, and stop a session that " +
+        "started without it? (writes .claude/settings.json; commit it to share)",
+      true,
+    ));
+  if (!add) return;
+  await bestEffort(io, "could not update the project's Claude Code settings", async () => {
+    const { file } = await agent.writeProjectSetup(root);
+    io.out(`Enabled the plugin and the missing-plugin guard in ${file}.`);
+  });
 }
 
 async function askLanguage(io: Io, opts: InitOptions): Promise<void> {
@@ -184,6 +207,7 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
     if (!existing.ok) throw new CliError(`${projectPaths(root).project}: ${existing.error}`);
     await register(io, root, existing.data.name);
     if (opts.allowSkill !== undefined) await askSkillPermission(io, opts);
+    if (opts.projectSettings !== undefined) await askProjectSettings(io, root, opts);
     await refreshGitIntegration(io, root);
     io.out(`Already initialized: ${existing.data.name} (${root})`);
     return;
@@ -210,6 +234,7 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
 
   await askRetention(io, opts);
   await askSkillPermission(io, opts);
+  await askProjectSettings(io, root, opts);
   await askLanguage(io, opts);
 
   await updateProject(root, (cur) => cur ?? { schema: 1, name, epochs: [] });

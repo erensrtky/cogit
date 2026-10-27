@@ -48,9 +48,10 @@ export function setupHint(ctx: HookContext): string {
     "Say this once, in one line, and do not repeat it in later turns. If the user asks " +
     "you to set it up, ask the install questions in the chat (whether to commit " +
     ".cogit/, whether to keep transcripts longer, whether the lineage skill may run " +
-    "without asking, and the summary language), then run " +
+    "without asking, whether to turn the plugin on for the whole project and stop " +
+    "sessions that start without it, and the summary language), then run " +
     `${cli(ctx)} init --yes --git <ignore|commit> --retention <days|keep> --language <lang>` +
-    " (add --allow-skill when the user agreed). Never run init or register the project on " +
+    " (add --allow-skill and --project-settings for what the user agreed to). Never run init or register the project on " +
     `your own. If the user wants no more hints here, run ${cli(ctx)} config hint-off. ` +
     "A plugin update reaches a running session only after /reload-plugins or a new chat."
   );

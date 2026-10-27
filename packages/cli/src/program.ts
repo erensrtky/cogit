@@ -283,6 +283,11 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .option("--retention <days>", 'Claude Code transcript retention, or "keep"', retention)
     .option("--allow-skill", "let the agent run the lineage skill without asking")
     .option("--no-allow-skill", "leave Claude Code's permissions unchanged")
+    .option(
+      "--project-settings",
+      "enable the plugin for this project and stop sessions that start without it",
+    )
+    .option("--no-project-settings", "leave the project's .claude/settings.json unchanged")
     .option("-y, --yes", "accept defaults for every question")
     .addHelpText("after", examples("cogit init", "cogit init ../my-app --git commit --yes"))
     .action(
@@ -290,6 +295,8 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
         const { yes, ...rest } = opts;
         // --yes never changes Claude Code's permissions on its own
         if (yes) rest.allowSkill ??= false;
+        // nor the project's shared settings
+        if (yes) rest.projectSettings ??= false;
         await init(dir, rest, makeIo(!yes && process.stdin.isTTY === true));
       }),
     );

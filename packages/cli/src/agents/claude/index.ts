@@ -3,10 +3,13 @@ import { additionalContext, parseHookInput } from "./hooks.js";
 import {
   allowSkill,
   CLAUDE_DEFAULT_RETENTION,
+  markLive,
+  readProjectSetup,
   readRetention,
   readSkillAllowed,
   SKILL_RULE,
   setRetention,
+  writeProjectSetup,
 } from "./settings.js";
 import {
   claudeConfigDir,
@@ -54,4 +57,7 @@ export const claude: AgentAdapter = {
   readSkillAllowed,
   setRetention,
   allowSkill,
+  readProjectSetup,
+  writeProjectSetup,
+  markLive,
 };

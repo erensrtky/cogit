@@ -58,14 +58,24 @@ The Claude Code plugin adds the skill that keeps the record and the hooks that m
 
 ```bash
 cd your-project
-cogit init        # asks about git, transcript retention and summary language
+cogit init        # asks about git, transcript retention, team setup and summary language
 cogit open        # builds the map and serves it on 127.0.0.1
 ```
 
 Then work as usual. The skill updates the record every few turns (`updateEveryTurns`, default
 5) and at session end; the hooks write `.cogit/HEAD`, rebuild the map and, if `recordCommit`
-is `auto`, commit the record. Nothing cogit installs can block a prompt or a commit: every
+is `auto`, commit the record. Nothing in the plugin can block a prompt or a commit: every
 hook failure is silent and exits 0.
+
+The record is written by the session's own agent, so it costs tokens: in our sessions it added
+about 3–7% to a session's token cost, more in short ones. Raise `updateEveryTurns` to record
+less often.
+
+If you agree to the team setup, `init` also writes the project's `.claude/settings.json`
+(commit it to share): it turns the plugin on for everyone who opens the repository, and adds a
+small hook that stops the first message of a session that started without the plugin, once,
+with the install command, since such a session records nothing. Send the message again to go
+on without recording. Headless runs (`claude -p`) are never stopped.
 
 ## Read the lineage
 

@@ -1,5 +1,5 @@
-import { constants, copyFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { constants, copyFile, mkdir, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { atomicWriteJson, readJson } from "../../store/fs.js";
 import type { FileChange } from "../types.js";
@@ -97,4 +97,114 @@ export async function allowSkill(env: NodeJS.ProcessEnv, stamp: string): Promise
     const permissions = (s.permissions ?? {}) as Record<string, unknown>;
     return { ...s, permissions: { ...permissions, allow: [...allow, SKILL_RULE] } };
   });
+}
+
+/**
+ * Team setup in the project's shared `.claude/settings.json`: the plugin is
+ * enabled for everyone who opens the repository, and a guard hook that does not
+ * need the plugin stops the first message of an attended session that started
+ * without it. The plugin's SessionStart hook leaves {@link liveMarker}; the
+ * guard blocks once per session when it is missing, so a second send goes
+ * through. Headless runs (`claude -p`, loops) are never blocked.
+ */
+export const PLUGIN_ID = "cogit@cogit";
+export const MARKETPLACE = "cogit";
+export const MARKETPLACE_REPO = "sainthardrock/cogit";
+export const INSTALL_COMMAND = `claude plugin install cogit --marketplace ${MARKETPLACE_REPO}`;
+
+/** Where a session's SessionStart leaves its mark; the guard reads the same path. */
+export function liveDir(): string {
+  return join(tmpdir(), "cogit-live");
+}
+
+/** Marks a session as started with the plugin loaded. */
+export async function markLive(sessionId: string): Promise<void> {
+  if (!/^[\w-]+$/.test(sessionId)) return;
+  await mkdir(liveDir(), { recursive: true });
+  await writeFile(join(liveDir(), sessionId), "");
+}
+
+export const GUARD_REASON =
+  "cogit: this session started without the cogit plugin, so nothing in it is recorded. " +
+  `Install it once with \`${INSTALL_COMMAND}\` (or start claude with --plugin-dir), ` +
+  "then open a new session. Send the message again to continue without recording.";
+
+/**
+ * The guard as one `node -e` command: no cogit install needed, no single quotes
+ * inside, so `sh` passes it through unchanged. Keep in step with {@link markLive}.
+ */
+export const GUARD_COMMAND =
+  "node -e '" +
+  [
+    'const fs=require("fs"),os=require("os"),path=require("path");',
+    'if(process.env.CLAUDE_CODE_SESSION_ATTENDED!=="1"||process.env.COGIT_DISABLE)process.exit(0);',
+    'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{',
+    "const id=JSON.parse(s).session_id;if(!/^[\\w-]+$/.test(id))return;",
+    'const dir=path.join(os.tmpdir(),"cogit-live");if(fs.existsSync(path.join(dir,id)))return;',
+    'const warned=path.join(dir,id+".warned");if(fs.existsSync(warned))return;',
+    'fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(warned,"");',
+    `process.stdout.write(JSON.stringify({decision:"block",reason:${JSON.stringify(GUARD_REASON)}}))`,
+    "}catch{}});",
+  ].join("") +
+  "' # cogit:guard";
+
+const GUARD_TAG = "# cogit:guard";
+
+export function projectSettingsPath(root: string): string {
+  return join(root, ".claude", "settings.json");
+}
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function hasGuard(settings: Record<string, unknown>): boolean {
+  const hooks = isObject(settings.hooks) ? settings.hooks.UserPromptSubmit : undefined;
+  return JSON.stringify(hooks ?? []).includes(GUARD_TAG);
+}
+
+/** Whether the project's shared settings already carry the team setup; undefined if unreadable. */
+export async function readProjectSetup(root: string): Promise<boolean | undefined> {
+  const settings = await readSettings(projectSettingsPath(root));
+  if (!settings) return undefined;
+  const plugins = isObject(settings.enabledPlugins) ? settings.enabledPlugins : {};
+  return plugins[PLUGIN_ID] === true && hasGuard(settings);
+}
+
+/**
+ * Writes the team setup into the project's `.claude/settings.json`, keeping every
+ * other key and hook. The file is meant to be committed, so no backup is left
+ * beside it; an unparseable file is never touched.
+ */
+export async function writeProjectSetup(root: string): Promise<FileChange> {
+  const file = projectSettingsPath(root);
+  const settings = await readSettings(file);
+  if (!settings) throw new Error(`${file} is not a valid JSON object; not changing it`);
+  for (const key of ["enabledPlugins", "extraKnownMarketplaces", "hooks"])
+    if (settings[key] !== undefined && !isObject(settings[key]))
+      throw new Error(`${file} has an unexpected ${key}; not changing it`);
+  const hooks = (settings.hooks ?? {}) as Record<string, unknown>;
+  const submit = hooks.UserPromptSubmit ?? [];
+  if (!Array.isArray(submit))
+    throw new Error(`${file} has an unexpected hooks.UserPromptSubmit; not changing it`);
+  const next: Record<string, unknown> = {
+    ...settings,
+    enabledPlugins: { ...(settings.enabledPlugins as object), [PLUGIN_ID]: true },
+    extraKnownMarketplaces: {
+      ...(settings.extraKnownMarketplaces as object),
+      [MARKETPLACE]: { source: { source: "github", repo: MARKETPLACE_REPO } },
+    },
+    hooks: hasGuard(settings)
+      ? hooks
+      : {
+          ...hooks,
+          UserPromptSubmit: [
+            ...submit,
+            { hooks: [{ type: "command", command: GUARD_COMMAND, timeout: 5 }] },
+          ],
+        },
+  };
+  await mkdir(join(root, ".claude"), { recursive: true });
+  await atomicWriteJson(file, next);
+  return { file };
 }
