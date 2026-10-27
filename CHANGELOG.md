@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `cogit pr [base]` turns a branch into a review-ready Markdown description from the thoughts behind its commits: the sessions' goals, each thought's title, summary, decisions and rejected options, its commits and changed files, and the commits with no recorded thought (`thought h… not recorded yet` when the record has not caught up). The base is the upstream's merge base, else `main`, else `master`, with a clear error when none resolves; `--json` prints the same content as data and `--copy` puts the Markdown on the clipboard. It reads only the record — never the conversation text or the user's prompts — and stays under GitHub's body limit by dropping file lists first, then summaries, saying what was left out. The record skill hands its output over instead of writing a PR description itself.
+
 ### Changed
 - The panel uses the map's centred 8-of-12 column, and every page names the product: "cogit" with its slogan "Cogito, ergo commit." opens the top bar, and on a served map it leads back to the panel.
 - A calmer map head: the top bar holds only "cogit", the search and Settings; the project switcher (recent projects and Ctrl/Cmd+K, its button now "Switch project") sits under the project's name and path. On the panel a click anywhere on a project's card opens its map.

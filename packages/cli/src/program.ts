@@ -17,6 +17,7 @@ import { type InitOptions, init } from "./commands/init.js";
 import { formatShow, log, logFile, show } from "./commands/log.js";
 import { migrateIds } from "./commands/migrate.js";
 import { openPanel, openProject } from "./commands/open.js";
+import { pr } from "./commands/pr.js";
 import { search } from "./commands/search.js";
 import { readStdin, sessionShow, sessionWrite } from "./commands/session.js";
 import { isGitHookEvent, runGitHook } from "./git-hooks.js";
@@ -207,6 +208,36 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
             session: opts.session,
             limit: opts.number,
             json: opts.json === true,
+          });
+        },
+      ),
+    );
+
+  program
+    .command("pr")
+    .description("print a review-ready description of a branch from the thoughts behind it")
+    .argument("[base]", "base ref; default: the upstream's merge base, else main, else master")
+    .option("-C, --dir <dir>", "project directory", ".")
+    .option("--json", "print JSON instead of Markdown")
+    .option("--copy", "also copy the Markdown to the clipboard")
+    .addHelpText(
+      "after",
+      "\nExamples:\n" +
+        "  $ cogit pr\n" +
+        "  $ cogit pr main --copy\n" +
+        "  $ cogit pr origin/main --json\n\n" +
+        "Prints only the record's titles, summaries and decisions — never the conversation\n" +
+        "text or your raw prompts, because the PR may be public.\n",
+    )
+    .action(
+      run(
+        async (base: string | undefined, opts: { dir: string; json?: boolean; copy?: boolean }) => {
+          await pr({
+            dir: opts.dir,
+            base,
+            io: makeIo(false),
+            json: opts.json === true,
+            copy: opts.copy === true,
           });
         },
       ),

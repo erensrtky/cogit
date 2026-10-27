@@ -23,6 +23,13 @@ A word rather than a hash: `node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" search "<te
 scans titles, branch summaries, decisions and stored conversations, newest first (`--json`,
 `-n`, `--session`); hashes go to `show`.
 
+## A pull request description
+
+When the user asks for a PR description, run
+`node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" pr -C "${CLAUDE_PROJECT_DIR}"` and hand its output
+over as it is; do not write one yourself. Only when the user uses `gh`, follow it with
+`gh pr create --body "$(node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" pr -C "${CLAUDE_PROJECT_DIR}")"`.
+
 ## Send only what is new or changed
 
 One JSON object:
