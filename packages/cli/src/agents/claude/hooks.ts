@@ -15,6 +15,9 @@ export const ClaudeHookInput = z.looseObject({
   stop_hook_active: z.boolean().optional(),
   /** SessionStart only: `startup`, `resume`, `clear` or `compact`. */
   source: z.string().optional(),
+  /** PreToolUse only: the tool and its arguments (`file_path` on the write tools). */
+  tool_name: z.string().optional(),
+  tool_input: z.looseObject({}).optional(),
 });
 
 /** Parses a hook's stdin; undefined when it is not Claude Code's payload. */

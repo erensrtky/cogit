@@ -46,6 +46,12 @@ export const Config = z.object({
    * not a judgement: it never hides or ranks anything by itself.
    */
   bigChangeLines: z.int().min(1).max(1_000_000).default(300),
+  /**
+   * Whether the agent is told, before editing a file, about options earlier
+   * thoughts considered and rejected for that file (Story 10.4). A note from
+   * the record, never a rule; off means silence.
+   */
+  tryBeforeNotes: z.boolean().default(true),
   agents: z.array(z.string().min(1)).default(["claude-code"]),
   /** Project roots ("don't ask again" in this project) where the setup hint stays silent. */
   setupHintOff: z.array(z.string().min(1)).default([]),

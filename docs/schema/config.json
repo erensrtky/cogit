@@ -75,6 +75,10 @@
       "minimum": 1,
       "maximum": 1000000
     },
+    "tryBeforeNotes": {
+      "default": true,
+      "type": "boolean"
+    },
     "agents": {
       "default": [
         "claude-code"
@@ -108,6 +112,7 @@
     "recordCommit",
     "trailerMaxAgeHours",
     "bigChangeLines",
+    "tryBeforeNotes",
     "agents",
     "setupHintOff"
   ],

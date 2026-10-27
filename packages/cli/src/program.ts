@@ -20,6 +20,7 @@ import { openPanel, openProject } from "./commands/open.js";
 import { pr } from "./commands/pr.js";
 import { search } from "./commands/search.js";
 import { readStdin, sessionShow, sessionWrite } from "./commands/session.js";
+import { why } from "./commands/why.js";
 import { isGitHookEvent, runGitHook } from "./git-hooks.js";
 import { runHook } from "./hooks/run.js";
 import { CliError, type Io, processIo } from "./io.js";
@@ -88,6 +89,20 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .action(
       run(async (target: string, dir: string, opts: { dir?: string }) => {
         await blame({ dir: opts.dir ?? dir, target, io: makeIo(false) });
+      }),
+    );
+
+  program
+    .command("why")
+    .description("show the decisions and rejected options behind a file")
+    .helpGroup("Read:")
+    .argument("<file>", "file to look up, relative to the project")
+    .argument("[dir]", "project directory", ".")
+    .option("-C, --dir <dir>", "project directory (same as the positional)")
+    .addHelpText("after", examples("cogit why src/auth.ts", "cogit why src/auth.ts ../my-app"))
+    .action(
+      run(async (file: string, dir: string, opts: { dir?: string }) => {
+        await why({ dir: opts.dir ?? dir, file, io: makeIo(false) });
       }),
     );
 

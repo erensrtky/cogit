@@ -46,6 +46,12 @@ const EDITABLE: FieldSpec[] = [
     kind: "boolean",
   },
   {
+    key: "tryBeforeNotes",
+    label: "Tried-before notes",
+    help: "Before the agent edits a file, tell it which options earlier thoughts rejected for it.",
+    kind: "boolean",
+  },
+  {
     key: "language",
     label: "Language",
     help: "Language the agent writes records in; `auto` follows the chat.",
@@ -126,6 +132,7 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   catchUpModel: "haiku",
   messageSummaries: false,
   startupContext: true,
+  tryBeforeNotes: true,
   shareConversations: false,
   recordCommit: "ask",
   gitPolicy: "commit",
@@ -142,6 +149,7 @@ export function editableSettings(settings: PanelSettings): PanelEditableSettings
   return {
     messageSummaries: settings.messageSummaries,
     startupContext: settings.startupContext,
+    tryBeforeNotes: settings.tryBeforeNotes,
     language: settings.language,
     updateEveryTurns: settings.updateEveryTurns,
     sessionEndCatchUp: settings.sessionEndCatchUp,

@@ -45,6 +45,7 @@ describe("createProgram", () => {
       "init",
       "build",
       "blame",
+      "why",
       "log",
       "show",
       "search",

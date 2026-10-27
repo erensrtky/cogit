@@ -88,6 +88,44 @@ describe("commands through the CLI", () => {
     expect(io.lines.at(-1)).toBe("Added epoch e1: First");
   });
 
+  it("runs why from the CLI", async () => {
+    const run = promisify(execFile);
+    const git = async (...args: string[]): Promise<string> =>
+      (await run("git", ["-C", root, ...args])).stdout;
+    await cli("init", root, "--yes", "--retention", "keep");
+    expect(await cli("why", "a.txt", "-C", root)).toMatch(/not inside a git repository/);
+
+    await git("init", "-q");
+    await git("config", "user.email", "t@example.com");
+    await git("config", "user.name", "Tester");
+    await writeFile(join(root, "a.txt"), "one\n");
+    await git("add", "a.txt");
+    await git("commit", "-q", "-m", "feat: add a", "-m", "Thought: h111111111111");
+    const record = {
+      schema: 1,
+      sessionId: "s1",
+      agent: "claude-code",
+      title: "CLI session",
+      epoch: null,
+      startedAt: T0,
+      updatedAt: T0,
+      status: { goal: "", done: [], pending: [], next: "" },
+      nodes: [
+        {
+          id: "h111111111111",
+          parent: null,
+          kind: "message",
+          title: "Add a",
+          at: T0,
+          alternatives: [{ option: "Keep the loop", why: "It loses data." }],
+        },
+      ],
+    };
+    await writeFile(join(root, ".cogit", "sessions", "s1.json"), JSON.stringify(record));
+    await cli("why", "a.txt", "-C", root);
+    expect(io.lines.join("\n")).toContain("not: Keep the loop — It loses data.");
+  });
+
   it("runs config hint-off and hint-on", async () => {
     await cli("config", "hint-off", root);
     expect(io.lines.at(-1)).toBe(`Setup hint off in ${root}`);

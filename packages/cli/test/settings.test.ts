@@ -19,6 +19,7 @@ describe("settings model", () => {
       catchUpModel: parsed.catchUpModel,
       messageSummaries: parsed.messageSummaries,
       startupContext: parsed.startupContext,
+      tryBeforeNotes: parsed.tryBeforeNotes,
       shareConversations: parsed.shareConversations,
       recordCommit: parsed.recordCommit,
       gitPolicy: parsed.gitPolicy,
@@ -63,6 +64,7 @@ describe("settings model", () => {
     expect(editableSettings(settings)).toEqual({
       messageSummaries: false,
       startupContext: true,
+      tryBeforeNotes: true,
       language: "tr",
       updateEveryTurns: 8,
       sessionEndCatchUp: true,

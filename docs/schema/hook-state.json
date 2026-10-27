@@ -30,13 +30,23 @@
           "type": "null"
         }
       ]
+    },
+    "notedFiles": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
     }
   },
   "required": [
     "schema",
     "turns",
     "turnsSinceUpdate",
-    "recordUpdatedAt"
+    "recordUpdatedAt",
+    "notedFiles"
   ],
   "additionalProperties": false
 }

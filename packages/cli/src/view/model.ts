@@ -32,6 +32,7 @@ export const TOKEN_META_NAME = "cogit-token";
 export const PANEL_EDITABLE_KEYS = [
   "messageSummaries",
   "startupContext",
+  "tryBeforeNotes",
   "language",
   "updateEveryTurns",
   "sessionEndCatchUp",
@@ -335,6 +336,11 @@ export interface PanelSettings {
   catchUpModel: string;
   messageSummaries: boolean;
   startupContext: boolean;
+  /**
+   * Whether the agent is told before editing a file about options earlier
+   * thoughts considered and rejected (Story 10.4).
+   */
+  tryBeforeNotes: boolean;
   shareConversations: boolean;
   recordCommit: "ask" | "auto" | "off";
   gitPolicy: "ignore" | "commit";

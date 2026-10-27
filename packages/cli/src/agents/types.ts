@@ -52,6 +52,13 @@ export interface HookInput {
   stop_hook_active?: boolean | undefined;
   /** SessionStart only: `startup`, `resume`, `clear` or `compact`. */
   source?: string | undefined;
+  /** PreToolUse only: the tool about to run (`Edit`, `Write`, `MultiEdit`, …). */
+  tool_name?: string | undefined;
+  /**
+   * PreToolUse only: the tool's arguments. `file_path` names the file for the
+   * write tools; other tools pass whatever they take.
+   */
+  tool_input?: Record<string, unknown> | undefined;
 }
 
 /** A file cogit changed and the backup it left first. */

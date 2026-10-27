@@ -546,6 +546,7 @@ describe("settings read", () => {
       settings: {
         messageSummaries: false,
         startupContext: true,
+        tryBeforeNotes: true,
         language: "auto",
         updateEveryTurns: 5,
         sessionEndCatchUp: true,

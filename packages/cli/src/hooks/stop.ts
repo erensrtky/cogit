@@ -28,6 +28,7 @@ export function countTurn(
     turns: 0,
     turnsSinceUpdate: 0,
     recordUpdatedAt,
+    notedFiles: [],
   };
   // The record changed since the last Stop (the skill ran), so count from here.
   const since = cur.recordUpdatedAt === recordUpdatedAt ? cur.turnsSinceUpdate : 0;

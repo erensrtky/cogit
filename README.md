@@ -71,12 +71,21 @@ cogit log --branches          # only the branch summaries
 cogit log --file src/auth.ts  # the thoughts that touched this file
 cogit show h3f9c2a1b4d6e      # one message: the turn, what came of it, its commits
 cogit blame src/auth.ts:42    # which recorded message produced this line
+cogit why src/auth.ts         # what earlier thoughts decided about this file, and rejected
 cogit search "refresh token"  # titles, summaries, decisions and the stored conversation
 ```
 
 Each takes `[dir]` (or `-C <dir>`), the list verbs take `-n <count>` and `--json`. A message is
 addressed by its hash (`h` plus 12 hex), `<session-id-prefix>:mN`, or — for `show` — a commit
 hash with a `Thought:` trailer.
+
+`cogit why <file>` runs the chain backwards: file → the commits that touched it → their
+`Thought:` messages → the decisions and rejected alternatives those messages recorded, newest
+first, each with its message hash and date. The lookup is exact, but the wording is the agent's
+summary from the record, so it is only as good as the record. The Claude Code plugin also uses
+it before an edit: when the file has rejected alternatives and the session has not been told
+about that file yet, the agent gets a short "earlier, for this file" note (at most five options,
+`tryBeforeNotes`). It is information, not a rule — the note never blocks the edit.
 
 ## Review a PR with cogit
 
@@ -159,6 +168,7 @@ under `gitPolicy: ignore` the description says the hashes resolve only on the au
 | `catchUpModel` | `haiku` | Model for the session-end catch-up |
 | `messageSummaries` | `false` | A summary on every message, not just every branch |
 | `startupContext` | `true` | Hand the agent the previous session's lineage at session start |
+| `tryBeforeNotes` | `true` | Tell the agent, before an edit, what earlier thoughts rejected for that file |
 | `gitPolicy` | `commit` | Whether new projects commit the record |
 | `shareConversations` | `false` | Commit the raw conversation too |
 | `recordCommit` | `ask` | What to do with messages after the last code commit |
