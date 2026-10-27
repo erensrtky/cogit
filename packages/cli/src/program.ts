@@ -54,6 +54,11 @@ export function positiveCount(value: string): number {
   return count;
 }
 
+/** The `Examples:` block every user-facing command carries in `--help` (Story 10.2). */
+function examples(...commands: string[]): string {
+  return `\nExamples:\n${commands.map((command) => `  $ ${command}`).join("\n")}\n`;
+}
+
 export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps = {}): Command {
   const program = new Command().name("cogit").description(pkg.description).version(pkg.version);
 
@@ -73,44 +78,13 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     };
 
   program
-    .command("init")
-    .description("set up .cogit/ in a project and register it")
-    .argument("[dir]", "project directory", ".")
-    .option("--name <name>", "project name")
-    .addOption(
-      new Option("--git <policy>", "commit or ignore .cogit/").choices(["ignore", "commit"]),
-    )
-    .option("--language <lang>", 'summary language: "auto" or a language')
-    .option("--retention <days>", 'Claude Code transcript retention, or "keep"', retention)
-    .option("--allow-skill", "let the agent run the lineage skill without asking")
-    .option("--no-allow-skill", "leave Claude Code's permissions unchanged")
-    .option("-y, --yes", "accept defaults for every question")
-    .action(
-      run(async (dir: string, opts: InitOptions & { yes?: boolean }) => {
-        const { yes, ...rest } = opts;
-        // --yes never changes Claude Code's permissions on its own
-        if (yes) rest.allowSkill ??= false;
-        await init(dir, rest, makeIo(!yes && process.stdin.isTTY === true));
-      }),
-    );
-
-  program
-    .command("build")
-    .description("regenerate .cogit/map.html")
-    .argument("[dir]", "project directory", ".")
-    .option("--quiet", "write the map without printing a success line")
-    .action(
-      run(async (dir: string, opts: { quiet?: boolean }) => {
-        await buildProject({ dir, io: makeIo(false), quiet: opts.quiet === true });
-      }),
-    );
-
-  program
     .command("blame")
     .description("show which recorded messages produced the code in a file or line")
+    .helpGroup("Read:")
     .argument("<target>", "file, or file:line")
     .argument("[dir]", "project directory", ".")
     .option("-C, --dir <dir>", "project directory (same as the positional)")
+    .addHelpText("after", examples("cogit blame src/auth.ts:42", "cogit blame src/auth.ts"))
     .action(
       run(async (target: string, dir: string, opts: { dir?: string }) => {
         await blame({ dir: opts.dir ?? dir, target, io: makeIo(false) });
@@ -120,6 +94,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
   program
     .command("log")
     .description("print the recorded lineage, newest first")
+    .helpGroup("Read:")
     .argument("[dir]", "project directory", ".")
     .option("-C, --dir <dir>", "project directory (same as the positional)")
     .option("--session <id>", "only this session (id or prefix)")
@@ -127,6 +102,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .option("--branches", "only the branch summaries (the compressed view)")
     .option("--file <path>", "only messages that touched this file (its history)")
     .option("--json", "print JSON instead of text")
+    .addHelpText("after", examples("cogit log -n 10", "cogit log --file src/auth.ts"))
     .action(
       run(
         async (
@@ -165,11 +141,13 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
   program
     .command("show")
     .description("print one recorded message by hash, <session-id>:mN or commit hash")
+    .helpGroup("Read:")
     .argument("<ref>", "message hash, <session-id-prefix>:mN, or a commit hash")
     .argument("[dir]", "project directory", ".")
     .option("-C, --dir <dir>", "project directory (same as the positional)")
     .option("--no-chat", "leave out the conversation turn")
     .option("--json", "print JSON instead of text")
+    .addHelpText("after", examples("cogit show h3f9c2a1b4d6e", "cogit show a1b2c3d"))
     .action(
       run(
         async (
@@ -188,12 +166,17 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
   program
     .command("search")
     .description("find recorded messages, branch summaries and conversation text")
+    .helpGroup("Read:")
     .argument("<text>", "text to look for")
     .argument("[dir]", "project directory", ".")
     .option("-C, --dir <dir>", "project directory (same as the positional)")
     .option("--session <id>", "only this session (id or prefix)")
     .option("-n, --number <count>", "at most this many hits", positiveCount)
     .option("--json", "print JSON instead of text")
+    .addHelpText(
+      "after",
+      examples('cogit search "refresh token"', "cogit search auth --session 9c32ab18"),
+    )
     .action(
       run(
         async (
@@ -216,6 +199,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
   program
     .command("pr")
     .description("print a review-ready description of a branch from the thoughts behind it")
+    .helpGroup("Read:")
     .argument("[base]", "base ref; default: the upstream's merge base, else main, else master")
     .option("-C, --dir <dir>", "project directory", ".")
     .option("--json", "print JSON instead of Markdown")
@@ -246,7 +230,9 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
   program
     .command("open")
     .description("build and open a project map, or the global panel without a directory")
+    .helpGroup("Map:")
     .argument("[dir]", "project directory; omit to open the global panel")
+    .addHelpText("after", examples("cogit open", "cogit open ../my-app"))
     .action(
       run(async (dir?: string) => {
         const io = makeIo(false);
@@ -260,27 +246,51 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       }),
     );
 
-  // Started detached by `open`; also useful on its own when the port is known.
   program
-    .command("serve", { hidden: true })
-    .description("run the local map server that `open` uses")
-    .option("--port <port>", "port to bind (default: serverPort from config)")
+    .command("init")
+    .description("set up .cogit/ in a project and register it")
+    .helpGroup("Set up:")
+    .argument("[dir]", "project directory", ".")
+    .option("--name <name>", "project name")
+    .addOption(
+      new Option("--git <policy>", "commit or ignore .cogit/").choices(["ignore", "commit"]),
+    )
+    .option("--language <lang>", 'summary language: "auto" or a language')
+    .option("--retention <days>", 'Claude Code transcript retention, or "keep"', retention)
+    .option("--allow-skill", "let the agent run the lineage skill without asking")
+    .option("--no-allow-skill", "leave Claude Code's permissions unchanged")
+    .option("-y, --yes", "accept defaults for every question")
+    .addHelpText("after", examples("cogit init", "cogit init ../my-app --git commit --yes"))
     .action(
-      run(async (opts: { port?: string }) => {
-        const io = makeIo(false);
-        const port =
-          opts.port === undefined ? (await loadConfig(io.env)).serverPort : Number(opts.port);
-        if (!Number.isInteger(port) || port < 1 || port > 65535)
-          throw new CliError(`invalid port: ${String(opts.port)}`);
-        try {
-          await startMapServer({ env: io.env, port });
-        } catch (err) {
-          throw new CliError(`could not start the map server: ${(err as Error).message}`);
-        }
+      run(async (dir: string, opts: InitOptions & { yes?: boolean }) => {
+        const { yes, ...rest } = opts;
+        // --yes never changes Claude Code's permissions on its own
+        if (yes) rest.allowSkill ??= false;
+        await init(dir, rest, makeIo(!yes && process.stdin.isTTY === true));
       }),
     );
 
-  const config = program.command("config").description("read or change global settings");
+  program
+    .command("build")
+    .description("regenerate .cogit/map.html")
+    .helpGroup("Map:")
+    .argument("[dir]", "project directory", ".")
+    .option("--quiet", "write the map without printing a success line")
+    .addHelpText("after", examples("cogit build", "cogit build ../my-app --quiet"))
+    .action(
+      run(async (dir: string, opts: { quiet?: boolean }) => {
+        await buildProject({ dir, io: makeIo(false), quiet: opts.quiet === true });
+      }),
+    );
+
+  const config = program
+    .command("config")
+    .description("read or change global settings")
+    .helpGroup("Set up:")
+    .addHelpText(
+      "after",
+      examples("cogit config get language", "cogit config set updateEveryTurns 3"),
+    );
   config
     .command("get")
     .argument("[key]")
@@ -330,9 +340,11 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
   program
     .command("backfill")
     .description("record the user messages a session has not summarized yet")
+    .helpGroup("Agent:")
     .argument("<session-id>", "session id")
     .option("-C, --dir <dir>", "project directory", ".")
     .option("--tail", "only this session's messages that have no node yet")
+    .addHelpText("after", examples("cogit backfill 9c32ab18 --tail"))
     .action(
       run(async (sessionId: string, opts: { dir: string; tail?: boolean }) => {
         if (opts.tail !== true)
@@ -343,22 +355,11 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       }),
     );
 
-  // One-time data upgrade for records written before stable message ids (8.5).
-  program
-    .command("migrate", { hidden: true })
-    .description("give old records stable message ids and an events file")
-    .argument("[dir]", "project directory", ".")
-    .action(
-      run(async (dir: string) => {
-        const io = makeIo(false);
-        const result = await migrateIds(dir, io);
-        io.out(
-          `Migrated ${result.migrated} session(s); ${result.skipped} skipped (already migrated or unmappable).`,
-        );
-      }),
-    );
-
-  const epoch = program.command("epoch").description("manage epochs (features, epics)");
+  const epoch = program
+    .command("epoch")
+    .description("manage epochs (features, epics)")
+    .helpGroup("Set up:")
+    .addHelpText("after", examples('cogit epoch add e2e "End-to-end"'));
   epoch
     .command("add")
     .argument("<id>", "short id, e.g. e2e")
@@ -372,7 +373,12 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
 
   const session = program
     .command("session")
-    .description("session records (used by the agent skill)");
+    .description("session records (used by the agent skill)")
+    .helpGroup("Agent:")
+    .addHelpText(
+      "after",
+      examples("cogit session show 9c32ab18", "cogit session write --file inbox.json"),
+    );
   session
     .command("write")
     .description("merge session JSON from stdin into .cogit/sessions/")
@@ -396,21 +402,11 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       ),
     );
 
-  // Started detached by the SessionEnd hook when `recordCommit` is `auto`.
-  program
-    .command("record-commit", { hidden: true })
-    .description("commit the session record files without touching other staged changes")
-    .argument("<session-id>", "session id")
-    .option("-C, --dir <dir>", "project directory", ".")
-    .action(
-      run(async (sessionId: string, opts: { dir: string }) => {
-        await maybeAutoCommit(opts.dir, sessionId, makeIo(false).env);
-      }),
-    );
-
   const hooks = program
     .command("hooks")
-    .description("manage the git hooks cogit adds to a project");
+    .description("manage the git hooks cogit adds to a project")
+    .helpGroup("Set up:")
+    .addHelpText("after", examples("cogit hooks install", "cogit hooks uninstall"));
   hooks
     .command("install")
     .description("add or refresh the cogit block in this project's git hooks")
@@ -425,11 +421,14 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
   // Called by the plugin's hooks.json with the hook input on stdin, and by the
   // git hooks cogit installs (Stories 9.3, 9.4) with git's arguments. Never fails.
   program
-    .command("hook", { hidden: true })
+    .command("hook")
+    .description("run one of the plugin or git hooks cogit installs (never blocks)")
+    .helpGroup("Agent:")
     .argument("<event>", "hook event, e.g. stop, sessionstart, pre-commit")
     .argument("[args...]", "arguments git passed to its hook: $1, $2, …")
     .option("-C, --dir <dir>", "project directory (git hooks pass theirs)")
     .allowExcessArguments(true)
+    .addHelpText("after", examples("cogit hook stop", "cogit hook pre-commit --dir ../my-app"))
     .action(async (event: string, args: string[], opts: { dir?: string }) => {
       const io = makeIo(false);
       if (isGitHookEvent(event)) {
@@ -444,6 +443,58 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       const out = await runHook(event, input, io.env, io.now(), io.warn);
       if (out !== undefined) io.out(out);
     });
+
+  // Hidden commands are registered last so `help` stays at the end of the
+  // top-level list: commander places a group where its first command appears.
+
+  // Started detached by `open`; also useful on its own when the port is known.
+  program
+    .command("serve", { hidden: true })
+    .description("run the local map server that `open` uses")
+    .option("--port <port>", "port to bind (default: serverPort from config)")
+    .action(
+      run(async (opts: { port?: string }) => {
+        const io = makeIo(false);
+        const port =
+          opts.port === undefined ? (await loadConfig(io.env)).serverPort : Number(opts.port);
+        if (!Number.isInteger(port) || port < 1 || port > 65535)
+          throw new CliError(`invalid port: ${String(opts.port)}`);
+        try {
+          await startMapServer({ env: io.env, port });
+        } catch (err) {
+          throw new CliError(`could not start the map server: ${(err as Error).message}`);
+        }
+      }),
+    );
+
+  // One-time data upgrade for records written before stable message ids (8.5).
+  program
+    .command("migrate", { hidden: true })
+    .description("give old records stable message ids and an events file")
+    .argument("[dir]", "project directory", ".")
+    .action(
+      run(async (dir: string) => {
+        const io = makeIo(false);
+        const result = await migrateIds(dir, io);
+        io.out(
+          `Migrated ${result.migrated} session(s); ${result.skipped} skipped (already migrated or unmappable).`,
+        );
+      }),
+    );
+
+  // Started detached by the SessionEnd hook when `recordCommit` is `auto`.
+  program
+    .command("record-commit", { hidden: true })
+    .description("commit the session record files without touching other staged changes")
+    .argument("<session-id>", "session id")
+    .option("-C, --dir <dir>", "project directory", ".")
+    .action(
+      run(async (sessionId: string, opts: { dir: string }) => {
+        await maybeAutoCommit(opts.dir, sessionId, makeIo(false).env);
+      }),
+    );
+
+  program.addHelpText("after", "\nDocs: https://github.com/sainthardrock/cogit#readme\n");
 
   return program;
 }

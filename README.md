@@ -12,6 +12,30 @@ came of it and the message it answered. Code commits point back to the thought t
 the lineage with `cogit log`, `show`, `blame` and `search`; you read it as a map of sessions,
 branches and decisions.
 
+## Why
+
+AI made writing code faster and moved the bottleneck to review. In a Harvard job-market
+working paper (Chen and Stratton, 4 August 2026; not peer-reviewed) covering 718 firms and
+725,938 workers, AI coding agents wrote 30% more lines of code, made 20% more commits and
+opened 23% more pull requests, while resolved Jira issues and epics showed no statistically
+significant gain — the paper rules out an increase larger than 12% of the baseline mean. The
+review absorbed the difference: average review time rose 49%, comments per pull request 35%,
+the share of pull requests with changes requested nearly doubled (0.13 to 0.25), and the share
+of workers doing reviews rose 14%. Pull requests did not get larger, so size does not explain
+it.
+
+A reviewer reading a diff sees what changed, not why: the goal, the decisions, and the options
+that were tried and rejected. That intent stays in the conversation with the coding agent,
+where the reviewer cannot see it. cogit keeps it in the record and hands it over: the
+`Thought:` trailer links each code commit to the message behind it, `cogit show <sha>` opens
+that thought, and `cogit pr` turns a branch into a review-ready description. It does not
+promise a faster review — nothing has measured that yet; it gives the reviewer the intent they
+would otherwise have to ask for in comments.
+
+Sources: [Chen & Stratton, *Artificial Intelligence in the Firm: Bottlenecks in Software
+Production* (working paper, 4 August 2026)](https://fion.ac/jellyfish.pdf) ·
+[InfoQ's report](https://www.infoq.com/news/2026/10/jellyfish-ai-productivity/)
+
 ## Install
 
 ```bash
@@ -53,6 +77,53 @@ cogit search "refresh token"  # titles, summaries, decisions and the stored conv
 Each takes `[dir]` (or `-C <dir>`), the list verbs take `-n <count>` and `--json`. A message is
 addressed by its hash (`h` plus 12 hex), `<session-id-prefix>:mN`, or — for `show` — a commit
 hash with a `Thought:` trailer.
+
+## Review a PR with cogit
+
+On the branch, before opening the pull request:
+
+```bash
+cogit pr main --copy   # Markdown on stdout, also copied to the clipboard
+```
+
+Open the pull request on github.com and paste it into the description (`gh pr create --body
+"$(cogit pr)"` works too if you use `gh`). It prints the goal, the sessions the work came
+from, each thought with its decisions and rejected options, and its commits and files — for
+example:
+
+```markdown
+## Goal
+- Add refresh-token rotation — Refresh tokens (9c32ab18)
+
+## Sessions
+Open a whole session with `cogit log --session <id>` or the map.
+- Refresh tokens (9c32ab18) · m12–m29 · 2026-10-24 09:12 → 2026-10-24 11:40
+
+## Thoughts
+
+### `hb7a9882` 9c32ab18:m24 — Rotate refresh tokens on use
+
+- Why: A leaked refresh token should stop working as soon as it is used.
+- Decided by: agreed
+- considered and rejected: shorten the token lifetime — it logs people out too often
+
+Commits:
+- `a1b2c3d` feat(auth): rotate refresh tokens on use
+  - `src/auth/tokens.ts`
+
+## Commits without a recorded thought
+- `e4f5a6b` chore: bump deps — thought `h9c8b7a6` not recorded yet
+
+## Dig deeper
+- `cogit show <message-hash>` opens a thought: its decisions, the options it rejected, and the conversation turn for whoever has it locally.
+- `cogit show <sha>` opens the thought behind a commit.
+- This branch commits its record, so a reviewer who checks it out gets the same `cogit show` output.
+```
+
+`cogit pr` reads only the record's titles, summaries and decisions — never the conversation
+text or your raw prompts — so the description is safe on a public pull request. Under the
+default commit policy the record travels with the branch and a reviewer can run `cogit show`;
+under `gitPolicy: ignore` the description says the hashes resolve only on the author's machine.
 
 ## What git sees
 

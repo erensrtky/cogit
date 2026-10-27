@@ -64,6 +64,21 @@ describe("plugin packaging", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("points every relative README link at a file that exists (Story 10.2)", async () => {
+    const readme = await readFile(new URL("../../../README.md", import.meta.url), "utf8");
+    const root = new URL("../../../", import.meta.url);
+    const links = [...readme.matchAll(/!?\[[^\]]*\]\(([^)\s]+)\)/g)]
+      .map((match) => match[1] ?? "")
+      .filter((href) => href !== "" && !/^[a-z]+:/i.test(href) && !href.startsWith("#"));
+    expect(links.length).toBeGreaterThan(0);
+    for (const href of links) {
+      await expect(
+        access(new URL(href.replace(/#.*$/, ""), root)),
+        `README links to ${href}`,
+      ).resolves.toBeUndefined();
+    }
+  });
+
   it("ships no runtime dependencies, since the CLI is bundled into one file", async () => {
     const pkg = await read("../package.json");
     expect(pkg.dependencies).toBeUndefined();

@@ -258,6 +258,14 @@ else is already staged, so a code commit carries its why and the hook never
 creates a record-only commit. `git commit -a`, `git commit <paths>` and a
 temporary index (`GIT_INDEX_FILE`) all work.
 
+## Reading a branch for a pull request
+
+`cogit pr` groups the commits of `base..HEAD` by the `Thought:` trailer and prints the
+sessions' goals, each thought's title, summary, decisions and rejected options, and its
+commits and changed files. It reads only the record (`project.json`, `sessions/`) — never
+the conversation store and never the user's raw prompts — so its output is safe to paste into
+a public pull request.
+
 ## What the schemas describe
 
 | File | Describes |
