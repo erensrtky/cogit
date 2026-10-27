@@ -213,24 +213,27 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
     return;
   }
 
+  // The record is tied to commits (trailers, blame, why, pr) and travels through
+  // git, so a project outside a repository would get only half of cogit.
+  if ((await findGitRoot(root)) === undefined)
+    throw new CliError(
+      `${root} is not in a git repository; cogit ties its record to your commits, so run \`git init\` first`,
+    );
+
   const name = opts.name ?? (await io.prompt.input("Project name?", basename(root)));
   const config = await loadConfig(io.env);
 
-  const gitRoot = await findGitRoot(root);
-  let policy: GitPolicy | undefined;
-  if (gitRoot) {
-    // Story 9.3: the record travels with the repository by default.
-    policy =
-      opts.git ??
-      (await io.prompt.select<GitPolicy>(
-        "This is a git repository. Commit the session records?",
-        [
-          { value: "commit", name: "Yes, commit session records (local state stays ignored)" },
-          { value: "ignore", name: "No, keep .cogit/ out of git (private)" },
-        ],
-        config.gitPolicy,
-      ));
-  }
+  // Story 9.3: the record travels with the repository by default.
+  const policy: GitPolicy =
+    opts.git ??
+    (await io.prompt.select<GitPolicy>(
+      "Commit the session records?",
+      [
+        { value: "commit", name: "Yes, commit session records (local state stays ignored)" },
+        { value: "ignore", name: "No, keep .cogit/ out of git (private)" },
+      ],
+      config.gitPolicy,
+    ));
 
   await askRetention(io, opts);
   await askSkillPermission(io, opts);
@@ -239,7 +242,7 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
 
   await updateProject(root, (cur) => cur ?? { schema: 1, name, epochs: [] });
   await mkdir(projectPaths(root).sessions, { recursive: true });
-  if (policy !== undefined) await applyGitPolicy(io, root, policy, config.shareConversations);
+  await applyGitPolicy(io, root, policy, config.shareConversations);
   await register(io, root, name);
 
   io.out(

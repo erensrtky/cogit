@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- `cogit init` needs a git repository and says to run `git init` first: the record is tied to commits (`Thought:` trailers, `blame`, `why`, `pr`) and travels through git, so outside a repository only half of cogit worked. The setup offer at session start stays quiet outside a repository.
 
 ## [0.16.0] - 2026-10-27
 ### Added

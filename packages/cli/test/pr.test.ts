@@ -18,7 +18,7 @@ import { createProgram } from "../src/program.js";
 import type { Session } from "../src/schema/session.js";
 import { appendConversationTurns } from "../src/store/conversations.js";
 import { projectPaths } from "../src/store/paths.js";
-import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
+import { envFor, type FakeIo, fakeIo, noGitProject, T0, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
 
@@ -264,9 +264,7 @@ describe("cogit pr (Story 10.1)", () => {
     );
     await expect(pr({ dir: empty, io })).rejects.toThrow(/HEAD has no commits yet/);
 
-    const plain = join(dir, "plain");
-    await mkdir(plain);
-    await init(plain, { name: "plain", retention: "keep", language: "auto" }, fakeIo(env));
+    const plain = await noGitProject(env);
     await expect(pr({ dir: plain, io })).rejects.toThrow(/not in a git repository/);
   });
 

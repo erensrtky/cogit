@@ -8,7 +8,7 @@ import { init } from "../src/commands/init.js";
 import { createProgram } from "../src/program.js";
 import type { Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
-import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
+import { envFor, type FakeIo, fakeIo, noGitProject, T0, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
 
@@ -152,9 +152,7 @@ describe("cogit blame", () => {
   });
 
   it("needs a git repository", async () => {
-    const plain = join(dir, "plain");
-    await mkdir(plain);
-    await init(plain, { name: "plain", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    const plain = await noGitProject(envFor(dir));
     await expect(blame({ dir: plain, target: "a.txt", io })).rejects.toThrow(
       /not inside a git repository/,
     );

@@ -9,7 +9,7 @@ import { readSkillAllowed } from "../src/agents/claude/settings.js";
 import { createProgram } from "../src/program.js";
 import { globalPaths } from "../src/store/paths.js";
 import { loadConfig, loadProject, loadSession } from "../src/store/stores.js";
-import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
+import { envFor, type FakeIo, fakeIo, noGitDir, noGitProject, T0, tempDir } from "./helpers.js";
 
 let dir: string;
 let root: string;
@@ -92,10 +92,8 @@ describe("commands through the CLI", () => {
     const run = promisify(execFile);
     const git = async (...args: string[]): Promise<string> =>
       (await run("git", ["-C", root, ...args])).stdout;
-    await cli("init", root, "--yes", "--retention", "keep");
-    expect(await cli("why", "a.txt", "-C", root)).toMatch(/not inside a git repository/);
-
     await git("init", "-q");
+    await cli("init", root, "--yes", "--retention", "keep");
     await git("config", "user.email", "t@example.com");
     await git("config", "user.name", "Tester");
     await writeFile(join(root, "a.txt"), "one\n");
@@ -304,9 +302,11 @@ describe("commands through the CLI", () => {
     expect(await readFile(join(root, ".gitignore"), "utf8")).toBe("# cogit\n/.cogit/\n");
   });
 
-  it("refuses config git outside a git repository", async () => {
-    await cli("init", root, "--yes", "--retention", "keep");
-    expect(await cli("config", "git", "commit", root)).toMatch(/not in a git repository/);
+  it("refuses init and config git outside a git repository", async () => {
+    const outside = await noGitDir();
+    expect(await cli("init", outside, "--yes")).toMatch(/not in a git repository.*git init/);
+    const plain = await noGitProject(envFor(dir));
+    expect(await cli("config", "git", "commit", plain)).toMatch(/not in a git repository/);
   });
 
   it("prints user errors as one line", async () => {

@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -40,6 +41,13 @@ describe("init", () => {
     expect(await readText(join(root, ".claude", "settings.json"))).toBe("{ not json");
   });
 
+  it("refuses a directory outside any git repository, before asking anything", async () => {
+    const outside = await mkdtemp(join(process.env.COGIT_TEST_NO_GIT ?? tmpdir(), "p-"));
+    const io = fakeIo(env, [], true);
+    await expect(init(outside, {}, io)).rejects.toThrow(/not in a git repository.*git init/);
+    expect(existsSync(join(outside, ".cogit"))).toBe(false);
+  });
+
   it("recognizes a pre-rename .codelineage project and renames it", async () => {
     await mkdir(join(root, ".codelineage"), { recursive: true });
     await writeFile(
@@ -65,13 +73,13 @@ describe("init", () => {
       data: { projects: [{ path: root, name: "proj" }] },
     });
     expect((await loadConfig(env)).language).toBe("auto");
-    // not a git repo: name, retention, skill permission, project settings and language
-    expect(io.asked).toHaveLength(5);
+    // name, git policy, retention, skill permission, project settings and language
+    expect(io.asked).toHaveLength(6);
     expect(await readProjectSetup(root)).toBe(true);
     expect(await readSkillAllowed(env)).toBe(true);
     expect(io.lines.at(-2)).toMatch(/^Initialized proj/);
-    // Outside a git repository there is nothing to ignore and no hook to install.
-    expect(existsSync(join(root, ".cogit", ".gitignore"))).toBe(false);
+    // The default commit policy writes the project's own ignore rules.
+    expect(await readText(join(root, ".cogit", ".gitignore"))).toBe(cogitGitignore(false));
     expect(io.lines).toContain(
       "Conversations are stored in .cogit/conversations/ (kept out of git; turn on shareConversations to share them).",
     );
@@ -119,7 +127,7 @@ describe("init", () => {
   it("raises transcript retention when asked, keeping other settings", async () => {
     await mkdir(join(dir, "claude"));
     await writeFile(settingsFile(), JSON.stringify({ model: "x" }));
-    const io = fakeIo(env, ["proj", "365"]);
+    const io = fakeIo(env, ["proj", "commit", "365"]);
     await init(root, {}, io);
     expect(JSON.parse(await readText(settingsFile()))).toEqual({
       model: "x",
@@ -143,20 +151,31 @@ describe("init", () => {
     const io = fakeIo(env);
     await init(root, {}, io);
     expect(io.lines).toContain("Claude Code keeps transcripts for 365 days.");
-    expect(io.asked).toHaveLength(4);
+    expect(io.asked).toHaveLength(5);
   });
 
   it("applies a retention option without asking, and skips an unchanged one", async () => {
     await init(
       root,
-      { name: "p", retention: 90, allowSkill: false, projectSettings: false, language: "auto" },
+      {
+        name: "p",
+        git: "commit",
+        retention: 90,
+        allowSkill: false,
+        projectSettings: false,
+        language: "auto",
+      },
       fakeIo(env, [], true),
     );
     expect(await readRetention(env)).toBe(90);
     const again = join(dir, "other");
     await mkdir(again);
     const io = fakeIo(env, [], true);
-    await init(again, { name: "o", retention: 90, allowSkill: false, projectSettings: false }, io);
+    await init(
+      again,
+      { name: "o", git: "commit", retention: 90, allowSkill: false, projectSettings: false },
+      io,
+    );
     expect(io.lines.some((l) => l.includes("cleanupPeriodDays"))).toBe(false);
   });
 
@@ -171,7 +190,7 @@ describe("init", () => {
   });
 
   it("asks which fixed language on the first run only", async () => {
-    await init(root, {}, fakeIo(env, ["proj", "keep", "yes", "yes", "fixed", "Turkish"]));
+    await init(root, {}, fakeIo(env, ["proj", "commit", "keep", "yes", "yes", "fixed", "Turkish"]));
     expect((await loadConfig(env)).language).toBe("Turkish");
     const second = join(dir, "second");
     await mkdir(second);
@@ -186,7 +205,7 @@ describe("init", () => {
       settingsFile(),
       JSON.stringify({ permissions: { allow: ["Bash(ls)"], deny: [] } }),
     );
-    const io = fakeIo(env, ["proj", "keep", "yes"]);
+    const io = fakeIo(env, ["proj", "commit", "keep", "yes"]);
     await init(root, {}, io);
     expect(JSON.parse(await readText(settingsFile())).permissions).toEqual({
       allow: ["Bash(ls)", SKILL_RULE],
@@ -201,7 +220,7 @@ describe("init", () => {
   });
 
   it("leaves permissions alone when declined", async () => {
-    const io = fakeIo(env, ["proj", "keep", "no"]);
+    const io = fakeIo(env, ["proj", "commit", "keep", "no"]);
     await init(root, {}, io);
     expect(await readSkillAllowed(env)).toBe(false);
     expect(io.lines).toContain(

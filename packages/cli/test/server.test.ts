@@ -33,7 +33,7 @@ import { globalPaths, projectPaths } from "../src/store/paths.js";
 import { readReadState } from "../src/store/read-state.js";
 import { loadConfig, updateConfig } from "../src/store/stores.js";
 import { DATA_ELEMENT_ID, LIVE_META_NAME, TOKEN_META_NAME } from "../src/view/model.js";
-import { envFor, fakeIo, tempDir } from "./helpers.js";
+import { envFor, fakeIo, noGitProject, tempDir } from "./helpers.js";
 
 const TEMPLATE = `<!doctype html><html><head><title>cogit</title></head><body><div id="root"></div>
 <script id="${DATA_ELEMENT_ID}" type="application/json"></script></body></html>`;
@@ -1001,9 +1001,7 @@ describe("commit diff endpoint (Story 10.5)", () => {
   it("answers not-a-git-repository for a registered project without git", async () => {
     const server = await start();
     const token = await panelToken(server);
-    const plain = join(dir, "plain");
-    await mkdir(plain);
-    await init(plain, { name: "plain", retention: "keep", language: "auto" }, fakeIo(env));
+    const plain = await noGitProject(env);
     const reply = await diffRequest(server, token, { dir: plain, commit: "abcdef0" });
     expect(reply.status).toBe(404);
     expect(reply.body).toContain("not a git repository");

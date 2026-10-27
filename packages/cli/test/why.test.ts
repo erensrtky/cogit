@@ -18,7 +18,7 @@ import {
 import { runHook } from "../src/hooks/run.js";
 import type { Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
-import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
+import { envFor, fakeIo, noGitProject, T0, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
 
@@ -186,9 +186,7 @@ describe("cogit why", () => {
       /not initialized/,
     );
 
-    const plain = join(dir, "plain");
-    await mkdir(plain);
-    await init(plain, { name: "plain", retention: "keep", language: "auto" }, fakeIo(env));
+    const plain = await noGitProject(env);
     await expect(why({ dir: plain, file: "a.txt", io: fakeIo(env) })).rejects.toThrow(
       /not inside a git repository/,
     );

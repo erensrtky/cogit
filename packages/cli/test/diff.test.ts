@@ -10,7 +10,7 @@ import {
   normalizeDiff,
   readCommitDiff,
 } from "../src/diff.js";
-import { tempDir } from "./helpers.js";
+import { noGitDir, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
 
@@ -48,8 +48,7 @@ describe("readCommitDiff", () => {
   });
 
   it("answers no-git outside a repository", async () => {
-    const plain = join(dir, "plain");
-    await mkdir(plain);
+    const plain = await noGitDir();
     expect(await readCommitDiff(plain, "abcdef0")).toEqual({
       ok: false,
       reason: "no-git",

@@ -32,7 +32,7 @@ import {
 } from "../src/session-git.js";
 import { projectPaths } from "../src/store/paths.js";
 import { loadSession, projectJson } from "../src/store/stores.js";
-import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
+import { envFor, fakeIo, noGitDir, T0, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
 
@@ -389,7 +389,7 @@ describe("ignore files and git hooks", () => {
       "#!/bin/sh\necho mine\n",
     );
     expect(await refreshGitHooks(root)).toEqual([]);
-    expect(await refreshGitHooks(join(dir, "not-a-repo"))).toEqual([]);
+    expect(await refreshGitHooks(await noGitDir())).toEqual([]);
   });
 
   it("installs the hooks on request and with the ignore policy", async () => {

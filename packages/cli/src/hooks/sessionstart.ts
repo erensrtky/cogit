@@ -1,5 +1,6 @@
 import { defaultAgent } from "../agents/index.js";
 import { branchesOf, type LogBranch } from "../commands/log.js";
+import { findGitRoot } from "../git.js";
 import { isRecorded, readSessionMessages, upgradeSessionIds } from "../messages.js";
 import type { Session } from "../schema/session.js";
 import { uncommittedSession } from "../session-git.js";
@@ -75,6 +76,8 @@ export async function onSessionStart(ctx: HookContext): Promise<HookOutput | und
     const config = await loadConfig(ctx.env);
     // "Don't ask again in this project" lives outside the project.
     if (config.setupHintOff.includes(ctx.root)) return undefined;
+    // `init` needs a git repository, so outside one there is nothing to offer.
+    if ((await findGitRoot(ctx.root)) === undefined) return undefined;
     return additionalContext(ctx, setupHint(ctx));
   }
   const config = await loadConfig(ctx.env);

@@ -39,7 +39,7 @@ import {
 } from "../src/thought.js";
 import { buildMessages } from "../src/view/lineage.js";
 import { DATA_ELEMENT_ID } from "../src/view/model.js";
-import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
+import { envFor, type FakeIo, fakeIo, noGitDir, T0, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
 
@@ -475,7 +475,7 @@ describe("the thought behind a commit (Story 9.4)", () => {
       expect(await readFile(join(root, ".husky", "pre-commit"), "utf8")).toBe(userHook);
 
       // No repository and no block: nothing to do.
-      expect(await uninstallGitHooks(dir)).toEqual([]);
+      expect(await uninstallGitHooks(await noGitDir())).toEqual([]);
       expect(await uninstallGitHooks(root)).toEqual([]);
     });
 

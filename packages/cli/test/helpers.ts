@@ -1,12 +1,32 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { init } from "../src/commands/init.js";
 import type { Io, Prompter } from "../src/io.js";
 
 export const T0 = "2026-10-21T10:00:00.000Z";
 
 export async function tempDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "cogit-"));
+}
+
+/** A directory outside every git repository (the temp dir itself is one; see global-setup). */
+export async function noGitDir(): Promise<string> {
+  return mkdtemp(join(process.env.COGIT_TEST_NO_GIT ?? tmpdir(), "cogit-"));
+}
+
+/**
+ * An initialized project whose repository is gone: `init` needs git, so it runs
+ * in a repository that is removed afterwards. Covers the no-git answers of the
+ * commands that read git.
+ */
+export async function noGitProject(env: NodeJS.ProcessEnv, name = "plain"): Promise<string> {
+  const dir = join(await noGitDir(), name);
+  await mkdir(join(dir, ".git"), { recursive: true });
+  const options = { name, git: "commit", retention: "keep", language: "auto" } as const;
+  await init(dir, { ...options, allowSkill: false, projectSettings: false }, fakeIo(env));
+  await rm(join(dir, ".git"), { recursive: true, force: true });
+  return dir;
 }
 
 export interface FakeIo extends Io {

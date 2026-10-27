@@ -20,7 +20,7 @@ import {
 import { countTurn, UPDATE_REQUEST } from "../src/hooks/stop.js";
 import type { Session, Status } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
-import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
+import { envFor, fakeIo, noGitDir, T0, tempDir } from "./helpers.js";
 
 describe("countTurn", () => {
   it("asks every N turns and starts counting again after each request", () => {
@@ -188,6 +188,12 @@ describe("runHook", () => {
       JSON.parse((await sessionStart("startup")) ?? "").hookSpecificOutput.additionalContext,
     ).not.toContain("records this project's lineage");
     expect(existsSync(join(root, ".cogit"))).toBe(false);
+  });
+
+  it("offers no setup outside a git repository, where init would refuse", async () => {
+    const outside = await noGitDir();
+    const input = JSON.stringify({ session_id: "s1", cwd: outside, source: "startup" });
+    expect(await runHook("sessionstart", input, env, T0, (l) => debug.push(l))).toBeUndefined();
   });
 
   it("replaces the setup offer with the lineage handoff after init", async () => {
