@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.14.0] - 2026-10-27
 ### Added
 - A "Your turn" inbox above the panel's project cards and in a project map's head: one row per session whose transcript ends with the agent (read through the agent adapter) or whose record has `needsUser` items, oldest first, with the project, session title, how long it has waited, the agent's last message (first 300 characters, verbatim), the record's goal/last decision/open items labelled as the record's, and buttons to open the map at the session's newest message, copy the resume command, and dismiss. The dismissal lives in `.cogit/state/inbox.json` (local, never committed) and a newer agent turn brings the row back; `inboxMaxAgeDays` (default 7) hides older sessions, and the local server writes a dismissal through `POST /api/inbox/dismiss`.
 
