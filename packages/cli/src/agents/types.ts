@@ -85,6 +85,12 @@ export interface AgentAdapter {
   readonly pluginRootEnv: string;
   /** Env var the skill and commands use for the current session id. */
   readonly sessionIdEnv: string;
+  /**
+   * Env var the agent sets in a shell it starts, naming the session that shell
+   * belongs to. `prepare-commit-msg` reads it so a commit carries its own
+   * session's message even when another session shares the working tree.
+   */
+  readonly commitSessionEnv: string;
   /** The agent's own default transcript retention, in days. */
   readonly defaultRetention: number;
 

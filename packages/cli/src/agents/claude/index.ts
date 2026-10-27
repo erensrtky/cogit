@@ -32,6 +32,7 @@ export const claude: AgentAdapter = {
   projectDirEnv: "CLAUDE_PROJECT_DIR",
   pluginRootEnv: "CLAUDE_PLUGIN_ROOT",
   sessionIdEnv: "CLAUDE_SESSION_ID",
+  commitSessionEnv: "CLAUDE_CODE_SESSION_ID",
   defaultRetention: CLAUDE_DEFAULT_RETENTION,
 
   configDir: claudeConfigDir,

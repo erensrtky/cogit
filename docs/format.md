@@ -228,7 +228,8 @@ holds one or more JSON lines:
   and deletes it.
 - `HEAD`: written by the `UserPromptSubmit` hook, local and ignored:
   `{sessionId, transcriptPath?, at?}`. It names the session the next code commit
-  carries (see the trailer below). A missing or stale `HEAD` means "no trailer".
+  from a terminal carries (see the trailer below). A missing or stale `HEAD`
+  means "no trailer".
 
 ## The `Thought:` trailer
 
@@ -240,12 +241,23 @@ feat(auth): add the login form
 Thought: h3f9a2c1b0d4
 ```
 
-The git `prepare-commit-msg` hook adds it with `git interpret-trailers` when
-`.cogit/HEAD` is fresh (within `trailerMaxAgeHours`, default 6) and the
-transcript is readable; it uses the newest user message of that session. It is
-skipped for merge and squash commits, a local-only record (`gitPolicy: ignore`),
-and when the trailer is already present (`--amend`). A failure never blocks the
-commit.
+The git `prepare-commit-msg` hook adds it with `git interpret-trailers`, always
+naming the newest user message of the session that made the commit:
+
+1. When the agent names the session in the hook's environment (Claude Code sets
+   `CLAUDE_CODE_SESSION_ID` in every Bash and hook subprocess), that session's
+   transcript is used and `.cogit/HEAD` is ignored — two sessions in one working
+   tree each carry their own message.
+2. When the variable is set but that session has no readable transcript (a
+   `--continue` whose id moved, a session of another project), no trailer is
+   added. cogit never falls back to `.cogit/HEAD` here: it may name the other
+   session.
+3. When no session is named (a human commit in a terminal), `.cogit/HEAD` is
+   used when it is fresh (within `trailerMaxAgeHours`, default 6) and its
+   transcript is readable.
+
+It is skipped for merge and squash commits and when the trailer is already
+present (`--amend`). A failure never blocks the commit.
 
 Readers must not trust the trailer alone: at read time cogit reads the trailers
 back from `git log` (`%(trailers:key=Thought,valueonly)`) and attaches those

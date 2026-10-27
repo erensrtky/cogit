@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { access } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { promisify } from "node:util";
-import { defaultAgent } from "./agents/index.js";
+import { type AgentAdapter, defaultAgent } from "./agents/index.js";
 import { findGitRoot } from "./git.js";
 import { messageHash } from "./messages.js";
 import type { Session } from "./schema/session.js";
@@ -15,9 +15,10 @@ const exec = promisify(execFile);
 /**
  * The link between a code commit and the thought behind it (Story 9.4). A git
  * `prepare-commit-msg` hook writes a `Thought: h…` trailer naming the newest user
- * message of the session in `.cogit/HEAD`; at read time the trailers are read
- * back from `git log`, so the link survives a rebase or a fresh clone and never
- * depends on the agent remembering a rule.
+ * message of the session that made the commit (Story 10.6: the session the
+ * agent's shell names, else the one in `.cogit/HEAD`); at read time the trailers
+ * are read back from `git log`, so the link survives a rebase or a fresh clone
+ * and never depends on the agent remembering a rule.
  */
 
 /** The trailer key git and cogit share. */
@@ -54,21 +55,61 @@ function messagePath(file: string): string {
   return isAbsolute(file) ? file : resolve(process.cwd(), file);
 }
 
+/** The newest user message of a transcript, as the trailer's value. */
+async function newestThought(
+  agent: AgentAdapter,
+  transcript: string,
+  sessionId: string,
+): Promise<string | undefined> {
+  const turns = await agent.readConversation(transcript);
+  const newest = turns.at(-1);
+  return newest === undefined ? undefined : messageHash(sessionId, newest);
+}
+
+/** Writes the trailer into git's message file, keeping one an `--amend` carried. */
+async function writeTrailer(messageFile: string, value: string): Promise<void> {
+  await exec("git", [
+    "interpret-trailers",
+    "--in-place",
+    "--if-exists",
+    "doNothing",
+    "--trailer",
+    `${THOUGHT_TRAILER}: ${value}`,
+    "--",
+    messagePath(messageFile),
+  ]);
+}
+
 /**
- * Adds the `Thought:` trailer to the prepared commit message (Story 9.4). Skip
- * merges and squashes, a missing or stale `.cogit/HEAD` and an unreadable
- * transcript. `--if-exists doNothing` keeps
- * a trailer an `--amend` already carried. A failure is the caller's to swallow:
- * this never blocks the commit.
+ * Adds the `Thought:` trailer to the prepared commit message (Stories 9.4, 10.6).
+ * The session that made the commit wins: when the agent names it in the
+ * environment (a shell it started, `CLAUDE_CODE_SESSION_ID`), only that
+ * session's transcript counts, so two sessions in one working tree cannot take
+ * each other's message. A named session with no readable transcript gets no
+ * trailer — never a fallback to `.cogit/HEAD`, which may be another session. With
+ * no name (a human commit in a terminal) the fresh `.cogit/HEAD` is used.
+ * Merges, squashes and an unreadable transcript are skipped, and a failure is
+ * the caller's to swallow: this never blocks the commit.
  */
 export async function addThoughtTrailer(opts: TrailerOptions): Promise<boolean> {
   const env = opts.env ?? process.env;
   if (captureDisabled(env)) return false;
   if (opts.source === "merge" || opts.source === "squash") return false;
+  const agent = defaultAgent();
+
+  const named = (env[agent.commitSessionEnv] ?? "").trim();
+  if (named !== "") {
+    const transcript = await agent.findTranscript(named, env);
+    if (transcript === null) return false;
+    const value = await newestThought(agent, transcript, named);
+    if (value === undefined) return false;
+    await writeTrailer(opts.messageFile, value);
+    return true;
+  }
+
   // Every policy gets the trailer: with the ignore policy the record stays on this
   // machine, but `blame` and `show <sha>` here still follow the exact link.
   const root = resolve(opts.dir);
-
   const head = await readSessionHead(root);
   if (head === undefined || head.at === undefined) return false;
   const written = Date.parse(head.at);
@@ -78,28 +119,15 @@ export async function addThoughtTrailer(opts: TrailerOptions): Promise<boolean> 
   // A little clock skew is fine; a cutoff that passed (or a future date) is not.
   if (age > config.trailerMaxAgeHours * 3_600_000 || age < -5 * 60_000) return false;
 
-  const agent = defaultAgent();
   const transcript =
     head.transcriptPath !== undefined && (await readable(head.transcriptPath))
       ? head.transcriptPath
       : await agent.findTranscript(head.sessionId, env);
   if (transcript === null) return false;
 
-  const turns = await agent.readConversation(transcript);
-  const newest = turns.at(-1);
-  if (newest === undefined) return false;
-
-  const file = messagePath(opts.messageFile);
-  await exec("git", [
-    "interpret-trailers",
-    "--in-place",
-    "--if-exists",
-    "doNothing",
-    "--trailer",
-    `${THOUGHT_TRAILER}: ${messageHash(head.sessionId, newest)}`,
-    "--",
-    file,
-  ]);
+  const value = await newestThought(agent, transcript, head.sessionId);
+  if (value === undefined) return false;
+  await writeTrailer(opts.messageFile, value);
   return true;
 }
 

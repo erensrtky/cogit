@@ -14,6 +14,7 @@ describe("agent adapter", () => {
     expect(agent.skill).toBe("/cogit:record");
     expect(agent.skillRule).toBe("Skill(cogit:record)");
     expect(agent.sessionIdEnv).toBe("CLAUDE_SESSION_ID");
+    expect(agent.commitSessionEnv).toBe("CLAUDE_CODE_SESSION_ID");
   });
 
   it("parses a Claude Code hook payload and refuses anything else", () => {

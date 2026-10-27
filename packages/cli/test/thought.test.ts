@@ -285,6 +285,74 @@ describe("the thought behind a commit (Story 9.4)", () => {
       ).toBe(false);
     });
 
+    it("follows the session the commit's shell names, not HEAD (Story 10.6)", async () => {
+      // Two sessions in one working tree: HEAD was last written by s1.
+      await writeHead();
+      await writeTranscript("s2", "other");
+      const file = await messageFile();
+      const named = { ...env, CLAUDE_CODE_SESSION_ID: "s2" };
+      expect(
+        await addThoughtTrailer({
+          dir: root,
+          messageFile: file,
+          source: "message",
+          env: named,
+          now: NOW,
+        }),
+      ).toBe(true);
+      const text = await readMessage(file);
+      expect(text).toContain(`Thought: ${thoughtOf("other", "s2")}`);
+      expect(text).not.toContain(thoughtOf());
+    });
+
+    it("works with no .cogit/HEAD at all (a headless claude -p run)", async () => {
+      await writeTranscript("s3", "headless");
+      const file = await messageFile();
+      const named = { ...env, CLAUDE_CODE_SESSION_ID: "s3" };
+      expect(
+        await addThoughtTrailer({
+          dir: root,
+          messageFile: file,
+          source: "message",
+          env: named,
+          now: NOW,
+        }),
+      ).toBe(true);
+      expect(await readMessage(file)).toContain(`Thought: ${thoughtOf("headless", "s3")}`);
+    });
+
+    it("never falls back to HEAD when the named session has no transcript", async () => {
+      await writeHead();
+      const file = await messageFile();
+      const named = { ...env, CLAUDE_CODE_SESSION_ID: "s-missing" };
+      expect(
+        await addThoughtTrailer({
+          dir: root,
+          messageFile: file,
+          source: "message",
+          env: named,
+          now: NOW,
+        }),
+      ).toBe(false);
+      expect(await readMessage(file)).toBe("feat: change the code\n");
+    });
+
+    it("uses HEAD when the variable is unset or empty (a human commit)", async () => {
+      await writeHead();
+      const file = await messageFile();
+      const blank = { ...env, CLAUDE_CODE_SESSION_ID: "  " };
+      expect(
+        await addThoughtTrailer({
+          dir: root,
+          messageFile: file,
+          source: "message",
+          env: blank,
+          now: NOW,
+        }),
+      ).toBe(true);
+      expect(await readMessage(file)).toContain(`Thought: ${thoughtOf()}`);
+    });
+
     it("runs through the CLI's prepare-commit-msg hook", async () => {
       await writeHead();
       const file = await messageFile();
