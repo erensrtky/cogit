@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - What the detached hook runs (the map build, the side model) print goes to `.cogit/state/detached.log` (local, never committed, starts over past 256 KB); a failed side run used to leave no trace.
 
 ### Changed
-- A setting's "?" explanation now floats over the settings on hover, keyboard focus or tap, instead of opening inside the row and pushing the rest of the list down.
+- A setting's "?" explanation now appears on hover or keyboard focus, floating over the settings, instead of opening on a click inside the row and pushing the rest of the list down.
 
 ## [0.15.0] - 2026-10-27
 ### Added

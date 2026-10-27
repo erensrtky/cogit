@@ -639,6 +639,10 @@ ul {
 
 /* The "?" behind a setting's plain-language explanation (Story 12.1). */
 .settings-why {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   width: 18px;
   height: 18px;
   padding: 0;
@@ -649,10 +653,11 @@ ul {
   font: inherit;
   font-size: 11px;
   line-height: 1;
-  cursor: pointer;
+  cursor: help;
 }
 
-.settings-why[aria-expanded="true"] {
+.settings-why-wrap:hover .settings-why,
+.settings-why:focus-visible {
   color: var(--text);
   border-color: var(--muted);
 }

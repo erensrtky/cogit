@@ -20,42 +20,39 @@ type SettingValue = PanelSettings[keyof PanelSettings];
 /**
  * The "?" next to a setting's label (Story 12.1): a plain-language answer to
  * "what is this, when do I change it, what does it cost". It floats over the
- * modal on hover or keyboard focus, so nothing below it moves; a tap pins it on
- * a touch screen, and Escape or leaving closes it.
+ * modal while the pointer rests on the "?" or the keyboard focuses it, so
+ * nothing below it moves; there is nothing to click. Escape closes it.
  */
 function FieldDetails({ id, field }: { id: string; field: SettingField }) {
   const [hovered, setHovered] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const open = hovered || pinned;
+  const [focused, setFocused] = useState(false);
+  const open = hovered || focused;
   const detailId = `${id}-details`;
   return (
     <span
       className="settings-why-wrap"
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => {
-        setHovered(false);
-        setPinned(false);
-      }}
+      onMouseLeave={() => setHovered(false)}
     >
-      <button
-        type="button"
+      <span
         className="settings-why"
-        aria-expanded={open}
-        aria-describedby={open ? detailId : undefined}
+        // Focusable so the keyboard reaches the explanation too.
+        tabIndex={0}
+        role="img"
         aria-label={`What does ${field.label} do?`}
-        onFocus={() => setPinned(true)}
-        onBlur={() => setPinned(false)}
-        onClick={() => setPinned((wasPinned) => !wasPinned)}
+        aria-describedby={open ? detailId : undefined}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         onKeyDown={(event) => {
           if (event.key !== "Escape" || !open) return;
           // Close the bubble, not the modal around it.
           event.stopPropagation();
           setHovered(false);
-          setPinned(false);
+          setFocused(false);
         }}
       >
         ?
-      </button>
+      </span>
       {open ? (
         <span className="settings-details" id={detailId} role="tooltip">
           {field.details}
