@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - A setting's "?" explanation now appears on hover or keyboard focus, floating over the settings, instead of opening on a click inside the row and pushing the rest of the list down.
+- The settings modal has one Save at its bottom instead of one per setting: it saves every changed setting at once, counts the unsaved ones and marks their rows; a value the server refuses keeps its edit and shows why.
 
 ## [0.15.0] - 2026-10-27
 ### Added

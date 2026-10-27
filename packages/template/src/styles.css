@@ -2228,6 +2228,26 @@ time {
   margin: 0;
 }
 
+/* The one Save of the modal, pinned to its bottom edge while the list scrolls. */
+.settings-foot {
+  position: sticky;
+  bottom: -22px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: 8px -20px -22px;
+  padding: 12px 20px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+
+.settings-field.is-changed .settings-label::after {
+  content: "•";
+  color: var(--accent, var(--text));
+}
+
+.settings-foot button,
 .setting-form button {
   padding: 3px 10px;
   color: var(--text);
@@ -2239,6 +2259,7 @@ time {
   cursor: pointer;
 }
 
+.settings-foot button:disabled,
 .setting-form button:disabled {
   opacity: 0.45;
   cursor: default;
