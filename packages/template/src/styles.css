@@ -1671,20 +1671,41 @@ time {
   font-size: 12px;
 }
 
+/* The close button in a row's top-right corner: hides the row until the agent
+   writes in that session again. */
 .inbox-dismiss {
-  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   color: var(--muted);
+  font-size: 18px;
+  line-height: 22px;
   background: none;
-  border: 1px solid var(--line);
+  border: 1px solid transparent;
   border-radius: 6px;
-  padding: 2px 8px;
-  font-size: 12px;
   cursor: pointer;
 }
 
 .inbox-dismiss:hover {
   color: var(--text);
-  border-color: var(--muted);
+  border-color: var(--line);
+  background: var(--hover);
+}
+
+/* On a map the inbox is one line until opened. */
+.inbox-toggle {
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.inbox-caret {
+  display: inline-block;
+  width: 1em;
+  color: var(--muted);
 }
 
 .inbox-error {

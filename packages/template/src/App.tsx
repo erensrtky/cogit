@@ -84,7 +84,7 @@ export function App({ model }: { model: LineageViewModel }) {
         </header>
 
         {/* Story 11.1: only this project's rows, same as the panel's inbox. */}
-        <Inbox rows={model.inbox ?? []} />
+        <Inbox rows={model.inbox ?? []} collapsible />
       </div>
 
       <Graph model={model} search={search} />

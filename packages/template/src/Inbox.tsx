@@ -21,6 +21,16 @@ function rowHref(row: ViewInboxRow): string {
   return `${base}#${params.toString()}`;
 }
 
+/**
+ * One lane colour per project, so rows of different projects never blur
+ * together: a stable hash of the path picks one of the six lane colours.
+ */
+export function projectColour(path: string): number {
+  let hash = 0;
+  for (const char of path) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
+  return hash % 6;
+}
+
 function WhereWereWe({ row }: { row: ViewInboxRow }) {
   const parts = [
     row.goal === "" ? "" : `Goal: ${row.goal}`,
@@ -35,7 +45,15 @@ function WhereWereWe({ row }: { row: ViewInboxRow }) {
   );
 }
 
-export function Inbox({ rows }: { rows: ViewInboxRow[] }) {
+export function Inbox({
+  rows,
+  collapsible = false,
+}: {
+  rows: ViewInboxRow[];
+  /** On a map the inbox starts folded to one line, so it never pushes the map away. */
+  collapsible?: boolean;
+}) {
+  const [open, setOpen] = useState(!collapsible);
   // A `file://` page has no server to persist a dismissal; the row hides for
   // this open page, which is what the button's title says.
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
@@ -64,58 +82,79 @@ export function Inbox({ rows }: { rows: ViewInboxRow[] }) {
   return (
     <section className="inbox" aria-labelledby="inbox-title">
       <h2 id="inbox-title">
-        Your turn <span className="muted inbox-count">{visible.length}</span>
+        {collapsible ? (
+          <button
+            type="button"
+            className="inbox-toggle"
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+          >
+            <span className="inbox-caret">{open ? "▾" : "▸"}</span> Your turn{" "}
+            <span className="muted inbox-count">{visible.length}</span>
+          </button>
+        ) : (
+          <>
+            Your turn <span className="muted inbox-count">{visible.length}</span>
+          </>
+        )}
       </h2>
-      <ul className="inbox-rows">
-        {visible.map((row) => (
-          <li className="inbox-row" key={dismissKey(row.projectPath, row.sessionId)}>
-            <div className="inbox-head">
-              <span className="inbox-project" title={row.projectPath}>
-                {row.projectName}
-              </span>
-              <span className="inbox-session">{row.sessionTitle}</span>
-              <span
-                className={row.signal === "record" ? "inbox-age is-record" : "inbox-age"}
-                title={formatTime(row.at)}
-              >
-                {row.signal === "record"
-                  ? `the record says it needs you · ${timeSince(row.at, now)}`
-                  : `your turn for ${timeSince(row.at, now)}`}
-              </span>
-            </div>
-            {row.lastMessage === undefined ? null : (
-              <p className="inbox-message">{row.lastMessage}</p>
-            )}
-            {row.signal !== "both" ? null : (
-              <p className="inbox-signal">The record says it needs you.</p>
-            )}
-            <WhereWereWe row={row} />
-            <div className="inbox-actions">
-              <a className="inbox-open" href={rowHref(row)}>
-                {row.messageId === undefined ? "Open the map →" : "Open at this message →"}
-              </a>
-              <ResumeButton
-                projectPath={row.projectPath}
-                sessionId={row.sessionId}
-                available={row.transcriptAvailable}
-                revealCommand
-              />
-              <button
-                type="button"
-                className="inbox-dismiss"
-                title={
-                  pageToken() === null
-                    ? "Hide until this page is reloaded"
-                    : "Hide until a new agent turn"
-                }
-                onClick={() => dismiss(row)}
-              >
-                Dismiss
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {open ? (
+        <ul className="inbox-rows">
+          {visible.map((row) => (
+            <li
+              className="inbox-row"
+              key={dismissKey(row.projectPath, row.sessionId)}
+              style={{ borderLeftColor: `var(--l${projectColour(row.projectPath)})` }}
+            >
+              <div className="inbox-head">
+                <span className="inbox-project" title={row.projectPath}>
+                  {row.projectName}
+                </span>
+                <span className="inbox-session">{row.sessionTitle}</span>
+                <span
+                  className={row.signal === "record" ? "inbox-age is-record" : "inbox-age"}
+                  title={formatTime(row.at)}
+                >
+                  {row.signal === "record"
+                    ? `the record says it needs you · ${timeSince(row.at, now)}`
+                    : `your turn for ${timeSince(row.at, now)}`}
+                </span>
+                <button
+                  type="button"
+                  className="inbox-dismiss"
+                  aria-label="Dismiss"
+                  title={
+                    pageToken() === null
+                      ? "Hide until this page is reloaded"
+                      : "Hide until the agent writes in this session again"
+                  }
+                  onClick={() => dismiss(row)}
+                >
+                  ×
+                </button>
+              </div>
+              {row.lastMessage === undefined ? null : (
+                <p className="inbox-message">{row.lastMessage}</p>
+              )}
+              {row.signal !== "both" ? null : (
+                <p className="inbox-signal">The record says it needs you.</p>
+              )}
+              <WhereWereWe row={row} />
+              <div className="inbox-actions">
+                <a className="inbox-open" href={rowHref(row)}>
+                  {row.messageId === undefined ? "Open the map →" : "Open at this message →"}
+                </a>
+                <ResumeButton
+                  projectPath={row.projectPath}
+                  sessionId={row.sessionId}
+                  available={row.transcriptAvailable}
+                  revealCommand
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {error === null ? null : <p className="muted inbox-error">{error}</p>}
     </section>
   );
