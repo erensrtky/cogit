@@ -54,6 +54,6 @@ cogit config hint-off
 
 ## Something else
 
-Open an issue at <https://github.com/sainthardrock/cogit/issues> with the output of
+Open an issue at <https://github.com/erensrtky/cogit/issues> with the output of
 `cogit --version`, what you ran and, if it is about recording, the end of
 `.cogit/state/detached.log`.

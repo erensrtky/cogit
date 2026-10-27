@@ -73,7 +73,7 @@ describe("project setup", () => {
     expect(s.enabledPlugins).toEqual({ "a@b": true, [PLUGIN_ID]: true });
     expect(s.extraKnownMarketplaces.cogit.source).toEqual({
       source: "github",
-      repo: "sainthardrock/cogit",
+      repo: "erensrtky/cogit",
     });
     expect(s.hooks.Stop).toEqual([other]);
     // the guard is added once, after the hooks that were there

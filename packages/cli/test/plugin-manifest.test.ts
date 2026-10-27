@@ -45,10 +45,10 @@ describe("plugin packaging", () => {
     expect(pkg.license).toBe("MIT");
     expect(pkg.repository).toEqual({
       type: "git",
-      url: "git+https://github.com/sainthardrock/cogit.git",
+      url: "git+https://github.com/erensrtky/cogit.git",
     });
-    expect(pkg.homepage).toBe("https://github.com/sainthardrock/cogit#readme");
-    expect(pkg.bugs).toEqual({ url: "https://github.com/sainthardrock/cogit/issues" });
+    expect(pkg.homepage).toBe("https://github.com/erensrtky/cogit#readme");
+    expect(pkg.bugs).toEqual({ url: "https://github.com/erensrtky/cogit/issues" });
     expect(pkg.keywords).toEqual(expect.arrayContaining(["git", "claude-code", "lineage"]));
   });
 

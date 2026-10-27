@@ -17,7 +17,7 @@ npx cogit --help          # or run it without installing
 The Claude Code plugin adds the skill that keeps the record and the hooks that maintain it:
 
 ```text
-/plugin install cogit --marketplace sainthardrock/cogit
+/plugin install cogit --marketplace erensrtky/cogit
 ```
 
 A plugin update reaches a running session only after `/reload-plugins` or a new chat.

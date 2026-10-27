@@ -536,7 +536,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       }),
     );
 
-  program.addHelpText("after", "\nDocs: https://github.com/sainthardrock/cogit#readme\n");
+  program.addHelpText("after", "\nDocs: https://github.com/erensrtky/cogit#readme\n");
 
   return program;
 }

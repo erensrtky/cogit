@@ -15,11 +15,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sainthardrock/cogit.git"
+    "url": "git+https://github.com/erensrtky/cogit.git"
   },
-  "homepage": "https://github.com/sainthardrock/cogit#readme",
+  "homepage": "https://github.com/erensrtky/cogit#readme",
   "bugs": {
-    "url": "https://github.com/sainthardrock/cogit/issues"
+    "url": "https://github.com/erensrtky/cogit/issues"
   },
   "type": "module",
   "bin": {

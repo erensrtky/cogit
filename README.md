@@ -52,7 +52,7 @@ npm install -g cogit
 Then, in Claude Code:
 
 ```text
-/plugin install cogit --marketplace sainthardrock/cogit
+/plugin install cogit --marketplace erensrtky/cogit
 ```
 
 ## Quick start

@@ -37,7 +37,7 @@ describe("createProgram", () => {
     for (const heading of ["Read:", "Map:", "Set up:", "Agent:"]) expect(help).toContain(heading);
     const order = ["Read:", "Map:", "Set up:", "Agent:"].map((heading) => help.indexOf(heading));
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(help).toContain("Docs: https://github.com/sainthardrock/cogit#readme");
+    expect(help).toContain("Docs: https://github.com/erensrtky/cogit#readme");
   });
 
   it("gives every user-facing command an examples block (Story 10.2)", () => {

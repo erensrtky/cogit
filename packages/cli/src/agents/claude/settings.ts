@@ -109,7 +109,7 @@ export async function allowSkill(env: NodeJS.ProcessEnv, stamp: string): Promise
  */
 export const PLUGIN_ID = "cogit@cogit";
 export const MARKETPLACE = "cogit";
-export const MARKETPLACE_REPO = "sainthardrock/cogit";
+export const MARKETPLACE_REPO = "erensrtky/cogit";
 export const INSTALL_COMMAND = `claude plugin install cogit --marketplace ${MARKETPLACE_REPO}`;
 
 /** Where a session's SessionStart leaves its mark; the guard reads the same path. */
