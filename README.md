@@ -6,10 +6,7 @@ Git remembers what changed. cogit remembers why.
 
 <p align="center"><img src="docs/images/cogit-descartes.jpg" width="360" alt="René Descartes with git branches running through his hair"><br><i>Cogito, ergo commit.</i></p>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/map-dark.png">
-  <img src="docs/images/map-light.png" alt="The map: sessions, branches and the decision behind a message">
-</picture>
+<img src="docs/images/demo.gif" alt="cogit open shows the projects, then the map; pasting a message hash opens the decision behind it, and cogit why lists the thoughts behind a file">
 
 cogit records every message you send to an AI coding agent as a *thought commit*: what you
 asked, what came of it, and the message it answered. Your code commits point back to the
@@ -55,6 +52,9 @@ Then, in Claude Code:
 ```text
 /plugin install cogit --marketplace erensrtky/cogit
 ```
+
+To get plugin updates on their own, turn on auto-update once: `/plugin` → Marketplaces →
+cogit → Enable auto-update. Claude Code leaves it off for marketplaces outside its own.
 
 ## Quick start
 

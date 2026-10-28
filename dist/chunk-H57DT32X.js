@@ -20242,6 +20242,12 @@ var Config = external_exports.object({
    * how to read the record (`log` / `show`). On by default; costs only tokens.
    */
   startupContext: external_exports.boolean().default(true),
+  /**
+   * Whether sessions started without a person (`claude -p`, an SDK) are recorded.
+   * Off by default: other plugins start them in the background, one per prompt,
+   * and they would fill the map and the inbox.
+   */
+  recordHeadless: external_exports.boolean().default(false),
   /** Port the local map server binds on `127.0.0.1`. */
   serverPort: external_exports.int().min(1).max(65535).default(4747),
   /** Default for new projects; `init` asks per repo. Story 9.3: the record travels. */
@@ -20773,6 +20779,12 @@ function parseHookInput(stdin) {
   const parsed = ClaudeHookInput.safeParse(raw);
   return parsed.success ? parsed.data : void 0;
 }
+function isHeadless(env) {
+  return env.CLAUDE_CODE_ENTRYPOINT?.startsWith("sdk") ?? false;
+}
+function userNotice(text) {
+  return { systemMessage: text };
+}
 function additionalContext(event, text) {
   return { hookSpecificOutput: { hookEventName: event, additionalContext: text } };
 }
@@ -21257,7 +21269,9 @@ var claude = {
   displayTurn,
   excerpt,
   parseHookInput,
+  isHeadless,
   additionalContext,
+  userNotice,
   readRetention,
   readPluginInstalled,
   readSkillAllowed,
