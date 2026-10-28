@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- When a new chat starts and the plugin and the `cogit` command on the PATH are different versions, a one-line notice says which one to update and how. Recording is not affected either way; the plugin's hooks run its own copy.
+- A new setting, `recordHeadless` (Settings → Headless sessions), off by default. Sessions started without a person, such as `claude -p`, are no longer recorded: some plugins start one in the background for every prompt, and each turned up as an empty session on the map and a new row in the "Your turn" inbox. Turn it on to record your own `claude -p` work.
+### Changed
+- The README and the getting-started guide say how to keep cogit updated: turn on auto-update for the cogit marketplace once (Claude Code leaves it off for marketplaces outside Anthropic's), and update the command with npm.
+- The README opens with a short recording: the panel, the map, a message hash opening the decision behind it, and `cogit why` on a file.
+### Fixed
+- `cogit why` works from any directory inside the project, with the path relative to where you are, as git does; it used to say the project was not initialized.
+- A cogit command piped into `head` or another reader that stops early exits quietly instead of printing a `write EPIPE` stack.
 
 ## [0.19.1] - 2026-10-28
 ### Changed

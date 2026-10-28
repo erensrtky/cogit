@@ -20,7 +20,19 @@ The Claude Code plugin adds the skill that keeps the record and the hooks that m
 /plugin install cogit --marketplace erensrtky/cogit
 ```
 
-A plugin update reaches a running session only after `/reload-plugins` or a new chat.
+### Updates
+
+The plugin and the `cogit` command update separately:
+
+- **Plugin**: Claude Code updates plugins on its own only for marketplaces that have
+  auto-update on, and it is off for every marketplace outside Anthropic's. Turn it on once:
+  `/plugin` → Marketplaces → cogit → Enable auto-update. Or update by hand with
+  `claude plugin update cogit@cogit`.
+- **Command**: `npm install -g @cogit/cli` again.
+
+A plugin update reaches a running session only after `/reload-plugins` or a new chat. When a
+new chat starts and the two versions differ, cogit says which one to update. Recording
+keeps working meanwhile: the plugin's hooks run the plugin's own copy of cogit.
 
 ## Set up a project
 

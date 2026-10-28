@@ -60,13 +60,12 @@ describe("plugin packaging", () => {
 
   it("keeps a README that shows the map and points at the guide and licence", async () => {
     const readme = await readFile(new URL("../../../README.md", import.meta.url), "utf8");
-    // One screenshot per theme; GitHub shows the one that matches the reader's.
-    expect(readme).toContain('srcset="docs/images/map-dark.png"');
-    expect(readme).toContain('src="docs/images/map-light.png"');
+    // The demo recording; the per-theme screenshots stay in the map guide.
+    expect(readme).toContain('src="docs/images/demo.gif"');
     expect(readme).toContain("(docs/guide/getting-started.md)");
     expect(readme).toContain("(LICENSE)");
     // A relative image only renders when the file it names is in the repository.
-    for (const image of ["map-dark.png", "map-light.png"]) {
+    for (const image of ["demo.gif", "map-dark.png", "map-light.png"]) {
       await expect(
         access(new URL(`../../../docs/images/${image}`, import.meta.url)),
       ).resolves.toBeUndefined();
