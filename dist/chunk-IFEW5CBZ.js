@@ -20844,6 +20844,15 @@ var PLUGIN_ID = "cogit@cogit";
 var MARKETPLACE = "cogit";
 var MARKETPLACE_REPO = "erensrtky/cogit";
 var INSTALL_COMMAND = `claude plugin install cogit --marketplace ${MARKETPLACE_REPO}`;
+async function readPluginInstalled(env) {
+  const base = env.CLAUDE_CONFIG_DIR ?? join5(homedir2(), ".claude");
+  const read = await readJson(join5(base, "plugins", "installed_plugins.json"));
+  if (!read.found || "error" in read) return void 0;
+  const plugins = isObject2(read.value) ? read.value.plugins : void 0;
+  if (!isObject2(plugins)) return void 0;
+  const entries = plugins[PLUGIN_ID];
+  return Array.isArray(entries) && entries.length > 0;
+}
 function liveDir() {
   return join5(tmpdir(), "cogit-live");
 }
@@ -21231,6 +21240,7 @@ var claude = {
   name: DEFAULT_AGENT,
   skill: "/cogit:record",
   skillRule: SKILL_RULE,
+  installCommand: INSTALL_COMMAND,
   projectDirEnv: "CLAUDE_PROJECT_DIR",
   pluginRootEnv: "CLAUDE_PLUGIN_ROOT",
   sessionIdEnv: "CLAUDE_SESSION_ID",
@@ -21249,6 +21259,7 @@ var claude = {
   parseHookInput,
   additionalContext,
   readRetention,
+  readPluginInstalled,
   readSkillAllowed,
   setRetention,
   allowSkill,
