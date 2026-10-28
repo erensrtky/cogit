@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.19.1] - 2026-10-28
 ### Changed
 - `cogit init` ends with the next step that fits: when Claude Code already lists the plugin as installed it says to work with Claude Code and open the map, otherwise it names the install command. It used to ask for the plugin even when it was there.
 - A panel card marked "missing" says on hover that `cogit config prune` removes it, and the map guide explains the panel's list, `prune` and that the map server stops after 30 idle minutes.
