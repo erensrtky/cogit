@@ -55,8 +55,12 @@ export function App({ model }: { model: LineageViewModel }) {
   return (
     <main className="map-page">
       <div className="page-head">
-        <div className="page-bar">
+        <div className="page-bar page-bar-centered">
           <Brand />
+          <div className="page-title">
+            <h1>{model.project.name}</h1>
+            <p className="muted">{model.project.path}</p>
+          </div>
           <div className="page-bar-actions">
             <SearchBox
               value={query}
@@ -72,8 +76,6 @@ export function App({ model }: { model: LineageViewModel }) {
 
         <header className="project">
           <div>
-            <h1>{model.project.name}</h1>
-            <p className="muted">{model.project.path}</p>
             <ProjectSwitcher model={model} />
             <BackToPanel />
           </div>

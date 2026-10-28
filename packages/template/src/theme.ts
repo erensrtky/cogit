@@ -16,9 +16,9 @@ export function nextTheme(mode: ThemeMode): ThemeMode {
   return ORDER[(ORDER.indexOf(mode) + 1) % ORDER.length] as ThemeMode;
 }
 
-/** What the button says for a mode. */
+/** How the button's tooltip names a mode. */
 export function themeLabel(mode: ThemeMode): string {
-  return mode === "system" ? "◐ System" : mode === "light" ? "☀ Light" : "☾ Dark";
+  return mode === "system" ? "same as your system" : mode === "light" ? "light" : "dark";
 }
 
 type Store = Pick<Storage, "getItem" | "setItem" | "removeItem">;

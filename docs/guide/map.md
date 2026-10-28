@@ -86,8 +86,8 @@ where it left off. "← All projects" goes to the panel.
 
 ## Theme
 
-The button next to Settings switches between **System** (follow your system's light or dark
-mode), **Light** and **Dark**. The choice is remembered in this browser.
+The icon next to Settings switches the theme: a screen follows your system's light or dark
+mode, a sun is light, a moon is dark. Hover it to see which is on. The choice is remembered in this browser.
 
 ## Settings
 

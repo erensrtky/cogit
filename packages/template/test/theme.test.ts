@@ -34,9 +34,9 @@ describe("the theme switch", () => {
     expect(nextTheme("system")).toBe("light");
     expect(nextTheme("light")).toBe("dark");
     expect(nextTheme("dark")).toBe("system");
-    expect(themeLabel("system")).toContain("System");
-    expect(themeLabel("light")).toContain("Light");
-    expect(themeLabel("dark")).toContain("Dark");
+    expect(themeLabel("system")).toBe("same as your system");
+    expect(themeLabel("light")).toBe("light");
+    expect(themeLabel("dark")).toBe("dark");
   });
 
   it("remembers a choice and forgets System", () => {
