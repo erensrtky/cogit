@@ -10,8 +10,8 @@
 ## Install
 
 ```bash
-npm install -g cogit      # the CLI
-npx cogit --help          # or run it without installing
+npm install -g @cogit/cli    # the CLI; the command is `cogit`
+npx @cogit/cli --help        # or run it without installing
 ```
 
 The Claude Code plugin adds the skill that keeps the record and the hooks that maintain it:
@@ -80,7 +80,7 @@ If you agreed to turn the plugin on for the repository, `init` wrote the project
   message once, with the install command. Send the message again to go on without recording.
   Headless runs (`claude -p`) are never stopped.
 
-Each teammate runs `npm install -g cogit` and `cogit init` once on their machine; `init` sees
+Each teammate runs `npm install -g @cogit/cli` and `cogit init` once on their machine; `init` sees
 the project is already set up, registers it on their machine and installs the git hooks in
 their clone. With the default commit policy,
 everyone's records travel with the branch. See [Teams and git](teams-and-git.md).

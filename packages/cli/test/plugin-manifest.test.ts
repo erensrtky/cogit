@@ -21,7 +21,12 @@ describe("plugin packaging", () => {
     // VERSION is the source; `npm run build` copies it (scripts/sync-version.mjs).
     const version = (await readFile(new URL("../../../VERSION", import.meta.url), "utf8")).trim();
     expect(pkg.version, "run npm run build to sync VERSION").toBe(version);
-    expect(plugin.name).toBe(pkg.name);
+    // The plugin keeps the short name; npm only had room for it under the @cogit scope.
+    expect(plugin.name).toBe("cogit");
+    expect(pkg.name).toBe("@cogit/cli");
+    expect(pkg.bin).toEqual({ cogit: "dist/cli.js" });
+    // A scoped package publishes as private unless told otherwise.
+    expect(pkg.publishConfig).toEqual({ access: "public" });
     expect(pkg.files).toEqual(
       expect.arrayContaining(["dist", ".claude-plugin", "skills", "hooks"]),
     );
@@ -32,7 +37,7 @@ describe("plugin packaging", () => {
     const pkg = await read("../package.json");
     expect(marketplace.plugins).toEqual([
       expect.objectContaining({
-        name: pkg.name,
+        name: "cogit",
         source: { source: "npm", package: pkg.name },
       }),
     ]);

@@ -13,7 +13,7 @@ The current record (`cogit session show`):
 ## Check first
 
 - `initialized: false`: reply exactly "cogit is not set up in this project yet; run
-  `npx cogit init` here first." and stop.
+  `npx @cogit/cli init` here first." and stop.
 - `sessionError`: quote it and stop; never write over the record.
 - Nothing new or changed (`newMessages` empty): reply "Lineage is up to date." and stop.
 

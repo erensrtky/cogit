@@ -9,7 +9,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "build": "npm run build -w template && npm run build -w cogit",
+    "build": "npm run build -w template && npm run build -w packages/cli",
     "dev:template": "npm run dev -w template",
     "lint": "biome check .",
     "format": "biome check --write .",

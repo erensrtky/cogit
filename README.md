@@ -46,7 +46,7 @@ reads. cogit keeps it next to the code. [More, with sources](docs/guide/why.md).
 You need Node 22.13+, Claude Code 2.1.275+ and a git repository.
 
 ```bash
-npm install -g cogit
+npm install -g @cogit/cli
 ```
 
 Then, in Claude Code:
