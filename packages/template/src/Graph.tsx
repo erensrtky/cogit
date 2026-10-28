@@ -26,6 +26,7 @@ import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
 import { usePageWheel } from "./scroll.js";
 import { layoutSessionGraph, type SessionGraph } from "./sessionLayout.js";
+import { useTheme } from "./ThemeButton.js";
 import { UnreadView } from "./UnreadView.js";
 
 /**
@@ -795,6 +796,7 @@ function MapCanvas({
   fit: number;
 }) {
   const { fitView, setViewport } = useReactFlow();
+  const theme = useTheme();
 
   /** Centres the view on a canvas point; does nothing before the canvas exists. */
   function centre(point: MapPoint): void {
@@ -862,7 +864,7 @@ function MapCanvas({
       nodesDraggable={false}
       nodesConnectable={false}
       elementsSelectable={false}
-      colorMode="system"
+      colorMode={theme}
     >
       <Background gap={24} size={1} color="#242a36" />
       <MiniMap

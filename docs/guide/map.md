@@ -84,6 +84,11 @@ Under the project's name, a strip of the most recently active projects and
 **Switch project** (Ctrl+K, Cmd+K on macOS) search every project on this machine. Each shows
 where it left off. "← All projects" goes to the panel.
 
+## Theme
+
+The button next to Settings switches between **System** (follow your system's light or dark
+mode), **Light** and **Dark**. The choice is remembered in this browser.
+
 ## Settings
 
 **Settings** in the top bar changes the global settings. A "?" next to each one explains it;

@@ -47,9 +47,11 @@ function variables(block: string): Record<string, string> {
 
 const darkVars = variables(css.match(/:root\s*\{([\s\S]*?)\}/)?.[1] ?? "");
 const lightBlock = css.match(
-  /@media \(prefers-color-scheme: light\)\s*\{\s*:root\s*\{([\s\S]*?)\}\s*\}/,
+  /@media \(prefers-color-scheme: light\)\s*\{\s*:root:not\(\[data-theme="dark"\]\)\s*\{([\s\S]*?)\}\s*\}/,
 );
 const lightVars = { ...darkVars, ...variables(lightBlock?.[1] ?? "") };
+// The theme switch's Light repeats the system palette exactly.
+const switchLight = css.match(/:root\[data-theme="light"\]\s*\{([\s\S]*?)\}/);
 
 /** WCAG relative luminance of a `#rrggbb` colour. */
 function luminance(hex: string): number {
@@ -149,6 +151,7 @@ describe("small text contrast (Story 9.2)", () => {
 
   it("declares a light theme besides the dark default", () => {
     expect(lightBlock).not.toBeNull();
+    expect(variables(switchLight?.[1] ?? "")).toEqual(variables(lightBlock?.[1] ?? ""));
   });
 
   for (const [name, theme] of [

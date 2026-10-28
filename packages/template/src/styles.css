@@ -46,7 +46,7 @@
 /* The same map in a light browser (Story 9.2). Small text keeps WCAG AA in
    both palettes; `layout.test.ts` computes the ratios. */
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="dark"]) {
     color-scheme: light;
     --bg: #fbfbfd;
     --panel: #f2f4f8;
@@ -87,6 +87,49 @@
     --overlay: rgba(20, 26, 38, 0.35);
     --shadow: rgba(20, 30, 50, 0.18);
   }
+}
+
+/* The same palette when the theme switch picks Light on a dark system. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #fbfbfd;
+  --panel: #f2f4f8;
+  --line: #d5dae4;
+  --text: #1b2230;
+  --muted: #545e72;
+  --accent: #2957c8;
+  --warn: #8a5300;
+  --l0: #2957c8;
+  --l1: #2f7d32;
+  --l2: #8a5300;
+  --l3: #6f42c1;
+  --l4: #0b6e99;
+  --l5: #b3261e;
+  --raised: #e9edf5;
+  --raised-2: #eef1f7;
+  --row-bg: #f4f6fa;
+  --hover: #e6ebf5;
+  --active: #d9e3f7;
+  --chip-bg: #e8edf5;
+  --chip-line: #c2cbdb;
+  --kind-bg: #e4e8f0;
+  --kind-decision-bg: #ece4ff;
+  --kind-decision-text: #5b3aa8;
+  --kind-question-bg: #fbf0dc;
+  --kind-message-bg: #e7f3e1;
+  --kind-message-text: #2a7430;
+  --missing: #4f586b;
+  --search-hit-bg: #e7e2dc;
+  --search-active-bg: #e1d9cd;
+  --diff-add-bg: #e2f5e4;
+  --diff-add-text: #145c22;
+  --diff-remove-bg: #fbe4e6;
+  --diff-remove-text: #8a1c26;
+  --on-lane: #ffffff;
+  --translucent-panel: rgba(255, 255, 255, 0.97);
+  --translucent-outline: rgba(246, 248, 251, 0.96);
+  --overlay: rgba(20, 26, 38, 0.35);
+  --shadow: rgba(20, 30, 50, 0.18);
 }
 
 * {
@@ -344,6 +387,10 @@ main.map-page {
   border: 1px solid var(--line);
   border-radius: 8px;
   cursor: pointer;
+}
+
+.theme-button {
+  margin-right: 8px;
 }
 
 .settings-button:hover {

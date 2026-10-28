@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- A theme switch next to Settings on the map and the panel: System (follow the system's light or dark mode), Light or Dark, remembered in the browser.
 
 ## [0.17.3] - 2026-10-28
 ### Changed

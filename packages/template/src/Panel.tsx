@@ -4,6 +4,7 @@ import { isLivePage } from "./data.js";
 import { formatTime } from "./format.js";
 import { Inbox } from "./Inbox.js";
 import { SettingsButton } from "./SettingsModal.js";
+import { ThemeButton } from "./ThemeButton.js";
 
 /**
  * From the local server, maps open as pages of that server so they refresh too;
@@ -28,6 +29,7 @@ export function Panel({ model }: { model: PanelViewModel }) {
           <p className="muted">Every project cogit knows about.</p>
         </div>
         <div className="page-actions">
+          <ThemeButton />
           <SettingsButton settings={model.settings} />
           <div className="meta">
             <span>

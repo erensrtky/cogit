@@ -5,6 +5,9 @@ import { App } from "./App.js";
 import { isLivePage, loadViewModel, parseViewModel } from "./data.js";
 import { Panel } from "./Panel.js";
 import "./styles.css";
+import { initTheme } from "./theme.js";
+
+initTheme();
 
 /** Re-reads the served page and takes its embedded model; null on any failure. */
 async function fetchLatestModel(): Promise<PageModel | null> {

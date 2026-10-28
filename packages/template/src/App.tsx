@@ -14,6 +14,7 @@ import { Inbox } from "./Inbox.js";
 import { type MapSearchState, SearchBox } from "./MapSearch.js";
 import { ProjectSwitcher } from "./ProjectSwitcher.js";
 import { SettingsButton } from "./SettingsModal.js";
+import { ThemeButton } from "./ThemeButton.js";
 
 export function App({ model }: { model: LineageViewModel }) {
   const sessionCount =
@@ -64,6 +65,7 @@ export function App({ model }: { model: LineageViewModel }) {
               onStep={move}
               onClear={clear}
             />
+            <ThemeButton />
             <SettingsButton settings={model.settings} />
           </div>
         </div>
