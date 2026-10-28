@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.20.0] - 2026-10-28
 ### Added
 - When a new chat starts and the plugin and the `cogit` command on the PATH are different versions, a one-line notice says which one to update and how. Recording is not affected either way; the plugin's hooks run its own copy.
 - A new setting, `recordHeadless` (Settings → Headless sessions), off by default. Sessions started without a person, such as `claude -p`, are no longer recorded: some plugins start one in the background for every prompt, and each turned up as an empty session on the map and a new row in the "Your turn" inbox. Turn it on to record your own `claude -p` work.
