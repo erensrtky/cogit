@@ -53,7 +53,14 @@ export function Panel({ model }: { model: PanelViewModel }) {
               <li key={project.path} className={project.missing ? "card missing" : "card"}>
                 <div className="card-head">
                   <h2>{project.name}</h2>
-                  {project.missing ? <span className="badge">missing</span> : null}
+                  {project.missing ? (
+                    <span
+                      className="badge"
+                      title="This directory is gone. `cogit config prune` removes it from the panel."
+                    >
+                      missing
+                    </span>
+                  ) : null}
                 </div>
                 <p className="muted path">{project.path}</p>
                 <dl className="card-facts">

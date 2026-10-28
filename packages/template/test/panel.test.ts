@@ -58,5 +58,23 @@ describe("Panel cards", () => {
       createElement(Panel, { model: { ...model, projects: [project] } }),
     );
     expect(html).toContain('<a class="card-open" href="/map?dir=%2Fwork%2Fcogit">');
+    expect(html).not.toContain("missing");
+  });
+
+  it("says how to remove a project whose directory is gone", () => {
+    (globalThis as { document?: unknown }).document = { querySelector: () => ({}) };
+    const project = {
+      name: "gone",
+      path: "/work/gone",
+      lineageUrl: "file:///work/gone/.cogit/map.html",
+      lastActivity: null,
+      needsUserCount: 0,
+      missing: true,
+    } as PanelViewModel["projects"][number];
+    const html = renderToStaticMarkup(
+      createElement(Panel, { model: { ...model, projects: [project] } }),
+    );
+    expect(html).toContain('<li class="card missing">');
+    expect(html).toContain("`cogit config prune` removes it from the panel.");
   });
 });

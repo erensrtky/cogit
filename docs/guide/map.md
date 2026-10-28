@@ -8,7 +8,12 @@ cogit open        # the panel: every project on this machine
 `cogit open` builds the page and serves it on `127.0.0.1` (port 4747, `serverPort`), starting
 the server in the background if it is not running. The page refreshes itself whenever the
 record changes and keeps your place: the selected message, the unfolded branches, the scroll
-and the zoom. Nothing is sent anywhere; the server answers only this machine.
+and the zoom. Nothing is sent anywhere; the server answers only this machine. The server
+stops on its own after 30 minutes without a page open; the next `cogit open` starts it again.
+
+The panel lists every project `cogit init` set up on this machine. A project whose directory
+was deleted or moved stays as a card marked "missing"; `cogit config prune` removes those
+(`--dry-run` lists them first).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../images/map-dark.png">
