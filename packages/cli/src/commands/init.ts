@@ -208,6 +208,10 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
     await register(io, root, existing.data.name);
     if (opts.allowSkill !== undefined) await askSkillPermission(io, opts);
     if (opts.projectSettings !== undefined) await askProjectSettings(io, root, opts);
+    await bestEffort(io, "could not refresh the project's Claude Code settings", async () => {
+      const file = await agent.refreshProjectSetup(root);
+      if (file) io.out(`Updated the cogit guard and marketplace in ${file}.`);
+    });
     await refreshGitIntegration(io, root);
     io.out(`Already initialized: ${existing.data.name} (${root})`);
     return;

@@ -147,6 +147,8 @@ export interface AgentAdapter {
   readProjectSetup(root: string): Promise<boolean | undefined>;
   /** Enables the plugin for the whole project and adds the guard against sessions without it. */
   writeProjectSetup(root: string): Promise<FileChange>;
+  /** Updates an outdated guard or marketplace an earlier setup wrote; the file when it changed. */
+  refreshProjectSetup(root: string): Promise<string | undefined>;
   /** Records that this session started with the plugin loaded; the guard looks for it. */
   markLive(sessionId: string): Promise<void>;
 }

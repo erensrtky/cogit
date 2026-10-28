@@ -10,10 +10,12 @@ import {
   PLUGIN_ID,
   projectSettingsPath,
   readProjectSetup,
+  refreshProjectSetup,
   writeProjectSetup,
 } from "../src/agents/claude/settings.js";
+import { init } from "../src/commands/init.js";
 import { runHook } from "../src/hooks/run.js";
-import { envFor, T0, tempDir } from "./helpers.js";
+import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
 let root: string;
 let tmp: string;
@@ -52,6 +54,84 @@ async function withTmp<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 describe("project setup", () => {
+  /** What an older cogit wrote: its own guard command and the old repository. */
+  const oldGuard = "node -e 'old' # cogit:guard";
+  const writeOld = async (extra: Record<string, unknown> = {}) => {
+    await mkdir(join(root, ".claude"), { recursive: true });
+    await writeFile(
+      projectSettingsPath(root),
+      JSON.stringify({
+        enabledPlugins: { [PLUGIN_ID]: true },
+        extraKnownMarketplaces: { cogit: { source: { source: "github", repo: "old/cogit" } } },
+        hooks: {
+          UserPromptSubmit: [
+            { hooks: [{ type: "command", command: "echo mine" }] },
+            { hooks: [{ type: "command", command: oldGuard, timeout: 5 }] },
+          ],
+        },
+        ...extra,
+      }),
+    );
+  };
+
+  it("replaces an outdated guard and marketplace, keeping everything else", async () => {
+    await writeOld({ model: "x" });
+    expect(await readProjectSetup(root)).toBe(false);
+    expect(await refreshProjectSetup(root)).toBe(projectSettingsPath(root));
+    const settings = await readSettings();
+    expect(settings.model).toBe("x");
+    expect(settings.extraKnownMarketplaces.cogit.source.repo).toBe("erensrtky/cogit");
+    const commands = settings.hooks.UserPromptSubmit.map(
+      (entry: { hooks: { command: string }[] }) => entry.hooks[0]?.command,
+    );
+    expect(commands).toEqual(["echo mine", GUARD_COMMAND]);
+    expect(await readProjectSetup(root)).toBe(true);
+    // Up to date: nothing to write.
+    expect(await refreshProjectSetup(root)).toBeUndefined();
+  });
+
+  it("refreshes only what an earlier setup wrote", async () => {
+    // No settings at all, or settings without our guard or marketplace.
+    expect(await refreshProjectSetup(root)).toBeUndefined();
+    await mkdir(join(root, ".claude"));
+    await writeFile(projectSettingsPath(root), JSON.stringify({ hooks: { Stop: [] } }));
+    expect(await refreshProjectSetup(root)).toBeUndefined();
+    // Only the marketplace is outdated: the guard is not added.
+    await writeFile(
+      projectSettingsPath(root),
+      JSON.stringify({
+        hooks: {},
+        extraKnownMarketplaces: { cogit: { source: { source: "github", repo: "old/cogit" } } },
+      }),
+    );
+    expect(await refreshProjectSetup(root)).toBe(projectSettingsPath(root));
+    const settings = await readSettings();
+    expect(settings.hooks).toEqual({});
+    expect(settings.extraKnownMarketplaces.cogit.source.repo).toBe("erensrtky/cogit");
+  });
+
+  it("writes one current guard over an outdated one", async () => {
+    await writeOld();
+    await writeProjectSetup(root);
+    const text = JSON.stringify((await readSettings()).hooks);
+    expect(text).not.toContain("'old'");
+    expect(text.split("# cogit:guard").length - 1).toBe(1);
+  });
+
+  it("refreshes an outdated guard when init runs again in a set-up project", async () => {
+    const env = envFor(tmp);
+    await mkdir(join(root, ".git"));
+    const options = { name: "p", git: "ignore", retention: "keep", language: "auto" } as const;
+    await init(root, { ...options, allowSkill: false, projectSettings: false }, fakeIo(env));
+    await writeOld();
+    const io = fakeIo(env, [], true);
+    await init(root, {}, io);
+    expect(io.lines).toContain(
+      `Updated the cogit guard and marketplace in ${projectSettingsPath(root)}.`,
+    );
+    expect(await readProjectSetup(root)).toBe(true);
+  });
+
   it("enables the plugin and adds the guard, keeping what was there", async () => {
     await mkdir(join(root, ".claude"));
     const other = { hooks: [{ type: "command", command: "echo other" }] };

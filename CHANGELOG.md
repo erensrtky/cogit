@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- A project set up by an earlier `cogit init --project-settings` kept its old missing-plugin guard, which named the install command from before the move to erensrtky/cogit. Running `cogit init` again now replaces an outdated guard and marketplace entry, touching nothing else; the team setup also writes one current guard over an old one.
 
 ## [0.18.1] - 2026-10-28
 ### Changed

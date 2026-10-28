@@ -7,6 +7,7 @@ import {
   readProjectSetup,
   readRetention,
   readSkillAllowed,
+  refreshProjectSetup,
   SKILL_RULE,
   setRetention,
   writeProjectSetup,
@@ -59,5 +60,6 @@ export const claude: AgentAdapter = {
   allowSkill,
   readProjectSetup,
   writeProjectSetup,
+  refreshProjectSetup,
   markLive,
 };

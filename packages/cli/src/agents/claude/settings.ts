@@ -163,12 +163,60 @@ function hasGuard(settings: Record<string, unknown>): boolean {
   return JSON.stringify(hooks ?? []).includes(GUARD_TAG);
 }
 
-/** Whether the project's shared settings already carry the team setup; undefined if unreadable. */
+/** Whether the guard there is this version's: an older one may name a moved install command. */
+function hasCurrentGuard(settings: Record<string, unknown>): boolean {
+  const hooks = isObject(settings.hooks) ? settings.hooks.UserPromptSubmit : undefined;
+  return JSON.stringify(hooks ?? []).includes(JSON.stringify(GUARD_COMMAND));
+}
+
+/** The UserPromptSubmit entries without ours, and the current guard appended. */
+function withCurrentGuard(submit: unknown[]): unknown[] {
+  return [
+    ...submit.filter((entry) => !JSON.stringify(entry).includes(GUARD_TAG)),
+    { hooks: [{ type: "command", command: GUARD_COMMAND, timeout: 5 }] },
+  ];
+}
+
+/** Whether the project's shared settings already carry the current team setup; undefined if unreadable. */
 export async function readProjectSetup(root: string): Promise<boolean | undefined> {
   const settings = await readSettings(projectSettingsPath(root));
   if (!settings) return undefined;
   const plugins = isObject(settings.enabledPlugins) ? settings.enabledPlugins : {};
-  return plugins[PLUGIN_ID] === true && hasGuard(settings);
+  return plugins[PLUGIN_ID] === true && hasCurrentGuard(settings);
+}
+
+/**
+ * Brings what an earlier `init` wrote up to date: an outdated guard is replaced
+ * and our marketplace entry points at the current repository. Nothing is added
+ * that the project did not have, and other keys and hooks stay as they are.
+ * Returns the file when it changed.
+ */
+export async function refreshProjectSetup(root: string): Promise<string | undefined> {
+  const file = projectSettingsPath(root);
+  const settings = await readSettings(file);
+  if (!settings || !isObject(settings.hooks)) return undefined;
+  const submit = settings.hooks.UserPromptSubmit;
+  const marketplaces = isObject(settings.extraKnownMarketplaces)
+    ? settings.extraKnownMarketplaces
+    : undefined;
+  const ours = marketplaces?.[MARKETPLACE];
+  const staleGuard = Array.isArray(submit) && hasGuard(settings) && !hasCurrentGuard(settings);
+  const staleMarketplace =
+    isObject(ours) &&
+    isObject(ours.source) &&
+    ours.source.source === "github" &&
+    ours.source.repo !== MARKETPLACE_REPO;
+  if (!staleGuard && !staleMarketplace) return undefined;
+  const next: Record<string, unknown> = { ...settings };
+  if (staleGuard)
+    next.hooks = { ...settings.hooks, UserPromptSubmit: withCurrentGuard(submit as unknown[]) };
+  if (staleMarketplace)
+    next.extraKnownMarketplaces = {
+      ...marketplaces,
+      [MARKETPLACE]: { source: { source: "github", repo: MARKETPLACE_REPO } },
+    };
+  await atomicWriteJson(file, next);
+  return file;
 }
 
 /**
@@ -194,15 +242,9 @@ export async function writeProjectSetup(root: string): Promise<FileChange> {
       ...(settings.extraKnownMarketplaces as object),
       [MARKETPLACE]: { source: { source: "github", repo: MARKETPLACE_REPO } },
     },
-    hooks: hasGuard(settings)
+    hooks: hasCurrentGuard(settings)
       ? hooks
-      : {
-          ...hooks,
-          UserPromptSubmit: [
-            ...submit,
-            { hooks: [{ type: "command", command: GUARD_COMMAND, timeout: 5 }] },
-          ],
-        },
+      : { ...hooks, UserPromptSubmit: withCurrentGuard(submit) },
   };
   await mkdir(join(root, ".claude"), { recursive: true });
   await atomicWriteJson(file, next);
