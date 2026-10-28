@@ -10,7 +10,10 @@ the server in the background if it is not running. The page refreshes itself whe
 record changes and keeps your place: the selected message, the unfolded branches, the scroll
 and the zoom. Nothing is sent anywhere; the server answers only this machine.
 
-![The map](../images/map.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/map-dark.png">
+  <img src="../images/map-light.png" alt="The map: sessions, branches and the decision behind a message">
+</picture>
 
 ## Sessions and branches
 
