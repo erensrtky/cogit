@@ -3,7 +3,9 @@ import { additionalContext, parseHookInput } from "./hooks.js";
 import {
   allowSkill,
   CLAUDE_DEFAULT_RETENTION,
+  INSTALL_COMMAND,
   markLive,
+  readPluginInstalled,
   readProjectSetup,
   readRetention,
   readSkillAllowed,
@@ -34,6 +36,7 @@ export const claude: AgentAdapter = {
   name: DEFAULT_AGENT,
   skill: "/cogit:record",
   skillRule: SKILL_RULE,
+  installCommand: INSTALL_COMMAND,
   projectDirEnv: "CLAUDE_PROJECT_DIR",
   pluginRootEnv: "CLAUDE_PLUGIN_ROOT",
   sessionIdEnv: "CLAUDE_SESSION_ID",
@@ -55,6 +58,7 @@ export const claude: AgentAdapter = {
   additionalContext,
 
   readRetention,
+  readPluginInstalled,
   readSkillAllowed,
   setRetention,
   allowSkill,

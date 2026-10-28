@@ -112,6 +112,20 @@ export const MARKETPLACE = "cogit";
 export const MARKETPLACE_REPO = "erensrtky/cogit";
 export const INSTALL_COMMAND = `claude plugin install cogit --marketplace ${MARKETPLACE_REPO}`;
 
+/**
+ * Whether Claude Code lists the plugin as installed, in any scope; undefined when its
+ * plugin list cannot be read (missing or another shape), so the caller says nothing either way.
+ */
+export async function readPluginInstalled(env: NodeJS.ProcessEnv): Promise<boolean | undefined> {
+  const base = env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+  const read = await readJson(join(base, "plugins", "installed_plugins.json"));
+  if (!read.found || "error" in read) return undefined;
+  const plugins = isObject(read.value) ? read.value.plugins : undefined;
+  if (!isObject(plugins)) return undefined;
+  const entries = plugins[PLUGIN_ID];
+  return Array.isArray(entries) && entries.length > 0;
+}
+
 /** Where a session's SessionStart leaves its mark; the guard reads the same path. */
 export function liveDir(): string {
   return join(tmpdir(), "cogit-live");

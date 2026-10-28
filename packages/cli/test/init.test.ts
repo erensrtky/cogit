@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   allowSkill,
+  readPluginInstalled,
   readProjectSetup,
   readRetention,
   readSkillAllowed,
@@ -78,11 +79,38 @@ describe("init", () => {
     expect(await readProjectSetup(root)).toBe(true);
     expect(await readSkillAllowed(env)).toBe(true);
     expect(io.lines.at(-2)).toMatch(/^Initialized proj/);
+    // No plugin list in this Claude Code config: the last line says how to install it.
+    expect(io.lines.at(-1)).toContain("claude plugin install cogit --marketplace erensrtky/cogit");
     // The default commit policy writes the project's own ignore rules.
     expect(await readText(join(root, ".cogit", ".gitignore"))).toBe(cogitGitignore(false));
     expect(io.lines).toContain(
       "Conversations are stored in .cogit/conversations/ (kept out of git; turn on shareConversations to share them).",
     );
+  });
+
+  it("skips the install hint when Claude Code lists the plugin as installed", async () => {
+    const list = join(env.CLAUDE_CONFIG_DIR ?? "", "plugins", "installed_plugins.json");
+    await mkdir(join(list, ".."), { recursive: true });
+    const write = (plugins: unknown) => writeFile(list, JSON.stringify({ version: 2, plugins }));
+
+    await write({ "cogit@cogit": [{ scope: "user", version: "0.19.0" }] });
+    expect(await readPluginInstalled(env)).toBe(true);
+    const io = fakeIo(env);
+    await init(root, {}, io);
+    expect(io.lines.at(-1)).toBe(
+      "Next: work with Claude Code here, then run `cogit open` to see the map.",
+    );
+
+    // Another plugin only, an empty entry, or a list of another shape.
+    await write({ "other@market": [{ scope: "user" }] });
+    expect(await readPluginInstalled(env)).toBe(false);
+    await write({ "cogit@cogit": [] });
+    expect(await readPluginInstalled(env)).toBe(false);
+    await write(["cogit@cogit"]);
+    expect(await readPluginInstalled(env)).toBeUndefined();
+    await writeFile(list, "[1,");
+    expect(await readPluginInstalled(env)).toBeUndefined();
+    expect(await readPluginInstalled({ CLAUDE_CONFIG_DIR: join(dir, "nowhere") })).toBeUndefined();
   });
 
   it("writes the project ignore file once for the commit policy", async () => {

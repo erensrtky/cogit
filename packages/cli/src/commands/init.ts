@@ -255,5 +255,10 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
       : "Conversations are stored in .cogit/conversations/ (kept out of git; turn on shareConversations to share them).",
   );
   io.out(`Initialized ${name} in ${projectPaths(root).base}`);
-  io.out("Next: install the Claude Code plugin, then run `cogit open` after a session.");
+  const installed = await agent.readPluginInstalled(io.env).catch(() => undefined);
+  io.out(
+    installed
+      ? "Next: work with Claude Code here, then run `cogit open` to see the map."
+      : `Next: install the Claude Code plugin (\`${agent.installCommand}\`), then run \`cogit open\` after a session.`,
+  );
 }

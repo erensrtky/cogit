@@ -93,6 +93,8 @@ export interface AgentAdapter {
   readonly skill: string;
   /** The permission rule that allows the skill without a prompt. */
   readonly skillRule: string;
+  /** The shell command that installs the plugin. */
+  readonly installCommand: string;
   /** Env var the agent sets to the project directory for hooks. */
   readonly projectDirEnv: string;
   /** Env var that points at the installed plugin (skill text uses it). */
@@ -137,6 +139,8 @@ export interface AgentAdapter {
   additionalContext(event: string, text: string): Record<string, unknown>;
   /** Days the agent keeps transcripts, undefined when the setting is unreadable. */
   readRetention(env: NodeJS.ProcessEnv): Promise<number | undefined>;
+  /** Whether the agent lists the plugin as installed; undefined when unreadable. */
+  readPluginInstalled(env: NodeJS.ProcessEnv): Promise<boolean | undefined>;
   /** Whether the record skill is already allowed; undefined when unreadable. */
   readSkillAllowed(env: NodeJS.ProcessEnv): Promise<boolean | undefined>;
   /** Sets the transcript retention in the agent's settings. */
