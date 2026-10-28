@@ -137,6 +137,8 @@ export interface AgentAdapter {
   parseHookInput(stdin: string): HookInput | undefined;
   /** Hook output that adds context for the agent, in the agent's own protocol. */
   additionalContext(event: string, text: string): Record<string, unknown>;
+  /** A hook answer that shows one line to the user, not to the agent. */
+  userNotice(text: string): Record<string, unknown>;
   /** Days the agent keeps transcripts, undefined when the setting is unreadable. */
   readRetention(env: NodeJS.ProcessEnv): Promise<number | undefined>;
   /** Whether the agent lists the plugin as installed; undefined when unreadable. */

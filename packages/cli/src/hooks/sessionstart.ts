@@ -1,4 +1,6 @@
+import pkg from "../../package.json" with { type: "json" };
 import { defaultAgent } from "../agents/index.js";
+import { installedCliVersion, versionNotice } from "../cli-version.js";
 import { branchesOf, type LogBranch } from "../commands/log.js";
 import { findGitRoot } from "../git.js";
 import { isRecorded, readSessionMessages, upgradeSessionIds } from "../messages.js";
@@ -67,6 +69,14 @@ export function setupHint(ctx: HookContext): string {
  * an initialized project it gets the handoff (Story 8.11).
  */
 export async function onSessionStart(ctx: HookContext): Promise<HookOutput | undefined> {
+  const output = await sessionStartOutput(ctx);
+  // Once per new chat: the user hears when the plugin and the cogit command drifted apart.
+  if (ctx.input.source !== "startup") return output;
+  const notice = versionNotice(pkg.version, await installedCliVersion(ctx.env));
+  return notice === undefined ? output : { ...output, ...ctx.agent.userNotice(notice) };
+}
+
+async function sessionStartOutput(ctx: HookContext): Promise<HookOutput | undefined> {
   if (ctx.input.source === "compact") return compactRequest(ctx);
   const source = ctx.input.source;
   if (source !== "startup" && source !== "resume" && source !== "clear") return undefined;

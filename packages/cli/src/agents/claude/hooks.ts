@@ -32,6 +32,11 @@ export function parseHookInput(stdin: string): HookInput | undefined {
   return parsed.success ? parsed.data : undefined;
 }
 
+/** A hook answer Claude Code shows the user as a warning line; the agent does not see it. */
+export function userNotice(text: string): Record<string, unknown> {
+  return { systemMessage: text };
+}
+
 /** One hook answer that adds text to the agent's context, in Claude Code's shape. */
 export function additionalContext(event: string, text: string): Record<string, unknown> {
   return { hookSpecificOutput: { hookEventName: event, additionalContext: text } };
