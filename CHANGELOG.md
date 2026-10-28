@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- `/plugin install cogit` failed with `EALLOWREMOTE` for everyone on npm 12, which refuses the npm download Claude Code makes for a plugin. The plugin now installs from the repository's `plugin` branch, which a GitHub Action rebuilds on every release; the CLI still comes from npm. An existing marketplace needs `/plugin marketplace update cogit` before the install.
 
 ## [0.18.2] - 2026-10-28
 ### Fixed

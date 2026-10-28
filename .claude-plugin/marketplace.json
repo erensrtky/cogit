@@ -5,7 +5,7 @@
   "plugins": [
     {
       "name": "cogit",
-      "source": { "source": "npm", "package": "@cogit/cli" },
+      "source": { "source": "github", "repo": "erensrtky/cogit", "ref": "plugin" },
       "description": "Records what each session decided and why, and renders it as a static map."
     }
   ]

@@ -1,0 +1,35 @@
+# The marketplace installs the plugin from the `plugin` branch (built files only), so every
+# release tag rebuilds it there. See scripts/build-plugin-branch.mjs.
+name: plugin branch
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: plugin-branch
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Fetch the current plugin branch
+        run: git fetch --no-tags origin +refs/heads/plugin:refs/heads/plugin || echo "no plugin branch yet"
+      - name: Commit the build onto it
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          node scripts/build-plugin-branch.mjs
+      - run: git push origin refs/heads/plugin:refs/heads/plugin

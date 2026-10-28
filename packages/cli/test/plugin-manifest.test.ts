@@ -16,7 +16,7 @@ describe("plugin packaging", () => {
   it("keeps the plugin manifest in step with the npm package", async () => {
     const pkg = await read("../package.json");
     const plugin = await read("../.claude-plugin/plugin.json");
-    // An npm-sourced plugin without a version resolves to "unknown" and never updates.
+    // A plugin without a version resolves to "unknown" and never updates.
     expect(plugin.version).toBe(pkg.version);
     // VERSION is the source; `npm run build` copies it (scripts/sync-version.mjs).
     const version = (await readFile(new URL("../../../VERSION", import.meta.url), "utf8")).trim();
@@ -32,13 +32,14 @@ describe("plugin packaging", () => {
     );
   });
 
-  it("lists the plugin in the marketplace under its manifest name, from npm", async () => {
+  it("lists the plugin in the marketplace under its manifest name, from the plugin branch", async () => {
     const marketplace = await read("../../../.claude-plugin/marketplace.json");
-    const pkg = await read("../package.json");
+    // Not the npm package: npm 12 refuses the tarball URL Claude Code fetches it by
+    // (EALLOWREMOTE). The branch holds the build; scripts/build-plugin-branch.mjs writes it.
     expect(marketplace.plugins).toEqual([
       expect.objectContaining({
         name: "cogit",
-        source: { source: "npm", package: pkg.name },
+        source: { source: "github", repo: "erensrtky/cogit", ref: "plugin" },
       }),
     ]);
   });

@@ -52,6 +52,19 @@ it in that project:
 cogit config hint-off
 ```
 
+## The plugin install fails with `EALLOWREMOTE`
+
+cogit 0.18 and earlier installed the plugin from npm, and npm 12 refuses the download Claude
+Code makes for that. From 0.19 the plugin comes from the repository's `plugin` branch. If you
+added the marketplace before, refresh it and install again:
+
+```text
+/plugin marketplace update cogit
+/plugin install cogit@cogit
+```
+
+The CLI is not affected: `npm install -g @cogit/cli` works with any npm.
+
 ## Something else
 
 Open an issue at <https://github.com/erensrtky/cogit/issues> with the output of
