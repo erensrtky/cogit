@@ -38,3 +38,18 @@ describe("processIo", () => {
     expect(io.now()).toMatch(/^\d{4}-\d\d-\d\dT/);
   });
 });
+
+describe("exitOnClosedPipe", () => {
+  it("exits quietly on EPIPE and rethrows any other stream error", async () => {
+    const { EventEmitter } = await import("node:events");
+    const { exitOnClosedPipe } = await import("../src/io.js");
+    const stream = new EventEmitter();
+    const exit = vi.fn();
+    exitOnClosedPipe(stream, exit);
+    stream.emit("error", Object.assign(new Error("write EPIPE"), { code: "EPIPE" }));
+    expect(exit).toHaveBeenCalledWith(0);
+    expect(() => stream.emit("error", Object.assign(new Error("boom"), { code: "EIO" }))).toThrow(
+      "boom",
+    );
+  });
+});

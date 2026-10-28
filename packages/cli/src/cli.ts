@@ -1,3 +1,4 @@
+import { exitOnClosedPipe } from "./io.js";
 import { createProgram } from "./program.js";
 import { migrateGlobal, takeMigrationWarnings } from "./store/migrate.js";
 
@@ -5,4 +6,5 @@ import { migrateGlobal, takeMigrationWarnings } from "./store/migrate.js";
 await migrateGlobal();
 for (const line of takeMigrationWarnings()) process.stderr.write(`warning: ${line}\n`);
 
+exitOnClosedPipe();
 await createProgram().parseAsync(process.argv);

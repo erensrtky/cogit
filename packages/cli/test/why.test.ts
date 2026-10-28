@@ -8,6 +8,7 @@ import { init } from "../src/commands/init.js";
 import {
   collectWhy,
   formatWhy,
+  nearestProjectDir,
   rejectedItems,
   TRY_BEFORE_MAX_CHARS,
   TRY_BEFORE_MAX_ITEMS,
@@ -18,7 +19,7 @@ import {
 import { runHook } from "../src/hooks/run.js";
 import type { Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
-import { envFor, fakeIo, noGitProject, T0, tempDir } from "./helpers.js";
+import { envFor, fakeIo, noGitDir, noGitProject, T0, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
 
@@ -177,6 +178,20 @@ describe("cogit why", () => {
     const none = fakeIo(env);
     await why({ dir: root, file: "loose.txt", io: none });
     expect(none.lines).toEqual(["No decisions or rejected alternatives recorded for loose.txt."]);
+  });
+
+  it("finds the project above the directory you are in, with the file relative to it", async () => {
+    const sub = join(root, "sub", "deeper");
+    await mkdir(sub, { recursive: true });
+    const io = fakeIo(env);
+    expect(await why({ cwd: sub, file: "../../a.txt", io })).toHaveLength(2);
+    expect(await why({ cwd: root, file: "a.txt", io: fakeIo(env) })).toHaveLength(2);
+    expect(await nearestProjectDir(sub)).toBe(root);
+    const outside = await noGitDir();
+    expect(await nearestProjectDir(outside)).toBeUndefined();
+    await expect(why({ cwd: outside, file: "a.txt", io: fakeIo(env) })).rejects.toThrow(
+      /not initialized/,
+    );
   });
 
   it("refuses an uninitialized project, a non-repository and a missing file", async () => {

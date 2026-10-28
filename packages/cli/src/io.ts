@@ -44,3 +44,17 @@ export function processIo(interactive: boolean): Io {
     now: () => new Date().toISOString(),
   };
 }
+
+/**
+ * Ends the process quietly when the reader of stdout goes away (`cogit log | head`),
+ * the way git does, instead of printing Node's EPIPE stack.
+ */
+export function exitOnClosedPipe(
+  stream: NodeJS.EventEmitter = process.stdout,
+  exit: (code: number) => void = process.exit,
+): void {
+  stream.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EPIPE") exit(0);
+    else throw err;
+  });
+}

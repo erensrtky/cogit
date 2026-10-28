@@ -34,6 +34,9 @@ each with its message hash and date.
 The lookup is exact, but the wording is the record's summary, so it is only as good as the
 record.
 
+Like git, it works from any directory inside the project: the path is relative to where you
+are, so `cd src && cogit why auth.ts` is the same lookup.
+
 ## How the agent uses it
 
 The agent reads the same commands:

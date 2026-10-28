@@ -1,7 +1,9 @@
+import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { blameCommitHashes, findGitRoot } from "../git.js";
 import { CliError, type Io } from "../io.js";
+import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadProject } from "../store/stores.js";
 import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
@@ -178,10 +180,28 @@ export function formatWhy(hits: readonly WhyHit[]): string[] {
 }
 
 export interface WhyOptions {
-  dir: string;
-  /** A file, relative to the project or absolute. */
+  /** The project; `file` is relative to it. */
+  dir?: string;
+  /**
+   * Instead of `dir`, the directory the user is in: the project is the nearest
+   * one above it and `file` is relative to it, as with git.
+   */
+  cwd?: string;
+  /** A file, relative to the project (or to `cwd`) or absolute. */
   file: string;
   io: Io;
+}
+
+/**
+ * The nearest directory at or above `start` that holds a cogit project or a
+ * repository's top; the walk stops there so a worktree never reaches the main
+ * checkout's `.cogit/` (resolveProjectRoot decides that). Undefined when none.
+ */
+export async function nearestProjectDir(start: string): Promise<string | undefined> {
+  for (let dir = resolve(start); ; dir = dirname(dir)) {
+    if (existsSync(projectPaths(dir).project) || existsSync(join(dir, ".git"))) return dir;
+    if (dirname(dir) === dir) return undefined;
+  }
 }
 
 /**
@@ -190,20 +210,26 @@ export interface WhyOptions {
  */
 export async function why(opts: WhyOptions): Promise<WhyHit[]> {
   const { io } = opts;
-  const { root } = await resolveProjectRoot(opts.dir);
+  let start = opts.dir ?? ".";
+  let file = opts.file;
+  if (opts.cwd !== undefined) {
+    start = (await nearestProjectDir(opts.cwd)) ?? opts.cwd;
+    file = relative(start, resolve(opts.cwd, opts.file));
+  }
+  const { root } = await resolveProjectRoot(start);
   const project = await loadProject(root);
   if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
   if (!project.ok) throw new CliError(project.error);
   if ((await findGitRoot(root)) === undefined)
     throw new CliError(`${root} is not inside a git repository; why needs one`);
 
-  const exists = await stat(resolve(root, opts.file)).then(
+  const exists = await stat(resolve(root, file)).then(
     (info) => info.isFile(),
     () => false,
   );
   if (!exists) throw new CliError(`${opts.file} does not exist`);
 
-  const hits = await collectWhy(root, opts.file, io.env);
+  const hits = await collectWhy(root, file, io.env);
   if (hits.length === 0) {
     io.out(`No decisions or rejected alternatives recorded for ${opts.file}.`);
     return hits;
