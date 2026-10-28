@@ -58,3 +58,7 @@ ss/
 coverage/
 # cogit
 /.cogit/
+
+# Internal planning: kept locally, not published
+specs/
+docs/qa/
