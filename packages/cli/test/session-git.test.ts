@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -362,8 +362,12 @@ describe("ignore files and git hooks", () => {
     );
     const hook = join(dir, "hook.sh");
     await writeFile(hook, `#!/bin/sh\n${hookBlock("pre-commit", root, cli)}\n`);
-    const path = `${join(process.execPath, "..")}:/usr/bin:/bin`;
-    await run("sh", [hook, "x"], { env: { PATH: path } });
+    // Only node in its own directory: a global `npm install -g @cogit/cli` puts cogit
+    // next to node, which would take this test off the path it checks.
+    const bin = join(dir, "bin");
+    await mkdir(bin);
+    await symlink(process.execPath, join(bin, "node"));
+    await run("sh", [hook, "x"], { env: { PATH: `${bin}:/usr/bin:/bin` } });
     expect(await readFile(marker, "utf8")).toBe(`hook pre-commit --dir ${root} x`);
   });
 
