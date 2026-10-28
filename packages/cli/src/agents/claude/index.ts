@@ -1,5 +1,5 @@
 import { type AgentAdapter, DEFAULT_AGENT } from "../types.js";
-import { additionalContext, parseHookInput, userNotice } from "./hooks.js";
+import { additionalContext, isHeadless, parseHookInput, userNotice } from "./hooks.js";
 import {
   allowSkill,
   CLAUDE_DEFAULT_RETENTION,
@@ -55,6 +55,7 @@ export const claude: AgentAdapter = {
   excerpt,
 
   parseHookInput,
+  isHeadless,
   additionalContext,
   userNotice,
 

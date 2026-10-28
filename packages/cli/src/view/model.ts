@@ -33,6 +33,7 @@ export const PANEL_EDITABLE_KEYS = [
   "recorder",
   "messageSummaries",
   "startupContext",
+  "recordHeadless",
   "tryBeforeNotes",
   "language",
   "updateEveryTurns",
@@ -387,6 +388,8 @@ export interface PanelSettings {
   sideModel: string;
   messageSummaries: boolean;
   startupContext: boolean;
+  /** Whether `claude -p` and SDK sessions are recorded. */
+  recordHeadless: boolean;
   /**
    * Whether the agent is told before editing a file about options earlier
    * thoughts considered and rejected (Story 10.4).

@@ -86,6 +86,16 @@ const EDITABLE: FieldSpec[] = [
     kind: "boolean",
   },
   {
+    key: "recordHeadless",
+    label: "Headless sessions",
+    help: "Record sessions that start without a person, such as `claude -p`.",
+    details:
+      "Some plugins and scripts run `claude -p` in the background, often once per prompt. " +
+      "Off, cogit leaves those sessions out of the map and the inbox. Turn it on if you do " +
+      "real work through `claude -p` or the SDK and want it recorded.",
+    kind: "boolean",
+  },
+  {
     key: "tryBeforeNotes",
     label: "Tried-before notes",
     help: "Before the agent edits a file, tell it which options earlier thoughts rejected for it.",
@@ -260,6 +270,7 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   sideModel: "haiku",
   messageSummaries: false,
   startupContext: true,
+  recordHeadless: false,
   tryBeforeNotes: true,
   shareConversations: false,
   recordCommit: "ask",
@@ -278,6 +289,7 @@ export function editableSettings(settings: PanelSettings): PanelEditableSettings
     recorder: settings.recorder,
     messageSummaries: settings.messageSummaries,
     startupContext: settings.startupContext,
+    recordHeadless: settings.recordHeadless,
     tryBeforeNotes: settings.tryBeforeNotes,
     language: settings.language,
     updateEveryTurns: settings.updateEveryTurns,

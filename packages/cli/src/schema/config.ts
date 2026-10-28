@@ -39,6 +39,12 @@ export const Config = z.object({
    * how to read the record (`log` / `show`). On by default; costs only tokens.
    */
   startupContext: z.boolean().default(true),
+  /**
+   * Whether sessions started without a person (`claude -p`, an SDK) are recorded.
+   * Off by default: other plugins start them in the background, one per prompt,
+   * and they would fill the map and the inbox.
+   */
+  recordHeadless: z.boolean().default(false),
   /** Port the local map server binds on `127.0.0.1`. */
   serverPort: z.int().min(1).max(65535).default(4747),
   /** Default for new projects; `init` asks per repo. Story 9.3: the record travels. */

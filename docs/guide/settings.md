@@ -32,6 +32,14 @@ A one-sentence summary under each message title, so a skim reads better. Off kee
 
 When a chat starts, the agent gets a short summary of where the previous session left off and how to read the record. It costs a few tokens; turn it off if your projects are unrelated.
 
+### Headless sessions
+
+`recordHeadless` · default `false`
+
+**Record sessions that start without a person, such as `claude -p`.**
+
+Some plugins and scripts run `claude -p` in the background, often once per prompt. Off, cogit leaves those sessions out of the map and the inbox. Turn it on if you do real work through `claude -p` or the SDK and want it recorded.
+
 ### Tried-before notes
 
 `tryBeforeNotes` · default `true`

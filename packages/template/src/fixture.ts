@@ -60,6 +60,7 @@ export const fixture: LineageViewModel = {
     sideModel: "haiku",
     messageSummaries: false,
     startupContext: true,
+    recordHeadless: false,
     tryBeforeNotes: true,
     shareConversations: false,
     recordCommit: "ask",

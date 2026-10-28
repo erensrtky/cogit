@@ -32,6 +32,15 @@ export function parseHookInput(stdin: string): HookInput | undefined {
   return parsed.success ? parsed.data : undefined;
 }
 
+/**
+ * Whether the hook runs in a session nobody types into: `claude -p` and the SDKs
+ * mark themselves `sdk-*` in `CLAUDE_CODE_ENTRYPOINT`, which the hooks inherit.
+ * Other plugins start such sessions in the background, one per prompt.
+ */
+export function isHeadless(env: NodeJS.ProcessEnv): boolean {
+  return env.CLAUDE_CODE_ENTRYPOINT?.startsWith("sdk") ?? false;
+}
+
 /** A hook answer Claude Code shows the user as a warning line; the agent does not see it. */
 export function userNotice(text: string): Record<string, unknown> {
   return { systemMessage: text };

@@ -56,6 +56,10 @@
       "default": true,
       "type": "boolean"
     },
+    "recordHeadless": {
+      "default": false,
+      "type": "boolean"
+    },
     "serverPort": {
       "default": 4747,
       "type": "integer",
@@ -134,6 +138,7 @@
     "sideEveryTurns",
     "messageSummaries",
     "startupContext",
+    "recordHeadless",
     "serverPort",
     "gitPolicy",
     "shareConversations",

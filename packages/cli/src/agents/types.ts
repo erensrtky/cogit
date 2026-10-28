@@ -135,6 +135,8 @@ export interface AgentAdapter {
   excerpt(text: string, max?: number): string;
   /** Parses a hook's stdin; undefined when it is not a payload cogit understands. */
   parseHookInput(stdin: string): HookInput | undefined;
+  /** Whether the hook runs in a session started without a person (`claude -p`, an SDK). */
+  isHeadless(env: NodeJS.ProcessEnv): boolean;
   /** Hook output that adds context for the agent, in the agent's own protocol. */
   additionalContext(event: string, text: string): Record<string, unknown>;
   /** A hook answer that shows one line to the user, not to the agent. */

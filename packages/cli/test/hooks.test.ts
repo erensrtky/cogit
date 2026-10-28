@@ -296,6 +296,19 @@ describe("runHook", () => {
     expect(await sessionStart("clear")).toBeUndefined();
   });
 
+  it("leaves `claude -p` sessions alone unless recordHeadless is on", async () => {
+    const headless = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli" };
+    expect(await sessionStart("startup", headless)).toBeUndefined();
+    await initialized(1);
+    expect(await sessionStart("startup", headless)).toBeUndefined();
+    expect(await stop({}, headless)).toBeUndefined();
+    expect(spawned).toEqual([]);
+    await configSet("recordHeadless", "true", fakeIo(env));
+    expect(await sessionStart("startup", headless)).toContain("records this project's lineage");
+    await stop({}, headless);
+    expect(spawned).not.toEqual([]);
+  });
+
   it("silences the setup hint per project with hint-off and undoes it with hint-on", async () => {
     const off = fakeIo(env);
     await configHintOff(root, off);

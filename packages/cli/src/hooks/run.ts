@@ -6,6 +6,7 @@ import { type AgentAdapter, defaultAgent, type HookInput } from "../agents/index
 import { Slug } from "../schema/common.js";
 import { captureDisabled, projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
+import { loadConfig } from "../store/stores.js";
 import { onPreToolUse } from "./pretooluse.js";
 import { onPromptSubmit } from "./promptsubmit.js";
 import { onSessionEnd } from "./sessionend.js";
@@ -126,6 +127,8 @@ export async function runHook(
       await agent
         .markLive(input.session_id)
         .catch((err: Error) => debug(`cogit mark: ${err.message}`));
+    // A session nobody types into is left alone unless the user asked for it.
+    if (agent.isHeadless(env) && !(await loadConfig(env)).recordHeadless) return undefined;
     // In a linked worktree both point at the worktree; the record lives in the main checkout.
     const { root } = await resolveProjectRoot(env[agent.projectDirEnv] ?? input.cwd ?? ".");
     const initialized = existsSync(projectPaths(root).project);

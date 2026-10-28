@@ -67,6 +67,7 @@ export function panelSettings(config: Config): PanelSettings {
     sideModel: config.sideModel,
     messageSummaries: config.messageSummaries,
     startupContext: config.startupContext,
+    recordHeadless: config.recordHeadless,
     tryBeforeNotes: config.tryBeforeNotes,
     shareConversations: config.shareConversations,
     recordCommit: config.recordCommit,

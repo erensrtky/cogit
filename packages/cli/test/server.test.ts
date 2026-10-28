@@ -550,6 +550,7 @@ describe("settings read", () => {
         recorder: "mixed",
         messageSummaries: false,
         startupContext: true,
+        recordHeadless: false,
         tryBeforeNotes: true,
         language: "auto",
         updateEveryTurns: 15,
