@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.21.0] - 2026-10-29
 ### Added
 - A session-end pass: when a session ends, the side model (Haiku by default) reads the whole session once, splits it into threads and says what each grew from. The parents follow from that, so a detour becomes a side branch and a return to earlier work hangs from where that work stopped; before, the side model chained nearly every message to the previous one. The same call writes each thread's summary and one line on where the session left off (`leftOff`). It costs about a cent per session and keeps every parent and note the main agent wrote. Run it on any recorded session with `cogit backfill <session-id> --tail --close`.
 - In side-only mode the session-end pass also hangs a session's first message from the earlier session it continues, which the side model never did before.
