@@ -66,8 +66,10 @@ Every message grows from an earlier one; a thread that starts something new is a
 - Default: the previous message. `parent: null` only if it would work as a new chat's first
   message. Back to an older thread: that message is the parent, the previous one goes in `links`.
 - A first message continuing earlier work: `parent` is `<sessionId>:<stable id>`;
-  `candidates` lists the last messages of the most recent other sessions. The target must be
-  a message of an earlier session of this project.
+  `candidates` lists the most recent other sessions: where each left off (`leftOff`), its
+  branches with the message each ends at (`last`), and its last messages. Read `leftOff`
+  first, then the branches; the usual target is a branch's `last`. The target must be a
+  message of an earlier session of this project.
 - Unsure: use the previous message. A wrong "continue" hides a branch; a wrong branch breaks
   the chain.
 - `links`: up to 5 earlier messages it builds on besides the parent.

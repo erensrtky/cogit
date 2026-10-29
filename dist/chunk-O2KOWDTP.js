@@ -20219,10 +20219,11 @@ var Config = external_exports.object({
   sessionEndCatchUp: external_exports.boolean().default(true),
   /**
    * Who writes the record (Story 12.1): the main agent (`agent`), both (`mixed`,
-   * the default: a side model often, the agent rarely), or only the side model
-   * (`side`, the agent is never interrupted).
+   * "Detailed" in the panel: a side model often, the agent rarely), or only the
+   * side model (`side`, "Economical", the default since 0.21: the agent is never
+   * interrupted and the session-end pass writes the branches).
    */
-  recorder: external_exports.enum(["agent", "mixed", "side"]).default("mixed"),
+  recorder: external_exports.enum(["agent", "mixed", "side"]).default("side"),
   /** Model the side runs use: the headless catch-up and the periodic records. */
   sideModel: external_exports.string().trim().min(1).max(64).default("haiku"),
   /** How often the side model records, in turns (Story 12.1). */
@@ -20413,6 +20414,12 @@ var Session = external_exports.object({
   startedAt: IsoDate,
   updatedAt: IsoDate,
   status: Status.default({ goal: "", done: [], pending: [], next: "" }),
+  /**
+   * One line on where the session left off (L0), so a later session can tell
+   * whether it continues this one without reading the branches. Written by the
+   * session-end pass; old records have none.
+   */
+  leftOff: external_exports.string().max(400).optional(),
   nodes: external_exports.array(LineageNode).default([]),
   /** The linked git worktree the session ran in; set by the CLI, never by the agent. */
   worktree: external_exports.object({ path: external_exports.string().min(1), branch: external_exports.string().min(1).nullable() }).optional(),
@@ -20441,6 +20448,7 @@ var SessionInput = external_exports.object({
   title: external_exports.string().max(200).optional(),
   epoch: Slug.nullable().optional(),
   status: Status.optional(),
+  leftOff: external_exports.string().max(400).optional(),
   nodes: external_exports.array(LineageNodeInput).optional()
 });
 
@@ -21065,13 +21073,23 @@ function displayTurn(turn, roots) {
     ...turn,
     text: capped(text),
     replies: turn.replies.map(capped),
-    tools: { ...turn.tools, files: turn.tools.files.map(relative3) }
+    // Steps and questions feed the recorder only; the map keeps the counts.
+    tools: {
+      commands: turn.tools.commands,
+      files: turn.tools.files.map(relative3),
+      other: turn.tools.other
+    }
   };
 }
 var EDIT_TOOLS = /* @__PURE__ */ new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 var CLEAR = /<command-name>\s*\/clear\s*<\/command-name>/;
 var LINE_UUID = /"uuid":"([^"]+)"/;
 var LINE_PARENT = /"parentUuid":"([^"]+)"/;
+var LIST_LIMIT = 40;
+function addOnce(tools, key, text) {
+  const list = tools[key] ?? [];
+  if (list.length < LIST_LIMIT && !list.includes(text)) tools[key] = [...list, text.slice(0, 300)];
+}
 function addAssistant(turn, line) {
   if (line.isSidechain) return;
   const content = line.message?.content;
@@ -21080,11 +21098,23 @@ function addAssistant(turn, line) {
     if (block?.type === "text" && typeof block.text === "string" && block.text.trim() !== "") {
       turn.replies.push(block.text);
     } else if (block?.type === "tool_use") {
-      const path = block.input?.file_path;
-      if (block.name === "Bash") turn.tools.commands += 1;
-      else if (EDIT_TOOLS.has(block.name) && typeof path === "string") {
+      const input2 = block.input ?? {};
+      const path = input2.file_path;
+      if (block.name === "Bash") {
+        turn.tools.commands += 1;
+        if (typeof input2.description === "string" && input2.description.trim() !== "")
+          addOnce(turn.tools, "steps", input2.description.trim());
+      } else if (EDIT_TOOLS.has(block.name) && typeof path === "string") {
         if (!turn.tools.files.includes(path)) turn.tools.files.push(path);
-      } else turn.tools.other += 1;
+      } else {
+        turn.tools.other += 1;
+        if (block.name === "AskUserQuestion" && Array.isArray(input2.questions))
+          for (const q of input2.questions) {
+            if (typeof q?.question !== "string") continue;
+            const options = Array.isArray(q.options) ? q.options.map((o) => o?.label).filter((label) => typeof label === "string") : [];
+            addOnce(turn.tools, "asks", `${q.question} [${options.join(" | ")}]`);
+          }
+      }
     }
   }
 }
@@ -21851,6 +21881,8 @@ export {
   Config,
   SESSION_SCHEMA,
   MESSAGE_ID,
+  BranchSummary,
+  Status,
   SessionInput,
   STATE_SCHEMA,
   LockBusyError,
