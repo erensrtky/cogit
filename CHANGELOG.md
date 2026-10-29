@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- The message rows of an open session stand in columns (time, number, message, commits and changes) under a small head; drag a column's edge in the head to make it wider or narrower, double-click it to reset. The widths apply to every session and are remembered in this browser.
 
 ## [0.21.2] - 2026-10-29
 ### Changed

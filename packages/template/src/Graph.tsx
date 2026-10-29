@@ -14,11 +14,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { unreadViewMessages } from "../../cli/src/view/change.js";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
+import { COLUMN_HEAD, ColumnHead, loadColumns, saveColumns } from "./ColumnHead.js";
 import { pageToken, saveRead } from "./data.js";
 import { type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
-import { type GitLayout, layoutGitGraph } from "./gitLayout.js";
+import { type GitLayout, layoutGitGraph, type RowColumns } from "./gitLayout.js";
 import { centreViewport, headOf, type MapPoint } from "./graph.js";
 import type { MapSearchState } from "./MapSearch.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
@@ -54,6 +55,8 @@ const GraphActions = createContext<{
   openNode: (sessionId: string, messageId: string, branchId?: string) => void;
   openContinue: (sessionId: string, messageId: string) => void;
   unfold: (segmentId: string) => void;
+  /** Sets the message rows' column widths (the column head's handles). */
+  resizeColumns: (columns: RowColumns) => void;
 }>({
   selection: null,
   openIds: new Set(),
@@ -63,6 +66,7 @@ const GraphActions = createContext<{
   openNode: () => {},
   openContinue: () => {},
   unfold: () => {},
+  resizeColumns: () => {},
 });
 
 /** An opened session: its message graph and where it sits on the canvas. */
@@ -93,24 +97,27 @@ function SessionMessages({
   highlights: ReadonlySet<string> | undefined;
   activeHitId: string | null;
 }) {
-  const { selection, readIds, bigChangeLines, openNode, openContinue, unfold } =
+  const { selection, readIds, bigChangeLines, openNode, openContinue, unfold, resizeColumns } =
     useContext(GraphActions);
   const own = selection?.sessionId === session.sessionId;
   if (git.rows.length === 0)
     return <p className="graph-status empty">No messages recorded in this session yet.</p>;
   return (
-    <GitGraph
-      git={git}
-      selectedId={selection?.type === "node" && own ? selection.nodeId : null}
-      activeSegmentId={selection?.type === "node" && own ? (selection.branchId ?? null) : null}
-      highlightIds={highlights}
-      activeHitId={activeHitId}
-      readIds={readIds}
-      bigChangeLines={bigChangeLines}
-      onSelect={(row) => openNode(session.sessionId, row.message.id, row.segmentId)}
-      onUnfold={unfold}
-      onContinue={(continues) => openContinue(continues.sessionId, continues.id)}
-    />
+    <>
+      <ColumnHead git={git} onResize={resizeColumns} />
+      <GitGraph
+        git={git}
+        selectedId={selection?.type === "node" && own ? selection.nodeId : null}
+        activeSegmentId={selection?.type === "node" && own ? (selection.branchId ?? null) : null}
+        highlightIds={highlights}
+        activeHitId={activeHitId}
+        readIds={readIds}
+        bigChangeLines={bigChangeLines}
+        onSelect={(row) => openNode(session.sessionId, row.message.id, row.segmentId)}
+        onUnfold={unfold}
+        onContinue={(continues) => openContinue(continues.sessionId, continues.id)}
+      />
+    </>
   );
 }
 
@@ -227,6 +234,9 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     return { type: "node", sessionId: initial.sessionId, nodeId: initial.messageId };
   });
   const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
+  /** Message rows' column widths; the same for every session, kept in this browser. */
+  const [columns, setColumns] = useState<RowColumns>(loadColumns);
+  useEffect(() => saveColumns(columns), [columns]);
   const [openAll, setOpenAll] = useState(false);
   const [showOutline, setShowOutline] = useState(true);
   // The files, unread and outline views share the left column; only one shows.
@@ -337,6 +347,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       let options = {
         unfolded,
         openAll,
+        columns,
         headId: head?.sessionId === sessionId ? head.messageId : null,
       };
       // A search hit inside a folded branch must be visible to be highlighted,
@@ -372,6 +383,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     openIds,
     unfolded,
     openAll,
+    columns,
     highlights,
     head?.sessionId,
     head?.messageId,
@@ -385,7 +397,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     for (const [sessionId, git] of messageGits)
       out.set(
         sessionId,
-        OPEN_TOP + (git.rows.length === 0 ? OPEN_EMPTY : git.height) + OPEN_BOTTOM,
+        OPEN_TOP + (git.rows.length === 0 ? OPEN_EMPTY : COLUMN_HEAD + git.height) + OPEN_BOTTOM,
       );
     return out;
   }, [messageGits]);
@@ -421,7 +433,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       // Frame the whole row (lanes and text), not only its dot.
       return {
         x: opening.left + opening.git.graphWidth / 2,
-        y: opening.top + row.y,
+        y: opening.top + COLUMN_HEAD + row.y,
         left: opening.left,
         right: opening.left + opening.git.width,
       };
@@ -579,6 +591,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       openNode,
       openContinue,
       unfold,
+      resizeColumns: setColumns,
     }),
     [selection, openIds, readIds, bigChangeLines, toggleSession, openNode, openContinue, unfold],
   );

@@ -1,4 +1,4 @@
-import { type MouseEvent, type ReactElement, useMemo } from "react";
+import { type CSSProperties, type MouseEvent, type ReactElement, useMemo } from "react";
 import { formatChange, isBigChange } from "../../cli/src/view/change.js";
 import type { ViewNode } from "../../cli/src/view/model.js";
 import { formatStamp } from "./format.js";
@@ -7,9 +7,11 @@ import {
   type GitLayout,
   type GitMessageRow,
   type GitRow,
+  ID_COLUMN,
   LANE_COLORS,
   linkArrow,
   linkPath,
+  type RowColumns,
 } from "./gitLayout.js";
 
 /**
@@ -20,6 +22,17 @@ import {
 
 function color(index: number): string {
   return `var(--l${index % LANE_COLORS})`;
+}
+
+/** The column widths as CSS variables for the rows' grid (`styles.css`). */
+export function columnVars(columns: RowColumns | undefined): CSSProperties {
+  if (!columns) return {};
+  return {
+    "--col-time": `${columns.time}px`,
+    "--col-id": `${ID_COLUMN}px`,
+    "--col-title": `${columns.title}px`,
+    "--col-details": `${columns.details}px`,
+  } as CSSProperties;
 }
 
 function rowRange(row: GitRow): string {
@@ -120,52 +133,54 @@ function Row({
       <span className="git-time">{rowRange(row)}</span>
       <span className="git-id">{message.label ?? message.id}</span>
       <span className="git-title">{message.title}</span>
-      {row.tags.length > 0 ? (
-        <span className="git-tags">
-          {row.tags.map((tag) => (
-            // A span, not a button: the whole row is already a button.
-            <span
-              key={tag.hash}
-              className={`git-tag${tag.missing ? " is-missing" : ""}`}
-              title={
-                tag.missing
-                  ? `commit ${tag.short} is not in this repository`
-                  : `${tag.short} ${tag.subject ?? ""}`
-              }
-              onClick={(event: MouseEvent) => {
-                event.stopPropagation();
-                onSelect(row);
-              }}
-            >
-              {tag.short}
-            </span>
-          ))}
-        </span>
-      ) : null}
-      {message.change ? (
-        <span
-          className="git-change"
-          title={`The commits linked to this message changed ${message.change.added} lines added, ${message.change.removed} removed${read ? " (read)" : ""}`}
-        >
-          {formatChange(message.change)}
-        </span>
-      ) : null}
-      {message.continues ? (
-        <span
-          className="git-continues"
-          title={`Open ${message.continues.sessionTitle} at ${message.continues.label ?? message.continues.id}`}
-          onClick={(event: MouseEvent) => {
-            event.stopPropagation();
-            onContinue(message.continues as NonNullable<ViewNode["continues"]>);
-          }}
-        >
-          ↑ continues {message.continues.sessionTitle} ·{" "}
-          {message.continues.label ?? message.continues.id}
-        </span>
-      ) : null}
-      {returnMark(row)}
-      {row.head ? <span className="left-off">left off here</span> : null}
-      {message.unsummarized ? <span className="unsummarized">not summarized yet</span> : null}
+      <span className="git-details">
+        {row.tags.length > 0 ? (
+          <span className="git-tags">
+            {row.tags.map((tag) => (
+              // A span, not a button: the whole row is already a button.
+              <span
+                key={tag.hash}
+                className={`git-tag${tag.missing ? " is-missing" : ""}`}
+                title={
+                  tag.missing
+                    ? `commit ${tag.short} is not in this repository`
+                    : `${tag.short} ${tag.subject ?? ""}`
+                }
+                onClick={(event: MouseEvent) => {
+                  event.stopPropagation();
+                  onSelect(row);
+                }}
+              >
+                {tag.short}
+              </span>
+            ))}
+          </span>
+        ) : null}
+        {message.change ? (
+          <span
+            className="git-change"
+            title={`The commits linked to this message changed ${message.change.added} lines added, ${message.change.removed} removed${read ? " (read)" : ""}`}
+          >
+            {formatChange(message.change)}
+          </span>
+        ) : null}
+        {message.continues ? (
+          <span
+            className="git-continues"
+            title={`Open ${message.continues.sessionTitle} at ${message.continues.label ?? message.continues.id}`}
+            onClick={(event: MouseEvent) => {
+              event.stopPropagation();
+              onContinue(message.continues as NonNullable<ViewNode["continues"]>);
+            }}
+          >
+            ↑ continues {message.continues.sessionTitle} ·{" "}
+            {message.continues.label ?? message.continues.id}
+          </span>
+        ) : null}
+        {returnMark(row)}
+        {row.head ? <span className="left-off">left off here</span> : null}
+        {message.unsummarized ? <span className="unsummarized">not summarized yet</span> : null}
+      </span>
     </button>
   );
 }
@@ -211,7 +226,10 @@ export function GitGraph({
   }, [git.segments]);
 
   return (
-    <div className="git-graph" style={{ width: git.width, height: git.height }}>
+    <div
+      className={git.columns ? "git-graph in-columns" : "git-graph"}
+      style={{ width: git.width, height: git.height }}
+    >
       <svg
         className="git-lanes"
         width={git.graphWidth}
@@ -291,7 +309,10 @@ export function GitGraph({
           );
         })}
       </svg>
-      <div className="git-rows" style={{ left: git.graphWidth + 8, width: git.rowWidth }}>
+      <div
+        className="git-rows"
+        style={{ left: git.graphWidth + 8, width: git.rowWidth, ...columnVars(git.columns) }}
+      >
         {git.rows.map((row) => {
           const messageId = row.kind === "message" ? row.message.id : null;
           return (

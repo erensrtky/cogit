@@ -64,6 +64,41 @@ const ROW_GAP = 8;
  */
 export const TITLE_MIN_WIDTH = 180;
 
+/**
+ * Widths of a message row's resizable columns (px): the time, the title and
+ * the details after it (commits, changed lines, marks). The user drags them in
+ * the column head; the message number keeps its own narrow column.
+ */
+export interface RowColumns {
+  time: number;
+  title: number;
+  details: number;
+}
+
+export const DEFAULT_COLUMNS: RowColumns = { time: 74, title: 260, details: 150 };
+export const COLUMN_MIN: RowColumns = { time: 40, title: TITLE_MIN_WIDTH, details: 60 };
+export const COLUMN_MAX = 1200;
+/** The message number column, the gap between columns and the row's padding. */
+export const ID_COLUMN = 36;
+const COLUMN_GAP = 8;
+const COLUMN_PAD = 16;
+
+/** Row text width the columns add up to. */
+export function columnsWidth(columns: RowColumns): number {
+  return COLUMN_PAD + columns.time + ID_COLUMN + columns.title + columns.details + 3 * COLUMN_GAP;
+}
+
+/** Keeps every column between its minimum and `COLUMN_MAX`; junk falls back to the default. */
+export function clampColumns(value: unknown): RowColumns {
+  const raw = (typeof value === "object" && value !== null ? value : {}) as Record<string, unknown>;
+  const pick = (key: keyof RowColumns): number => {
+    const n = raw[key];
+    if (typeof n !== "number" || !Number.isFinite(n)) return DEFAULT_COLUMNS[key];
+    return Math.round(Math.min(COLUMN_MAX, Math.max(COLUMN_MIN[key], n)));
+  };
+  return { time: pick("time"), title: pick("title"), details: pick("details") };
+}
+
 /** How many lane colours the page defines (`--l0` … `--l5`). */
 export const LANE_COLORS = 6;
 
@@ -201,6 +236,8 @@ export interface GitLayout {
   graphWidth: number;
   /** Width of the row text right of the dots. */
   rowWidth: number;
+  /** The column widths the rows were laid out with, if any. */
+  columns?: RowColumns;
   /** Whole box: graph width, gap, then the row text. */
   width: number;
   height: number;
@@ -228,6 +265,11 @@ export interface GitLayoutOptions {
   itemEnd?: (item: GitNode) => number | null;
   /** Width of the row text area; defaults to `ROW_WIDTH`. */
   rowWidth?: number;
+  /**
+   * Message rows laid out in resizable columns: the title wraps inside its own
+   * column and the details wrap inside theirs. Replaces `rowWidth`.
+   */
+  columns?: RowColumns;
   /**
    * Extra height to leave below an item's row, by item id: the project map opens
    * a session in place by reserving room for its messages under the session's
@@ -261,6 +303,45 @@ const TAG_WIDTH = 56;
 const TAG_LINE = 18;
 /** Padding, the time column and the gaps around it. */
 const ROW_FIXED = 106;
+
+/** The things in a row's details column, as rough widths in px. */
+export interface RowDetails {
+  tags: number;
+  change: boolean;
+  continues: string | null;
+  returns: number;
+  head: boolean;
+  unsummarized: boolean;
+}
+
+const DETAIL_LINE = 18;
+
+/**
+ * Height of a message row laid out in columns: the title wraps in its column,
+ * the details wrap in theirs, and the taller of the two decides.
+ */
+export function columnRowHeight(title: string, details: RowDetails, columns: RowColumns): number {
+  const titleLines = Math.max(1, Math.ceil((title.length * TITLE_CHAR) / columns.title));
+  const widths = [
+    ...Array.from({ length: details.tags }, () => TAG_WIDTH),
+    ...(details.change ? [120] : []),
+    ...(details.continues === null ? [] : [150 + details.continues.length * 6.4]),
+    ...Array.from({ length: details.returns }, () => 44),
+    ...(details.head ? [92] : []),
+    ...(details.unsummarized ? [116] : []),
+  ];
+  let lines = 0;
+  let used = columns.details;
+  for (const wanted of widths) {
+    const width = Math.min(wanted, columns.details);
+    if (used + width > columns.details) {
+      lines += 1;
+      used = 0;
+    }
+    used += width + 4;
+  }
+  return Math.max(ROW_HEIGHT, 12 + Math.max(titleLines * TITLE_LINE, lines * DETAIL_LINE));
+}
 
 /**
  * Height of a message row whose title (and branch label) wrap instead of being
@@ -315,7 +396,8 @@ function branchOf(ids: string[], byId: Map<string, GitNode>): GitBranch {
 }
 
 export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = {}): GitLayout {
-  const rowWidth = options.rowWidth ?? ROW_WIDTH;
+  const columns = options.columns;
+  const rowWidth = columns ? columnsWidth(columns) : (options.rowWidth ?? ROW_WIDTH);
   const index = new Map(messages.map((message, at) => [message.id, at]));
   const byId = new Map(messages.map((message) => [message.id, message]));
   const kids = new Map<string | null, string[]>();
@@ -435,17 +517,31 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
       row.segment.ids[0] === row.id;
     if (row.gap) cursor += ROOT_GAP;
     const message = row.kind === "message" ? byId.get(row.id ?? "") : undefined;
-    row.height = message
-      ? rowHeight(
-          message,
-          {
-            returns: (message.links ?? []).filter((id) => segOf.has(id)).length,
-            tags: tagsOf(message).length,
-            head: message.id === headId,
-          },
-          rowWidth,
-        )
-      : ROW_HEIGHT;
+    const returns = message ? (message.links ?? []).filter((id) => segOf.has(id)).length : 0;
+    row.height = !message
+      ? ROW_HEIGHT
+      : columns
+        ? columnRowHeight(
+            message.title,
+            {
+              tags: tagsOf(message).length,
+              change: message.change !== undefined,
+              continues: message.continues?.sessionTitle ?? null,
+              returns,
+              head: message.id === headId,
+              unsummarized: message.unsummarized === true,
+            },
+            columns,
+          )
+        : rowHeight(
+            message,
+            {
+              returns,
+              tags: tagsOf(message).length,
+              head: message.id === headId,
+            },
+            rowWidth,
+          );
     row.y = cursor + row.height / 2;
     cursor += row.height;
     const space = row.kind === "message" ? options.spaceAfter?.get(row.id ?? "") : undefined;
@@ -563,6 +659,7 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
     laneX,
     graphWidth,
     rowWidth,
+    ...(columns ? { columns } : {}),
     width: graphWidth + ROW_GAP + rowWidth,
     height: cursor,
     headId,

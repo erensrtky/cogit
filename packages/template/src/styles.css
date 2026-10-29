@@ -2185,6 +2185,100 @@ time {
   background: var(--hover);
 }
 
+/* Outside columns the details are part of the row's flex line, as before. */
+.git-details {
+  display: contents;
+}
+
+/* Message rows in resizable columns: time, number, title, details. The widths
+   come from `--col-*`, set by `columnVars` from the column head's handles. */
+.in-columns .git-row {
+  display: grid;
+  grid-template-columns: var(--col-time) var(--col-id) var(--col-title) var(--col-details);
+  column-gap: 8px;
+}
+
+.in-columns .git-time {
+  width: auto;
+}
+
+.in-columns .git-title {
+  min-width: 0;
+}
+
+.in-columns .git-more .git-title {
+  grid-column: 1 / -1;
+}
+
+.in-columns .git-details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+  min-width: 0;
+}
+
+.in-columns .git-tags {
+  justify-content: flex-start;
+  max-width: none;
+}
+
+.in-columns .git-continues {
+  max-width: 100%;
+}
+
+.in-columns .left-off,
+.in-columns .unsummarized {
+  margin-top: 0;
+}
+
+.column-head {
+  display: grid;
+  grid-template-columns: var(--col-time) var(--col-id) var(--col-title) var(--col-details);
+  column-gap: 8px;
+  height: 22px;
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+  align-items: center;
+}
+
+.column-name {
+  position: relative;
+  white-space: nowrap;
+}
+
+/* A thin bar on the column's right edge, inside the 8px gap; wider to grab. */
+.column-handle {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  width: 8px;
+  height: 22px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.column-handle::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--line);
+}
+
+.column-handle:hover::after,
+.column-handle.is-dragging::after {
+  background: var(--accent);
+}
+
 .git-row.in-branch {
   background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
