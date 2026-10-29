@@ -386,5 +386,6 @@ export function embedViewModel(template: string, model: PageModel): string {
   const data = `<script id="${DATA_ELEMENT_ID}" type="application/json">${escapeForScript(
     JSON.stringify(model),
   )}</script>`;
-  return template.replace(EMPTY_DATA_ELEMENT, data);
+  // A function, not a string: a `$'` or `$&` in the data must not act as a replace pattern.
+  return template.replace(EMPTY_DATA_ELEMENT, () => data);
 }

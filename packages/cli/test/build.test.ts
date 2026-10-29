@@ -434,6 +434,11 @@ describe("embedViewModel", () => {
     expect(embedded(html)).toEqual(risky);
   });
 
+  it("keeps a `$'` or `$&` in the data as text, not as a replace pattern", () => {
+    const priced = { ...model, project: { ...model.project, name: "under 0,02 $'s budget $& $`" } };
+    expect(embedded(embedViewModel(TEMPLATE, priced))).toEqual(priced);
+  });
+
   it("refuses a template without the data element", () => {
     expect(() => embedViewModel("<html></html>", model)).toThrow(/no empty/);
   });
