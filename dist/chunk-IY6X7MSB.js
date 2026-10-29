@@ -21890,6 +21890,7 @@ export {
   Status,
   SessionInput,
   STATE_SCHEMA,
+  HookState,
   LockBusyError,
   isLockHeld,
   withLock,
