@@ -2220,22 +2220,6 @@ time {
   white-space: nowrap;
 }
 
-.git-branch {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 150px;
-  overflow: hidden;
-  padding: 1px 6px;
-  color: var(--on-lane);
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background: var(--accent);
-  border-radius: 4px;
-}
-
 .git-id {
   flex: none;
   color: var(--muted);

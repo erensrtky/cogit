@@ -252,9 +252,6 @@ interface RawRow {
 /** Average glyph widths at the row's font sizes; a rough estimate is enough. */
 const TITLE_CHAR = 6.4;
 const TITLE_LINE = 16;
-const BRANCH_CHAR = 6;
-const BRANCH_LINE = 14;
-const BRANCH_MAX = 150;
 /**
  * Commit tags stand in a block of at most this many per line and wrap below
  * instead of being clipped; keep in step with `.git-tags` in `styles.css`.
@@ -270,24 +267,14 @@ const ROW_FIXED = 106;
  * cut with an ellipsis: the width left for the title after the fixed parts of
  * the row decides how many lines it needs.
  */
-/**
- * Whether a branch's first row shows its name: a branch without a summary is
- * named after that first message, and the pill would only repeat its title.
- */
-export function showsBranchPill(first: boolean, branchTitle: string, title: string): boolean {
-  return first && branchTitle.trim() !== title.trim();
-}
-
 export function rowHeight(
   message: GitNode,
-  row: { first: boolean; branchTitle: string; returns: number; tags: number; head: boolean },
+  row: { returns: number; tags: number; head: boolean },
   rowWidth = ROW_WIDTH,
 ): number {
-  const pill = showsBranchPill(row.first, row.branchTitle, message.title);
   const fixed =
     ROW_FIXED +
     (message.label ?? message.id).length * 7 +
-    (pill ? BRANCH_MAX + 8 : 0) +
     row.returns * 44 +
     Math.min(row.tags, TAGS_PER_LINE) * TAG_WIDTH +
     (row.head ? 92 : 0) +
@@ -296,14 +283,8 @@ export function rowHeight(
     (message.continues ? 150 + message.continues.sessionTitle.length * 6.4 : 0);
   const room = Math.max(TITLE_MIN_WIDTH, rowWidth - fixed);
   const titleLines = Math.max(1, Math.ceil((message.title.length * TITLE_CHAR) / room));
-  const branchLines = pill
-    ? Math.max(1, Math.ceil((row.branchTitle.length * BRANCH_CHAR) / (BRANCH_MAX - 12)))
-    : 1;
   const tagLines = Math.ceil(row.tags / TAGS_PER_LINE);
-  return Math.max(
-    ROW_HEIGHT,
-    12 + Math.max(titleLines * TITLE_LINE, branchLines * BRANCH_LINE, tagLines * TAG_LINE),
-  );
+  return Math.max(ROW_HEIGHT, 12 + Math.max(titleLines * TITLE_LINE, tagLines * TAG_LINE));
 }
 
 /** Parent ids that point forward, at themselves or outside the session become roots. */
@@ -458,8 +439,6 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
       ? rowHeight(
           message,
           {
-            first: row.segment.ids[0] === message.id,
-            branchTitle: row.segment.branch.title,
             returns: (message.links ?? []).filter((id) => segOf.has(id)).length,
             tags: tagsOf(message).length,
             head: message.id === headId,

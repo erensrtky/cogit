@@ -1,12 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import {
-  ROW_HEIGHT,
-  rowHeight,
-  showsBranchPill,
-  TAGS_PER_LINE,
-  TITLE_MIN_WIDTH,
-} from "../src/gitLayout.js";
+import { ROW_HEIGHT, rowHeight, TAGS_PER_LINE, TITLE_MIN_WIDTH } from "../src/gitLayout.js";
 import { shouldForwardWheel } from "../src/scroll.js";
 
 /**
@@ -103,8 +97,6 @@ describe("map layout (Story 9.2)", () => {
   it("never squeezes a title into a one-letter column", () => {
     expect(value(".git-title", "min-width")).toBe(`${TITLE_MIN_WIDTH}px`);
     // Every chip beside the title may shrink and truncate instead of pushing it.
-    expect(declarations(".git-branch")).toMatch(/flex:\s*0 1 auto/);
-    expect(declarations(".git-branch")).toMatch(/text-overflow:\s*ellipsis/);
     expect(declarations(".git-continues")).toMatch(/flex:\s*0 1 auto/);
     expect(declarations(".git-continues")).toMatch(/text-overflow:\s*ellipsis/);
   });
@@ -113,33 +105,16 @@ describe("map layout (Story 9.2)", () => {
     // 120 characters need 5 lines at 180px, but would need 7 at the old 120px
     // floor; the height follows the title, not the chips next to it.
     const message = { id: "x", label: "m1", title: "a".repeat(120) };
-    const height = rowHeight(message, {
-      first: true,
-      branchTitle: "a very long branch label that leaves no room",
-      returns: 2,
-      tags: 3,
-      head: false,
-    });
+    // A narrow map: the chips leave the title only its minimum width.
+    const height = rowHeight(message, { returns: 2, tags: 3, head: false }, 300);
     expect(height).toBeGreaterThanOrEqual(12 + Math.ceil((120 * 6.4) / TITLE_MIN_WIDTH) * 16);
-  });
-
-  it("leaves out a branch pill that would repeat the title", () => {
-    expect(showsBranchPill(true, "Fix the map", " Fix the map ")).toBe(false);
-    expect(showsBranchPill(true, "Map fixes", "Fix the map")).toBe(true);
-    expect(showsBranchPill(false, "Map fixes", "Fix the map")).toBe(false);
-    // Without the pill the title gets its room back and needs fewer lines.
-    const message = { id: "x", label: "m1", title: "a".repeat(90) };
-    const row = { first: true, returns: 0, tags: 0, head: false };
-    expect(rowHeight(message, { ...row, branchTitle: message.title })).toBeLessThan(
-      rowHeight(message, { ...row, branchTitle: "Map fixes" }),
-    );
   });
 
   it("wraps commit tags below each other instead of clipping them", () => {
     expect(declarations(".git-tags")).toMatch(/flex-wrap:\s*wrap/);
     expect(declarations(".git-tags")).not.toMatch(/overflow:\s*hidden/);
     expect(declarations(".git-tag")).toMatch(/flex:\s*none/);
-    const row = { first: false, branchTitle: "", returns: 0, head: false };
+    const row = { returns: 0, head: false };
     const message = { id: "x", label: "m28", title: "short" };
     expect(rowHeight(message, { ...row, tags: TAGS_PER_LINE })).toBe(ROW_HEIGHT);
     // A third tag starts a second line, so the row grows to hold it.

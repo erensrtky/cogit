@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- The map no longer shows a branch pill that only repeats the message title next to it (a branch without a summary is named after its first message).
+- The map no longer draws the coloured branch-name pill in front of a branch's first row and its "⋮ N more" row; it mostly repeated the message title. The lane colour still marks the branch, and the branch summary stays in the detail panel.
 ### Fixed
 - A new session shows on the map while its first turn is still running; 0.21.1 listed it only once that turn ended.
 - The side model's message ids are checked against the transcript: a node with an id it made up is no longer stored, so the real message stays unrecorded and the next catch-up records it. Before, the made-up nodes counted as recorded, the real messages were never recorded, and the closing pass wrote a stale "where it left off" line without them.

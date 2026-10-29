@@ -10,7 +10,6 @@ import {
   LANE_COLORS,
   linkArrow,
   linkPath,
-  showsBranchPill,
 } from "./gitLayout.js";
 
 /**
@@ -43,7 +42,6 @@ function returnMark(row: GitMessageRow): ReactElement | null {
 
 function Row({
   row,
-  branchTitle,
   selected,
   branchSelected,
   searchHit,
@@ -55,7 +53,6 @@ function Row({
   onContinue,
 }: {
   row: GitRow;
-  branchTitle: string;
   selected: boolean;
   branchSelected: boolean;
   /** The message matches the search (Story 8.14). */
@@ -88,9 +85,6 @@ function Row({
         }}
         title="Show the folded messages of this branch"
       >
-        <span className="git-branch" style={{ background: color(row.colorIndex) }}>
-          {branchTitle}
-        </span>
         <span className="git-title">⋮ {row.hidden.length} more — open</span>
       </button>
     );
@@ -124,11 +118,6 @@ function Row({
       title={message.summary || message.title}
     >
       <span className="git-time">{rowRange(row)}</span>
-      {showsBranchPill(row.first, branchTitle, message.title) ? (
-        <span className="git-branch" style={{ background: color(row.colorIndex) }}>
-          {branchTitle}
-        </span>
-      ) : null}
       <span className="git-id">{message.label ?? message.id}</span>
       <span className="git-title">{message.title}</span>
       {row.tags.length > 0 ? (
@@ -304,13 +293,11 @@ export function GitGraph({
       </svg>
       <div className="git-rows" style={{ left: git.graphWidth + 8, width: git.rowWidth }}>
         {git.rows.map((row) => {
-          const branch = branches.get(row.segmentId);
           const messageId = row.kind === "message" ? row.message.id : null;
           return (
             <Row
               key={row.kind === "more" ? `${row.segmentId}-more` : row.message.id}
               row={row}
-              branchTitle={branch?.branch.title ?? ""}
               selected={messageId !== null && selectedId !== null && messageId === selectedId}
               branchSelected={activeSegmentId !== null && row.segmentId === activeSegmentId}
               searchHit={messageId !== null && highlightIds?.has(messageId) === true}

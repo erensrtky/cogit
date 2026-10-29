@@ -158,7 +158,8 @@ describe("rows", () => {
       message("m3", "m2", { unsummarized: true }),
     ]);
     const [first, second, third] = messageRows;
-    expect(first!.height).toBeGreaterThan(ROW_HEIGHT);
+    // The branch name is not drawn in the row, so it never makes the row taller.
+    expect(first!.height).toBe(ROW_HEIGHT);
     expect(second!.height).toBeGreaterThanOrEqual(ROW_HEIGHT + 2 * 16);
     expect(third!.height).toBe(ROW_HEIGHT);
     expect(second!.y - second!.height / 2).toBe(first!.y + first!.height / 2);
