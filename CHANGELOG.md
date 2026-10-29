@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- The message rows of an open session stand in columns (time, number, message, commits and changes) under a small head; drag a column's edge in the head to make it wider or narrower, double-click it to reset. The widths apply to every session and are remembered in this browser.
+- Drag the right edge of an open session's messages to make the rows wider or narrower, so long titles wrap into fewer lines; double-click the edge to reset. The width applies to every session and is remembered in this browser.
 
 ## [0.21.2] - 2026-10-29
 ### Changed
