@@ -109,7 +109,7 @@ describe("Project and Config schemas", () => {
     expect(Config.parse({ schema: 1 })).toMatchObject({
       language: "auto",
       updateEveryTurns: 15,
-      recorder: "mixed",
+      recorder: "side",
       sideModel: "haiku",
       sideEveryTurns: 5,
       sessionEndCatchUp: true,

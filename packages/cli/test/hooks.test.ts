@@ -165,6 +165,8 @@ describe("runHook", () => {
   const initialized = async (everyTurns: number) => {
     await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(env));
     await configSet("updateEveryTurns", String(everyTurns), fakeIo(env));
+    // These tests drive the main agent's check-ins, which only Detailed mode asks for.
+    await configSet("recorder", "mixed", fakeIo(env));
   };
 
   it("offers setup before init on startup and resume, but not on clear", async () => {

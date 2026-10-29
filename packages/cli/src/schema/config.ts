@@ -16,10 +16,11 @@ export const Config = z.object({
   sessionEndCatchUp: z.boolean().default(true),
   /**
    * Who writes the record (Story 12.1): the main agent (`agent`), both (`mixed`,
-   * the default: a side model often, the agent rarely), or only the side model
-   * (`side`, the agent is never interrupted).
+   * "Detailed" in the panel: a side model often, the agent rarely), or only the
+   * side model (`side`, "Economical", the default since 0.21: the agent is never
+   * interrupted and the session-end pass writes the branches).
    */
-  recorder: z.enum(["agent", "mixed", "side"]).default("mixed"),
+  recorder: z.enum(["agent", "mixed", "side"]).default("side"),
   /** Model the side runs use: the headless catch-up and the periodic records. */
   sideModel: z.string().trim().min(1).max(64).default("haiku"),
   /** How often the side model records, in turns (Story 12.1). */

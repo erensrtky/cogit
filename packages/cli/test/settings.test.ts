@@ -65,16 +65,12 @@ describe("settings model", () => {
   it("returns only the editable keys with their current values", () => {
     const settings = { ...DEFAULT_SETTINGS, language: "tr", updateEveryTurns: 8 };
     expect(editableSettings(settings)).toEqual({
-      recorder: "mixed",
+      recorder: "side",
       messageSummaries: false,
       startupContext: true,
       recordHeadless: false,
       tryBeforeNotes: true,
       language: "tr",
-      updateEveryTurns: 8,
-      sideEveryTurns: 5,
-      sessionEndCatchUp: true,
-      sideModel: "haiku",
       shareConversations: false,
       recordCommit: "ask",
     });
@@ -89,8 +85,11 @@ describe("settings model", () => {
       expect(text).toContain(field.details);
     }
     // The recording-mode explanation states the measured trade-off plainly.
+    expect(text).toContain("about a cent per session");
     expect(text).toContain("1–2%");
-    expect(text).toContain("5%");
+    // The advanced recording keys left the panel but keep their help (0.21).
+    expect(text).toContain("sideEveryTurns");
+    expect(text).toContain("sideModel");
   });
 
   it("formats a read-only value for the modal", () => {

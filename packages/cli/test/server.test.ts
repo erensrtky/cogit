@@ -419,7 +419,7 @@ describe("settings write", () => {
     try {
       expect(await events.waitFor("retry: 1000")).toBe(true);
       const token = await panelToken(server);
-      const reply = await configWrite(server, token, { key: "sessionEndCatchUp", value: false });
+      const reply = await configWrite(server, token, { key: "messageSummaries", value: true });
       expect(reply.status).toBe(200);
       expect(await events.waitFor("event: change")).toBe(true);
     } finally {
@@ -547,16 +547,12 @@ describe("settings read", () => {
     expect(JSON.parse(reply.body)).toEqual({
       ok: true,
       settings: {
-        recorder: "mixed",
+        recorder: "side",
         messageSummaries: false,
         startupContext: true,
         recordHeadless: false,
         tryBeforeNotes: true,
         language: "auto",
-        updateEveryTurns: 15,
-        sideEveryTurns: 5,
-        sessionEndCatchUp: true,
-        sideModel: "haiku",
         shareConversations: false,
         recordCommit: "ask",
       },
@@ -570,16 +566,20 @@ describe("settings read", () => {
       [CONFIG_TOKEN_HEADER]: token,
     });
     expect(reply.status).toBe(200);
-    expect(JSON.parse(reply.body).settings.updateEveryTurns).toBe(15);
+    expect(JSON.parse(reply.body).settings.recorder).toBe("side");
   });
 
   it("shows a value changed after the page was built", async () => {
     const server = await start();
     const token = await panelToken(server);
-    const write = await configWrite(server, token, { key: "updateEveryTurns", value: 8 });
+    const write = await configWrite(server, token, { key: "recorder", value: "mixed" });
     expect(write.status).toBe(200);
     const reply = await configRead(server, token);
-    expect(JSON.parse(reply.body).settings.updateEveryTurns).toBe(8);
+    expect(JSON.parse(reply.body).settings.recorder).toBe("mixed");
+    // The advanced recording keys stay on `cogit config set` (0.21).
+    expect((await configWrite(server, token, { key: "updateEveryTurns", value: 8 })).status).toBe(
+      400,
+    );
   });
 
   it("rejects a wrong token, a foreign origin and a foreign Host", async () => {

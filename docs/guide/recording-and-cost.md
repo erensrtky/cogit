@@ -15,14 +15,16 @@ Two writers share the record, and `recorder` decides which ones run:
 Each writer owns its own fields: the side model fills what is empty and never overwrites what
 the agent wrote.
 
-| `recorder` | What happens | Cost in our sessions |
-|---|---|---|
-| `mixed` (default) | The side model records every 5 turns (`sideEveryTurns`); the agent checks in every 15 (`updateEveryTurns`) to add its decisions | about 1–2% of a session's tokens |
-| `agent` | The agent records everything itself every `updateEveryTurns` turns | about 3–7%, more in short sessions |
-| `side` | Only the side model records; the agent is never asked | the side model's runs only |
+| `recorder` | Panel | What happens | Cost in our sessions |
+|---|---|---|---|
+| `side` (default) | Economical | Only the side model records, every 5 turns (`sideEveryTurns`); the agent is never asked | about a cent per session |
+| `mixed` | Detailed | As above, and the agent checks in every 15 turns (`updateEveryTurns`) to add its decisions | about 1–2% of a session's tokens |
+| `agent` | (config only) | The agent records everything itself every `updateEveryTurns` turns | about 3–7%, more in short sessions |
 
-When a session ends, the side model records whatever is still unrecorded
-(`sessionEndCatchUp`). Nothing in the chat waits for it.
+When a session ends, the side model records whatever is still unrecorded and then closes the
+session (`sessionEndCatchUp`): it reads the whole session once, splits it into threads, hangs
+each message from the thread it belongs to, and writes the branch summaries and one line on
+where the session left off. Nothing in the chat waits for it.
 
 ## What it costs
 
@@ -30,8 +32,10 @@ The side model runs with your own Claude Code login, like any `claude -p` run, s
 your plan or API account. Haiku is about thirty times cheaper than the main model per token.
 In an A/B over three real sessions (109 messages) Haiku matched the main agent on message
 parents in 94% of cases and was good on titles and your decisions; it was weaker on the
-agent's own technical decisions and branch summaries, which is why `mixed` still asks the
-agent every 15 turns.
+agent's own technical decisions and at splitting a session into threads. Telling it what the
+agent did in each turn (its steps, questions and edited files) fixed most of the first, and
+the session-end pass fixed the second, so `side` is the default since 0.21. Choose `mixed`
+(Detailed) when you want the agent's own account of its decisions as well.
 
 To record less often, raise `sideEveryTurns` and `updateEveryTurns`. To spend nothing on
 recording during the session, use `recorder: side` and turn `sessionEndCatchUp` off; the

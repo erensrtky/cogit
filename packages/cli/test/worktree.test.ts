@@ -146,6 +146,7 @@ describe("commands in a worktree", () => {
 
   it("counts hook turns for a worktree session in the main checkout", async () => {
     await configSet("updateEveryTurns", "1", fakeIo(env));
+    await configSet("recorder", "mixed", fakeIo(env));
     const input = JSON.stringify({ session_id: "s1", cwd: wt });
     const out = await runHook("stop", input, { ...env, CLAUDE_PROJECT_DIR: wt }, T0, () => {});
     expect(out).toBeDefined();

@@ -50,29 +50,30 @@ export interface FieldSpec {
 const EDITABLE: FieldSpec[] = [
   {
     key: "recorder",
-    label: "Recording mode",
-    help: "Who writes the record: a side model, the main agent, or both.",
+    label: "Recording",
+    help: "How much of the chat goes into the record.",
     details:
-      "Who writes the record. Mixed (recommended): a small side model records every few " +
-      "turns and the main agent still checks in every 15 turns to record its own decisions; " +
-      "measured on real sessions this costs about 1–2% of a session. Main agent: the agent " +
-      "records its own work every few turns, which costs about 5% of a session but catches its " +
-      "technical decisions best. Side model only: a small model records everything in the " +
-      "background and the agent is never interrupted.",
+      "Economical (recommended): a small model records in the background every few turns and " +
+      "closes each session with one pass that finds its threads, writes the branch summaries " +
+      "and one line on where the session left off. The agent is never interrupted; it costs " +
+      "about a cent per session. Detailed: on top of that, the main agent records its own " +
+      "decisions every 15 turns. It catches the agent's technical choices best and costs about " +
+      "1–2% of a session. A third mode, where only the main agent records, is set with " +
+      "`cogit config set recorder agent`.",
     kind: "select",
     options: [
-      { value: "mixed", label: "Mixed (recommended)" },
-      { value: "agent", label: "Main agent" },
-      { value: "side", label: "Side model only" },
+      { value: "side", label: "Economical (recommended)" },
+      { value: "mixed", label: "Detailed" },
     ],
   },
   {
     key: "messageSummaries",
-    label: "Message summaries",
-    help: "Write a one-line summary for each recorded message.",
+    label: "One-line summary under each message",
+    help: "A sentence under each message title on the map.",
     details:
       "A one-sentence summary under each message title, so a skim reads better. Off keeps " +
-      "the record shorter and cheaper.",
+      "the record shorter and cheaper. Branch summaries and the line on where a session left " +
+      "off are written either way.",
     kind: "boolean",
   },
   {
@@ -115,43 +116,6 @@ const EDITABLE: FieldSpec[] = [
     kind: "text",
   },
   {
-    key: "updateEveryTurns",
-    label: "Record every N turns",
-    help: "Ask the agent to record after this many turns.",
-    details:
-      "How often the main agent is asked to update the record inside the chat. In mixed mode " +
-      "the side model records in between, so this can be rare (15 turns by default).",
-    kind: "number",
-  },
-  {
-    key: "sideEveryTurns",
-    label: "Side model every N turns",
-    help: "How often the background recorder writes in mixed or side mode.",
-    details:
-      "How often the small side model records in the background. A lower number keeps the " +
-      "map fresher and costs a little more; a higher number is quieter.",
-    kind: "number",
-  },
-  {
-    key: "sessionEndCatchUp",
-    label: "Side model at session end",
-    help: "When a session ends, the side model records the messages still unrecorded.",
-    details:
-      "When a session ends, the side model records whatever nobody got to. It runs outside " +
-      "the chat, so it does not spend the session's tokens.",
-    kind: "boolean",
-  },
-  {
-    key: "sideModel",
-    label: "Side model",
-    help: "The small model that records outside the chat.",
-    details:
-      "The small model behind every side record: every few turns in mixed mode, all the " +
-      "time in side mode, and at session end. Haiku is cheap and good enough for titles, " +
-      "parents and short decisions.",
-    kind: "text",
-  },
-  {
     key: "shareConversations",
     label: "Share conversations",
     help: "Commit the raw chat text too, not only the session record (off: chat stays local).",
@@ -181,6 +145,40 @@ export interface CliSetting {
 
 /** The settings the panel leaves out; `cogit config --help` and the guide explain them. */
 export const CLI_ONLY: CliSetting[] = [
+  {
+    key: "updateEveryTurns",
+    label: "Record every N turns",
+    help: "Ask the agent to record after this many turns.",
+    details:
+      "How often the main agent is asked to update the record inside the chat. In mixed mode " +
+      "the side model records in between, so this can be rare (15 turns by default).",
+  },
+  {
+    key: "sideEveryTurns",
+    label: "Side model every N turns",
+    help: "How often the background recorder writes in mixed or side mode.",
+    details:
+      "How often the small side model records in the background. A lower number keeps the " +
+      "map fresher and costs a little more; a higher number is quieter.",
+  },
+  {
+    key: "sessionEndCatchUp",
+    label: "Side model at session end",
+    help: "When a session ends, the side model records what is left and closes the session.",
+    details:
+      "When a session ends, the side model records whatever nobody got to, then reads the " +
+      "whole session once to find its threads, write the branch summaries and one line on " +
+      "where it left off. It runs outside the chat, so it does not spend the session's tokens.",
+  },
+  {
+    key: "sideModel",
+    label: "Side model",
+    help: "The small model that records outside the chat.",
+    details:
+      "The small model behind every side record: every few turns in mixed mode, all the " +
+      "time in side mode, and at session end. Haiku is cheap and good enough for titles, " +
+      "parents and short decisions.",
+  },
   {
     key: "gitPolicy",
     label: "Git policy",
@@ -262,7 +260,7 @@ export function configHelpLines(): string[] {
  * the defaults from the config schema, overridden by what the build embedded.
  */
 export const DEFAULT_SETTINGS: PanelSettings = {
-  recorder: "mixed",
+  recorder: "side",
   language: "auto",
   updateEveryTurns: 15,
   sideEveryTurns: 5,
@@ -292,10 +290,6 @@ export function editableSettings(settings: PanelSettings): PanelEditableSettings
     recordHeadless: settings.recordHeadless,
     tryBeforeNotes: settings.tryBeforeNotes,
     language: settings.language,
-    updateEveryTurns: settings.updateEveryTurns,
-    sideEveryTurns: settings.sideEveryTurns,
-    sessionEndCatchUp: settings.sessionEndCatchUp,
-    sideModel: settings.sideModel,
     shareConversations: settings.shareConversations,
     recordCommit: settings.recordCommit,
   };

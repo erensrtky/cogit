@@ -127,6 +127,10 @@ function EditableSetting({ id, field, value, draft, error, onChange }: EditableP
                 {option.label}
               </option>
             ))}
+            {/* A value set with `cogit config set` that the panel does not offer still shows. */}
+            {(field.options ?? []).some((option) => option.value === String(shown)) ? null : (
+              <option value={String(shown)}>{String(shown)}</option>
+            )}
           </select>
         ) : (
           <input

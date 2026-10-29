@@ -184,6 +184,7 @@ describe("commands through the CLI", () => {
   it("runs a hook from stdin and prints its output", async () => {
     await cli("init", root, "--yes", "--retention", "keep");
     await cli("config", "set", "updateEveryTurns", "1");
+    await cli("config", "set", "recorder", "mixed");
     stdin = JSON.stringify({ session_id: "s1", cwd: root });
     await cli("hook", "stop");
     expect(JSON.parse(io.lines.at(-1) ?? "")).toHaveProperty("hookSpecificOutput");

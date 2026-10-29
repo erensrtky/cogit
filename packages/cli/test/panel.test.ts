@@ -81,7 +81,7 @@ describe("buildPanel", () => {
       schema: 1,
       generatedAt: T0,
       settings: {
-        recorder: "mixed",
+        recorder: "side",
         language: "auto",
         updateEveryTurns: 7,
         sideEveryTurns: 5,

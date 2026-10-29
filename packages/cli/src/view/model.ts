@@ -36,10 +36,6 @@ export const PANEL_EDITABLE_KEYS = [
   "recordHeadless",
   "tryBeforeNotes",
   "language",
-  "updateEveryTurns",
-  "sideEveryTurns",
-  "sessionEndCatchUp",
-  "sideModel",
   "shareConversations",
   "recordCommit",
 ] as const;

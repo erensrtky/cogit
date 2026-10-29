@@ -587,7 +587,7 @@ describe("cogit build", () => {
     expect(model.settings).toMatchObject({
       messageSummaries: true,
       startupContext: true,
-      recorder: "mixed",
+      recorder: "side",
       updateEveryTurns: 15,
       shareConversations: false,
       recordCommit: "ask",

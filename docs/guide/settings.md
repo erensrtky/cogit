@@ -8,21 +8,21 @@ or with `cogit config set <key> <value>`; `cogit config get` lists them all.
 
 ## In the panel
 
-### Recording mode
+### Recording
 
-`recorder` · default `mixed`
+`recorder` · default `side`
 
-**Who writes the record: a side model, the main agent, or both.**
+**How much of the chat goes into the record.**
 
-Who writes the record. Mixed (recommended): a small side model records every few turns and the main agent still checks in every 15 turns to record its own decisions; measured on real sessions this costs about 1–2% of a session. Main agent: the agent records its own work every few turns, which costs about 5% of a session but catches its technical decisions best. Side model only: a small model records everything in the background and the agent is never interrupted.
+Economical (recommended): a small model records in the background every few turns and closes each session with one pass that finds its threads, writes the branch summaries and one line on where the session left off. The agent is never interrupted; it costs about a cent per session. Detailed: on top of that, the main agent records its own decisions every 15 turns. It catches the agent's technical choices best and costs about 1–2% of a session. A third mode, where only the main agent records, is set with `cogit config set recorder agent`.
 
-### Message summaries
+### One-line summary under each message
 
 `messageSummaries` · default `false`
 
-**Write a one-line summary for each recorded message.**
+**A sentence under each message title on the map.**
 
-A one-sentence summary under each message title, so a skim reads better. Off keeps the record shorter and cheaper.
+A one-sentence summary under each message title, so a skim reads better. Off keeps the record shorter and cheaper. Branch summaries and the line on where a session left off are written either way.
 
 ### Lineage at session start
 
@@ -56,6 +56,26 @@ Before the agent edits a file, it hears which options earlier thoughts tried and
 
 The language the record is written in. With auto, it follows the language of the conversation.
 
+### Share conversations
+
+`shareConversations` · default `false`
+
+**Commit the raw chat text too, not only the session record (off: chat stays local).**
+
+Also commit the raw chat text, not only the record. Leave it off to keep conversations on your machine while the record still travels with the branch.
+
+### Commit the record
+
+`recordCommit` · default `ask`
+
+**ask, auto or off: what to do with the last messages after the last code commit.**
+
+What happens to record changes made after your last code commit: ask you next time, commit them automatically, or leave them for you to commit.
+
+## Only through `cogit config`
+
+These are set up once, per project, or rarely touched, so the panel leaves them out.
+
 ### Record every N turns
 
 `updateEveryTurns` · default `15`
@@ -76,9 +96,9 @@ How often the small side model records in the background. A lower number keeps t
 
 `sessionEndCatchUp` · default `true`
 
-**When a session ends, the side model records the messages still unrecorded.**
+**When a session ends, the side model records what is left and closes the session.**
 
-When a session ends, the side model records whatever nobody got to. It runs outside the chat, so it does not spend the session's tokens.
+When a session ends, the side model records whatever nobody got to, then reads the whole session once to find its threads, write the branch summaries and one line on where it left off. It runs outside the chat, so it does not spend the session's tokens.
 
 ### Side model
 
@@ -87,26 +107,6 @@ When a session ends, the side model records whatever nobody got to. It runs outs
 **The small model that records outside the chat.**
 
 The small model behind every side record: every few turns in mixed mode, all the time in side mode, and at session end. Haiku is cheap and good enough for titles, parents and short decisions.
-
-### Share conversations
-
-`shareConversations` · default `false`
-
-**Commit the raw chat text too, not only the session record (off: chat stays local).**
-
-Also commit the raw chat text, not only the record. Leave it off to keep conversations on your machine while the record still travels with the branch.
-
-### Commit the record
-
-`recordCommit` · default `ask`
-
-**ask, auto or off: what to do with the last messages after the last code commit.**
-
-What happens to record changes made after your last code commit: ask you next time, commit them automatically, or leave them for you to commit.
-
-## Only through `cogit config`
-
-These are set up once, per project, or rarely touched, so the panel leaves them out.
 
 ### Git policy
 

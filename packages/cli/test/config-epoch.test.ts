@@ -21,7 +21,7 @@ describe("config", () => {
     const io = fakeIo(env);
     await configGet(undefined, io);
     expect(io.lines).toContain("updateEveryTurns = 15");
-    expect(io.lines).toContain('recorder = "mixed"');
+    expect(io.lines).toContain('recorder = "side"');
     expect(io.lines).toContain('sideModel = "haiku"');
     expect(io.lines).toContain("sideEveryTurns = 5");
     // The old name is an accepted alias, not a listed key (Story 12.1).
@@ -67,7 +67,7 @@ describe("config", () => {
     const config = await loadConfig(env);
     expect(config.sideModel).toBe("sonnet");
     expect(config.catchUpModel).toBeUndefined();
-    expect(config.recorder).toBe("mixed");
+    expect(config.recorder).toBe("side");
     // The next write stores only the new name.
     await configSet("updateEveryTurns", "6", fakeIo(env));
     const stored = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
