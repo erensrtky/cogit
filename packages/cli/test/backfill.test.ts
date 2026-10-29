@@ -8,6 +8,7 @@ import {
   catchUpPrompt,
   headlessEnv,
   resultText,
+  withoutNulls,
 } from "../src/commands/backfill.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
@@ -157,6 +158,17 @@ describe("headless output", () => {
     expect(agentRecord('```json\n{"a":1}\n```')).toEqual({ a: 1 });
     expect(() => agentRecord("not json")).toThrow(/JSON record/);
     expect(() => agentRecord("[1]")).toThrow(/JSON object/);
+  });
+
+  it("drops the null notes a small model writes, keeping a root's null parent", () => {
+    expect(
+      withoutNulls({
+        status: null,
+        epoch: null,
+        nodes: [{ id: "m1", parent: null, why: null, decidedBy: null, title: "t" }, 3],
+      }),
+    ).toEqual({ epoch: null, nodes: [{ id: "m1", parent: null, title: "t" }, 3] });
+    expect(withoutNulls({ nodes: "x" })).toEqual({ nodes: "x" });
   });
 
   it("turns capture off in the headless run", () => {

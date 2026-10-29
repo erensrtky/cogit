@@ -153,6 +153,29 @@ export function agentRecord(text: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
+/**
+ * A small model writes `null` for a note it has nothing for (`"why": null`).
+ * The schema wants such a field left out, and one null would fail the whole
+ * write, so they are dropped; a node's `parent: null` (a root) and `epoch: null` stay.
+ */
+export function withoutNulls(record: Record<string, unknown>): Record<string, unknown> {
+  // `epoch: null` means "no epoch"; any other null at the top is a missing field.
+  const top = Object.fromEntries(
+    Object.entries(record).filter(([key, value]) => value !== null || key === "epoch"),
+  );
+  if (!Array.isArray(top.nodes)) return top;
+  return {
+    ...top,
+    nodes: top.nodes.map((node) =>
+      typeof node === "object" && node !== null
+        ? Object.fromEntries(
+            Object.entries(node).filter(([key, value]) => value !== null || key === "parent"),
+          )
+        : node,
+    ),
+  };
+}
+
 /** The headless agent must not fire our own hooks or leave a transcript. */
 export function headlessEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return { ...process.env, ...env, COGIT_DISABLE: "1" };
@@ -271,7 +294,7 @@ export async function backfillTail(
     config.recorder,
   );
   const stdout = await runClaude(prompt, config.sideModel, io.env);
-  const payload = { ...agentRecord(resultText(stdout)), sessionId };
+  const payload = { ...withoutNulls(agentRecord(resultText(stdout))), sessionId };
   // Story 12.1: a side run fills empty fields and new nodes; it never rewrites
   // what the main agent wrote.
   await sessionWrite({ dir: root, by: "side" }, io, async () => JSON.stringify(payload));

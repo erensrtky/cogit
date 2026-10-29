@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - A new session's first message is offered the eight most recent other sessions, each with where it left off, its branches and the message each branch ends at, instead of the last three messages of three sessions. Work from further back or the middle of a session can now be continued.
 - The side model's prompt now includes what the agent did in each turn: the questions it asked with their options, the files it edited and its steps. It finds the agent's decisions and the topic of a turn in these.
+### Fixed
+- A side-model catch-up no longer fails the whole write when the model sends an empty note as `null` (for example `"why": null`); such fields are left out.
 
 ## [0.20.0] - 2026-10-28
 ### Added
