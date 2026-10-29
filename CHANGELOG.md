@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In side-only mode the session-end pass also hangs a session's first message from the earlier session it continues, which the side model never did before.
 ### Changed
 - Settings → Recording is one choice: **Economical** (the default for new installs: a small model records in the background and closes each session) or **Detailed** (the main agent also records its own decisions every 15 turns). The turn intervals, the side model and the session-end switch left the panel and stay on `cogit config set`; so does the main-agent-only mode. An existing config keeps the mode it has.
+- A message's detail panel puts the reason first: why, what was considered and rejected and who decided, then the agent's own decisions and work, then the code. The conversation and the branch context come last, folded.
 - "Message summaries" is now "One-line summary under each message", and its help says that branch summaries and where a session left off are written either way.
 - A new session's first message is offered the eight most recent other sessions, each with where it left off, its branches and the message each branch ends at, instead of the last three messages of three sessions. Work from further back or the middle of a session can now be continued.
 - The side model's prompt now includes what the agent did in each turn: the questions it asked with their options, the files it edited and its steps. It finds the agent's decisions and the topic of a turn in these.
 ### Fixed
+- A map or panel whose record contains `$'`, `$&` or `` $` `` (for example a price written as "0,02 $'ın") no longer breaks with "The embedded cogit data is not valid JSON": those characters were read as a replace pattern when the data went into the page.
 - A side-model catch-up no longer fails the whole write when the model sends an empty note as `null` (for example `"why": null`); such fields are left out.
 
 ## [0.20.0] - 2026-10-28

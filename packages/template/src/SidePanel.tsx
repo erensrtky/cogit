@@ -247,10 +247,10 @@ function Conversation({ session, id }: { session: ViewSession | undefined; id: s
     body = <p className="muted">This message was not found in the transcript.</p>;
   }
   return (
-    <section className="chat">
-      <h3>Conversation</h3>
+    <details className="chat fold">
+      <summary>Conversation</summary>
       {body}
-    </section>
+    </details>
   );
 }
 
@@ -280,8 +280,10 @@ function BranchDetails({
       ? ` · ${formatTime(branch.firstAt)} → ${formatTime(branch.lastAt)}`
       : "";
   return (
-    <section className="branch-detail">
-      <h3 style={{ color: `var(--l${segment.colorIndex})` }}>{branch.title}</h3>
+    <details className="branch-detail fold">
+      <summary>
+        Branch · <span style={{ color: `var(--l${segment.colorIndex})` }}>{branch.title}</span>
+      </summary>
       <p className="branch-range">
         {branch.count > 1 ? `${branch.fromLabel}–${branch.toLabel}` : branch.fromLabel} ·{" "}
         {branch.count} message{branch.count === 1 ? "" : "s"}
@@ -302,7 +304,7 @@ function BranchDetails({
           <b>Open:</b> {branch.open}
         </p>
       ) : null}
-    </section>
+    </details>
   );
 }
 
@@ -375,6 +377,68 @@ function NodeDetails({
       {node.kind === "message" && isMessageHash(node.nodeId) ? (
         <MessageHash value={node.nodeId} />
       ) : null}
+      {/* The reason first; the long text folded at the end. */}
+      {node.summary ? (
+        <section>
+          <h3>Summary</h3>
+          <p>{node.summary}</p>
+        </section>
+      ) : null}
+      {node.why ? (
+        <section>
+          <h3>Why</h3>
+          <p>{node.why}</p>
+        </section>
+      ) : null}
+      {node.alternatives?.length ? (
+        <section>
+          <h3>Considered and rejected</h3>
+          <ul className="drilldown-list">
+            {node.alternatives.map((alt) => (
+              <li key={alt.option}>
+                <strong>{alt.option}</strong>
+                {alt.why ? <> — {alt.why}</> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {node.decidedBy ? (
+        <p className="decided-by">Decided by: {DECIDED_LABEL[node.decidedBy]}</p>
+      ) : null}
+      {node.agentDecisions?.length ? (
+        <section>
+          <h3>Decided by the agent on its own</h3>
+          <ul className="drilldown-list">
+            {node.agentDecisions.map((decision) => (
+              <li key={decision.title}>
+                <strong>{decision.title}</strong>
+                {decision.why ? <> — {decision.why}</> : null}
+                {decision.alternatives?.length ? (
+                  <ul>
+                    {decision.alternatives.map((alt) => (
+                      <li key={alt.option}>
+                        Not: {alt.option}
+                        {alt.why ? <> — {alt.why}</> : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {node.work?.length ? (
+        <section>
+          <h3>What the agent did</h3>
+          <ul className="drilldown-list">
+            {node.work.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {node.kind === "message" && node.change ? (
         <section>
           <h3>Code landed</h3>
@@ -403,65 +467,6 @@ function NodeDetails({
             </p>
           )}
           {readError === null ? null : <p className="error">{readError}</p>}
-        </section>
-      ) : null}
-      {session ? <BranchDetails session={session} branchId={branchId} /> : null}
-      {node.summary ? (
-        <section>
-          <h3>Summary</h3>
-          <p>{node.summary}</p>
-        </section>
-      ) : null}
-      {node.why ? (
-        <section>
-          <h3>Why</h3>
-          <p>{node.why}</p>
-        </section>
-      ) : null}
-      {node.work?.length ? (
-        <section>
-          <h3>What the agent did</h3>
-          <ul className="drilldown-list">
-            {node.work.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-      {node.agentDecisions?.length ? (
-        <section>
-          <h3>Decided by the agent on its own</h3>
-          <ul className="drilldown-list">
-            {node.agentDecisions.map((decision) => (
-              <li key={decision.title}>
-                <strong>{decision.title}</strong>
-                {decision.why ? <> — {decision.why}</> : null}
-                {decision.alternatives?.length ? (
-                  <ul>
-                    {decision.alternatives.map((alt) => (
-                      <li key={alt.option}>
-                        Not: {alt.option}
-                        {alt.why ? <> — {alt.why}</> : null}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-      {node.alternatives?.length ? (
-        <section>
-          <h3>Considered and rejected</h3>
-          <ul className="drilldown-list">
-            {node.alternatives.map((alt) => (
-              <li key={alt.option}>
-                <strong>{alt.option}</strong>
-                {alt.why ? <> — {alt.why}</> : null}
-              </li>
-            ))}
-          </ul>
         </section>
       ) : null}
       {node.commits?.length ? (
@@ -516,8 +521,8 @@ function NodeDetails({
         <p className="muted">Open with `cogit open` to see diffs.</p>
       ) : null}
       {node.kind === "message" ? <Conversation session={session} id={node.nodeId} /> : null}
+      {session ? <BranchDetails session={session} branchId={branchId} /> : null}
       <dl className="drilldown-meta">
-        {node.decidedBy ? <Field label="Decided by">{DECIDED_LABEL[node.decidedBy]}</Field> : null}
         <Field label={node.kind === "message" ? "Sent" : "Recorded"}>
           {formatTime(node.at ?? node.addedAt ?? null)}
         </Field>

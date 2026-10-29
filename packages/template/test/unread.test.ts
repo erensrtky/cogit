@@ -194,6 +194,10 @@ describe("how much code landed on the map (10.3)", () => {
     expect(unread).toContain("Mark as read");
     expect(unread).toContain("after this message");
     expect(unread).toContain("is-big");
+    // The reason and the code come first; the conversation is folded at the end.
+    expect(unread).toContain('<details class="chat fold"><summary>Conversation</summary>');
+    expect(unread.indexOf("Code landed")).toBeLessThan(unread.indexOf("Conversation"));
+    expect(unread.indexOf("Conversation")).toBeLessThan(unread.indexOf("drilldown-meta"));
 
     const read = renderToStaticMarkup(
       createElement(DrillDown, {

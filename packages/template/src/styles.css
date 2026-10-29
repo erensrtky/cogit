@@ -1322,6 +1322,30 @@ body:has(.map-shell.is-expanded) {
   overflow-wrap: anywhere;
 }
 
+/* Long text (the conversation, the branch context) sits folded at the end. */
+.drilldown-body details.fold {
+  margin-bottom: 14px;
+}
+
+.drilldown-body details.fold > summary {
+  cursor: pointer;
+  margin-bottom: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.drilldown-body details.fold > summary:hover {
+  color: var(--text);
+}
+
+.drilldown-body .decided-by {
+  margin: -8px 0 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .drilldown-list {
   margin: 4px 0 0;
   padding-left: 18px;
