@@ -10,6 +10,7 @@ import {
   LANE_COLORS,
   linkArrow,
   linkPath,
+  showsBranchPill,
 } from "./gitLayout.js";
 
 /**
@@ -123,7 +124,7 @@ function Row({
       title={message.summary || message.title}
     >
       <span className="git-time">{rowRange(row)}</span>
-      {row.first ? (
+      {showsBranchPill(row.first, branchTitle, message.title) ? (
         <span className="git-branch" style={{ background: color(row.colorIndex) }}>
           {branchTitle}
         </span>

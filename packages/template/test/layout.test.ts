@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ROW_HEIGHT, rowHeight, TAGS_PER_LINE, TITLE_MIN_WIDTH } from "../src/gitLayout.js";
+import {
+  ROW_HEIGHT,
+  rowHeight,
+  showsBranchPill,
+  TAGS_PER_LINE,
+  TITLE_MIN_WIDTH,
+} from "../src/gitLayout.js";
 import { shouldForwardWheel } from "../src/scroll.js";
 
 /**
@@ -115,6 +121,18 @@ describe("map layout (Story 9.2)", () => {
       head: false,
     });
     expect(height).toBeGreaterThanOrEqual(12 + Math.ceil((120 * 6.4) / TITLE_MIN_WIDTH) * 16);
+  });
+
+  it("leaves out a branch pill that would repeat the title", () => {
+    expect(showsBranchPill(true, "Fix the map", " Fix the map ")).toBe(false);
+    expect(showsBranchPill(true, "Map fixes", "Fix the map")).toBe(true);
+    expect(showsBranchPill(false, "Map fixes", "Fix the map")).toBe(false);
+    // Without the pill the title gets its room back and needs fewer lines.
+    const message = { id: "x", label: "m1", title: "a".repeat(90) };
+    const row = { first: true, returns: 0, tags: 0, head: false };
+    expect(rowHeight(message, { ...row, branchTitle: message.title })).toBeLessThan(
+      rowHeight(message, { ...row, branchTitle: "Map fixes" }),
+    );
   });
 
   it("wraps commit tags below each other instead of clipping them", () => {
