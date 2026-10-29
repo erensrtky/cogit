@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { ReactFlowProvider } from "@xyflow/react";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -36,6 +37,11 @@ describe("dragging the message rows wider", () => {
     // At zoom 1 the strip is 12px wide, centred on the edge.
     expect(html).toContain(`left:${git.width - 6}px`);
     expect(html).toContain(`height:${git.height}px`);
+  });
+
+  it("takes the pointer although React Flow turns it off inside map nodes", () => {
+    const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+    expect(css).toMatch(/\.row-edge,[^{]*\{\s*pointer-events:\s*all/);
   });
 
   it("remembers the width, and reads a blocked or empty storage as the default", () => {

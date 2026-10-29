@@ -2392,6 +2392,7 @@ time {
  */
 .map-node button,
 .map-node .git-row,
+.row-edge,
 .session-dot,
 .git-dot-hit {
   pointer-events: all;
