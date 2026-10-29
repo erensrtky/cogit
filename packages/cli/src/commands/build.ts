@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { readdir, stat } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { type ChatTurn, defaultAgent } from "../agents/index.js";
 import {
   type CommitChange,
@@ -17,7 +18,8 @@ import {
   upgradeSessionIds,
 } from "../messages.js";
 import { redactDeep } from "../redact.js";
-import type { Session } from "../schema/session.js";
+import { Slug } from "../schema/common.js";
+import { SESSION_SCHEMA, type Session } from "../schema/session.js";
 import { readProjectChanges } from "../store/changes.js";
 import {
   appendConversationHashes,
@@ -82,6 +84,49 @@ function toViewTurn(turn: ChatTurn): ViewChatTurn {
     replies: turn.replies,
     tools: turn.tools,
   };
+}
+
+/**
+ * Sessions the hooks have seen in this project that have no record yet: the
+ * first records come only after a few turns, and until then the map would not
+ * show the session at all. Each gets an empty record for this build only (never
+ * written), so its messages appear as unsummarized rows from the first one.
+ */
+async function unrecordedSessions(
+  root: string,
+  sessions: Session[],
+  transcripts: ReadonlyMap<string, string>,
+): Promise<Session[]> {
+  const dir = dirname(projectPaths(root).state("x"));
+  let names: string[];
+  try {
+    names = await readdir(dir);
+  } catch {
+    return [];
+  }
+  const known = new Set(sessions.map((session) => session.sessionId));
+  const found: Session[] = [];
+  for (const name of names) {
+    if (!name.endsWith(".json")) continue;
+    const id = name.slice(0, -".json".length);
+    if (known.has(id) || !transcripts.has(id) || !Slug.safeParse(id).success) continue;
+    // Gone since the listing (the session just ended and was cleaned up): skip it.
+    const info = await stat(resolve(dir, name)).catch(() => undefined);
+    if (!info) continue;
+    const startedAt = (info.birthtimeMs > 0 ? info.birthtime : info.mtime).toISOString();
+    found.push({
+      schema: SESSION_SCHEMA,
+      sessionId: id,
+      agent: "claude-code",
+      title: "",
+      epoch: null,
+      startedAt,
+      updatedAt: info.mtime.toISOString(),
+      status: { goal: "", done: [], pending: [], next: "" },
+      nodes: [],
+    });
+  }
+  return found;
 }
 
 /**
@@ -275,8 +320,9 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   const model = await withLock(
     paths.lock("build"),
     async () => {
-      const sessions = await loadAllSessions(root, io.warn);
+      const recorded = await loadAllSessions(root, io.warn);
       const transcripts = await defaultAgent().collectTranscripts(io.env);
+      const sessions = [...recorded, ...(await unrecordedSessions(root, recorded, transcripts))];
       const views = await readTranscriptViews(sessions, transcripts, root, io);
       // The `Thought:` trailers git holds (Story 9.4) attach commits to the
       // message they carry out, so the map, the file history and `blame` agree

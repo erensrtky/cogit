@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { gzipSync } from "node:zlib";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -655,6 +655,25 @@ describe("cogit build", () => {
       unsummarized: true,
     });
     expect(await readFile(paths().session("s1"), "utf8")).not.toContain("Fix the card");
+  });
+
+  it("shows a session the hooks saw before its first record, without writing one", async () => {
+    const folder = join(dir, "claude", "projects", "-proj");
+    await mkdir(folder, { recursive: true });
+    const line = { type: "user", timestamp: T0, message: { content: "Start the work" } };
+    await writeFile(join(folder, "s3.jsonl"), JSON.stringify(line));
+    await mkdir(dirname(paths().state("s3")), { recursive: true });
+    await writeFile(paths().state("s3"), "{}");
+    // No transcript: nothing to show. Not a session: the read state.
+    await writeFile(paths().state("gone"), "{}");
+    await writeFile(paths().readState, "[]");
+
+    const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(model.unassigned.map((s) => s.sessionId)).toEqual(["s3"]);
+    expect(model.unassigned[0]?.messages).toEqual([
+      expect.objectContaining({ title: "Start the work", unsummarized: true }),
+    ]);
+    await expect(readFile(paths().session("s3"), "utf8")).rejects.toThrow();
   });
 
   it("reads commit subjects from git for the map and greys a hash git no longer has", async () => {

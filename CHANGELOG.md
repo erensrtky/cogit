@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- The session-end pass writes each thread's outcome, what is still open and where the session left off as things stood at the end: a problem a later message fixed no longer shows as open.
+### Fixed
+- A new session shows on the map from its first message. Before, it appeared only once its first record was written, a few turns in.
 
 ## [0.21.0] - 2026-10-29
 ### Added
