@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.21.2] - 2026-10-29
 ### Changed
 - The map no longer draws the coloured branch-name pill in front of a branch's first row and its "⋮ N more" row; it mostly repeated the message title. The lane colour still marks the branch, and the branch summary stays in the detail panel.
 ### Fixed
