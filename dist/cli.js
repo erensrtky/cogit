@@ -81,7 +81,7 @@ import {
   updateState,
   upgradeSessionIds,
   withLock
-} from "./chunk-O2KOWDTP.js";
+} from "./chunk-MPOCC62M.js";
 
 // ../../node_modules/cli-width/index.js
 var require_cli_width = __commonJS({
@@ -5529,7 +5529,7 @@ var program = new Command();
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "0.21.0",
+  version: "0.21.1",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [
@@ -5748,7 +5748,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-WL5FS4Y7.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-2F5ALCNN.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -6032,7 +6032,8 @@ function repairTree(nodes) {
 }
 
 // src/commands/build.ts
-import { resolve as resolve4 } from "path";
+import { readdir, stat as stat3 } from "fs/promises";
+import { dirname as dirname3, resolve as resolve4 } from "path";
 
 // src/store/changes.ts
 async function readProjectChanges(root, hashes) {
@@ -6881,6 +6882,37 @@ function toViewTurn(turn) {
     tools: turn.tools
   };
 }
+async function unrecordedSessions(root, sessions, transcripts) {
+  const dir = dirname3(projectPaths(root).state("x"));
+  let names;
+  try {
+    names = await readdir(dir);
+  } catch {
+    return [];
+  }
+  const known = new Set(sessions.map((session) => session.sessionId));
+  const found = [];
+  for (const name of names) {
+    if (!name.endsWith(".json")) continue;
+    const id = name.slice(0, -".json".length);
+    if (known.has(id) || !transcripts.has(id) || !Slug.safeParse(id).success) continue;
+    const info = await stat3(resolve4(dir, name)).catch(() => void 0);
+    if (!info) continue;
+    const startedAt = (info.birthtimeMs > 0 ? info.birthtime : info.mtime).toISOString();
+    found.push({
+      schema: SESSION_SCHEMA,
+      sessionId: id,
+      agent: "claude-code",
+      title: "",
+      epoch: null,
+      startedAt,
+      updatedAt: info.mtime.toISOString(),
+      status: { goal: "", done: [], pending: [], next: "" },
+      nodes: []
+    });
+  }
+  return found;
+}
 async function readTranscriptViews(sessions, transcripts, root, io) {
   const agent3 = defaultAgent();
   const chats = /* @__PURE__ */ new Map();
@@ -7013,8 +7045,9 @@ async function buildProject(opts) {
   const model = await withLock(
     paths.lock("build"),
     async () => {
-      const sessions = await loadAllSessions(root, io.warn);
+      const recorded = await loadAllSessions(root, io.warn);
       const transcripts = await defaultAgent().collectTranscripts(io.env);
+      const sessions = [...recorded, ...await unrecordedSessions(root, recorded, transcripts)];
       const views = await readTranscriptViews(sessions, transcripts, root, io);
       const trailers = await readThoughtTrailers(root, {
         env: io.env,
@@ -7530,6 +7563,7 @@ function closePrompt(turns, record, opts) {
     "- For each thread give `from`: the message whose outcome it starts from. Usually the message just before the thread's first message; for a detour the message it interrupts (the same); for a new task after a finished one, the last message of the finished thread; null only if the first message would work as the first message of a brand-new chat.",
     "",
     "Then write a branch summary for every thread (asked: what the user wanted; outcome: what it meant and what came of it; open: what is still open, or empty), and leftOff: one line saying where the session left off, so a later session can decide whether to continue it.",
+    "Outcome, open and leftOff describe the state at the end: read each thread to its last message, and the whole session to its last messages. A problem or task a later message fixed, finished or dropped is done, not open; never report a mid-session state as where things stand.",
     `Write text in ${writing}; JSON keys stay English. Never invent what is not in the record. Never write secrets, credentials or personal data.`,
     "",
     ...candidatePart(opts.candidates),
@@ -7743,7 +7777,9 @@ function headlessEnv(env) {
 function claudeBin() {
   return process.platform === "win32" ? "claude.cmd" : "claude";
 }
+var CLAUDE_TIMEOUT_MS = 5 * 6e4;
 function runClaude(prompt, model, env) {
+  const limit = Number(env.COGIT_CLAUDE_TIMEOUT_MS) || CLAUDE_TIMEOUT_MS;
   return new Promise((resolve12, reject) => {
     const child = spawn(
       claudeBin(),
@@ -7760,6 +7796,11 @@ function runClaude(prompt, model, env) {
     );
     let out = "";
     let err = "";
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, limit);
     child.stdin.on("error", () => {
     });
     child.stdout.setEncoding("utf8").on("data", (chunk) => {
@@ -7769,10 +7810,14 @@ function runClaude(prompt, model, env) {
       err += chunk;
     });
     child.on("error", (error) => {
+      clearTimeout(timer);
       reject(new CliError(`could not run claude: ${error.message}`));
     });
     child.on("close", (code) => {
-      if (code === 0) resolve12(out);
+      clearTimeout(timer);
+      if (timedOut)
+        reject(new CliError(`claude did not answer within ${Math.round(limit / 1e3)} s`));
+      else if (code === 0) resolve12(out);
       else reject(new CliError(`claude exited with ${code}: ${err.trim() || "no output"}`));
     });
     child.stdin.end(prompt);
@@ -7834,7 +7879,7 @@ async function backfillTail(dir, sessionId, io, opts = {}) {
 }
 
 // src/commands/blame.ts
-import { stat as stat3 } from "fs/promises";
+import { stat as stat4 } from "fs/promises";
 import { isAbsolute, relative as relative2, resolve as resolve6, sep as sep2 } from "path";
 import { pathToFileURL as pathToFileURL2 } from "url";
 function parseBlameTarget(target) {
@@ -7867,7 +7912,7 @@ async function blame(opts) {
   const path3 = relative2(gitRoot, absolute);
   if (path3 === "" || path3.startsWith("..") || isAbsolute(path3))
     throw new CliError(`${file} is outside ${gitRoot}`);
-  const exists = await stat3(absolute).then(
+  const exists = await stat4(absolute).then(
     (info) => info.isFile(),
     () => false
   );
@@ -8808,7 +8853,7 @@ async function logFile(opts) {
 }
 
 // src/commands/migrate.ts
-import { copyFile, mkdir as mkdir3, readdir } from "fs/promises";
+import { copyFile, mkdir as mkdir3, readdir as readdir2 } from "fs/promises";
 import { join as join3 } from "path";
 var BACKUP_DIR = "backup-pre-8.5";
 async function migrateIds(dir, io) {
@@ -8865,7 +8910,7 @@ async function migrateIds(dir, io) {
 }
 async function backupRecords(sessions, backup) {
   await mkdir3(backup, { recursive: true });
-  for (const entry of await readdir(sessions)) {
+  for (const entry of await readdir2(sessions)) {
     if (!entry.endsWith(".json") && !entry.endsWith(".events.jsonl")) continue;
     await copyFile(join3(sessions, entry), join3(backup, entry));
   }
@@ -10341,8 +10386,8 @@ async function search(opts) {
 
 // src/commands/why.ts
 import { existsSync as existsSync3 } from "fs";
-import { stat as stat4 } from "fs/promises";
-import { dirname as dirname3, isAbsolute as isAbsolute2, join as join5, relative as relative4, resolve as resolve10, sep as sep4 } from "path";
+import { stat as stat5 } from "fs/promises";
+import { dirname as dirname4, isAbsolute as isAbsolute2, join as join5, relative as relative4, resolve as resolve10, sep as sep4 } from "path";
 var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function dayStamp(iso) {
   const date = new Date(iso);
@@ -10443,9 +10488,9 @@ function formatWhy(hits) {
   return lines;
 }
 async function nearestProjectDir(start) {
-  for (let dir = resolve10(start); ; dir = dirname3(dir)) {
+  for (let dir = resolve10(start); ; dir = dirname4(dir)) {
     if (existsSync3(projectPaths(dir).project) || existsSync3(join5(dir, ".git"))) return dir;
-    if (dirname3(dir) === dir) return void 0;
+    if (dirname4(dir) === dir) return void 0;
   }
 }
 async function why(opts) {
@@ -10462,7 +10507,7 @@ async function why(opts) {
   if (!project.ok) throw new CliError(project.error);
   if (await findGitRoot(root) === void 0)
     throw new CliError(`${root} is not inside a git repository; why needs one`);
-  const exists = await stat4(resolve10(root, file)).then(
+  const exists = await stat5(resolve10(root, file)).then(
     (info) => info.isFile(),
     () => false
   );
@@ -10524,8 +10569,8 @@ function tryBeforeNote(file, hits) {
 
 // src/hooks/run.ts
 import { spawn as spawn5 } from "child_process";
-import { closeSync, existsSync as existsSync4, mkdirSync, openSync, statSync, writeSync } from "fs";
-import { dirname as dirname5 } from "path";
+import { closeSync, existsSync as existsSync4, mkdirSync, openSync, statSync as statSync2, writeSync } from "fs";
+import { dirname as dirname6 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 
 // src/hooks/pretooluse.ts
@@ -10604,17 +10649,17 @@ async function onSessionEnd(ctx) {
 }
 
 // src/cli-version.ts
-import { readFile as readFile6, realpath, stat as stat5 } from "fs/promises";
-import { delimiter, dirname as dirname4, join as join6 } from "path";
+import { readFile as readFile6, realpath, stat as stat6 } from "fs/promises";
+import { delimiter, dirname as dirname5, join as join6 } from "path";
 var PACKAGE = "@cogit/cli";
 async function installedCliVersion(env) {
   for (const dir of (env.PATH ?? "").split(delimiter)) {
     if (dir === "") continue;
     const bin = join6(dir, "cogit");
     try {
-      if (!(await stat5(bin)).isFile()) continue;
+      if (!(await stat6(bin)).isFile()) continue;
       const pkg = JSON.parse(
-        await readFile6(join6(dirname4(dirname4(await realpath(bin))), "package.json"), "utf8")
+        await readFile6(join6(dirname5(dirname5(await realpath(bin))), "package.json"), "utf8")
       );
       if (pkg.name === PACKAGE && typeof pkg.version === "string") return pkg.version;
       return void 0;
@@ -10640,6 +10685,55 @@ function versionNotice(running, installed) {
   if (order < 0)
     return `cogit: the plugin is ${running}, the cogit command ${installed}. Update the plugin with \`claude plugin update cogit@cogit\`, or turn on auto-update in /plugin \u2192 Marketplaces \u2192 cogit.`;
   return void 0;
+}
+
+// src/hooks/close-retry.ts
+import { statSync } from "fs";
+var CLOSE_RETRY_IDLE_MS = 10 * 6e4;
+var CLOSE_RETRY_WINDOW_MS = 3 * 24 * 60 * 6e4;
+var CLOSE_RETRY_LIMIT = 2;
+var CLOSE_RETRY_BATCH = 3;
+async function retryUnclosed(ctx) {
+  const config = await loadConfig(ctx.env);
+  if (!config.sessionEndCatchUp) return;
+  const now = Date.parse(ctx.now);
+  const sessions = await loadAllSessions(ctx.root, () => {
+  });
+  const candidates = sessions.filter((session) => session.sessionId !== ctx.sessionId && unclosed(session, now)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  let started = 0;
+  for (const session of candidates) {
+    if (started >= CLOSE_RETRY_BATCH) break;
+    const id = session.sessionId;
+    const transcript = await ctx.agent.findTranscript(id, ctx.env);
+    const written = transcript ? statSync(transcript, { throwIfNoEntry: false })?.mtimeMs : void 0;
+    if (written !== void 0 && now - written < CLOSE_RETRY_IDLE_MS) continue;
+    let allowed = false;
+    await updateState(ctx.root, id, (cur) => {
+      const tries = cur?.closeRetries ?? 0;
+      if (tries >= CLOSE_RETRY_LIMIT) return cur ?? emptyState2();
+      allowed = true;
+      return { ...cur ?? emptyState2(), closeRetries: tries + 1 };
+    });
+    if (!allowed) continue;
+    ctx.spawnDetached(["backfill", id, "--tail", "--close", "-C", ctx.root]);
+    started += 1;
+  }
+}
+function unclosed(session, now) {
+  if (session.leftOff !== void 0) return false;
+  if (!session.nodes.some((node) => node.kind === "message")) return false;
+  const age = now - Date.parse(session.updatedAt);
+  return age >= CLOSE_RETRY_IDLE_MS && age <= CLOSE_RETRY_WINDOW_MS;
+}
+function emptyState2() {
+  return {
+    schema: STATE_SCHEMA,
+    turns: 0,
+    turnsSinceUpdate: 0,
+    recordUpdatedAt: null,
+    turnsSinceSide: 0,
+    notedFiles: []
+  };
 }
 
 // src/hooks/sessionstart.ts
@@ -10675,6 +10769,7 @@ async function sessionStartOutput(ctx) {
     if (await findGitRoot(ctx.root) === void 0) return void 0;
     return additionalContext(ctx, setupHint(ctx));
   }
+  await retryUnclosed(ctx).catch(() => void 0);
   const config = await loadConfig(ctx.env);
   if (!config.startupContext) return void 0;
   return additionalContext(ctx, await startupContext(ctx, config.recordCommit));
@@ -10856,10 +10951,10 @@ var HOOK_EVENTS = Object.keys(HANDLERS);
 var LOG_LIMIT = 256 * 1024;
 function openLog(log2, args) {
   try {
-    mkdirSync(dirname5(log2), { recursive: true });
+    mkdirSync(dirname6(log2), { recursive: true });
     let flag = "a";
     try {
-      if (statSync(log2).size > LOG_LIMIT) flag = "w";
+      if (statSync2(log2).size > LOG_LIMIT) flag = "w";
     } catch {
     }
     const fd = openSync(log2, flag);

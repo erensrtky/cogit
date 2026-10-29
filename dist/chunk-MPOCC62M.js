@@ -20470,7 +20470,12 @@ var HookState = external_exports.object({
    * and a file with nothing to say is remembered too, so every edit does not
    * walk the history again.
    */
-  notedFiles: external_exports.array(external_exports.string().min(1).max(500)).default([])
+  notedFiles: external_exports.array(external_exports.string().min(1).max(500)).default([]),
+  /**
+   * Closing passes a later session started for this one because its own, at
+   * the session end, never finished (machine shut down, run hung or failed).
+   */
+  closeRetries: external_exports.number().int().min(0).optional()
 });
 
 // src/schema/versioned.ts

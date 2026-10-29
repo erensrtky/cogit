@@ -1,7 +1,7 @@
 {
   "name": "cogit",
   "displayName": "cogit",
-  "version": "0.21.0",
+  "version": "0.21.1",
   "description": "Git remembers what changed. cogit remembers why.",
   "author": {
     "name": "Eren Sertkaya"
