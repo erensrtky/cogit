@@ -9,6 +9,7 @@ import { uncommittedSession } from "../session-git.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { loadAllSessions, loadConfig, loadSession } from "../store/stores.js";
 import { buildMessages } from "../view/lineage.js";
+import { retryUnclosed } from "./close-retry.js";
 import type { HookContext, HookOutput } from "./run.js";
 
 /** The compaction request, naming the skill the way the agent spells it. */
@@ -90,6 +91,9 @@ async function sessionStartOutput(ctx: HookContext): Promise<HookOutput | undefi
     if ((await findGitRoot(ctx.root)) === undefined) return undefined;
     return additionalContext(ctx, setupHint(ctx));
   }
+  // Sessions whose closing pass never finished get it now, detached (a failure
+  // here must not cost the handoff).
+  await retryUnclosed(ctx).catch(() => undefined);
   const config = await loadConfig(ctx.env);
   // SessionStart runs inside the chat's startup budget: opt out and it is silent.
   if (!config.startupContext) return undefined;

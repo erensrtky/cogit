@@ -24,6 +24,11 @@ export const HookState = z.object({
    * walk the history again.
    */
   notedFiles: z.array(z.string().min(1).max(500)).default([]),
+  /**
+   * Closing passes a later session started for this one because its own, at
+   * the session end, never finished (machine shut down, run hung or failed).
+   */
+  closeRetries: z.number().int().min(0).optional(),
 });
 
 export type HookState = z.infer<typeof HookState>;

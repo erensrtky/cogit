@@ -10,7 +10,8 @@ import type { HookContext } from "./run.js";
  *
  * The catch-up then runs the closing pass (threads, parents, branch summaries,
  * where the session left off) over the whole session, so it starts even when
- * every message already has a node.
+ * every message already has a node. Nothing waits for it: when it never
+ * finishes, the next session start in the project runs it again (close-retry.ts).
  *
  * With `recordCommit: auto` (Story 9.3) the last record is committed detached as
  * well; the catch-up does that itself once it has written, so this only starts a

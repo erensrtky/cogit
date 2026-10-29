@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - The session-end pass writes each thread's outcome, what is still open and where the session left off as things stood at the end: a problem a later message fixed no longer shows as open.
 ### Fixed
+- A session whose closing pass never finished (the machine was shut down within a minute or two of leaving, the terminal was closed, or the model run failed) is closed at the next session start in the project, in the background; before, it kept no "where it left off" line and no branch summaries. Each session is retried at most twice, and only sessions from the last three days that have been idle for ten minutes are touched.
+- A side-model run that hangs is stopped after five minutes and logged as such (`COGIT_CLAUDE_TIMEOUT_MS` changes the limit); before, it waited silently until the machine shut down.
 - A new session shows on the map from its first message. Before, it appeared only once its first record was written, a few turns in.
 
 ## [0.21.0] - 2026-10-29

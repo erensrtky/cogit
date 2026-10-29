@@ -185,11 +185,17 @@ function claudeBin(): string {
   return process.platform === "win32" ? "claude.cmd" : "claude";
 }
 
+/** How long one headless run may take; a closing pass usually needs under two minutes. */
+export const CLAUDE_TIMEOUT_MS = 5 * 60_000;
+
 /**
  * Runs the agent once, headless and without session persistence, with the prompt
- * on stdin. Resolves with stdout; a missing binary or a failed run rejects.
+ * on stdin. Resolves with stdout; a missing binary, a failed run or one that
+ * outlives the time limit rejects, so a hung run lands in the log instead of
+ * waiting until the machine shuts down. `COGIT_CLAUDE_TIMEOUT_MS` overrides the limit.
  */
 export function runClaude(prompt: string, model: string, env: NodeJS.ProcessEnv): Promise<string> {
+  const limit = Number(env.COGIT_CLAUDE_TIMEOUT_MS) || CLAUDE_TIMEOUT_MS;
   return new Promise((resolve, reject) => {
     const child = spawn(
       claudeBin(),
@@ -206,6 +212,11 @@ export function runClaude(prompt: string, model: string, env: NodeJS.ProcessEnv)
     );
     let out = "";
     let err = "";
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, limit);
     // The child may exit before reading the prompt; that write error is not ours.
     child.stdin.on("error", () => {});
     child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
@@ -215,10 +226,14 @@ export function runClaude(prompt: string, model: string, env: NodeJS.ProcessEnv)
       err += chunk;
     });
     child.on("error", (error) => {
+      clearTimeout(timer);
       reject(new CliError(`could not run claude: ${error.message}`));
     });
     child.on("close", (code) => {
-      if (code === 0) resolve(out);
+      clearTimeout(timer);
+      if (timedOut)
+        reject(new CliError(`claude did not answer within ${Math.round(limit / 1000)} s`));
+      else if (code === 0) resolve(out);
       else reject(new CliError(`claude exited with ${code}: ${err.trim() || "no output"}`));
     });
     child.stdin.end(prompt);

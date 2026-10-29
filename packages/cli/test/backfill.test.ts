@@ -262,6 +262,19 @@ describe("backfill --tail", () => {
     expect(await record()).toBeUndefined();
   });
 
+  it("stops a headless run that outlives the time limit and says so", async () => {
+    const env = {
+      ...(await fakeClaude("setTimeout(() => {}, 60_000);", dir)),
+      COGIT_CLAUDE_TIMEOUT_MS: "300",
+    };
+    await initialized(env);
+    await transcript([typed("first", 1)]);
+    await expect(backfillTail(root, "s1", fakeIo(env))).rejects.toThrow(
+      /claude did not answer within 0 s/,
+    );
+    expect(await record()).toBeUndefined();
+  });
+
   it("reports a missing claude binary", async () => {
     const empty = join(dir, "empty");
     await mkdir(empty);
