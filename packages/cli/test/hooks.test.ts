@@ -562,6 +562,18 @@ describe("runHook", () => {
       transcriptPath: "/t/s1.jsonl",
       at: T0,
     });
+    // The state file opens with the first message, so the map lists the session.
+    const statePath = projectPaths(root).state("s1");
+    expect(JSON.parse(await readFile(statePath, "utf8"))).toMatchObject({ turns: 0 });
+    await writeFile(statePath, JSON.stringify({ schema: 1, turns: 3 }));
+    await runHook(
+      "promptsubmit",
+      JSON.stringify({ session_id: "s1", cwd: root }),
+      env,
+      T0,
+      () => {},
+    );
+    expect(JSON.parse(await readFile(statePath, "utf8"))).toMatchObject({ turns: 3 });
   });
 
   it("points an existing git hook block at the CLI running now", async () => {

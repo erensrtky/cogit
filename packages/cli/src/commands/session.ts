@@ -110,7 +110,9 @@ export async function sessionWrite(
   // Both ids work: the agent may send the stable `h…` id, or the `m1` label it
   // reads in `session show`; the CLI maps the label to the stable id.
   const messages = await readSessionMessages(root, redacted.sessionId, io.env);
-  const input = nameMessages(redacted, messages, io);
+  // The side model runs on this same transcript, so a message id it does not
+  // know is made up; its node is dropped instead of stored beside the real one.
+  const input = nameMessages(redacted, messages, io, opts.by === "side");
   if (count > 0) io.warn(`redacted ${count} secret-looking value(s)`);
   if (input.epoch && !project.data.epochs.some((e) => e.id === input.epoch)) {
     io.warn(
@@ -181,6 +183,7 @@ function nameMessages(
   input: SessionInput,
   messages: SessionMessage[] | null,
   io: Io,
+  dropUnknown = false,
 ): SessionInput {
   const nodes = input.nodes ?? [];
   if (!nodes.some((n) => n.kind === "message")) return input;
@@ -192,9 +195,15 @@ function nameMessages(
     const own = parseMessageRef(id);
     return rename(own.sessionId === input.sessionId ? own.id : id);
   };
+  const known = (node: (typeof nodes)[number]): boolean =>
+    node.kind !== "message" || !messages || byHash.has(rename(node.id));
+  for (const node of nodes) {
+    if (dropUnknown && !known(node))
+      io.warn(`message node ${node.id}: no such message in the transcript; not recorded`);
+  }
   return {
     ...input,
-    nodes: nodes.map((node) => {
+    nodes: (dropUnknown ? nodes.filter(known) : nodes).map((node) => {
       if (node.kind !== "message") return node;
       const at = byHash.get(rename(node.id))?.at;
       if (!messages) {

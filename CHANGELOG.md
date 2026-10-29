@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- A new session shows on the map while its first turn is still running; 0.21.1 listed it only once that turn ended.
+- The side model's message ids are checked against the transcript: a node with an id it made up is no longer stored, so the real message stays unrecorded and the next catch-up records it. Before, the made-up nodes counted as recorded, the real messages were never recorded, and the closing pass wrote a stale "where it left off" line without them.
 
 ## [0.21.1] - 2026-10-29
 ### Changed

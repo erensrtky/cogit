@@ -73,6 +73,28 @@ describe("session write", () => {
     await epochAdd(root, "e2e", "E2E", fakeIo(envFor(dir)));
   });
 
+  it("drops a side message node the transcript does not have", async () => {
+    const folder = join(io.env.CLAUDE_CONFIG_DIR ?? "", "projects", "proj");
+    await mkdir(folder, { recursive: true });
+    const line = { type: "user", timestamp: T0, message: { content: "Hi" } };
+    await writeFile(join(folder, "s1.jsonl"), `${JSON.stringify(line)}\n`);
+    await sessionWrite({ dir: root, by: "side" }, io, async () =>
+      JSON.stringify({
+        sessionId: "s1",
+        nodes: [
+          { id: "m1", kind: "message", title: "Hi" },
+          { id: "h7d21e4f0a9b3", kind: "message", title: "Made up" },
+        ],
+      }),
+    );
+    const loaded = await loadSession(root, "s1");
+    if (!loaded.found || !loaded.ok) throw new Error("no record");
+    expect(loaded.data.nodes.map((n) => n.title)).toEqual(["Hi"]);
+    expect(io.warnings).toContain(
+      "message node h7d21e4f0a9b3: no such message in the transcript; not recorded",
+    );
+  });
+
   describe("side recording (Story 12.1)", () => {
     const side = (json: unknown) =>
       sessionWrite({ dir: root, by: "side" }, io, async () => JSON.stringify(json));

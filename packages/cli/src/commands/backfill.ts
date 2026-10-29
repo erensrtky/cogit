@@ -72,7 +72,7 @@ function rules(language: string, messageSummaries: boolean, recorder: RecordMode
   const writing = language === "auto" ? "the conversation's language" : language;
   const lines = [
     "Rules (from the cogit lineage skill):",
-    '- Send one "message" node for every message below, with the id exactly as given; skip none, even a short "ok".',
+    '- Send one "message" node for every message below, with the id exactly as given in its heading (m1, m2, …); skip none, even a short "ok". Never make up an id.',
     `- kind is "message". title: a few words in the user's own wording.${
       messageSummaries ? " summary: one or two sentences on what came of it." : ""
     }`,
