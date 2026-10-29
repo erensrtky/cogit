@@ -1,6 +1,5 @@
-import { isRecorded, readSessionMessages, upgradeSessionIds } from "../messages.js";
-import { applyEvents, readEvents } from "../store/events.js";
-import { loadConfig, loadSession } from "../store/stores.js";
+import { readSessionMessages } from "../messages.js";
+import { loadConfig } from "../store/stores.js";
 import type { HookContext } from "./run.js";
 
 /**
@@ -9,6 +8,10 @@ import type { HookContext } from "./run.js";
  * is not stored: the catch-up reads whatever messages still have no node, so a
  * child that dies is retried when the session is opened next.
  *
+ * The catch-up then runs the closing pass (threads, parents, branch summaries,
+ * where the session left off) over the whole session, so it starts even when
+ * every message already has a node.
+ *
  * With `recordCommit: auto` (Story 9.3) the last record is committed detached as
  * well; the catch-up does that itself once it has written, so this only starts a
  * commit when there is nothing to catch up (or the catch-up is off).
@@ -16,9 +19,9 @@ import type { HookContext } from "./run.js";
 export async function onSessionEnd(ctx: HookContext): Promise<undefined> {
   if (!ctx.initialized) return undefined;
   const config = await loadConfig(ctx.env);
-  const autoCommit = config.recordCommit === "auto";
   const commitOnly = (): void => {
-    if (autoCommit) ctx.spawnDetached(["record-commit", ctx.sessionId, "-C", ctx.root]);
+    if (config.recordCommit === "auto")
+      ctx.spawnDetached(["record-commit", ctx.sessionId, "-C", ctx.root]);
   };
   if (!config.sessionEndCatchUp) {
     commitOnly();
@@ -29,17 +32,6 @@ export async function onSessionEnd(ctx: HookContext): Promise<undefined> {
     commitOnly();
     return undefined;
   }
-  const record = await loadSession(ctx.root, ctx.sessionId);
-  let recorded = new Set<string>();
-  if (record.found && record.ok) {
-    const upgraded = upgradeSessionIds(record.data, messages);
-    const events = await readEvents(ctx.root, ctx.sessionId);
-    recorded = new Set(applyEvents(upgraded.nodes, events).map((node) => node.id));
-  }
-  if (messages.every((message) => isRecorded(recorded, message))) {
-    commitOnly();
-    return undefined;
-  }
-  ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "-C", ctx.root]);
+  ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "--close", "-C", ctx.root]);
   return undefined;
 }

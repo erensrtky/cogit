@@ -103,6 +103,10 @@
       ],
       "additionalProperties": false
     },
+    "leftOff": {
+      "type": "string",
+      "maxLength": 400
+    },
     "nodes": {
       "default": [],
       "type": "array",

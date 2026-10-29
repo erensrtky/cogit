@@ -159,7 +159,12 @@ export function displayTurn(turn: ChatTurn, roots: string[]): ChatTurn {
     ...turn,
     text: capped(text),
     replies: turn.replies.map(capped),
-    tools: { ...turn.tools, files: turn.tools.files.map(relative) },
+    // Steps and questions feed the recorder only; the map keeps the counts.
+    tools: {
+      commands: turn.tools.commands,
+      files: turn.tools.files.map(relative),
+      other: turn.tools.other,
+    },
   };
 }
 
@@ -172,6 +177,14 @@ const CLEAR = /<command-name>\s*\/clear\s*<\/command-name>/;
 const LINE_UUID = /"uuid":"([^"]+)"/;
 const LINE_PARENT = /"parentUuid":"([^"]+)"/;
 
+/** Keeps a step or question list short and free of repeats. */
+const LIST_LIMIT = 40;
+
+function addOnce(tools: ToolUse, key: "steps" | "asks", text: string): void {
+  const list = tools[key] ?? [];
+  if (list.length < LIST_LIMIT && !list.includes(text)) tools[key] = [...list, text.slice(0, 300)];
+}
+
 /** Records the agent's text and tool calls of one assistant line on the current turn. */
 function addAssistant(turn: ChatTurn, line: Record<string, unknown>): void {
   if (line.isSidechain) return;
@@ -181,11 +194,27 @@ function addAssistant(turn: ChatTurn, line: Record<string, unknown>): void {
     if (block?.type === "text" && typeof block.text === "string" && block.text.trim() !== "") {
       turn.replies.push(block.text);
     } else if (block?.type === "tool_use") {
-      const path = (block.input as { file_path?: unknown } | undefined)?.file_path;
-      if (block.name === "Bash") turn.tools.commands += 1;
-      else if (EDIT_TOOLS.has(block.name) && typeof path === "string") {
+      const input = (block.input ?? {}) as Record<string, unknown>;
+      const path = input.file_path;
+      if (block.name === "Bash") {
+        turn.tools.commands += 1;
+        if (typeof input.description === "string" && input.description.trim() !== "")
+          addOnce(turn.tools, "steps", input.description.trim());
+      } else if (EDIT_TOOLS.has(block.name) && typeof path === "string") {
         if (!turn.tools.files.includes(path)) turn.tools.files.push(path);
-      } else turn.tools.other += 1;
+      } else {
+        turn.tools.other += 1;
+        if (block.name === "AskUserQuestion" && Array.isArray(input.questions))
+          for (const q of input.questions as { question?: unknown; options?: unknown }[]) {
+            if (typeof q?.question !== "string") continue;
+            const options = Array.isArray(q.options)
+              ? (q.options as { label?: unknown }[])
+                  .map((o) => o?.label)
+                  .filter((label): label is string => typeof label === "string")
+              : [];
+            addOnce(turn.tools, "asks", `${q.question} [${options.join(" | ")}]`);
+          }
+      }
     }
   }
 }

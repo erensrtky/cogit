@@ -50,15 +50,23 @@ export async function appendEvents(
 /**
  * Messages whose latest parent event was written by the side model (Story
  * 12.1). A side run may correct those parents, and only those: a parent the
- * main agent wrote stays put.
+ * main agent wrote stays put. A root leaves no event, so a message the side
+ * model added (its title is the side model's) with no parent event is the side
+ * model's too; otherwise the session-end pass could never move a side root.
  */
-export function sideOwnedParents(events: readonly SessionEvent[]): Set<string> {
+export function sideOwnedParents(
+  events: readonly SessionEvent[],
+  nodes: readonly LineageNode[] = [],
+): Set<string> {
   const owners = new Map<string, SessionEvent["by"]>();
   for (const event of events) {
     if (event.type === "parent") owners.set(event.msg, event.by);
   }
   const owned = new Set<string>();
   for (const [msg, by] of owners) if (by === "side") owned.add(msg);
+  for (const node of nodes)
+    if (node.kind === "message" && !owners.has(node.id) && node.by?.title === "side")
+      owned.add(node.id);
   return owned;
 }
 

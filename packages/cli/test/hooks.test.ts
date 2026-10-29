@@ -507,18 +507,25 @@ describe("runHook", () => {
     await initialized(2);
     await transcript([typed("first", 1)]);
     expect(await sessionEnd()).toBeUndefined();
-    expect(spawned).toEqual([["/plugin/dist/cli.js", "backfill", "s1", "--tail", "-C", root]]);
+    expect(spawned).toEqual([
+      ["/plugin/dist/cli.js", "backfill", "s1", "--tail", "--close", "-C", root],
+    ]);
   });
 
-  it("does not spawn at session end when everything is recorded or catch-up is off", async () => {
+  it("still starts the closing pass at session end when everything is recorded", async () => {
     await initialized(2);
     await transcript([typed("first", 1)]);
     await sessionWrite({ dir: root }, fakeIo(env), async () =>
       JSON.stringify({ sessionId: "s1", nodes: [{ id: "m1", kind: "message", title: "First" }] }),
     );
     expect(await sessionEnd()).toBeUndefined();
-    expect(spawned).toEqual([]);
+    expect(spawned).toEqual([
+      ["/plugin/dist/cli.js", "backfill", "s1", "--tail", "--close", "-C", root],
+    ]);
+  });
 
+  it("does not spawn at session end when the catch-up is off", async () => {
+    await initialized(2);
     await transcript([typed("second", 2)]);
     await configSet("sessionEndCatchUp", "false", fakeIo(env));
     expect(await sessionEnd()).toBeUndefined();

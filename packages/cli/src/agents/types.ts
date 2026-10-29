@@ -28,6 +28,14 @@ export interface ToolUse {
   files: string[];
   /** Any other tool calls (reads, searches, web, subagents…). */
   other: number;
+  /**
+   * What the shell commands were for, in the agent's own words (their
+   * descriptions, never the commands). Only for the recorder's prompt; the map
+   * does not show it.
+   */
+  steps?: string[];
+  /** Questions the agent asked the user, with their options. Only for the recorder's prompt. */
+  asks?: string[];
 }
 
 /** One user message and what the agent wrote back before the next one. */

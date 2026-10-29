@@ -119,6 +119,12 @@ export const Session = z.object({
   startedAt: IsoDate,
   updatedAt: IsoDate,
   status: Status.default({ goal: "", done: [], pending: [], next: "" }),
+  /**
+   * One line on where the session left off (L0), so a later session can tell
+   * whether it continues this one without reading the branches. Written by the
+   * session-end pass; old records have none.
+   */
+  leftOff: z.string().max(400).optional(),
   nodes: z.array(LineageNode).default([]),
   /** The linked git worktree the session ran in; set by the CLI, never by the agent. */
   worktree: z.object({ path: z.string().min(1), branch: z.string().min(1).nullable() }).optional(),
@@ -154,6 +160,7 @@ export const SessionInput = z.object({
   title: z.string().max(200).optional(),
   epoch: Slug.nullable().optional(),
   status: Status.optional(),
+  leftOff: z.string().max(400).optional(),
   nodes: z.array(LineageNodeInput).optional(),
 });
 

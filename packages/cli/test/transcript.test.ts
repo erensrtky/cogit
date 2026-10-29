@@ -115,6 +115,42 @@ describe("readConversation", () => {
     expect(turns[0]?.tools).toEqual({ commands: 1, files: ["/p/a.ts"], other: 2 });
   });
 
+  it("keeps the agent's steps and questions for the recorder, and drops them for the map", async () => {
+    const file = join(await tempDir(), "s1.jsonl");
+    const agent = (content: unknown[]) => ({ type: "assistant", message: { content } });
+    const bash = (description?: string) => ({
+      type: "tool_use",
+      name: "Bash",
+      input: { command: "git status", ...(description ? { description } : {}) },
+    });
+    const lines = [
+      user("first", {}, 1),
+      agent([bash("Show working tree status"), bash("Show working tree status"), bash()]),
+      agent([
+        {
+          type: "tool_use",
+          name: "AskUserQuestion",
+          input: {
+            questions: [
+              { question: "Which order?", options: [{ label: "A" }, { label: "B" }] },
+              { options: [] },
+            ],
+          },
+        },
+      ]),
+    ];
+    await writeFile(file, lines.map((line) => JSON.stringify(line)).join("\n"));
+    const [turn] = await readConversation(file);
+    expect(turn?.tools).toEqual({
+      commands: 3,
+      files: [],
+      other: 1,
+      steps: ["Show working tree status"],
+      asks: ["Which order? [A | B]"],
+    });
+    expect(turn && displayTurn(turn, []).tools).toEqual({ commands: 3, files: [], other: 1 });
+  });
+
   it("marks the message after a broken uuid chain as resumed", async () => {
     const file = join(await tempDir(), "s1.jsonl");
     const lines = [

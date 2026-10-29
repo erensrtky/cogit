@@ -627,27 +627,36 @@ ${line("second", 2)}
     });
   });
 
-  it("offers the last messages of recent sessions when the first message may continue one", async () => {
+  it("offers recent sessions with where they left off, their branches and last messages", async () => {
     await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    const branch = (title: string) => ({ title, asked: "a", outcome: "o", open: "" });
     await sessionWrite({ dir: root }, fakeIo(envFor(dir)), async () =>
       JSON.stringify({
         sessionId: "first",
         title: "Epic 8 work",
+        leftOff: "Epic 8 half done; the release waits",
         nodes: [
-          { id: "m1", kind: "message", title: "One", at: "2026-10-22T09:00:00.000Z" },
+          {
+            id: "m1",
+            kind: "message",
+            title: "One",
+            at: "2026-10-22T09:00:00.000Z",
+            branch: branch("Epic 8"),
+          },
           { id: "m2", kind: "message", title: "Two", parent: "m1", at: "2026-10-22T09:10:00.000Z" },
           {
             id: "m3",
             kind: "message",
             title: "Three",
-            parent: "m2",
+            parent: "m1",
             at: "2026-10-22T09:20:00.000Z",
+            branch: { ...branch("Detour"), open: "still open" },
           },
           {
             id: "m4",
             kind: "message",
             title: "Four",
-            parent: "m3",
+            parent: "m2",
             at: "2026-10-22T09:30:00.000Z",
           },
         ],
@@ -671,7 +680,18 @@ ${line("second", 2)}
           sessionId: "first",
           title: "Epic 8 work",
           updatedAt: T0,
-          // The last three messages, oldest first: enough to pick the parent.
+          leftOff: "Epic 8 half done; the release waits",
+          // Each branch ends at the newest message that grew from it.
+          branches: [
+            { title: "Epic 8", first: "m1", last: { id: "m4", title: "Four" } },
+            {
+              title: "Detour",
+              open: "still open",
+              first: "m3",
+              last: { id: "m3", title: "Three" },
+            },
+          ],
+          // The last three messages, oldest first.
           messages: [
             { id: "m2", title: "Two", at: "2026-10-22T09:10:00.000Z" },
             { id: "m3", title: "Three", at: "2026-10-22T09:20:00.000Z" },

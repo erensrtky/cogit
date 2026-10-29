@@ -71,6 +71,10 @@
         }
       }
     },
+    "leftOff": {
+      "type": "string",
+      "maxLength": 400
+    },
     "nodes": {
       "type": "array",
       "items": {

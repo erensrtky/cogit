@@ -387,14 +387,21 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .argument("<session-id>", "session id")
     .option("-C, --dir <dir>", "project directory", ".")
     .option("--tail", "only this session's messages that have no node yet")
-    .addHelpText("after", examples("cogit backfill 9c32ab18 --tail"))
+    .option(
+      "--close",
+      "then run the session-end pass: threads, parents, branch summaries and where it left off",
+    )
+    .addHelpText(
+      "after",
+      examples("cogit backfill 9c32ab18 --tail", "cogit backfill 9c32ab18 --tail --close"),
+    )
     .action(
-      run(async (sessionId: string, opts: { dir: string; tail?: boolean }) => {
+      run(async (sessionId: string, opts: { dir: string; tail?: boolean; close?: boolean }) => {
         if (opts.tail !== true)
           throw new CliError(
             "backfill of past sessions is not available yet; run `cogit backfill <session-id> --tail`",
           );
-        await backfillTail(opts.dir, sessionId, makeIo(false));
+        await backfillTail(opts.dir, sessionId, makeIo(false), { close: opts.close === true });
       }),
     );
 

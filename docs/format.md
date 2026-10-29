@@ -108,6 +108,7 @@ slug (`[A-Za-z0-9][A-Za-z0-9_.-]{0,127}`), normally the agent's session id.
     "pending": [{"text": "…", "needsUser": true}],
     "next": "…"
   },
+  "leftOff": "…",
   "nodes": [
     {
       "id": "h3f9a2c1b0d4",
@@ -127,6 +128,9 @@ slug (`[A-Za-z0-9][A-Za-z0-9_.-]{0,127}`), normally the agent's session id.
 - `author` is git `user.name` (else the OS user), set on the first write. Older
   records have none.
 - `worktree` is set by the CLI when the session ran in a linked worktree.
+- `leftOff` is one line on where the session left off, written by the session-end
+  pass, so a later session can tell whether it continues this one. Older records
+  have none.
 - `addedAt` and `touchedAt` on a node are stamped by `session write`, never taken
   from agent input. A resent node that changes nothing keeps `touchedAt`.
 

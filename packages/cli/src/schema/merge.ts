@@ -193,6 +193,9 @@ export function mergeSession(
     title: input.title ?? base.title,
     epoch: input.epoch === undefined ? base.epoch : input.epoch,
     status: input.status ?? base.status,
+    ...(input.leftOff === undefined && base.leftOff === undefined
+      ? {}
+      : { leftOff: input.leftOff ?? base.leftOff }),
     nodes: [...nodes.values()],
     updatedAt: now,
   };

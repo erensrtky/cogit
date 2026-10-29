@@ -9,6 +9,7 @@ import { LockBusyError, withLock } from "../store/lock.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadConfig, loadProject, loadSession } from "../store/stores.js";
+import { closeSession } from "./close.js";
 import { sessionWrite } from "./session.js";
 
 /** How much of one message or reply goes into the prompt. */
@@ -30,7 +31,24 @@ function turnBlock(turn: ChatTurn): string {
     `USER: ${cut(turn.text)}`,
     `AGENT: ${agent}`,
     `TOOLS: ${tools}`,
+    ...actionLines(turn),
   ].join("\n");
+}
+
+/**
+ * What the agent actually did in a turn, beyond its words: the questions it
+ * asked with their options, the files it edited and its steps. The recorder
+ * finds the agent's choices and the topic of a turn in these.
+ */
+export function actionLines(turn: ChatTurn): string[] {
+  const lines: string[] = [];
+  const asks = turn.tools.asks ?? [];
+  if (asks.length > 0) lines.push(`ASKED THE USER: ${asks.slice(0, 5).join(" ; ")}`);
+  if (turn.tools.files.length > 0)
+    lines.push(`FILES EDITED: ${turn.tools.files.slice(0, 12).join(", ")}`);
+  const steps = turn.tools.steps ?? [];
+  if (steps.length > 0) lines.push(`STEPS: ${steps.slice(0, 15).join(" ; ")}`);
+  return lines;
 }
 
 function recordPart(record: Session | undefined): string {
@@ -90,7 +108,7 @@ export function catchUpPrompt(
 ): string {
   return [
     "You add the missing part of a cogit lineage record, a map of the user's messages.",
-    "Below are the user's messages that have no node yet, each followed by the agent's written replies and a count of its tool calls.",
+    "Below are the user's messages that have no node yet, each followed by the agent's written replies and what the agent did: the questions it asked the user with their options, the files it edited and its steps. Use these to find the agent's technical decisions and what it rejected.",
     "",
     rules(language, messageSummaries, recorder),
     "",
@@ -148,7 +166,7 @@ function claudeBin(): string {
  * Runs the agent once, headless and without session persistence, with the prompt
  * on stdin. Resolves with stdout; a missing binary or a failed run rejects.
  */
-function runClaude(prompt: string, model: string, env: NodeJS.ProcessEnv): Promise<string> {
+export function runClaude(prompt: string, model: string, env: NodeJS.ProcessEnv): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       claudeBin(),
@@ -210,7 +228,12 @@ async function missingTurns(
  * its answer through `session write` (validation, redaction, stamping, build).
  * A busy session lock means another catch-up already runs, which is not an error.
  */
-export async function backfillTail(dir: string, sessionId: string, io: Io): Promise<void> {
+export async function backfillTail(
+  dir: string,
+  sessionId: string,
+  io: Io,
+  opts: { close?: boolean } = {},
+): Promise<void> {
   const { root } = await resolveProjectRoot(dir);
   const project = await loadProject(root);
   if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
@@ -230,6 +253,7 @@ export async function backfillTail(dir: string, sessionId: string, io: Io): Prom
   }
   if (turns.length === 0) {
     io.out(`session ${sessionId} has nothing left to record`);
+    if (opts.close === true) await closeSession(root, sessionId, io);
     // Story 9.3: `recordCommit: auto` still commits what an earlier update wrote.
     await maybeAutoCommit(root, sessionId, io.env);
     return;
@@ -251,6 +275,8 @@ export async function backfillTail(dir: string, sessionId: string, io: Io): Prom
   // Story 12.1: a side run fills empty fields and new nodes; it never rewrites
   // what the main agent wrote.
   await sessionWrite({ dir: root, by: "side" }, io, async () => JSON.stringify(payload));
+  // At the session end the closing pass reads the whole session once it is all recorded.
+  if (opts.close === true) await closeSession(root, sessionId, io);
   // The session end wrote the last messages after the last code commit; auto
   // mode commits exactly those record files now (Story 9.3).
   await maybeAutoCommit(root, sessionId, io.env);

@@ -140,7 +140,7 @@ export async function sessionWrite(
       labels: hashesToLabels(messages),
       crossTargets,
       by,
-      sideOwnsParent: sideOwnedParents(events),
+      sideOwnsParent: sideOwnedParents(events, base?.nodes),
     });
     warnings = merged.warnings;
     const changes = structureChanges(merged.session, base, io.now(), by);
@@ -452,27 +452,81 @@ async function newMessages(
   return out;
 }
 
-/** How many earlier sessions and messages `session show` offers for a parent. */
-const CANDIDATE_SESSIONS = 3;
+/**
+ * How many earlier sessions `session show` offers for a parent, and how many of
+ * their last messages. Each session comes with its one-line `leftOff` (L0) and
+ * its branches (L1), so the pick reaches past a session's last messages.
+ */
+const CANDIDATE_SESSIONS = 8;
 const CANDIDATE_MESSAGES = 3;
+const CANDIDATE_BRANCHES = 8;
 
 /** A first message that says, in the user's words, that it continues earlier work. */
 const CONTINUES = /\b(devam|kaldığımız yerden|continue)\b/i;
 
+/** One earlier session as the parent pick sees it: L0, its branches (L1) and its last messages. */
+export interface CandidateSession {
+  sessionId: string;
+  title: string;
+  updatedAt: string;
+  leftOff?: string;
+  /** Each branch with the message it ends at, the usual target for "continue this thread". */
+  branches: { title: string; open?: string; first: string; last: { id: string; title: string } }[];
+  messages: { id: string; title: string; at?: string }[];
+}
+
 /**
- * The candidates for hanging a session's first message from an earlier session
- * (8.6): the last messages of the most recently updated other sessions, with a
- * hint when the transcript shows a handoff file being read or the message itself
- * says it continues. Cheap hints from records and the transcript, no model call.
+ * The branches of a record, oldest first: every message that carries a branch
+ * summary, with the newest message that grew from it before another branch began.
  */
-async function parentCandidates(
+function branchesOf(nodes: Session["nodes"]): CandidateSession["branches"] {
+  const messages = nodes
+    .filter((node) => node.kind === "message")
+    .sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+  const byId = new Map(messages.map((node) => [node.id, node]));
+  /** The nearest message at or above this one that starts a branch. */
+  const startOf = (id: string): string | null => {
+    const seen = new Set<string>();
+    let cur: string | null = id;
+    while (cur !== null && !seen.has(cur)) {
+      seen.add(cur);
+      const node = byId.get(cur);
+      if (!node) return null;
+      if (node.branch) return node.id;
+      cur = node.parent ?? null;
+    }
+    return null;
+  };
+  const last = new Map<string, Session["nodes"][number]>();
+  for (const node of messages) {
+    const start = startOf(node.id);
+    if (start !== null) last.set(start, node);
+  }
+  return messages
+    .filter((node) => node.branch)
+    .slice(-CANDIDATE_BRANCHES)
+    .map((node) => {
+      const end = last.get(node.id) ?? node;
+      return {
+        title: node.branch?.title ?? node.title,
+        ...(node.branch?.open ? { open: node.branch.open } : {}),
+        first: node.id,
+        last: { id: end.id, title: end.title },
+      };
+    });
+}
+
+/**
+ * The most recently updated other sessions of the project, newest first, as
+ * the parent pick of a first message sees them (Story 8.6, widened in 0.21).
+ * Cheap: records only, plus a transcript read for a legacy record's ids.
+ */
+export async function candidateSessions(
   root: string,
   sessionId: string,
-  first: SessionMessage,
-  io: Io,
-): Promise<Record<string, unknown>> {
-  // Newest records first, and only the three that keep a message need their
-  // transcript read (old ids become stable ones there).
+  env: NodeJS.ProcessEnv,
+  limit = CANDIDATE_SESSIONS,
+): Promise<CandidateSession[]> {
   const recent: Session[] = [];
   for (const id of await listSessionIds(projectPaths(root).sessions)) {
     if (id === sessionId) continue;
@@ -480,47 +534,58 @@ async function parentCandidates(
     if (loaded.found && loaded.ok) recent.push(loaded.data);
   }
   recent.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const others: {
-    sessionId: string;
-    title: string;
-    updatedAt: string;
-    messages: { id: string; title: string; at?: string }[];
-  }[] = [];
+  const out: CandidateSession[] = [];
   for (const candidate of recent) {
-    const nodes = [...candidate.nodes]
-      .filter((node) => node.kind === "message")
-      .sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
-    if (nodes.length === 0) continue;
+    if (!candidate.nodes.some((node) => node.kind === "message")) continue;
     // Only a legacy record needs its transcript (for stable ids); the rest are
     // already keyed by them, so most sessions cost one file read.
-    const messages = await readSessionMessages(root, candidate.sessionId, io.env);
+    const messages = await readSessionMessages(root, candidate.sessionId, env);
     const record = await effectiveRecord(
       root,
       candidate.sessionId,
       { found: true, ok: true, data: candidate, warnings: [] },
       messages,
     );
-    const effective = (record?.nodes ?? nodes)
+    const nodes = record?.nodes ?? candidate.nodes;
+    const effective = nodes
       .filter((node) => node.kind === "message")
       .sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
-    others.push({
+    out.push({
       sessionId: candidate.sessionId,
       title: candidate.title,
       updatedAt: candidate.updatedAt,
+      ...(candidate.leftOff ? { leftOff: candidate.leftOff } : {}),
+      branches: branchesOf(nodes),
       messages: effective.slice(-CANDIDATE_MESSAGES).map(({ id: messageId, title, at }) => ({
         id: messageId,
         title,
         ...(at === undefined ? {} : { at }),
       })),
     });
-    if (others.length === CANDIDATE_SESSIONS) break;
+    if (out.length === limit) break;
   }
+  return out;
+}
+
+/**
+ * The candidates for hanging a session's first message from an earlier session
+ * (8.6), with a hint when the transcript shows a handoff file being read or the
+ * message itself says it continues. Cheap hints from records and the transcript,
+ * no model call.
+ */
+async function parentCandidates(
+  root: string,
+  sessionId: string,
+  first: SessionMessage,
+  io: Io,
+): Promise<Record<string, unknown>> {
+  const sessions = await candidateSessions(root, sessionId, io.env);
   const file = await agent.findTranscript(sessionId, io.env);
   const handoff = file ? await agent.readsHandoff(file).catch(() => false) : false;
   return {
     forMessage: { id: first.hash, label: first.label },
     ...(handoff || CONTINUES.test(first.text) ? { continuesHint: true } : {}),
-    sessions: others,
+    sessions,
   };
 }
 
