@@ -889,6 +889,23 @@ body:has(.map-shell.is-expanded) {
   height: auto;
 }
 
+/* Whose sessions (Everyone / You / a teammate): sits with the toolbar buttons. */
+.person-filter {
+  padding: 4px 8px;
+  color: var(--muted);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 13px;
+}
+
+/* Another person's sessions under the filter: in place, faded, so the lines stay whole. */
+.session-row.is-dimmed,
+.session-rows.is-dimmed {
+  opacity: 0.35;
+}
+
 .outline-button {
   padding: 5px 12px;
   color: var(--muted);

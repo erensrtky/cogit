@@ -57,6 +57,9 @@ and `user.email`, and like git it tells people apart by email. Your sessions onl
 continue your own earlier sessions; a teammate's session is never taken for the start of
 yours, so everyone's line of thought stays their own on the map.
 
+On the map a teammate's session shows their name (yours shows none), and the toolbar's
+Everyone / You / teammate choice fades everyone else's sessions while keeping them in place.
+
 Raw conversations stay on each author's machine unless they turn `shareConversations` on, so
 teammates see the record (titles, decisions, reasons) but not the chat itself.
 

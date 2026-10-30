@@ -2,6 +2,7 @@ import type { MouseEvent } from "react";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { formatStamp } from "./format.js";
 import { branchPath, type GitMessageRow, type GitRow, LANE_COLORS } from "./gitLayout.js";
+import { type PersonFilter, peopleOf } from "./people.js";
 import type { SessionGraph } from "./sessionLayout.js";
 
 /**
@@ -22,6 +23,7 @@ function SessionRow({
   row,
   session,
   showAuthor,
+  dimmed,
   selected,
   open,
   searchHit,
@@ -30,8 +32,10 @@ function SessionRow({
 }: {
   row: GitMessageRow;
   session: ViewSession;
-  /** More than one person recorded sessions here; otherwise the name says nothing. */
+  /** Whose session it is: shown for a teammate's, never for your own. */
   showAuthor: boolean;
+  /** Left out by the person filter: kept in place, faded, so the lines stay whole. */
+  dimmed: boolean;
   selected: boolean;
   /** Its messages are open below the row. */
   open: boolean;
@@ -48,6 +52,7 @@ function SessionRow({
     selected ? "is-selected" : "",
     open ? "is-open" : "",
     searchHit ? "is-search-hit" : "",
+    dimmed ? "is-dimmed" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -104,6 +109,7 @@ export function SessionMap({
   selectedSessionId,
   openIds,
   highlightSessionIds,
+  person = null,
   onOpen,
   onContinue,
 }: {
@@ -114,15 +120,14 @@ export function SessionMap({
   openIds: ReadonlySet<string>;
   /** Sessions whose title or status matched the map search. */
   highlightSessionIds: ReadonlySet<string>;
+  /** The person filter: everyone when left out. */
+  person?: PersonFilter;
   onOpen: (sessionId: string) => void;
   onContinue: (sessionId: string, messageId: string) => void;
 }) {
   const { git } = graph;
   const segments = new Map(git.segments.map((segment) => [segment.id, segment]));
-  const authors = new Set(
-    [...graph.sessions.values()].flatMap((s) => (s.author ? [s.author] : [])),
-  );
-  const showAuthor = authors.size > 1;
+  const people = peopleOf(model);
 
   const open: (row: GitRow) => void = (row) => {
     if (row.kind === "message") onOpen(row.message.id);
@@ -211,7 +216,8 @@ export function SessionMap({
               key={row.message.id}
               row={row}
               session={session}
-              showAuthor={showAuthor}
+              showAuthor={people.showAuthor(session)}
+              dimmed={!people.matches(session, person)}
               selected={selectedSessionId === session.sessionId}
               open={openIds.has(session.sessionId)}
               searchHit={highlightSessionIds.has(session.sessionId)}

@@ -28,6 +28,7 @@ import { type GitLayout, layoutGitGraph, ROW_WIDTH } from "./gitLayout.js";
 import { centreViewport, headOf, type MapPoint } from "./graph.js";
 import type { MapSearchState } from "./MapSearch.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
+import { filterOf, type PersonFilter, peopleOf, valueOf } from "./people.js";
 import { RowEdge, type RowWidths, rowWidthsOf } from "./RowEdge.js";
 import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
@@ -65,6 +66,9 @@ const GraphActions = createContext<{
   /** Sets the width of the open sessions' message rows (their right edge). */
   resizeRows: (sessionId: string, width: number) => void;
   storeRowWidth: (sessionId: string, width: number) => void;
+  /** The person filter (Everyone, You, a teammate); null for everyone. */
+  person: PersonFilter;
+  people: ReturnType<typeof peopleOf>;
 }>({
   selection: null,
   openIds: new Set(),
@@ -76,6 +80,8 @@ const GraphActions = createContext<{
   unfold: () => {},
   resizeRows: () => {},
   storeRowWidth: () => {},
+  person: null,
+  people: peopleOf({ sessions: [] }),
 });
 
 /** An opened session: its message graph and where it sits on the canvas. */
@@ -106,13 +112,23 @@ function SessionMessages({
   highlights: ReadonlySet<string> | undefined;
   activeHitId: string | null;
 }) {
-  const { selection, readIds, bigChangeLines, openNode, unfold, resizeRows, storeRowWidth } =
-    useContext(GraphActions);
+  const {
+    selection,
+    readIds,
+    bigChangeLines,
+    openNode,
+    unfold,
+    resizeRows,
+    storeRowWidth,
+    person,
+    people,
+  } = useContext(GraphActions);
   const own = selection?.sessionId === session.sessionId;
   if (git.rows.length === 0)
     return <p className="graph-status empty">No messages recorded in this session yet.</p>;
+  const dimmed = !people.matches(session, person);
   return (
-    <div className="session-rows">
+    <div className={dimmed ? "session-rows is-dimmed" : "session-rows"}>
       <GitGraph
         git={git}
         selectedId={selection?.type === "node" && own ? selection.nodeId : null}
@@ -133,7 +149,7 @@ function SessionMessages({
 }
 
 function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
-  const { openSession, openContinue, selection, openIds } = useContext(GraphActions);
+  const { openSession, openContinue, selection, openIds, person } = useContext(GraphActions);
   return (
     <div className="map-node">
       <SessionMap
@@ -143,6 +159,7 @@ function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
         selectedSessionId={selection?.type === "session" ? selection.sessionId : null}
         openIds={openIds}
         highlightSessionIds={data.sessionHits}
+        person={person}
         onOpen={openSession}
         onContinue={openContinue}
       />
@@ -327,6 +344,9 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   // The files, unread and outline views share the left column; only one shows.
   const [showFiles, setShowFiles] = useState(false);
   const [showUnread, setShowUnread] = useState(false);
+  const [person, setPerson] = useState<PersonFilter>(null);
+  const people = useMemo(() => peopleOf(model), [model]);
+  const personOptions = useMemo(() => people.options(), [people]);
   const { expanded: fullscreen, toggle: toggleFullscreen } = useFullscreen();
   // Story 10.3: the read marks the page was built with. A live rebuild refreshes
   // them; the toggle updates this set at once so the row answers the click.
@@ -672,6 +692,8 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       unfold,
       resizeRows,
       storeRowWidth,
+      person,
+      people,
     }),
     [
       selection,
@@ -684,6 +706,8 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       unfold,
       resizeRows,
       storeRowWidth,
+      person,
+      people,
     ],
   );
 
@@ -759,6 +783,21 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
           >
             {openAll ? "Fold all" : "Unfold all"}
           </button>
+          {personOptions.length > 0 ? (
+            <select
+              className="person-filter"
+              aria-label="Whose sessions"
+              title="Fade the other people's sessions; the lines between them stay"
+              value={valueOf(person)}
+              onChange={(event) => setPerson(filterOf(event.target.value))}
+            >
+              {personOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ) : null}
           <button
             type="button"
             className="outline-button"

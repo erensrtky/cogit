@@ -22,6 +22,7 @@ import {
   toNodeDetail,
 } from "./graph.js";
 import type { OutlineTarget } from "./Outline.js";
+import { peopleOf } from "./people.js";
 import { ResumeButton } from "./ResumeButton.js";
 
 /**
@@ -121,7 +122,12 @@ function SessionSummary({ model, session }: { model: LineageViewModel; session: 
     <>
       <dl className="drilldown-meta">
         <Field label="Agent">{session.agent}</Field>
-        {session.author ? <Field label="Recorded by">{session.author}</Field> : null}
+        {session.author ? (
+          <Field label="Recorded by">
+            {session.author}
+            {peopleOf(model).mine(session) ? " (you)" : ""}
+          </Field>
+        ) : null}
         <Field label="Session">
           <code>{session.sessionId}</code>
         </Field>

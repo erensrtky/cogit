@@ -1,28 +1,9 @@
 import { userInfo } from "node:os";
 import { findGitRoot, gitUserEmail, gitUserName } from "./git.js";
 
-/**
- * Who a session belongs to (Story 9.3): the git identity it was recorded with.
- * Like git, a person is their email when there is one, else their name. A
- * session's thoughts are its author's own; another person's session is never
- * taken for a continuation of yours.
- */
-export interface Author {
-  author?: string | undefined;
-  authorEmail?: string | undefined;
-}
+export { type Author, sameAuthor } from "./view/people.js";
 
-/**
- * Whether two sessions were recorded by the same person. Emails decide when both
- * have one, else names; a record from before authors were stamped matches
- * anyone, since it was made before teammates' records could be told apart.
- */
-export function sameAuthor(a: Author, b: Author): boolean {
-  if (a.authorEmail !== undefined && b.authorEmail !== undefined)
-    return a.authorEmail.toLowerCase() === b.authorEmail.toLowerCase();
-  if (a.author !== undefined && b.author !== undefined) return a.author === b.author;
-  return true;
-}
+import type { Author } from "./view/people.js";
 
 /**
  * Who gets credited for a session (Story 9.3): the git name this repository

@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- The map tells your sessions from your teammates': a teammate's session always shows their name and yours never needs to, the side panel marks yours "(you)", and a new Everyone / You / teammate choice in the toolbar fades the other people's sessions.
+
 ### Changed
 - A session records its author's git email next to their name, and people are told apart by email, as in git.
 - A session only continues its author's own earlier sessions: after a pull, a teammate's sessions are no longer offered as the start of yours, and the map no longer draws a session as the continuation of someone else's.
