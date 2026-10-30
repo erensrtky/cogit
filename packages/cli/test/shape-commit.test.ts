@@ -22,13 +22,17 @@ const OLDER = "h0000000000aa";
 
 const ANSWER = JSON.stringify({ tools: [{ kind: "pseudo", text: "1. Read it\n2. Write it" }] });
 
+// The record's first write comes after the commits, as it does when a commit
+// lands before the Stop hook records the message.
+const LATER = "2099-01-01T00:00:00.000Z";
+
 function session(nodes: Session["nodes"], id = "s1"): Session {
   return {
     schema: 1,
     sessionId: id,
     agent: "claude-code",
     title: "Ship it",
-    startedAt: T0,
+    startedAt: LATER,
     updatedAt: T0,
     status: { goal: "", done: [], pending: [], next: "" },
     nodes,

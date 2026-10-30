@@ -145,9 +145,11 @@ async function shapeCommit(root: string, ref: string, config: Config, io: Io): P
   await underLock(root, session.sessionId, io, async () => {
     const fresh = await loadSession(root, session.sessionId);
     if (!fresh.found || !fresh.ok) return;
+    // No `since`: `startedAt` is the record's first write, which often comes
+    // after the commit that is being shaped.
     const [withTrailers] = attachThoughtTrailers(
       [fresh.data],
-      await readThoughtTrailers(root, { env: io.env, since: fresh.data.startedAt }),
+      await readThoughtTrailers(root, { env: io.env }),
     );
     const node = withTrailers?.nodes.find((n) => n.id === thought);
     if (node === undefined || !needsShape(node)) return;
@@ -168,7 +170,7 @@ async function runShape(root: string, sessionId: string, config: Config, io: Io)
   // The trailers link commits the record has not listed yet.
   const [session] = attachThoughtTrailers(
     [loaded.data],
-    await readThoughtTrailers(root, { env: io.env, since: loaded.data.startedAt }),
+    await readThoughtTrailers(root, { env: io.env }),
   );
   for (const node of shapeCandidates(session?.nodes ?? [])) {
     if (await shapeNode(root, gitRoot, sessionId, node, config, io)) return;
