@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- `cogit why <file>:<line>` (or `--line N`) shows only the thought behind that line: git blames the line to its commit, the commit's `Thought:` trailer names the message, and `why` prints that message's decision and rejected options. When the commit carries no thought it says so and lists the file's other thoughts; a line past the end of the file is an error.
 - `cogit doctor` explains why the map may stay empty: read-only checks for Node, the Claude Code plugin and its version, git identity, the project and its hooks, the skill permission, transcripts and their retention, recorded sessions and the unrecorded tail, the map server and the close-pass log. Each line says `ok`, `warn` or `fail` with the command that fixes it; `--json` prints the report, and a failed check exits 1.
 - `cogit init` warns when git has no `user.email`, since sessions are now told apart by it.
 - The map tells your sessions from your teammates': a teammate's session always shows their name and yours never needs to, the side panel marks yours "(you)", and a new Everyone / You / teammate choice in the toolbar fades the other people's sessions.

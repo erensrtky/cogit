@@ -12,6 +12,8 @@ cogit show h3f9c2a1b4d6e      # one message: what came of it, its decisions, its
 cogit show a1b2c3d            # the message behind a commit (through its Thought: trailer)
 cogit blame src/auth.ts:42    # which recorded message produced this line
 cogit why src/auth.ts         # what earlier messages decided about this file, and rejected
+cogit why src/auth.ts:42      # only the thought behind line 42
+cogit why src/auth.ts --line 42  # the same lookup
 cogit search "refresh token"  # titles, decisions, summaries and the stored conversation
 ```
 
@@ -33,6 +35,12 @@ each with its message hash and date.
 
 The lookup is exact, but the wording is the record's summary, so it is only as good as the
 record.
+
+Add a line — `cogit why src/auth.ts:42` or `--line 42` — and `why` asks git which commit last
+touched that line and shows only the thought behind it: for a surprising line, that is the one
+you wanted. When that commit carries no thought, `why` says so and lists the file's other
+thoughts under a "Thoughts behind the rest of the file" heading. A line past the end of the file
+is an error.
 
 Like git, it works from any directory inside the project: the path is relative to where you
 are, so `cd src && cogit why auth.ts` is the same lookup.

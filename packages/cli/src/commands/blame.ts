@@ -8,6 +8,7 @@ import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadProject } from "../store/stores.js";
 import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
 import { buildMessages } from "../view/lineage.js";
+import type { ViewNode } from "../view/model.js";
 
 /**
  * `cogit blame` (Story 8.8): git knows which commit wrote a line, the
@@ -50,7 +51,7 @@ function sameCommit(recorded: string, blamed: string): boolean {
 }
 
 /** One readable line from git's failure; the first line carries the reason. */
-function gitMessage(err: unknown): string {
+export function gitMessage(err: unknown): string {
   const stderr = (err as { stderr?: unknown }).stderr;
   const text = typeof stderr === "string" && stderr.trim() !== "" ? stderr : String(err);
   return text.trim().split("\n")[0] ?? "unknown git error";
@@ -58,6 +59,71 @@ function gitMessage(err: unknown): string {
 
 function oneLine(text: string): string {
   return text.replace(/\s+/g, " ").trim();
+}
+
+/** One recorded thought behind a commit. */
+export interface CommitThought {
+  /** The blamed commit, full hash. */
+  commit: string;
+  sessionId: string;
+  sessionTitle: string;
+  messageId: string;
+  /** The `m12` label the map shows. */
+  label: string;
+  title: string;
+  summary?: string;
+  /** The message time (its session's start when the record has none). */
+  at: string;
+  /** The message itself, for the decisions `why` prints. */
+  node: ViewNode;
+}
+
+/**
+ * The recorded messages behind `commits` (Story 13.2): a commit's `Thought:`
+ * trailer (Story 9.4) or a record's `commits` list links the two. `blame` and
+ * `why <file>:<line>` share this walk, so line → commit → message exists once.
+ */
+export async function thoughtsForCommits(
+  root: string,
+  commits: readonly string[],
+  env?: NodeJS.ProcessEnv,
+  warn?: (line: string) => void,
+): Promise<CommitThought[]> {
+  const loaded = [...(await loadAllSessions(root, warn ?? (() => {})))].sort(
+    (a, b) => a.startedAt.localeCompare(b.startedAt) || a.sessionId.localeCompare(b.sessionId),
+  );
+  const trailers = await readThoughtTrailers(root, {
+    ...(env === undefined ? {} : { env }),
+    since: earliestSessionStart(loaded),
+  });
+  const sessions = attachThoughtTrailers(loaded, trailers);
+  const thoughts: CommitThought[] = [];
+  const seen = new Set<string>();
+
+  for (const commit of commits) {
+    for (const session of sessions) {
+      const sessionTitle = session.title.trim() === "" ? session.sessionId : session.title;
+      for (const message of buildMessages(session.nodes)) {
+        const recorded = (message.commits ?? []).find((hash) => sameCommit(hash, commit));
+        if (recorded === undefined) continue;
+        const key = `${commit}:${message.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        thoughts.push({
+          commit,
+          sessionId: session.sessionId,
+          sessionTitle,
+          messageId: message.id,
+          label: message.label ?? message.id,
+          title: message.title,
+          ...(message.summary === undefined ? {} : { summary: message.summary }),
+          at: message.at ?? session.startedAt,
+          node: message,
+        });
+      }
+    }
+  }
+  return thoughts;
 }
 
 /**
@@ -96,43 +162,22 @@ export async function blame(opts: BlameOptions): Promise<BlameHit[]> {
     throw new CliError(`git could not read ${opts.target}: ${gitMessage(err)}`);
   }
 
-  const loaded = [...(await loadAllSessions(root, io.warn))].sort(
-    (a, b) => a.startedAt.localeCompare(b.startedAt) || a.sessionId.localeCompare(b.sessionId),
-  );
   // A commit whose message carries a `Thought:` trailer (Story 9.4) belongs to
   // that message even when the agent's record did not list the hash.
-  const trailers = await readThoughtTrailers(root, {
-    env: io.env,
-    since: earliestSessionStart(loaded),
-  });
-  const sessions = attachThoughtTrailers(loaded, trailers);
+  const thoughts = await thoughtsForCommits(root, commits, io.env, io.warn);
   const mapUrl = pathToFileURL(projectPaths(root).html).href;
-  const hits: BlameHit[] = [];
-  const seen = new Set<string>();
-
-  for (const commit of commits) {
-    for (const session of sessions) {
-      for (const message of buildMessages(session.nodes)) {
-        const recorded = (message.commits ?? []).find((hash) => sameCommit(hash, commit));
-        if (recorded === undefined) continue;
-        const key = `${commit}:${message.id}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        hits.push({
-          commit: commit.slice(0, 7),
-          sessionId: session.sessionId,
-          sessionTitle: session.title || session.sessionId,
-          messageId: message.id,
-          label: message.label ?? message.id,
-          title: message.title,
-          ...(message.summary === undefined ? {} : { summary: message.summary }),
-          url: `${mapUrl}#s=${encodeURIComponent(session.sessionId)}&m=${encodeURIComponent(
-            message.id,
-          )}`,
-        });
-      }
-    }
-  }
+  const hits: BlameHit[] = thoughts.map((thought) => ({
+    commit: thought.commit.slice(0, 7),
+    sessionId: thought.sessionId,
+    sessionTitle: thought.sessionTitle,
+    messageId: thought.messageId,
+    label: thought.label,
+    title: thought.title,
+    ...(thought.summary === undefined ? {} : { summary: thought.summary }),
+    url: `${mapUrl}#s=${encodeURIComponent(thought.sessionId)}&m=${encodeURIComponent(
+      thought.messageId,
+    )}`,
+  }));
 
   for (const hit of hits) {
     io.out(`${hit.commit}  ${hit.sessionTitle} · ${hit.label} ${hit.title}`);

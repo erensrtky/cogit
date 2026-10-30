@@ -7,6 +7,7 @@ import { configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
 import {
   collectWhy,
+  collectWhyLine,
   formatWhy,
   nearestProjectDir,
   rejectedItems,
@@ -17,6 +18,7 @@ import {
   why,
 } from "../src/commands/why.js";
 import { runHook } from "../src/hooks/run.js";
+import { createProgram } from "../src/program.js";
 import type { Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
 import { envFor, fakeIo, noGitDir, noGitProject, T0, tempDir } from "./helpers.js";
@@ -243,6 +245,67 @@ describe("cogit why", () => {
     // Outside the project, or a file that never existed.
     expect(await collectWhy(root, "../outside.txt", env)).toEqual([]);
     expect(await collectWhy(root, "missing.txt", env)).toEqual([]);
+  });
+
+  it("narrows to the thought behind one line (13.2)", async () => {
+    // Line 1 came from the first commit (thought A), line 2 from the second (B).
+    expect((await collectWhyLine(root, "a.txt", 1, env)).map((entry) => entry.messageId)).toEqual([
+      A,
+    ]);
+    expect((await collectWhyLine(root, "a.txt", 2, env)).map((entry) => entry.messageId)).toEqual([
+      B,
+    ]);
+
+    const io = fakeIo(env);
+    expect(await why({ dir: root, file: "a.txt:1", io })).toHaveLength(1);
+    const text = io.lines.join("\n");
+    expect(text).toContain("decision: Parse the file — The old loop ate one line.");
+    expect(text).toContain("not: Keep the loop — It loses data.");
+    expect(text).not.toContain("Extend the parser");
+
+    // `--line` takes the same path as the `:line` suffix.
+    const flag = fakeIo(env);
+    expect(await why({ dir: root, file: "a.txt", line: 2, io: flag })).toHaveLength(1);
+    expect(flag.lines.join("\n")).toContain("Extend the parser");
+    expect(flag.lines.join("\n")).not.toContain("Parse the file");
+
+    const cliIo = fakeIo(env);
+    const program = createProgram(() => cliIo);
+    await program.parseAsync(["why", "a.txt", "--line", "1", "-C", root], { from: "user" });
+    expect(cliIo.lines.join("\n")).toContain("h1111111  m1");
+  });
+
+  it("falls back to the file's other thoughts when the line has none (13.2)", async () => {
+    await writeFile(join(root, "a.txt"), "one\ntwo\nthree\n");
+    await git("add", "a.txt");
+    await git("commit", "-q", "-m", "chore: third line");
+    expect(await collectWhyLine(root, "a.txt", 3, env)).toEqual([]);
+
+    const io = fakeIo(env);
+    await why({ dir: root, file: "a.txt:3", io });
+    const text = io.lines.join("\n");
+    expect(io.lines[0]).toBe("No thought recorded for a.txt:3.");
+    expect(text).toContain("Thoughts behind the rest of the file:");
+    expect(text).toContain("h2222222  m2");
+    expect(text).toContain("h1111111  m1");
+  });
+
+  it("reports a line git cannot blame (13.2)", async () => {
+    await expect(why({ dir: root, file: "a.txt:99", io: fakeIo(env) })).rejects.toThrow(
+      /git could not read a\.txt:99/,
+    );
+    await expect(why({ dir: root, file: "a.txt", line: 0, io: fakeIo(env) })).rejects.toThrow(
+      /positive line number/,
+    );
+  });
+
+  it("says plainly when a file has no thought for a line or anywhere else (13.2)", async () => {
+    await writeFile(join(root, "plain.txt"), "x\n");
+    await git("add", "plain.txt");
+    await git("commit", "-q", "-m", "chore: plain");
+    const io = fakeIo(env);
+    await why({ dir: root, file: "plain.txt:1", io });
+    expect(io.lines).toEqual(["No decisions or rejected alternatives recorded for plain.txt."]);
   });
 
   it("writes one note per file per session and then stays quiet", async () => {

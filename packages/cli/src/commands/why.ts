@@ -5,10 +5,9 @@ import { blameCommitHashes, findGitRoot } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
-import { loadAllSessions, loadProject } from "../store/stores.js";
-import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
-import { buildMessages } from "../view/lineage.js";
+import { loadProject } from "../store/stores.js";
 import type { ViewNode } from "../view/model.js";
+import { type CommitThought, gitMessage, parseBlameTarget, thoughtsForCommits } from "./blame.js";
 import { shortHash, stamp } from "./log.js";
 
 /**
@@ -18,6 +17,10 @@ import { shortHash, stamp } from "./log.js";
  * record's "considered and rejected" options — so the answer is exact, though
  * each summary is only as good as the record the agent wrote. No message text
  * is read or classified.
+ *
+ * `cogit why <file>:<line>` (Story 13.2) narrows the same chain to the commit
+ * git blames for that line, so a surprising line gets only the thought that
+ * produced it.
  */
 
 /** An option the record says was considered and not taken, with the reason. */
@@ -67,11 +70,6 @@ function repositoryPath(gitRoot: string, root: string, file: string): string | u
   return rel.split(sep).join("/");
 }
 
-/** A recorded short hash may name a full hash git printed, or the reverse. */
-function sameCommit(recorded: string, blamed: string): boolean {
-  return blamed.startsWith(recorded) || recorded.startsWith(blamed);
-}
-
 /**
  * The decisions a message recorded: its own (a user-level choice with a `why`,
  * or rejected options) and the agent's decisions along the way. A message with
@@ -94,8 +92,7 @@ function decisionsOf(message: ViewNode): WhyDecision[] {
   return decisions;
 }
 
-/**
- * The decisions of the thoughts behind `file`, newest first. `file` is relative
+/** The decisions of the thoughts behind `file`, newest first. `file` is relative
  * to the project root. Any unreadable part (no repository, no history, no
  * record) is "nothing known": a hook may call this on every edit.
  */
@@ -104,6 +101,32 @@ export async function collectWhy(
   file: string,
   env?: NodeJS.ProcessEnv,
 ): Promise<WhyHit[]> {
+  return collect(root, file, undefined, env, false);
+}
+
+/**
+ * The decisions of the one thought behind line `line` of `file` (Story 13.2):
+ * `git blame -L` names the commit that last touched the line, and the shared
+ * `blame` walk turns that commit into its recorded message. Unlike
+ * {@link collectWhy} a broken blame (a line past the end of the file) is an
+ * error, not "nothing known": the user named the line.
+ */
+export async function collectWhyLine(
+  root: string,
+  file: string,
+  line: number,
+  env?: NodeJS.ProcessEnv,
+): Promise<WhyHit[]> {
+  return collect(root, file, line, env, true);
+}
+
+async function collect(
+  root: string,
+  file: string,
+  line: number | undefined,
+  env: NodeJS.ProcessEnv | undefined,
+  strict: boolean,
+): Promise<WhyHit[]> {
   const gitRoot = await findGitRoot(root);
   if (gitRoot === undefined) return [];
   const repoPath = repositoryPath(gitRoot, root, file);
@@ -111,39 +134,35 @@ export async function collectWhy(
 
   let commits: string[];
   try {
-    commits = await blameCommitHashes(gitRoot, repoPath);
-  } catch {
+    commits = await blameCommitHashes(gitRoot, repoPath, line);
+  } catch (err) {
+    if (strict) throw err;
     return [];
   }
   if (commits.length === 0) return [];
 
-  const sessions = await loadAllSessions(root, () => {});
-  const trailers = await readThoughtTrailers(root, {
-    ...(env === undefined ? {} : { env }),
-    since: earliestSessionStart(sessions),
-  });
-  const attached = attachThoughtTrailers(sessions, trailers);
-  const hits: WhyHit[] = [];
+  return hitsFromThoughts(await thoughtsForCommits(root, commits, env));
+}
 
-  for (const session of attached) {
-    const sessionTitle = session.title.trim() === "" ? session.sessionId : session.title;
-    for (const message of buildMessages(session.nodes)) {
-      const linked = (message.commits ?? []).some((hash) =>
-        commits.some((commit) => sameCommit(hash, commit)),
-      );
-      if (!linked) continue;
-      const decisions = decisionsOf(message);
-      if (decisions.length === 0) continue;
-      hits.push({
-        sessionId: session.sessionId,
-        sessionTitle,
-        messageId: message.id,
-        label: message.label ?? message.id,
-        at: message.at ?? session.startedAt,
-        title: message.title,
-        decisions,
-      });
-    }
+/** One hit per message, newest first; the same message may name several commits. */
+function hitsFromThoughts(thoughts: readonly CommitThought[]): WhyHit[] {
+  const hits: WhyHit[] = [];
+  const seen = new Set<string>();
+  for (const thought of thoughts) {
+    const decisions = decisionsOf(thought.node);
+    if (decisions.length === 0) continue;
+    const key = `${thought.sessionId}:${thought.messageId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    hits.push({
+      sessionId: thought.sessionId,
+      sessionTitle: thought.sessionTitle,
+      messageId: thought.messageId,
+      label: thought.label,
+      at: thought.at,
+      title: thought.title,
+      decisions,
+    });
   }
 
   const time = (hit: WhyHit): number => {
@@ -187,8 +206,10 @@ export interface WhyOptions {
    * one above it and `file` is relative to it, as with git.
    */
   cwd?: string;
-  /** A file, relative to the project (or to `cwd`) or absolute. */
+  /** A file, or `file:line` (Story 13.2), relative to the project (or to `cwd`) or absolute. */
   file: string;
+  /** The line to look up, when it is not written as `file:line`. */
+  line?: number;
   io: Io;
 }
 
@@ -206,16 +227,25 @@ export async function nearestProjectDir(start: string): Promise<string | undefin
 
 /**
  * Prints the decisions and rejected alternatives of the thoughts behind a file,
- * each with its message hash and date.
+ * each with its message hash and date. With a line (Story 13.2) only the thought
+ * behind that line is printed; when its commit carries none, the file-level
+ * thoughts follow under a heading.
  */
 export async function why(opts: WhyOptions): Promise<WhyHit[]> {
   const { io } = opts;
+  if (opts.line !== undefined && (!Number.isInteger(opts.line) || opts.line < 1))
+    throw new CliError("--line needs a positive line number");
+
   let start = opts.dir ?? ".";
-  let file = opts.file;
+  let target = opts.file;
   if (opts.cwd !== undefined) {
     start = (await nearestProjectDir(opts.cwd)) ?? opts.cwd;
-    file = relative(start, resolve(opts.cwd, opts.file));
+    target = relative(start, resolve(opts.cwd, opts.file));
   }
+  const parsed = parseBlameTarget(target);
+  const file = parsed.file;
+  const line = opts.line ?? parsed.line;
+
   const { root } = await resolveProjectRoot(start);
   const project = await loadProject(root);
   if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
@@ -229,15 +259,45 @@ export async function why(opts: WhyOptions): Promise<WhyHit[]> {
   );
   if (!exists) throw new CliError(`${opts.file} does not exist`);
 
+  if (line !== undefined) {
+    let lineHits: WhyHit[];
+    try {
+      lineHits = await collectWhyLine(root, file, line, io.env);
+    } catch (err) {
+      throw new CliError(`git could not read ${opts.file}: ${gitMessage(err)}`);
+    }
+    if (lineHits.length > 0) {
+      printHits(io, lineHits);
+      return lineHits;
+    }
+
+    const fileHits = await collectWhy(root, file, io.env);
+    if (fileHits.length === 0) {
+      io.out(`No decisions or rejected alternatives recorded for ${file}.`);
+      return fileHits;
+    }
+    io.out(`No thought recorded for ${file}:${line}.`);
+    io.out("");
+    io.out("Thoughts behind the rest of the file:");
+    io.out("");
+    printHits(io, fileHits);
+    return fileHits;
+  }
+
   const hits = await collectWhy(root, file, io.env);
   if (hits.length === 0) {
-    io.out(`No decisions or rejected alternatives recorded for ${opts.file}.`);
+    io.out(`No decisions or rejected alternatives recorded for ${file}.`);
     return hits;
   }
+  printHits(io, hits);
+  return hits;
+}
+
+/** The hits in today's `why` format, then the pointer to `show`. */
+function printHits(io: Io, hits: readonly WhyHit[]): void {
   for (const line of formatWhy(hits)) io.out(line);
   io.out("");
   io.out("`cogit show <hash>` opens the thought; the record is the agent's summary.");
-  return hits;
 }
 
 /** How many rejected options one PreToolUse note carries. */

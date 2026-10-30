@@ -98,18 +98,27 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
 
   program
     .command("why")
-    .description("show the decisions and rejected options behind a file")
+    .description("show the decisions and rejected options behind a file or a line")
     .helpGroup("Read:")
-    .argument("<file>", "file to look up, relative to where you are (or to [dir])")
+    .argument("<file>", "file (or file:line) to look up, relative to where you are (or to [dir])")
     .argument("[dir]", "project directory; by default the nearest one above you")
     .option("-C, --dir <dir>", "project directory (same as the positional)")
-    .addHelpText("after", examples("cogit why src/auth.ts", "cogit why src/auth.ts ../my-app"))
+    .option("--line <n>", "the line to look up (same as file:line)", positiveCount)
+    .addHelpText(
+      "after",
+      examples(
+        "cogit why src/auth.ts",
+        "cogit why src/auth.ts:42",
+        "cogit why src/auth.ts ../my-app",
+      ),
+    )
     .action(
-      run(async (file: string, dir: string | undefined, opts: { dir?: string }) => {
+      run(async (file: string, dir: string | undefined, opts: { dir?: string; line?: number }) => {
         const project = opts.dir ?? dir;
         await why({
           ...(project === undefined ? { cwd: process.cwd() } : { dir: project }),
           file,
+          ...(opts.line === undefined ? {} : { line: opts.line }),
           io: makeIo(false),
         });
       }),
