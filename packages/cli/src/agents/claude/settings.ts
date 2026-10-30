@@ -112,18 +112,56 @@ export const MARKETPLACE = "cogit";
 export const MARKETPLACE_REPO = "erensrtky/cogit";
 export const INSTALL_COMMAND = `claude plugin install cogit --marketplace ${MARKETPLACE_REPO}`;
 
-/**
- * Whether Claude Code lists the plugin as installed, in any scope; undefined when its
- * plugin list cannot be read (missing or another shape), so the caller says nothing either way.
- */
-export async function readPluginInstalled(env: NodeJS.ProcessEnv): Promise<boolean | undefined> {
+/** The installed-plugin entries for cogit, one per scope; undefined when the list is unreadable. */
+async function installedEntries(env: NodeJS.ProcessEnv): Promise<unknown[] | undefined> {
   const base = env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
   const read = await readJson(join(base, "plugins", "installed_plugins.json"));
   if (!read.found || "error" in read) return undefined;
   const plugins = isObject(read.value) ? read.value.plugins : undefined;
   if (!isObject(plugins)) return undefined;
+  // A readable list without our key (or with a broken entry) means "not installed".
   const entries = plugins[PLUGIN_ID];
-  return Array.isArray(entries) && entries.length > 0;
+  return Array.isArray(entries) ? entries : [];
+}
+
+/**
+ * Whether Claude Code lists the plugin as installed, in any scope; undefined when its
+ * plugin list cannot be read (missing or another shape), so the caller says nothing either way.
+ */
+export async function readPluginInstalled(env: NodeJS.ProcessEnv): Promise<boolean | undefined> {
+  const entries = await installedEntries(env);
+  return entries === undefined ? undefined : entries.length > 0;
+}
+
+/** The installed plugin's version; undefined when it is not installed or names none. */
+export async function readPluginVersion(env: NodeJS.ProcessEnv): Promise<string | undefined> {
+  const entries = await installedEntries(env);
+  for (const entry of entries ?? []) {
+    const version = isObject(entry) ? entry.version : undefined;
+    if (typeof version === "string" && version !== "") return version;
+  }
+  return undefined;
+}
+
+function pluginEnabledIn(settings: Record<string, unknown>): boolean {
+  const plugins = isObject(settings.enabledPlugins) ? settings.enabledPlugins : undefined;
+  return plugins?.[PLUGIN_ID] === true;
+}
+
+/**
+ * Whether Claude Code has the plugin enabled, in the user's own settings or in
+ * the project's shared ones; undefined when the user's settings cannot be read.
+ */
+export async function readPluginEnabled(
+  env: NodeJS.ProcessEnv,
+  root?: string,
+): Promise<boolean | undefined> {
+  const settings = await readSettings(claudeSettingsPath(env));
+  if (!settings) return undefined;
+  if (pluginEnabledIn(settings)) return true;
+  if (root === undefined) return false;
+  const project = await readSettings(projectSettingsPath(root));
+  return project !== undefined && pluginEnabledIn(project);
 }
 
 /** Where a session's SessionStart leaves its mark; the guard reads the same path. */

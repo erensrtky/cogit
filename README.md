@@ -56,6 +56,8 @@ Then, in Claude Code:
 To get plugin updates on their own, turn on auto-update once: `/plugin` → Marketplaces →
 cogit → Enable auto-update. Claude Code leaves it off for marketplaces outside its own.
 
+If the map stays empty, run `cogit doctor`.
+
 ## Quick start
 
 ```bash

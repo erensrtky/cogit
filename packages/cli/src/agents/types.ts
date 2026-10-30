@@ -169,6 +169,13 @@ export interface AgentAdapter {
   readRetention(env: NodeJS.ProcessEnv): Promise<number | undefined>;
   /** Whether the agent lists the plugin as installed; undefined when unreadable. */
   readPluginInstalled(env: NodeJS.ProcessEnv): Promise<boolean | undefined>;
+  /** The installed plugin's version; undefined when it is not installed or names none. */
+  readPluginVersion(env: NodeJS.ProcessEnv): Promise<string | undefined>;
+  /**
+   * Whether the plugin is enabled, in the user's settings or (with `root`)
+   * the project's; undefined when the user's settings cannot be read.
+   */
+  readPluginEnabled(env: NodeJS.ProcessEnv, root?: string): Promise<boolean | undefined>;
   /** Whether the record skill is already allowed; undefined when unreadable. */
   readSkillAllowed(env: NodeJS.ProcessEnv): Promise<boolean | undefined>;
   /** Sets the transcript retention in the agent's settings. */

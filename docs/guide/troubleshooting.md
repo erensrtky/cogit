@@ -1,5 +1,20 @@
 # Troubleshooting
 
+## Run `cogit doctor` first
+
+When the map stays empty, `cogit doctor` checks everything recording depends on: Node, the
+Claude Code plugin and its version, your git identity, the project and its git hooks, the
+skill permission, the transcripts and how long Claude Code keeps them, the recorded sessions
+and the newest unrecorded tail, the local map server, and the log of the last close pass.
+
+It changes nothing. Every check prints one line — `ok`, `warn` or `fail`, the reason, and the
+command that fixes it — and it exits 1 when a check fails, so it can also guard a script.
+
+```bash
+cogit doctor
+cogit doctor --json
+```
+
 ## `cogit init` says the directory is not in a git repository
 
 cogit ties its record to commits, so it needs git. Run `git init` (or work in a clone), then

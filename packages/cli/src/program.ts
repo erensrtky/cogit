@@ -12,6 +12,7 @@ import {
   configPrune,
   configSet,
 } from "./commands/config.js";
+import { doctor } from "./commands/doctor.js";
 import { hooksInstall, hooksUninstall } from "./commands/hooks.js";
 import { type InitOptions, init } from "./commands/init.js";
 import { formatShow, log, logFile, logUnread, show } from "./commands/log.js";
@@ -39,6 +40,8 @@ export interface ProgramDeps {
   server?: (env: NodeJS.ProcessEnv) => Promise<string | null>;
   /** Reads a hook's JSON input; tests pass it directly. */
   stdin?: () => Promise<string>;
+  /** Sets the process exit code; tests observe it. */
+  exitCode?: (code: number) => void;
 }
 
 function retention(value: string): number | "keep" {
@@ -306,6 +309,30 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
         await init(dir, rest, makeIo(!yes && process.stdin.isTTY === true));
       }),
     );
+
+  program
+    .command("doctor")
+    .description("check why the map may be empty; one line per check, with the fix")
+    .helpGroup("Set up:")
+    .argument("[dir]", "project directory", ".")
+    .option("-C, --dir <dir>", "project directory (same as the positional)")
+    .option("--json", "print the checks as JSON")
+    .addHelpText("after", examples("cogit doctor", "cogit doctor ../my-app --json"))
+    .action(async (dir: string, opts: { dir?: string; json?: boolean }) => {
+      const report = await doctor({
+        dir: opts.dir ?? dir,
+        io: makeIo(false),
+        json: opts.json === true,
+      });
+      if (!report.ok) {
+        const setCode =
+          deps.exitCode ??
+          ((code: number) => {
+            process.exitCode = code;
+          });
+        setCode(1);
+      }
+    });
 
   program
     .command("build")

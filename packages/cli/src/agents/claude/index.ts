@@ -5,7 +5,9 @@ import {
   CLAUDE_DEFAULT_RETENTION,
   INSTALL_COMMAND,
   markLive,
+  readPluginEnabled,
   readPluginInstalled,
+  readPluginVersion,
   readProjectSetup,
   readRetention,
   readSkillAllowed,
@@ -63,6 +65,8 @@ export const claude: AgentAdapter = {
 
   readRetention,
   readPluginInstalled,
+  readPluginVersion,
+  readPluginEnabled,
   readSkillAllowed,
   setRetention,
   allowSkill,
