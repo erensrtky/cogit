@@ -20,3 +20,12 @@ describe("sessionTitle", () => {
     expect(sessionTitle({ title: "", nodes: [] })).toBe("");
   });
 });
+
+describe("builtBy", () => {
+  it("reads back the version a page was stamped with, and null without one", async () => {
+    const { builtBy, markBuiltBy } = await import("../src/view/lineage.js");
+    const page = markBuiltBy("<html><head><title>x</title></head></html>", "1.2.3");
+    expect(builtBy(page)).toBe("1.2.3");
+    expect(builtBy("<html><head></head></html>")).toBeNull();
+  });
+});

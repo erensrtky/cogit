@@ -33,6 +33,7 @@ import { readMapView } from "../src/store/map-view.js";
 import { globalPaths, projectPaths } from "../src/store/paths.js";
 import { readReadState } from "../src/store/read-state.js";
 import { loadConfig, updateConfig } from "../src/store/stores.js";
+import { builtBy } from "../src/view/lineage.js";
 import { DATA_ELEMENT_ID, LIVE_META_NAME, TOKEN_META_NAME } from "../src/view/model.js";
 import { envFor, fakeIo, noGitProject, tempDir } from "./helpers.js";
 
@@ -235,6 +236,23 @@ describe("map server", () => {
     expect(reply.headers["content-type"]).toContain("text/html");
     expect(reply.body).toContain(LIVE_META_NAME);
     expect(reply.body).toContain("proj");
+  });
+
+  it("rebuilds a map another cogit version wrote before serving it", async () => {
+    const server = await start();
+    await writeFile(
+      projectPaths(root).html,
+      '<html><head><meta name="cogit-built-by" content="0.0.1"></head><body>old page</body></html>',
+    );
+    const reply = await request(mapPageUrl(server.url, root));
+    expect(reply.status).toBe(200);
+    expect(reply.body).not.toContain("old page");
+    expect(builtBy(reply.body)).toBe(pkg.version);
+    // Built by this version already: served as it is.
+    const again = await readFile(projectPaths(root).html, "utf8");
+    expect((await request(mapPageUrl(server.url, root))).body).toContain(
+      again.slice(again.indexOf("</head>")),
+    );
   });
 
   it("serves the panel at the root", async () => {

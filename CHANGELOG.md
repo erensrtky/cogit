@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- After an upgrade the map no longer shows the old version's page until the next message: every map is stamped with the cogit version that built it, and the server rebuilds one another version wrote before serving it.
 - A session the closing pass left untitled no longer shows as a bare id on the map and in the inbox: it takes its first message's title, and the side model is now told to write a title when the record has none.
 
 ### Changed

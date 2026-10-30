@@ -1,5 +1,6 @@
 import { readdir, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import pkg from "../../package.json" with { type: "json" };
 import { type ChatTurn, defaultAgent } from "../agents/index.js";
 import {
   type CommitChange,
@@ -37,7 +38,7 @@ import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
 import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
 import { attachChanges } from "../view/change.js";
 import { buildFileHistory, modelSessions } from "../view/files.js";
-import { buildViewModel, embedViewModel } from "../view/lineage.js";
+import { buildViewModel, embedViewModel, markBuiltBy } from "../view/lineage.js";
 import type { LineageViewModel, ViewChatTurn, ViewPendingMessage } from "../view/model.js";
 import {
   buildPanel,
@@ -383,7 +384,10 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         io.warn(`redacted ${redacted.count} secret-looking value(s) in the map`);
 
       const template = opts.templateHtml ?? TEMPLATE_HTML;
-      await atomicWrite(paths.html, embedViewModel(template, redacted.value));
+      await atomicWrite(
+        paths.html,
+        markBuiltBy(embedViewModel(template, redacted.value), pkg.version),
+      );
       if (!opts.quiet) io.out(`Wrote ${paths.html}`);
       return redacted.value;
     },

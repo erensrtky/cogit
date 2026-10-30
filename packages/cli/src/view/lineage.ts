@@ -370,6 +370,21 @@ export function escapeForScript(json: string): string {
 }
 
 /** Fills the template's empty data element with the serialized model. */
+/** The meta tag naming the cogit version that built a map page. */
+export const BUILT_BY_META_NAME = "cogit-built-by";
+
+/** Stamps the version that built the page, so a server of another version can rebuild it. */
+export function markBuiltBy(html: string, version: string): string {
+  const meta = `<meta name="${BUILT_BY_META_NAME}" content="${version}">`;
+  return html.replace(/<head(\s[^>]*)?>/i, (head) => `${head}${meta}`);
+}
+
+/** The version that built a page, or null for a page built before the stamp. */
+export function builtBy(html: string): string | null {
+  const match = html.match(/<meta name="cogit-built-by" content="([^"]*)">/);
+  return match?.[1] ?? null;
+}
+
 export function embedViewModel(template: string, model: PageModel): string {
   if (!template.includes(EMPTY_DATA_ELEMENT)) {
     throw new Error(`the template has no empty <script id="${DATA_ELEMENT_ID}"> element`);

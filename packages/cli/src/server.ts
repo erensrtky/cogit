@@ -23,6 +23,7 @@ import { MAX_OPEN, readMapView, setOpenSessions, setRowWidth } from "./store/map
 import { globalPaths, projectPaths } from "./store/paths.js";
 import { setMessageRead } from "./store/read-state.js";
 import { loadConfig, loadRegistry, updateConfig } from "./store/stores.js";
+import { builtBy } from "./view/lineage.js";
 import { isPanelEditableKey, LIVE_META_NAME, TOKEN_META_NAME } from "./view/model.js";
 import { buildPanel, panelSettings } from "./view/panel.js";
 import { editableSettings } from "./view/settings.js";
@@ -939,6 +940,12 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
     let html: string;
     try {
       html = await readFile(target.file, "utf8");
+      // A map another cogit wrote (an older plugin's hook, a server before an
+      // upgrade) would show that version's page; build it again with this one.
+      if (target.root !== undefined && builtBy(html) !== VERSION) {
+        await buildProject({ dir: target.root, io: buildIo, quiet: true }).catch(() => undefined);
+        html = await readFile(target.file, "utf8");
+      }
     } catch {
       respond(res, 404, "not found");
       return;
