@@ -31,6 +31,9 @@ beforeEach(async () => {
 
 const settingsFile = () => join(dir, "claude", "settings.json");
 const readText = (f: string) => readFile(f, "utf8");
+/** The warnings a test is about; the test repos have no git email, which init also notes. */
+const warningsOf = (io: { warnings: string[] }) =>
+  io.warnings.filter((w) => !w.startsWith("git has no user.email"));
 
 describe("init", () => {
   it("leaves project settings it cannot read alone and says so", async () => {
@@ -212,8 +215,8 @@ describe("init", () => {
     await writeFile(settingsFile(), "{oops");
     const io = fakeIo(env);
     await init(root, {}, io);
-    expect(io.warnings[0]).toMatch(/retention left unchanged/);
-    expect(io.warnings[1]).toMatch(/add Skill\(cogit:record\) to permissions.allow yourself/);
+    expect(warningsOf(io)[0]).toMatch(/retention left unchanged/);
+    expect(warningsOf(io)[1]).toMatch(/add Skill\(cogit:record\) to permissions.allow yourself/);
     expect(await readText(settingsFile())).toBe("{oops");
   });
 
@@ -261,7 +264,7 @@ describe("init", () => {
     await writeFile(settingsFile(), JSON.stringify({ permissions: { allow: "all" } }));
     const io = fakeIo(env);
     await init(root, {}, io);
-    expect(io.warnings[0]).toMatch(/could not read Claude Code permissions/);
+    expect(warningsOf(io)[0]).toMatch(/could not read Claude Code permissions/);
     expect(JSON.parse(await readText(settingsFile()))).toEqual({ permissions: { allow: "all" } });
   });
 
@@ -292,7 +295,7 @@ describe("init", () => {
     await writeFile(join(dir, "home"), "a file, not a dir");
     const io = fakeIo(env);
     await init(root, {}, io);
-    expect(io.warnings.map((w) => w.split(":")[0])).toEqual([
+    expect(warningsOf(io).map((w) => w.split(":")[0])).toEqual([
       "could not save global config",
       "could not register the project in the global panel",
     ]);
@@ -339,6 +342,21 @@ describe("git helpers", () => {
     await rm(join(root, ".git", "hooks", "prepare-commit-msg"));
     await init(root, { allowSkill: false }, fakeIo(env));
     expect(existsSync(join(root, ".git", "hooks", "prepare-commit-msg"))).toBe(true);
+  });
+
+  it("warns when git has no email to tell this person's sessions apart by", async () => {
+    const run = promisify(execFile);
+    const git = (...args: string[]) => run("git", ["-C", root, ...args]);
+    await git("init", "-q");
+    const options = { name: "P", retention: "keep", allowSkill: false, language: "auto" } as const;
+    const bare = fakeIo(env);
+    await init(root, options, bare);
+    expect(bare.warnings.join("\n")).toMatch(/no user\.email/);
+    await rm(join(root, ".cogit"), { recursive: true });
+    await git("config", "user.email", "t@example.com");
+    const set = fakeIo(env);
+    await init(root, options, set);
+    expect(set.warnings.join("\n")).not.toMatch(/user\.email/);
   });
 
   it("restores the record hook when init runs again on a commit project", async () => {

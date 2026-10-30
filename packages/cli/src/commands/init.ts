@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { defaultAgent } from "../agents/index.js";
+import { sessionIdentity } from "../author.js";
 import {
   cogitIgnored,
   ensureCogitGitignore,
@@ -222,6 +223,14 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
   if ((await findGitRoot(root)) === undefined)
     throw new CliError(
       `${root} is not in a git repository; cogit ties its record to your commits, so run \`git init\` first`,
+    );
+
+  // A session is credited to the git identity (Story 9.3); without an email,
+  // two teammates with one name would read as one person.
+  if ((await sessionIdentity(root, io.env)).authorEmail === undefined)
+    io.warn(
+      "git has no user.email here; cogit tells people's sessions apart by it, so set one: " +
+        "git config --global user.email you@example.com",
     );
 
   const name = opts.name ?? (await io.prompt.input("Project name?", basename(root)));

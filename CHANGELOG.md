@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- `cogit init` warns when git has no `user.email`, since sessions are now told apart by it.
 - The map tells your sessions from your teammates': a teammate's session always shows their name and yours never needs to, the side panel marks yours "(you)", and a new Everyone / You / teammate choice in the toolbar fades the other people's sessions.
 
 ### Changed
