@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Dragging the message rows' edge on the map now widens the session rows too, so the whole map grows with it.
+- The map's resize edge now runs down its whole right side: dragging it widens the session rows and every open session's messages together, and the messages end where the session rows end.
 
 ## [0.22.0] - 2026-10-30
 ### Added

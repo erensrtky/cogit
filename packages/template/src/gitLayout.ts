@@ -64,14 +64,28 @@ const ROW_GAP = 8;
  */
 export const TITLE_MIN_WIDTH = 180;
 
-/** How far the user may drag an open session's message rows narrower or wider. */
-export const ROW_WIDTH_MIN = 360;
-export const ROW_WIDTH_MAX = 1600;
+/**
+ * The project map's text column: where the session rows end, measured from
+ * their left edge. The user drags the map's right edge to change it, and an open
+ * session's message rows end at the same place.
+ */
+export const MAP_WIDTH = 720;
+export const MAP_WIDTH_MIN = 560;
+export const MAP_WIDTH_MAX = 1800;
 
-/** A dragged or stored row width, kept in range; junk falls back to `ROW_WIDTH`. */
-export function clampRowWidth(value: unknown): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return ROW_WIDTH;
-  return Math.round(Math.min(ROW_WIDTH_MAX, Math.max(ROW_WIDTH_MIN, value)));
+/** A dragged or stored map width, kept in range; junk falls back to `MAP_WIDTH`. */
+export function clampMapWidth(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return MAP_WIDTH;
+  return Math.round(Math.min(MAP_WIDTH_MAX, Math.max(MAP_WIDTH_MIN, value)));
+}
+
+/**
+ * Text width for an open session's message rows so they end where the session
+ * rows end; the session's own lanes (`graphWidth`) take the rest. A very wide
+ * set of lanes still leaves the title room to read.
+ */
+export function messageRowWidth(mapWidth: number, graphWidth: number): number {
+  return Math.max(TITLE_MIN_WIDTH * 2, mapWidth - graphWidth - ROW_GAP);
 }
 
 /** How many lane colours the page defines (`--l0` … `--l5`). */

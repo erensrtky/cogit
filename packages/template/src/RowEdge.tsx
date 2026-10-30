@@ -1,28 +1,28 @@
 import { useStore } from "@xyflow/react";
 import { type PointerEvent, useState } from "react";
-import { clampRowWidth, type GitLayout, ROW_WIDTH } from "./gitLayout.js";
+import { clampMapWidth, MAP_WIDTH } from "./gitLayout.js";
 
 /**
- * The right edge of an open session's message rows: drag it to make the rows
- * wider or narrower, double-click it to reset. Titles get the room and wrap
- * into fewer lines. The width is the same for every session and stays in this
- * browser.
+ * The project map's right edge, full height: drag it to make every row, the
+ * sessions' and the open sessions' messages, wider or narrower; double-click it
+ * to reset. Titles get the room and wrap into fewer lines. The width stays in
+ * this browser.
  */
 
-const KEY = "cogit.mapRowWidth";
+const KEY = "cogit.mapWidth";
 /** The grab area stays this wide on screen whatever the zoom. */
 const GRAB = 12;
 
-export function loadRowWidth(): number {
+export function loadMapWidth(): number {
   try {
     const raw = window.localStorage.getItem(KEY);
-    return raw === null ? ROW_WIDTH : clampRowWidth(Number(raw));
+    return raw === null ? MAP_WIDTH : clampMapWidth(Number(raw));
   } catch {
-    return ROW_WIDTH;
+    return MAP_WIDTH;
   }
 }
 
-export function saveRowWidth(width: number): void {
+export function saveMapWidth(width: number): void {
   try {
     window.localStorage.setItem(KEY, String(width));
   } catch {
@@ -40,7 +40,19 @@ function capture(event: PointerEvent, on: boolean): void {
   }
 }
 
-export function RowEdge({ git, onResize }: { git: GitLayout; onResize: (width: number) => void }) {
+export function RowEdge({
+  left,
+  height,
+  width,
+  onResize,
+}: {
+  /** Where the edge sits on the canvas. */
+  left: number;
+  height: number;
+  /** The width the edge sets; a drag adds to it. */
+  width: number;
+  onResize: (width: number) => void;
+}) {
   // The canvas may be zoomed: a screen pixel is 1/zoom of a canvas pixel.
   const zoom = useStore((state) => state.transform[2]) || 1;
   const [start, setStart] = useState<{ x: number; width: number } | null>(null);
@@ -50,17 +62,17 @@ export function RowEdge({ git, onResize }: { git: GitLayout; onResize: (width: n
       className={`row-edge nodrag nopan${start ? " is-dragging" : ""}`}
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize the message rows"
+      aria-label="Resize the map's rows"
       title="Drag to make the rows wider or narrower · double-click to reset"
-      style={{ left: git.width - grab / 2, width: grab, height: git.height }}
+      style={{ left: left - grab / 2, width: grab, height }}
       onPointerDown={(event: PointerEvent) => {
         event.stopPropagation();
         capture(event, true);
-        setStart({ x: event.clientX, width: git.rowWidth });
+        setStart({ x: event.clientX, width });
       }}
       onPointerMove={(event: PointerEvent) => {
         if (!start) return;
-        onResize(clampRowWidth(start.width + (event.clientX - start.x) / zoom));
+        onResize(clampMapWidth(start.width + (event.clientX - start.x) / zoom));
       }}
       onPointerUp={(event: PointerEvent) => {
         if (!start) return;
@@ -69,7 +81,7 @@ export function RowEdge({ git, onResize }: { git: GitLayout; onResize: (width: n
       }}
       onDoubleClick={(event) => {
         event.stopPropagation();
-        onResize(ROW_WIDTH);
+        onResize(MAP_WIDTH);
       }}
     />
   );

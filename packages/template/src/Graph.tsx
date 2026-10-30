@@ -18,11 +18,17 @@ import { pageToken, saveRead } from "./data.js";
 import { type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
-import { type GitLayout, layoutGitGraph } from "./gitLayout.js";
+import {
+  type GitLayout,
+  type GitLayoutOptions,
+  layoutGitGraph,
+  MAP_WIDTH,
+  messageRowWidth,
+} from "./gitLayout.js";
 import { centreViewport, headOf, type MapPoint } from "./graph.js";
 import type { MapSearchState } from "./MapSearch.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
-import { loadRowWidth, RowEdge, saveRowWidth } from "./RowEdge.js";
+import { loadMapWidth, RowEdge, saveMapWidth } from "./RowEdge.js";
 import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
 import { usePageWheel } from "./scroll.js";
@@ -56,7 +62,8 @@ const GraphActions = createContext<{
   openContinue: (sessionId: string, messageId: string) => void;
   unfold: (segmentId: string) => void;
   /** Sets the width of the open sessions' message rows (their right edge). */
-  resizeRows: (width: number) => void;
+  mapWidth: number;
+  resizeMap: (width: number) => void;
 }>({
   selection: null,
   openIds: new Set(),
@@ -66,7 +73,8 @@ const GraphActions = createContext<{
   openNode: () => {},
   openContinue: () => {},
   unfold: () => {},
-  resizeRows: () => {},
+  mapWidth: MAP_WIDTH,
+  resizeMap: () => {},
 });
 
 /** An opened session: its message graph and where it sits on the canvas. */
@@ -97,34 +105,38 @@ function SessionMessages({
   highlights: ReadonlySet<string> | undefined;
   activeHitId: string | null;
 }) {
-  const { selection, readIds, bigChangeLines, openNode, openContinue, unfold, resizeRows } =
+  const { selection, readIds, bigChangeLines, openNode, openContinue, unfold } =
     useContext(GraphActions);
   const own = selection?.sessionId === session.sessionId;
   if (git.rows.length === 0)
     return <p className="graph-status empty">No messages recorded in this session yet.</p>;
   return (
-    <div className="session-rows">
-      <GitGraph
-        git={git}
-        selectedId={selection?.type === "node" && own ? selection.nodeId : null}
-        activeSegmentId={selection?.type === "node" && own ? (selection.branchId ?? null) : null}
-        highlightIds={highlights}
-        activeHitId={activeHitId}
-        readIds={readIds}
-        bigChangeLines={bigChangeLines}
-        onSelect={(row) => openNode(session.sessionId, row.message.id, row.segmentId)}
-        onUnfold={unfold}
-        onContinue={(continues) => openContinue(continues.sessionId, continues.id)}
-      />
-      <RowEdge git={git} onResize={resizeRows} />
-    </div>
+    <GitGraph
+      git={git}
+      selectedId={selection?.type === "node" && own ? selection.nodeId : null}
+      activeSegmentId={selection?.type === "node" && own ? (selection.branchId ?? null) : null}
+      highlightIds={highlights}
+      activeHitId={activeHitId}
+      readIds={readIds}
+      bigChangeLines={bigChangeLines}
+      onSelect={(row) => openNode(session.sessionId, row.message.id, row.segmentId)}
+      onUnfold={unfold}
+      onContinue={(continues) => openContinue(continues.sessionId, continues.id)}
+    />
   );
 }
 
 function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
-  const { openSession, openContinue, selection, openIds } = useContext(GraphActions);
+  const { openSession, openContinue, selection, openIds, mapWidth, resizeMap } =
+    useContext(GraphActions);
   return (
     <div className="map-node">
+      <RowEdge
+        left={data.graph.git.width}
+        height={data.graph.git.height}
+        width={mapWidth}
+        onResize={resizeMap}
+      />
       <SessionMap
         model={data.model}
         graph={data.graph}
@@ -234,9 +246,9 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     return { type: "node", sessionId: initial.sessionId, nodeId: initial.messageId };
   });
   const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
-  /** Width of the open sessions' message rows; dragged at their right edge. */
-  const [rowWidth, setRowWidth] = useState(loadRowWidth);
-  useEffect(() => saveRowWidth(rowWidth), [rowWidth]);
+  /** Where every row ends; dragged at the map's right edge. */
+  const [mapWidth, setMapWidth] = useState(loadMapWidth);
+  useEffect(() => saveMapWidth(mapWidth), [mapWidth]);
   const [openAll, setOpenAll] = useState(false);
   const [showOutline, setShowOutline] = useState(true);
   // The files, unread and outline views share the left column; only one shows.
@@ -344,10 +356,18 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     for (const sessionId of openIds) {
       const session = findSession(model, sessionId);
       if (!session) continue;
-      let options = {
+      // The rows end where the session rows end; the lanes' width decides how
+      // much of that is text, and it does not depend on the text width.
+      const lay = (options: GitLayoutOptions): GitLayout => {
+        const probe = layoutGitGraph(session.messages, options);
+        return layoutGitGraph(session.messages, {
+          ...options,
+          rowWidth: messageRowWidth(mapWidth, probe.graphWidth),
+        });
+      };
+      let options: GitLayoutOptions = {
         unfolded,
         openAll,
-        rowWidth,
         headId: head?.sessionId === sessionId ? head.messageId : null,
       };
       // A search hit inside a folded branch must be visible to be highlighted,
@@ -360,7 +380,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
           .map((segment) => segment.id);
         if (extra.length > 0) options = { ...options, unfolded: new Set([...unfolded, ...extra]) };
       }
-      let layout = layoutGitGraph(session.messages, options);
+      let layout = lay(options);
       const targetId = target?.sessionId === sessionId ? target.nodeId : null;
       if (
         targetId !== null &&
@@ -370,10 +390,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
         // rather than letting the page land on a row the user cannot see.
         const segment = layout.segments.find((candidate) => candidate.ids.includes(targetId));
         if (segment !== undefined)
-          layout = layoutGitGraph(session.messages, {
-            ...options,
-            unfolded: new Set([...unfolded, segment.id]),
-          });
+          layout = lay({ ...options, unfolded: new Set([...unfolded, segment.id]) });
       }
       out.set(sessionId, layout);
     }
@@ -383,7 +400,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     openIds,
     unfolded,
     openAll,
-    rowWidth,
+    mapWidth,
     highlights,
     head?.sessionId,
     head?.messageId,
@@ -403,8 +420,8 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   }, [messageGits]);
 
   const sessionGraph = useMemo(
-    () => layoutSessionGraph(model, spaceAfter, rowWidth),
-    [model, spaceAfter, rowWidth],
+    () => layoutSessionGraph(model, spaceAfter, mapWidth),
+    [model, spaceAfter, mapWidth],
   );
 
   const openings = useMemo(() => {
@@ -594,9 +611,20 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       openNode,
       openContinue,
       unfold,
-      resizeRows: setRowWidth,
+      mapWidth,
+      resizeMap: setMapWidth,
     }),
-    [selection, openIds, readIds, bigChangeLines, toggleSession, openNode, openContinue, unfold],
+    [
+      selection,
+      openIds,
+      readIds,
+      bigChangeLines,
+      toggleSession,
+      openNode,
+      openContinue,
+      unfold,
+      mapWidth,
+    ],
   );
 
   const nodes = useMemo<MapFlowNode[]>(() => {

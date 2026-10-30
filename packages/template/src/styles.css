@@ -2411,14 +2411,11 @@ time {
   position: absolute;
 }
 
-.session-rows {
-  position: relative;
-}
-
-/* The rows' right edge (RowEdge.tsx): a faint line that lights up to grab. */
+/* The map's right edge (RowEdge.tsx): a faint line that lights up to grab. */
 .row-edge {
   position: absolute;
   top: 0;
+  z-index: 2;
   cursor: col-resize;
   touch-action: none;
 }
