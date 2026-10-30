@@ -40,7 +40,7 @@
   "scripts": {
     "prebuild": "node ../../scripts/sync-version.mjs",
     "build": "tsup",
-    "prepack": "node ../../scripts/sync-version.mjs && node ../../scripts/copy-docs.mjs"
+    "prepack": "npm --prefix ../.. run build && node ../../scripts/copy-docs.mjs"
   },
   "devDependencies": {
     "@inquirer/prompts": "^8.7.4",

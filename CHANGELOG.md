@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `cogit --version` said 0.22.0 in the 0.23.0 package: publishing now always builds first, so the bundled version matches the package.
+
 ## [0.23.0] - 2026-10-30
 ### Fixed
 - After an upgrade the map no longer shows the old version's page until the next message: every map is stamped with the cogit version that built it, and the server rebuilds one another version wrote before serving it.
