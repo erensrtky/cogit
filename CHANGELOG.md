@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Each session on the map now keeps its own message row width: dragging one session's edge leaves the others alone, and the width survives a reload.
+- Each session on the map now keeps its own message row width: dragging one session's edge leaves the others alone. The width is stored in the project's local `.cogit/state/row-widths.json` (never committed, so teammates keep their own), and survives a reload or a different browser.
 
 ## [0.22.0] - 2026-10-30
 ### Added

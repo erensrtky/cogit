@@ -21,6 +21,7 @@ import { dismissInboxSession } from "./store/inbox-state.js";
 import { LockBusyError } from "./store/lock.js";
 import { globalPaths, projectPaths } from "./store/paths.js";
 import { setMessageRead } from "./store/read-state.js";
+import { setRowWidth } from "./store/row-widths.js";
 import { loadConfig, loadRegistry, updateConfig } from "./store/stores.js";
 import { isPanelEditableKey, LIVE_META_NAME, TOKEN_META_NAME } from "./view/model.js";
 import { buildPanel, panelSettings } from "./view/panel.js";
@@ -660,6 +661,83 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
     res.end(JSON.stringify({ ok: true, sessionId, at }));
   }
 
+  /**
+   * `POST /api/row-width` { dir, sessionId, width } : the map's row edge, sent
+   * when a drag ends. `width` null forgets the session (the double-click reset).
+   * It writes the project's local state file, never a committed one. Same Host,
+   * Origin, content-type and token checks as a read mark, and `dir` must be
+   * registered.
+   */
+  async function writeRowWidth(
+    req: IncomingMessage,
+    res: ServerResponse,
+    port: number,
+  ): Promise<void> {
+    if (
+      !originAllowed(req.headers.origin, port) ||
+      !tokenMatches(req.headers[CONFIG_TOKEN_HEADER])
+    ) {
+      respond(res, 403, "forbidden");
+      return;
+    }
+    const type = req.headers["content-type"];
+    if (
+      typeof type !== "string" ||
+      type.split(";")[0]?.trim().toLowerCase() !== "application/json"
+    ) {
+      respond(res, 415, "content-type must be application/json");
+      return;
+    }
+    const body = await readLimitedBody(req);
+    if (body === null) {
+      respond(res, 413, "request body too large");
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      respond(res, 400, "invalid JSON");
+      return;
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      respond(res, 400, "expected a JSON object");
+      return;
+    }
+    const { dir, sessionId, width } = parsed as Record<string, unknown>;
+    if (
+      typeof dir !== "string" ||
+      typeof sessionId !== "string" ||
+      (width !== null && typeof width !== "number")
+    ) {
+      respond(res, 400, "expected { dir, sessionId, width }");
+      return;
+    }
+    if (
+      !/^[A-Za-z0-9._:-]{1,128}$/.test(sessionId) ||
+      (width !== null && !(Number.isInteger(width) && width > 0 && width <= 10_000))
+    ) {
+      respond(res, 400, "sessionId or width is not valid");
+      return;
+    }
+    const root = await registeredRoot(env, dir);
+    if (root === null) {
+      respond(res, 403, "not a registered project");
+      return;
+    }
+    try {
+      await setRowWidth(root, sessionId, width);
+    } catch {
+      respond(res, 500, "could not write the row width");
+      return;
+    }
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify({ ok: true, sessionId, width }));
+  }
+
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const port = (server.address() as AddressInfo | null)?.port ?? opts.port;
     if (req.method === "POST") {
@@ -685,6 +763,10 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       }
       if (url.pathname === "/api/inbox/dismiss") {
         await writeInboxDismiss(req, res, port);
+        return;
+      }
+      if (url.pathname === "/api/row-width") {
+        await writeRowWidth(req, res, port);
         return;
       }
       if (url.pathname !== "/api/config") {

@@ -99,6 +99,28 @@ export async function saveRead(
 }
 
 /**
+ * Stores how wide one session's message rows are, or forgets it (`null`). The
+ * state lives in the project's `.cogit/state/`, so this needs the local server;
+ * over `file://` the width lasts for the open page only.
+ */
+export async function saveRowWidth(
+  dir: string,
+  sessionId: string,
+  width: number | null,
+  token: string,
+): Promise<void> {
+  const response = await fetch("/api/row-width", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-cogit-token": token },
+    body: JSON.stringify({ dir, sessionId, width }),
+  });
+  if (!response.ok) {
+    const text = (await response.text()).trim();
+    throw new Error(text || `could not save the row width (HTTP ${response.status})`);
+  }
+}
+
+/**
  * Dismisses one inbox row (Story 11.1). The state lives in the project's
  * `.cogit/state/`, so this needs the local server; over `file://` the row
  * stays hidden for the open page only. The turn time is what was dismissed, so

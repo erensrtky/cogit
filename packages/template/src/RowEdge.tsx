@@ -5,35 +5,23 @@ import { clampRowWidth, type GitLayout, ROW_WIDTH } from "./gitLayout.js";
 /**
  * The right edge of an open session's message rows: drag it to make the rows
  * wider or narrower, double-click it to reset. Titles get the room and wrap
- * into fewer lines. Each session keeps its own width, and it stays in this
- * browser.
+ * into fewer lines. Each session keeps its own width, stored in the project's
+ * local state when the drag ends.
  */
 
-const KEY = "cogit.sessionRowWidths";
 /** The grab area stays this wide on screen whatever the zoom. */
 const GRAB = 12;
 
 /** Widths the user dragged, by session id; a session not listed has `ROW_WIDTH`. */
 export type RowWidths = Readonly<Record<string, number>>;
 
-export function loadRowWidths(): RowWidths {
-  try {
-    const raw: unknown = JSON.parse(window.localStorage.getItem(KEY) ?? "{}");
-    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
-    const out: Record<string, number> = {};
-    for (const [sessionId, width] of Object.entries(raw)) out[sessionId] = clampRowWidth(width);
-    return out;
-  } catch {
-    return {};
-  }
-}
-
-export function saveRowWidths(widths: RowWidths): void {
-  try {
-    window.localStorage.setItem(KEY, JSON.stringify(widths));
-  } catch {
-    // Private window or blocked storage: the width lasts until the page closes.
-  }
+/** The page's stored widths, kept in range; anything else is dropped. */
+export function rowWidthsOf(raw: unknown): RowWidths {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+  const out: Record<string, number> = {};
+  for (const [sessionId, width] of Object.entries(raw))
+    if (typeof width === "number") out[sessionId] = clampRowWidth(width);
+  return out;
 }
 
 /** Keeps the drag on the edge when the pointer leaves it; best effort. */
@@ -46,7 +34,17 @@ function capture(event: PointerEvent, on: boolean): void {
   }
 }
 
-export function RowEdge({ git, onResize }: { git: GitLayout; onResize: (width: number) => void }) {
+export function RowEdge({
+  git,
+  onResize,
+  onDone,
+}: {
+  git: GitLayout;
+  /** Every move of a drag. */
+  onResize: (width: number) => void;
+  /** The width a drag or a reset ended at: the one worth storing. */
+  onDone: (width: number) => void;
+}) {
   // The canvas may be zoomed: a screen pixel is 1/zoom of a canvas pixel.
   const zoom = useStore((state) => state.transform[2]) || 1;
   const [start, setStart] = useState<{ x: number; width: number } | null>(null);
@@ -72,10 +70,12 @@ export function RowEdge({ git, onResize }: { git: GitLayout; onResize: (width: n
         if (!start) return;
         capture(event, false);
         setStart(null);
+        onDone(clampRowWidth(start.width + (event.clientX - start.x) / zoom));
       }}
       onDoubleClick={(event) => {
         event.stopPropagation();
         onResize(ROW_WIDTH);
+        onDone(ROW_WIDTH);
       }}
     />
   );

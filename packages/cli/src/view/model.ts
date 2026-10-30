@@ -312,6 +312,12 @@ export interface LineageViewModel {
    */
   read?: string[];
   /**
+   * How wide the user dragged each session's message rows, by session id, from
+   * `.cogit/state/row-widths.json` at build time. Local state like `read`.
+   * Absent on pages built before it.
+   */
+  rowWidths?: Record<string, number>;
+  /**
    * The "your turn" inbox for this project only (Story 11.1). Absent on pages
    * built before it; a project's map never carries another project's rows.
    */

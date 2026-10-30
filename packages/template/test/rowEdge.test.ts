@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { ReactFlowProvider } from "@xyflow/react";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   clampRowWidth,
   layoutGitGraph,
@@ -10,13 +10,11 @@ import {
   ROW_WIDTH_MAX,
   ROW_WIDTH_MIN,
 } from "../src/gitLayout.js";
-import { loadRowWidths, RowEdge, saveRowWidths } from "../src/RowEdge.js";
+import { RowEdge, rowWidthsOf } from "../src/RowEdge.js";
 
 const T0 = "2026-10-26T10:00:00.000Z";
 
 describe("dragging the message rows wider", () => {
-  afterEach(() => vi.unstubAllGlobals());
-
   it("keeps a dragged width in range and reads junk as the default", () => {
     expect(clampRowWidth(10)).toBe(ROW_WIDTH_MIN);
     expect(clampRowWidth(99_999)).toBe(ROW_WIDTH_MAX);
@@ -31,7 +29,11 @@ describe("dragging the message rows wider", () => {
       { rowWidth: 700 },
     );
     const html = renderToStaticMarkup(
-      createElement(ReactFlowProvider, null, createElement(RowEdge, { git, onResize: () => {} })),
+      createElement(
+        ReactFlowProvider,
+        null,
+        createElement(RowEdge, { git, onResize: () => {}, onDone: () => {} }),
+      ),
     );
     expect(html).toContain('role="separator"');
     // At zoom 1 the strip is 12px wide, centred on the edge.
@@ -44,33 +46,13 @@ describe("dragging the message rows wider", () => {
     expect(css).toMatch(/\.row-edge,[^{]*\{\s*pointer-events:\s*all/);
   });
 
-  it("remembers each session's width, and reads blocked, empty or junk storage as none", () => {
-    const store = new Map<string, string>();
-    vi.stubGlobal("window", {
-      localStorage: {
-        getItem: (key: string) => store.get(key) ?? null,
-        setItem: (key: string, value: string) => store.set(key, value),
-      },
+  it("reads the stored widths in range and drops anything else", () => {
+    expect(rowWidthsOf({ a: 840, b: 99_999, c: 10, d: "wide" })).toEqual({
+      a: 840,
+      b: ROW_WIDTH_MAX,
+      c: ROW_WIDTH_MIN,
     });
-    expect(loadRowWidths()).toEqual({});
-    saveRowWidths({ a: 840, b: 600 });
-    expect(loadRowWidths()).toEqual({ a: 840, b: 600 });
-    store.set("cogit.sessionRowWidths", JSON.stringify({ a: 99_999, b: "wide" }));
-    expect(loadRowWidths()).toEqual({ a: ROW_WIDTH_MAX, b: ROW_WIDTH });
-    store.set("cogit.sessionRowWidths", "[1,2]");
-    expect(loadRowWidths()).toEqual({});
-
-    vi.stubGlobal("window", {
-      localStorage: {
-        getItem: () => {
-          throw new Error("blocked");
-        },
-        setItem: () => {
-          throw new Error("blocked");
-        },
-      },
-    });
-    expect(loadRowWidths()).toEqual({});
-    expect(() => saveRowWidths({ a: 600 })).not.toThrow();
+    expect(rowWidthsOf(undefined)).toEqual({});
+    expect(rowWidthsOf([1, 2])).toEqual({});
   });
 });

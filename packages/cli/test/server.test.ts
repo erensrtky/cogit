@@ -31,6 +31,7 @@ import { atomicWrite } from "../src/store/fs.js";
 import { readInboxDismissed } from "../src/store/inbox-state.js";
 import { globalPaths, projectPaths } from "../src/store/paths.js";
 import { readReadState } from "../src/store/read-state.js";
+import { readRowWidths } from "../src/store/row-widths.js";
 import { loadConfig, updateConfig } from "../src/store/stores.js";
 import { DATA_ELEMENT_ID, LIVE_META_NAME, TOKEN_META_NAME } from "../src/view/model.js";
 import { envFor, fakeIo, noGitProject, tempDir } from "./helpers.js";
@@ -886,6 +887,69 @@ describe("inbox dismiss endpoint (Story 11.1)", () => {
     const token = await panelToken(server);
     await mkdir(projectPaths(root).inboxState, { recursive: true });
     const reply = await dismissWrite(server, token, { dir: root, sessionId: SESSION, at: AT });
+    expect(reply.status).toBe(500);
+  });
+});
+
+describe("row width endpoint", () => {
+  const SESSION = "3f2b1c4d-0000-4000-8000-000000000001";
+
+  function widthWrite(
+    server: MapServer,
+    token: string,
+    payload: unknown,
+    overrides: Record<string, string> = {},
+  ): Promise<Reply> {
+    return postConfig(`${server.url}/api/row-width`, JSON.stringify(payload), {
+      origin: `http://127.0.0.1:${server.port}`,
+      [CONFIG_TOKEN_HEADER]: token,
+      ...overrides,
+    });
+  }
+
+  it("stores a session's width in local state and forgets it on null", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const reply = await widthWrite(server, token, { dir: root, sessionId: SESSION, width: 840 });
+    expect(reply.status).toBe(200);
+    expect(JSON.parse(reply.body)).toEqual({ ok: true, sessionId: SESSION, width: 840 });
+    expect(await readRowWidths(root)).toEqual({ [SESSION]: 840 });
+    await widthWrite(server, token, { dir: root, sessionId: SESSION, width: null });
+    expect(await readRowWidths(root)).toEqual({});
+  });
+
+  it("refuses a foreign project, a bad payload, a bad token and a bad body", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const good = { dir: root, sessionId: SESSION, width: 700 };
+    expect((await widthWrite(server, token, { ...good, dir: join(dir, "elsewhere") })).status).toBe(
+      403,
+    );
+    expect((await widthWrite(server, "nope", good)).status).toBe(403);
+    expect((await widthWrite(server, token, good, { "content-type": "text/plain" })).status).toBe(
+      415,
+    );
+    expect((await widthWrite(server, token, { ...good, sessionId: "bad id!" })).status).toBe(400);
+    expect((await widthWrite(server, token, { ...good, width: 700.5 })).status).toBe(400);
+    expect((await widthWrite(server, token, { ...good, width: -1 })).status).toBe(400);
+    expect((await widthWrite(server, token, { ...good, width: "wide" })).status).toBe(400);
+    expect((await widthWrite(server, token, [])).status).toBe(400);
+    expect(
+      (
+        await postConfig(`${server.url}/api/row-width`, "{oops", {
+          origin: `http://127.0.0.1:${server.port}`,
+          [CONFIG_TOKEN_HEADER]: token,
+        })
+      ).status,
+    ).toBe(400);
+    expect((await widthWrite(server, token, { ...good, pad: "x".repeat(5000) })).status).toBe(413);
+  });
+
+  it("answers 500 instead of crashing when the state cannot be written", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    await mkdir(projectPaths(root).rowWidths, { recursive: true });
+    const reply = await widthWrite(server, token, { dir: root, sessionId: SESSION, width: 700 });
     expect(reply.status).toBe(500);
   });
 });

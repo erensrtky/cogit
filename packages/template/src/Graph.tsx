@@ -14,7 +14,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { unreadViewMessages } from "../../cli/src/view/change.js";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
-import { pageToken, saveRead } from "./data.js";
+import { pageToken, saveRead, saveRowWidth } from "./data.js";
 import { type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
@@ -22,7 +22,7 @@ import { type GitLayout, layoutGitGraph, ROW_WIDTH } from "./gitLayout.js";
 import { centreViewport, headOf, type MapPoint } from "./graph.js";
 import type { MapSearchState } from "./MapSearch.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
-import { loadRowWidths, RowEdge, type RowWidths, saveRowWidths } from "./RowEdge.js";
+import { RowEdge, type RowWidths, rowWidthsOf } from "./RowEdge.js";
 import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
 import { usePageWheel } from "./scroll.js";
@@ -57,6 +57,7 @@ const GraphActions = createContext<{
   unfold: (segmentId: string) => void;
   /** Sets the width of the open sessions' message rows (their right edge). */
   resizeRows: (sessionId: string, width: number) => void;
+  storeRowWidth: (sessionId: string, width: number) => void;
 }>({
   selection: null,
   openIds: new Set(),
@@ -67,6 +68,7 @@ const GraphActions = createContext<{
   openContinue: () => {},
   unfold: () => {},
   resizeRows: () => {},
+  storeRowWidth: () => {},
 });
 
 /** An opened session: its message graph and where it sits on the canvas. */
@@ -97,8 +99,16 @@ function SessionMessages({
   highlights: ReadonlySet<string> | undefined;
   activeHitId: string | null;
 }) {
-  const { selection, readIds, bigChangeLines, openNode, openContinue, unfold, resizeRows } =
-    useContext(GraphActions);
+  const {
+    selection,
+    readIds,
+    bigChangeLines,
+    openNode,
+    openContinue,
+    unfold,
+    resizeRows,
+    storeRowWidth,
+  } = useContext(GraphActions);
   const own = selection?.sessionId === session.sessionId;
   if (git.rows.length === 0)
     return <p className="graph-status empty">No messages recorded in this session yet.</p>;
@@ -116,7 +126,11 @@ function SessionMessages({
         onUnfold={unfold}
         onContinue={(continues) => openContinue(continues.sessionId, continues.id)}
       />
-      <RowEdge git={git} onResize={(width) => resizeRows(session.sessionId, width)} />
+      <RowEdge
+        git={git}
+        onResize={(width) => resizeRows(session.sessionId, width)}
+        onDone={(width) => storeRowWidth(session.sessionId, width)}
+      />
     </div>
   );
 }
@@ -235,8 +249,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   });
   const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
   /** Each session's message row width, dragged at the rows' right edge. */
-  const [rowWidths, setRowWidths] = useState<RowWidths>(loadRowWidths);
-  useEffect(() => saveRowWidths(rowWidths), [rowWidths]);
+  const [rowWidths, setRowWidths] = useState<RowWidths>(() => rowWidthsOf(model.rowWidths));
   const resizeRows = useCallback((sessionId: string, width: number) => {
     setRowWidths((previous) => {
       // Back at the default (double-click): forget the session.
@@ -244,6 +257,23 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       return width === ROW_WIDTH ? rest : { ...rest, [sessionId]: width };
     });
   }, []);
+  /** A drag ended: store the width in the project's local state. */
+  const storeRowWidth = useCallback(
+    (sessionId: string, width: number) => {
+      // Over `file://` there is no server; the width lasts for this open page.
+      const token = pageToken();
+      if (token === null) return;
+      void saveRowWidth(
+        model.project.path,
+        sessionId,
+        width === ROW_WIDTH ? null : width,
+        token,
+      ).catch((err: unknown) => {
+        console.warn("cogit: could not save the row width", err);
+      });
+    },
+    [model.project.path],
+  );
   const [openAll, setOpenAll] = useState(false);
   const [showOutline, setShowOutline] = useState(true);
   // The files, unread and outline views share the left column; only one shows.
@@ -599,6 +629,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       openContinue,
       unfold,
       resizeRows,
+      storeRowWidth,
     }),
     [
       selection,
@@ -610,6 +641,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       openContinue,
       unfold,
       resizeRows,
+      storeRowWidth,
     ],
   );
 
