@@ -18,6 +18,8 @@ export interface ShapeToolSpec {
   name: string;
   /** When the writer should reach for this tool. */
   when: string;
+  /** The JSON shape of one answer, as the prompt shows it. */
+  output: string;
   /** True when the output can be shown as designed. */
   validate(text: string): boolean;
 }
@@ -60,6 +62,7 @@ export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
     when:
       "The change is mostly logic: a new path through functions, a rule, a check. " +
       "Numbered plain-language steps, naming the functions and files they touch.",
+    output: '{"kind": "pseudo", "text": "1. ...\\n2. ..."}',
     validate(text) {
       const lines = text
         .split("\n")
@@ -76,6 +79,7 @@ export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
     when:
       `The change is a flow between files or functions (a request path, a queue, a state ` +
       `machine). A Mermaid flowchart of at most ${MERMAID_MAX_NODES} nodes.`,
+    output: '{"kind": "mermaid", "text": "flowchart TD\\n  A --> B"}',
     validate(text) {
       const source = text.trim();
       if (!/^(flowchart|graph)\s+(TD|TB|LR|RL|BT)\b/i.test(source)) return false;
@@ -171,8 +175,7 @@ export const SHAPE_DIFF_LIMIT = 7000;
 /** The tool catalogue as the prompt lists it. */
 export function toolCatalogue(): string {
   return SHAPE_TOOLS.map(
-    (tool) =>
-      `- "${tool.kind}" (${tool.name}): ${tool.when}\n  Output: {"kind": "${tool.kind}", "text": "..."}`,
+    (tool) => `- "${tool.kind}" (${tool.name}): ${tool.when}\n  Output: ${tool.output}`,
   ).join("\n");
 }
 

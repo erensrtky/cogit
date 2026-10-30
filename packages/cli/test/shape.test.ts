@@ -60,6 +60,8 @@ describe("the Shape tool catalogue", () => {
     expect(catalogue).toContain('"pseudo"');
     expect(catalogue).toContain('"mermaid"');
     expect(catalogue).toContain("15 nodes");
+    expect(catalogue).toContain('{"kind": "pseudo"');
+    expect(catalogue).toContain('{"kind": "mermaid"');
   });
 
   it("stamps who wrote it, when, and each answer's validity", () => {
