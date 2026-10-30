@@ -6,7 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Map rows show the date only on a day's first row (the rest show the time), the `mN` label is quieter, and "↑ continues <session> · m37" is now "↑ m37" with the session in its tooltip.
+
 ### Removed
+- The map is quieter: no "experimental" badge or "you" labels in the Outline, no dot grid, minimap or React Flow credit, and the toolbar shows only the session count. The author shows only when more than one person recorded sessions.
 - The map no longer draws the dashed return arrow and the "↩ mN" mark (a branch already shows the return; the details panel still lists it), nor the epoch tag on session rows.
 
 ### Changed

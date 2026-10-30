@@ -144,7 +144,10 @@ function SessionRow({
                       })
                     }
                   >
-                    <span className={`kind kind-${message.kind}`}>{kindLabel(message.kind)}</span>
+                    {/* Every node is a message now; older records still carry other kinds. */}
+                    {message.kind === "message" ? null : (
+                      <span className={`kind kind-${message.kind}`}>{kindLabel(message.kind)}</span>
+                    )}
                     <span className="label">{message.title}</span>
                   </button>
                 </div>
@@ -204,7 +207,6 @@ export function Outline({
     <nav className="outline" aria-label="Project outline">
       <header className="outline-head">
         <span className="outline-title">Outline</span>
-        <span className="outline-badge">experimental</span>
         <button
           type="button"
           className="drilldown-close"

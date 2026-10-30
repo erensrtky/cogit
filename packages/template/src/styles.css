@@ -248,13 +248,6 @@ main.map-page {
   container-type: inline-size;
 }
 
-/* On a narrow map the minimap would sit on top of the message text. */
-@container (max-width: 900px) {
-  .react-flow__minimap {
-    display: none;
-  }
-}
-
 @media (max-width: 1100px) {
   main.map-page {
     padding-right: 16px;
@@ -2205,7 +2198,8 @@ time {
   flex: none;
   color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-size: 10px;
+  opacity: 0.7;
 }
 
 /* The title wins over the chips around it (Story 9.2): it keeps its minimum
@@ -2255,7 +2249,7 @@ time {
   border-style: dashed;
 }
 
-/* "↑ continues <session> · m67": a jump to the earlier session's message. */
+/* "↑ m67": a jump to the earlier session's message; the tooltip names the session. */
 .git-continues {
   flex: 0 1 auto;
   min-width: 0;

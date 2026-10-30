@@ -21,6 +21,7 @@ function color(index: number): string {
 function SessionRow({
   row,
   session,
+  showAuthor,
   selected,
   open,
   searchHit,
@@ -29,6 +30,8 @@ function SessionRow({
 }: {
   row: GitMessageRow;
   session: ViewSession;
+  /** More than one person recorded sessions here; otherwise the name says nothing. */
+  showAuthor: boolean;
   selected: boolean;
   /** Its messages are open below the row. */
   open: boolean;
@@ -65,7 +68,7 @@ function SessionRow({
       </span>
       <span className="git-time">{session.startedAt ? formatStamp(session.startedAt) : ""}</span>
       <span className="git-title">{session.title || session.sessionId}</span>
-      {session.author ? (
+      {showAuthor && session.author ? (
         <span className="muted session-author" title={`Recorded by ${session.author}`}>
           {session.author}
         </span>
@@ -87,7 +90,7 @@ function SessionRow({
             onContinue(continues);
           }}
         >
-          ↑ continues {continues.sessionTitle} · {continues.label ?? continues.id}
+          ↑ {continues.label ?? continues.id}
         </span>
       ) : null}
       {row.head ? <span className="left-off">left off here</span> : null}
@@ -116,6 +119,10 @@ export function SessionMap({
 }) {
   const { git } = graph;
   const segments = new Map(git.segments.map((segment) => [segment.id, segment]));
+  const authors = new Set(
+    [...graph.sessions.values()].flatMap((s) => (s.author ? [s.author] : [])),
+  );
+  const showAuthor = authors.size > 1;
 
   const open: (row: GitRow) => void = (row) => {
     if (row.kind === "message") onOpen(row.message.id);
@@ -204,6 +211,7 @@ export function SessionMap({
               key={row.message.id}
               row={row}
               session={session}
+              showAuthor={showAuthor}
               selected={selectedSessionId === session.sessionId}
               open={openIds.has(session.sessionId)}
               searchHit={highlightSessionIds.has(session.sessionId)}

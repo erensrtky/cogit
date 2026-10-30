@@ -34,21 +34,29 @@ function modelOf(current: ViewSession): LineageViewModel {
 }
 
 describe("Story 9.3 on the map", () => {
-  it("shows the author on the session row", () => {
-    const model = modelOf(session);
-    const html = renderToStaticMarkup(
-      createElement(SessionMap, {
-        model,
-        graph: layoutSessionGraph(model),
-        selectedSessionId: null,
-        openIds: new Set<string>(),
-        highlightSessionIds: new Set<string>(),
-        onOpen: () => {},
-        onContinue: () => {},
-      }),
-    );
+  it("shows the author on the session row only when several people recorded", () => {
+    const render = (model: LineageViewModel): string =>
+      renderToStaticMarkup(
+        createElement(SessionMap, {
+          model,
+          graph: layoutSessionGraph(model),
+          selectedSessionId: null,
+          openIds: new Set<string>(),
+          highlightSessionIds: new Set<string>(),
+          onOpen: () => {},
+          onContinue: () => {},
+        }),
+      );
+    expect(render(modelOf(session))).not.toContain("session-author");
+
+    const two = modelOf(session);
+    two.unassigned = [
+      { ...session, sessionId: "s2", author: "Ada", startedAt: "2026-10-26T11:00:00.000Z" },
+    ];
+    const html = render(two);
     expect(html).toContain('class="muted session-author"');
     expect(html).toContain("Eren");
+    expect(html).toContain("Ada");
   });
 
   it("says a missing conversation lives on another machine", () => {

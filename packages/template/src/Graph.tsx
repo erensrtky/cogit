@@ -1,7 +1,5 @@
 import {
-  Background,
   Controls,
-  MiniMap,
   type Node,
   type NodeProps,
   type NodeTypes,
@@ -730,7 +728,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
           <span className="map-title">
             {`${sessionGraph.git.rows.length} session${
               sessionGraph.git.rows.length === 1 ? "" : "s"
-            } · click a session to open or close its messages`}
+            }`}
           </span>
           {leftOff ? (
             <button
@@ -877,12 +875,6 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   );
 }
 
-/** A theme colour for an SVG attribute (the minimap cannot read CSS variables). */
-function cssVar(name: string, fallback: string): string {
-  if (typeof window === "undefined") return fallback;
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-}
-
 /**
  * One React Flow canvas for the whole map. It frames the map once on load (or
  * centres a deep-linked message); opening or closing a session and live data
@@ -977,6 +969,7 @@ function MapCanvas({
 
   return (
     <ReactFlow
+      proOptions={{ hideAttribution: true }}
       nodes={nodes}
       edges={[]}
       nodeTypes={nodeTypes}
@@ -989,13 +982,6 @@ function MapCanvas({
       elementsSelectable={false}
       colorMode={theme}
     >
-      <Background gap={24} size={1} color="#242a36" />
-      <MiniMap
-        pannable
-        zoomable
-        nodeColor={() => cssVar("--active", "#243040")}
-        maskColor={`${cssVar("--bg", "#0f1115")}b3`}
-      />
       <Controls showInteractive={false} />
     </ReactFlow>
   );

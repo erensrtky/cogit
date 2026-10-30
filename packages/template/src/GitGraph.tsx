@@ -1,7 +1,7 @@
 import { type MouseEvent, useMemo } from "react";
 import { formatChange, isBigChange } from "../../cli/src/view/change.js";
 import type { ViewNode } from "../../cli/src/view/model.js";
-import { formatStamp } from "./format.js";
+import { dayOf, formatClock, formatStamp } from "./format.js";
 import {
   branchPath,
   type GitLayout,
@@ -20,13 +20,15 @@ function color(index: number): string {
   return `var(--l${index % LANE_COLORS})`;
 }
 
-function rowRange(row: GitRow): string {
-  if (row.kind === "more") return "";
-  return row.message.at ? formatStamp(row.message.at) : "";
+/** Date and time on a day's first row; the rows under it on the same day show the time only. */
+function rowRange(row: GitRow, sameDay: boolean): string {
+  if (row.kind === "more" || !row.message.at) return "";
+  return sameDay ? formatClock(row.message.at) : formatStamp(row.message.at);
 }
 
 function Row({
   row,
+  sameDay,
   selected,
   branchSelected,
   searchHit,
@@ -38,6 +40,8 @@ function Row({
   onContinue,
 }: {
   row: GitRow;
+  /** The row above is on the same day, so this one shows only the time. */
+  sameDay: boolean;
   selected: boolean;
   branchSelected: boolean;
   /** The message matches the search (Story 8.14). */
@@ -102,7 +106,7 @@ function Row({
       }}
       title={message.summary || message.title}
     >
-      <span className="git-time">{rowRange(row)}</span>
+      <span className="git-time">{rowRange(row, sameDay)}</span>
       <span className="git-id">{message.label ?? message.id}</span>
       <span className="git-title">{message.title}</span>
       {row.tags.length > 0 ? (
@@ -144,8 +148,7 @@ function Row({
             onContinue(message.continues as NonNullable<ViewNode["continues"]>);
           }}
         >
-          ↑ continues {message.continues.sessionTitle} ·{" "}
-          {message.continues.label ?? message.continues.id}
+          ↑ {message.continues.label ?? message.continues.id}
         </span>
       ) : null}
       {row.head ? <span className="left-off">left off here</span> : null}
@@ -258,12 +261,17 @@ export function GitGraph({
         })}
       </svg>
       <div className="git-rows" style={{ left: git.graphWidth + 8, width: git.rowWidth }}>
-        {git.rows.map((row) => {
+        {git.rows.map((row, at) => {
           const messageId = row.kind === "message" ? row.message.id : null;
+          const above = git.rows[at - 1];
+          const day = row.kind === "message" ? dayOf(row.message.at) : null;
+          const sameDay =
+            day !== null && above?.kind === "message" && dayOf(above.message.at) === day;
           return (
             <Row
               key={row.kind === "more" ? `${row.segmentId}-more` : row.message.id}
               row={row}
+              sameDay={sameDay}
               selected={messageId !== null && selectedId !== null && messageId === selectedId}
               branchSelected={activeSegmentId !== null && row.segmentId === activeSegmentId}
               searchHit={messageId !== null && highlightIds?.has(messageId) === true}
