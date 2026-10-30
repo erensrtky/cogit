@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The map tells your sessions from your teammates': a teammate's session always shows their name and yours never needs to, the side panel marks yours "(you)", and a new Everyone / You / teammate choice in the toolbar fades the other people's sessions.
 
 ### Changed
+- The README and the guide now describe what 0.20–0.25 ship: the map without epochs (row widths, open sessions remembered, the panel beside the map, one date shape, the person filter), Resume and Fork, forked sessions, `cogit doctor`, `why <file>:<line>` and the git-email identity. The map screenshots and the README demo are recorded again from the current map.
 - A session records its author's git email next to their name, and people are told apart by email, as in git.
 - A session only continues its author's own earlier sessions: after a pull, a teammate's sessions are no longer offered as the start of yours, and the map no longer draws a session as the continuation of someone else's.
 

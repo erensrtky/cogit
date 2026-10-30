@@ -7,9 +7,13 @@ cogit open        # the panel: every project on this machine
 
 `cogit open` builds the page and serves it on `127.0.0.1` (port 4747, `serverPort`), starting
 the server in the background if it is not running. The page refreshes itself whenever the
-record changes and keeps your place: the selected message, the unfolded branches, the scroll
-and the zoom. Nothing is sent anywhere; the server answers only this machine. The server
-stops on its own after 30 minutes without a page open; the next `cogit open` starts it again.
+record changes and keeps your place: the selected message, the unfolded branches, the open
+sessions, the scroll and the zoom. Nothing is sent anywhere; the server answers only this
+machine. The server stops on its own after 30 minutes without a page open; the next
+`cogit open` starts it again.
+
+Times read the same everywhere — `2026-10-30 21:09` in the details panel, the inbox and the
+project panel, `10-30` on the project tabs — instead of the browser's locale.
 
 The panel lists every project `cogit init` set up on this machine. A project whose directory
 was deleted or moved stays as a card marked "missing"; `cogit config prune` removes those
@@ -17,31 +21,50 @@ was deleted or moved stays as a card marked "missing"; `cogit config prune` remo
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../images/map-dark.png">
-  <img src="../images/map-light.png" alt="The map: sessions, branches and the decision behind a message">
+  <img src="../images/map-light.png" alt="The map: sessions as branches, each message's commits and where the work left off">
 </picture>
 
 ## Sessions and branches
 
 The map reads like a git graph of your conversations. Time runs down the page.
 
-- **A session** is one Claude Code chat. Its header shows the title and when it ran.
-- **A row** is one message you sent, titled in your words and saying what came of it.
+- **A session** is one Claude Code chat. Its header shows the title, when it ran, and, when
+  someone else's sessions are on the map too, whose it is.
+- **A row** is one message you sent, titled in your words and saying what came of it. Rows
+  show the date on a day's first row and the time on the rest (`10-24 00:10`), so a long
+  session stays readable.
 - **A branch** is a chain of messages that answer each other. It gets its own coloured lane;
   its first message is a hollow ring carrying the branch's title. A new topic in the same chat
   starts a new branch, and a message that goes back to an older thread curves out of that
   thread.
-- **A return** to an earlier message without continuing it is a dashed arrow, marked
-  `↩ m22` on the row.
-- **Long branches fold** to their first and last message and a "⋮ N more" row. "Unfold all"
-  and "Fold all" open and close every branch at once.
+- **A continued session** starts with `↑ m37` on its first message, naming the message of an
+  earlier session it picks up from; hover it to see that session. A return to an earlier
+  message inside a session is listed in the message's details.
+- **Long branches fold** to their first and last message and a "⋮ N more — open" row.
+  **Unfold all** opens every session and every folded branch; **Fold all** closes them again.
 - **"Left off here"** marks the newest message you sent. The map opens there.
 
 A message with commits carries them as small chips with the commit subject, and a
 `+1 240 −80 · 14 files` chip saying how much code landed after it.
 
+Clicking a message selects only that message; the details panel shows its branch. A session's
+header is highlighted only when the session itself is selected.
+
+The toolbar's Everyone / You / teammate choice fades the other people's sessions while leaving
+them in place, so the lines between them stay whole. It appears only when a teammate's sessions
+are on the map.
+
+Drag the right edge of an open session's messages to make the rows wider or narrower, so long
+titles wrap into fewer lines; double-click the edge to reset. Each session keeps its own width.
+Sessions you opened stay open after a reload, and the map still lands where you left off. Both
+are stored in the project's local `.cogit/state/map.json`, never in git, so every teammate
+keeps their own view.
+
 ## Message details
 
-Click a row to open its details on the right:
+Click a row to open its details in a column beside the map: the map keeps its place and
+narrows instead of the panel covering it, though a window narrower than 900 pixels lays the
+panel over the map.
 
 - the branch it belongs to, with the branch summary: what was asked, what came of it, what is
   still open
@@ -83,7 +106,8 @@ the map. In the terminal: `cogit log --file <path>` and `cogit why <path>`.
 The search box in the top bar (Ctrl+F or Cmd+F) finds text in message titles, decisions,
 branch summaries, session titles and the stored conversation, ignoring case and accents. Enter
 and Shift+Enter step through the hits, Esc clears. A pasted message hash jumps straight to that
-message. In the terminal: `cogit search "<text>"`.
+message. Sessions the search opened close again when the search is cleared or stops matching
+them, unless you clicked into one. In the terminal: `cogit search "<text>"`.
 
 ## Switching projects
 

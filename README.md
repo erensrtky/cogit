@@ -6,7 +6,7 @@ Git remembers what changed. cogit remembers why.
 
 <p align="center"><img src="docs/images/cogit-descartes.jpg" width="360" alt="René Descartes with git branches running through his hair"><br><i>Cogito, ergo commit.</i></p>
 
-<img src="docs/images/demo.gif" alt="cogit open shows the projects, then the map; pasting a message hash opens the decision behind it, and cogit why lists the thoughts behind a file">
+<img src="docs/images/demo.gif" alt="cogit open shows the map; pasting a message hash jumps to that message and opens the decision behind it">
 
 cogit records every message you send to an AI coding agent as a *thought commit*: what you
 asked, what came of it, and the message it answered. Your code commits point back to the
@@ -18,7 +18,8 @@ Claude Code today.
 - **Every message becomes a thought commit**: the question, the outcome, the decisions with
   their reasons and the options that were rejected, and which earlier message it continues.
 - **A map of your sessions**: a git graph of your conversations with branches, decisions, a
-  "Your turn" inbox and a one-click command to resume any chat.
+  "Your turn" inbox, and Resume and Fork buttons that copy the command to reopen a chat or
+  continue it as a new one.
 - **Commits point back to their reason**: a `Thought:` trailer on each commit;
   `cogit show <sha>`, `cogit blame` and `cogit why` follow it back.
 - **Pull request descriptions with the decisions**: `cogit pr` writes the goal, the
@@ -75,7 +76,8 @@ cogit open .
 
 - [Getting started](docs/guide/getting-started.md): what `init` asks, your first session,
   setting up a team
-- [The map](docs/guide/map.md): sessions, branches, the inbox, unread work, files, search
+- [The map](docs/guide/map.md): sessions, branches, the inbox, unread work, files, search,
+  resuming and forking a session
 - [Reading the lineage](docs/guide/reading-the-lineage.md): `log`, `show`, `blame`, `why`,
   `search`
 - [Pull requests](docs/guide/pull-requests.md): `cogit pr`

@@ -36,9 +36,12 @@ A message without a record yet is picked up by the next side run or at the sessi
 
 ## The map looks old after an upgrade
 
-The map server keeps running in the background with the version it started with, and it
-rebuilds the map with that version. Stop it (it listens on `127.0.0.1:4747`) and run
-`cogit open .` again.
+Every map is stamped with the cogit version that built it. The next `cogit open` stops a
+server left running by the old version and starts this one, and the server rebuilds a map
+another version wrote before serving it, so the page matches the command you have. If a tab
+still shows the old page, reload it; a server too old to be stopped by `cogit open` keeps
+running on `127.0.0.1:4747`, and `cogit open .` falls back to the file — stop that process and
+open the map again.
 
 ## The port is taken
 

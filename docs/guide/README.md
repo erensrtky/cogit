@@ -6,7 +6,7 @@ part in detail.
 | Page | What it covers |
 |---|---|
 | [Getting started](getting-started.md) | Install, what `cogit init` asks, your first session, setting up a team |
-| [The map](map.md) | Sessions, branches, the "Your turn" inbox, unread work, files, search, resuming a session |
+| [The map](map.md) | Sessions, branches, the "Your turn" inbox, unread work, files, search, resuming or forking a session, the people filter |
 | [Reading the lineage](reading-the-lineage.md) | `log`, `show`, `blame`, `why`, `search` in the terminal, and how the agent uses them |
 | [Pull requests](pull-requests.md) | `cogit pr`: a review-ready description with the decisions behind the code |
 | [Teams and git](teams-and-git.md) | What is committed, the `Thought:` trailer, the git hooks, teammates' records |
