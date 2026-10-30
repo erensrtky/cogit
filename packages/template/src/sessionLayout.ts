@@ -1,5 +1,5 @@
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
-import { type GitLayout, type GitNode, layoutGitGraph } from "./gitLayout.js";
+import { type GitLayout, type GitNode, layoutGitGraph, ROW_WIDTH } from "./gitLayout.js";
 import { headOf } from "./graph.js";
 
 /**
@@ -12,6 +12,14 @@ import { headOf } from "./graph.js";
 
 /** Wider than a message row: a session row carries a title, a count and a tag. */
 export const SESSION_ROW_WIDTH = 720;
+
+/**
+ * Session rows follow the dragged width of the message rows, keeping the same
+ * extra room, so widening one session's messages widens the whole map.
+ */
+export function sessionRowWidth(messageRowWidth: number): number {
+  return SESSION_ROW_WIDTH + messageRowWidth - ROW_WIDTH;
+}
 
 function time(value: string | undefined): number {
   if (!value) return Number.NEGATIVE_INFINITY;
@@ -71,6 +79,8 @@ export function layoutSessionGraph(
   model: LineageViewModel,
   /** Room to leave under a session's row for its opened messages, by session id. */
   spaceAfter?: ReadonlyMap<string, number>,
+  /** The message rows' width; the session rows keep pace with it. */
+  messageRowWidth: number = ROW_WIDTH,
 ): SessionGraph {
   const sessions = allSessions(model);
   const byId = new Map(sessions.map((session) => [session.sessionId, session]));
@@ -102,7 +112,7 @@ export function layoutSessionGraph(
 
   const git = layoutGitGraph(items, {
     fold: false,
-    rowWidth: SESSION_ROW_WIDTH,
+    rowWidth: sessionRowWidth(messageRowWidth),
     headId: headOf(model)?.sessionId ?? null,
     itemEnd: endIndex,
     ...(spaceAfter === undefined ? {} : { spaceAfter }),

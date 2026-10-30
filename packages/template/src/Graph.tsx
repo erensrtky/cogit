@@ -402,7 +402,10 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     return out;
   }, [messageGits]);
 
-  const sessionGraph = useMemo(() => layoutSessionGraph(model, spaceAfter), [model, spaceAfter]);
+  const sessionGraph = useMemo(
+    () => layoutSessionGraph(model, spaceAfter, rowWidth),
+    [model, spaceAfter, rowWidth],
+  );
 
   const openings = useMemo(() => {
     const out: Opening[] = [];

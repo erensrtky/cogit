@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Dragging the message rows' edge on the map now widens the session rows too, so the whole map grows with it.
+
 ## [0.22.0] - 2026-10-30
 ### Added
 - Drag the right edge of an open session's messages to make the rows wider or narrower, so long titles wrap into fewer lines; double-click the edge to reset. The width applies to every session and is remembered in this browser.
