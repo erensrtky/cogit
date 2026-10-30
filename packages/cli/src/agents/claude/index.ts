@@ -23,6 +23,7 @@ import {
   excerpt,
   findTranscript,
   readConversation,
+  readForkOrigin,
   readLastTurn,
   readsHandoff,
 } from "./transcripts.js";
@@ -48,6 +49,7 @@ export const claude: AgentAdapter = {
   collectTranscripts,
   collectTranscriptIds,
   readConversation,
+  readForkOrigin,
   readsHandoff,
   readLastTurn,
   countUserLines,

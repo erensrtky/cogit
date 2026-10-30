@@ -52,6 +52,20 @@ export interface ChatTurn extends UserMessage {
 }
 
 /**
+ * Where a forked session came from (`claude --resume <id> --fork-session`): the
+ * fork's transcript starts with copies of the original's messages, which belong
+ * to the original, so its own messages begin after them.
+ */
+export interface ForkOrigin {
+  /** The session the shared messages were first written in. */
+  sessionId: string;
+  /** How many of the fork's first messages are copies. */
+  copied: number;
+  /** The last copied message as the origin has it; the fork's first own message grows from it. */
+  last: { uuid: string; at: string; text: string };
+}
+
+/**
  * How a transcript ends (Story 11.1): the deterministic "your turn" signal.
  * The agent wrote after the newest user message, or that message is still
  * waiting for an answer. Who asked what is never guessed from the text.
@@ -128,6 +142,8 @@ export interface AgentAdapter {
   collectTranscriptIds(env: NodeJS.ProcessEnv): Promise<Set<string>>;
   /** Each message the user typed, in order, with the agent's replies and tool counts. */
   readConversation(file: string): Promise<ChatTurn[]>;
+  /** Where a forked session came from; null for a session of its own. */
+  readForkOrigin(file: string): Promise<ForkOrigin | null>;
   /** Whether the transcript shows the agent reading a handoff file (Story 8.6). */
   readsHandoff(file: string): Promise<boolean>;
   /**

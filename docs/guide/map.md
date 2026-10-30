@@ -54,7 +54,8 @@ Click a row to open its details on the right:
 - previous and next message buttons, and two small buttons that copy a command for the
   whole session: **Resume** (`cd '<project>' && claude --resume <session-id>`) reopens the
   chat where it left off, and **Fork** adds `--fork-session`, so the chat goes on as a new
-  session with the same history and the original stays as it was.
+  session with the same history and the original stays as it was. On the map the fork starts from
+  the message it was forked at, like a session that continues another.
 
 ## "Your turn"
 

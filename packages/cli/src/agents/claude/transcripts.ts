@@ -1,9 +1,10 @@
 import { createReadStream } from "node:fs";
-import { access, type FileHandle, open, readdir } from "node:fs/promises";
+import { access, type FileHandle, open, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import type { ChatTurn, LastTurn, ToolUse, UserMessage } from "../types.js";
+import type { ChatTurn, ForkOrigin, LastTurn, ToolUse, UserMessage } from "../types.js";
+import { forkOrigin } from "./fork.js";
 
 /**
  * Reading Claude Code's transcripts. A session is one JSONL file under
@@ -222,9 +223,44 @@ function addAssistant(turn: ChatTurn, line: Record<string, unknown>): void {
 /**
  * Reads the conversation from a transcript: each message the user typed, in
  * order, with the agent's written replies and a count of its tool calls up to
- * the next message. Unparseable lines are skipped.
+ * the next message. Unparseable lines are skipped. A fork's copied messages
+ * belong to the session it came from and are left out (see `fork.ts`).
  */
 export async function readConversation(file: string): Promise<ChatTurn[]> {
+  // Read fresh: callers own the turns they get; only other transcripts are cached.
+  const turns = await readAllTurns(file);
+  const origin = await forkOrigin(file, turns, readTranscriptTurns, isMessageLine);
+  if (origin === null) return turns;
+  return turns.slice(origin.copied).map((turn, index) => {
+    const { resumed: _, ...rest } = turn;
+    // The fork's first own message starts its session; a later one keeps its flag.
+    return { ...(index === 0 ? rest : turn), id: `m${index + 1}` };
+  });
+}
+
+/** Where a forked transcript came from; null for a session of its own. */
+export async function readForkOrigin(file: string): Promise<ForkOrigin | null> {
+  return forkOrigin(file, await readAllTurns(file), readTranscriptTurns, isMessageLine);
+}
+
+function isMessageLine(line: Record<string, unknown>): boolean {
+  return messageText(line) !== null && typeof line.timestamp === "string";
+}
+
+/** Other transcripts' messages, copies included, while a fork is matched; per process, by size. */
+const turnCache = new Map<string, { size: number; turns: Promise<ChatTurn[]> }>();
+
+async function readTranscriptTurns(file: string): Promise<ChatTurn[]> {
+  const size = (await stat(file)).size;
+  const cached = turnCache.get(file);
+  if (cached && cached.size === size) return cached.turns;
+  const turns = readAllTurns(file);
+  turnCache.set(file, { size, turns });
+  turns.catch(() => turnCache.delete(file));
+  return turns;
+}
+
+async function readAllTurns(file: string): Promise<ChatTurn[]> {
   const turns: ChatTurn[] = [];
   /** Uuids already read, to notice a chain that starts again (a resumed process). */
   const seen = new Set<string>();

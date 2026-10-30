@@ -8,6 +8,7 @@ import {
   hashesToLabels,
   isRecorded,
   labelsToHashes,
+  messageHash,
   messageOrder,
   readSessionMessages,
   type SessionMessage,
@@ -112,7 +113,11 @@ export async function sessionWrite(
   const messages = await readSessionMessages(root, redacted.sessionId, io.env);
   // The side model runs on this same transcript, so a message id it does not
   // know is made up; its node is dropped instead of stored beside the real one.
-  const input = nameMessages(redacted, messages, io, opts.by === "side");
+  const input = withForkParent(
+    nameMessages(redacted, messages, io, opts.by === "side"),
+    messages,
+    await forkParent(redacted.sessionId, io.env),
+  );
   if (count > 0) io.warn(`redacted ${count} secret-looking value(s)`);
 
   // Cross-session parents (8.6) are checked against the other records before the
@@ -215,6 +220,41 @@ function nameMessages(
         ...(node.links === undefined ? {} : { links: node.links.map(ref) }),
       };
     }),
+  };
+}
+
+/**
+ * A forked session's first own message grows from the last message it copied,
+ * as `<origin session>:<id>`; null for a session of its own.
+ */
+export async function forkParent(
+  sessionId: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string | null> {
+  const agent = defaultAgent();
+  const file = await agent.findTranscript(sessionId, env);
+  if (!file) return null;
+  const origin = await agent.readForkOrigin(file).catch(() => null);
+  return origin ? `${origin.sessionId}:${messageHash(origin.sessionId, origin.last)}` : null;
+}
+
+/**
+ * Hangs a fork's first message from where it was forked, when the input sends
+ * that message without a parent: a fork is a fact of the transcript, not a guess,
+ * so no recorder has to find it among the candidates.
+ */
+export function withForkParent(
+  input: SessionInput,
+  messages: readonly SessionMessage[] | null,
+  parent: string | null,
+): SessionInput {
+  const first = messages?.[0];
+  if (parent === null || first === undefined || !input.nodes) return input;
+  return {
+    ...input,
+    nodes: input.nodes.map((node) =>
+      node.id === first.hash && typeof node.parent !== "string" ? { ...node, parent } : node,
+    ),
   };
 }
 
@@ -362,8 +402,12 @@ export async function sessionShow(
     // the expensive other-session scan only runs while that message is unrecorded
     // (`--full` asks for it every time, for debugging and backfill).
     const first = messages[0];
+    const unrecorded = first !== undefined && (opts.full === true || !isRecorded(recorded, first));
+    // A fork names its own parent; the candidates are for guessing one.
+    const forkedFrom = unrecorded ? await forkParent(sessionId, io.env) : null;
+    if (forkedFrom !== null) view.forkedFrom = forkedFrom;
     const candidates =
-      first !== undefined && (opts.full === true || !isRecorded(recorded, first))
+      unrecorded && first !== undefined && forkedFrom === null
         ? await parentCandidates(root, sessionId, first, io)
         : null;
     if (candidates) view.candidates = candidates;

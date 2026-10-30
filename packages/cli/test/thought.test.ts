@@ -98,8 +98,9 @@ describe("the thought behind a commit (Story 9.4)", () => {
     await writeFile(
       file,
       [
-        { type: "user", uuid: "u1", timestamp: T0, message: { content: "first" } },
-        { type: "user", uuid: "u2", timestamp: NEWEST_AT, message: { content: text } },
+        // Uuids are unique per session; only a fork shares them (see fork.test.ts).
+        { type: "user", uuid: `${id}-u1`, timestamp: T0, message: { content: "first" } },
+        { type: "user", uuid: `${id}-u2`, timestamp: NEWEST_AT, message: { content: text } },
       ]
         .map((line) => JSON.stringify(line))
         .join("\n") + "\n",
@@ -108,7 +109,7 @@ describe("the thought behind a commit (Story 9.4)", () => {
   };
 
   const thoughtOf = (text = "second", id = "s1"): string =>
-    messageHash(id, { uuid: "u2", at: NEWEST_AT, text });
+    messageHash(id, { uuid: `${id}-u2`, at: NEWEST_AT, text });
 
   const writeHead = async (at = T0, path: string | undefined = transcript): Promise<void> => {
     await writeFile(
