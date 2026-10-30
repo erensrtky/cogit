@@ -34,7 +34,6 @@ const session: ViewSession = {
   sessionId: "s1",
   agent: "claude-code",
   title: "Session one",
-  epoch: null,
   startedAt: T0,
   updatedAt: T0,
   status: { goal: "", done: [], pending: [], next: "" },
@@ -52,8 +51,7 @@ function modelOf(current: ViewSession): LineageViewModel {
     schema: 1,
     project: { name: "p", path: "/p", generatedAt: T0 },
     status: { goal: "", done: [], pending: [], next: "", lastActivity: T0 },
-    epochs: [{ id: "e1", title: "E", createdAt: T0, sessions: [current] }],
-    unassigned: [],
+    sessions: [current],
     read: [],
     settings: {
       recorder: "mixed",

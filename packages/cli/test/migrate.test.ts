@@ -80,7 +80,6 @@ describe("migrateProject", () => {
     await atomicWriteJson(join(root, ".codelineage", "project.json"), {
       schema: 1,
       name: "p",
-      epochs: [],
     });
 
     const resolved = await resolveProjectRoot(root);

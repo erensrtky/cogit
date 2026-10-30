@@ -50,7 +50,7 @@ function time(value: string): number {
 }
 
 function latestSession(model: LineageViewModel): ViewSession | undefined {
-  const all = [...model.epochs.flatMap((epoch) => epoch.sessions), ...model.unassigned];
+  const all = model.sessions;
   return all.sort(
     (a, b) => time(b.updatedAt) - time(a.updatedAt) || a.sessionId.localeCompare(b.sessionId),
   )[0];
@@ -64,7 +64,7 @@ function latestSession(model: LineageViewModel): ViewSession | undefined {
  */
 export function headOf(model: LineageViewModel): Head | null {
   let best: { sessionId: string; messageId: string; at: number } | null = null;
-  for (const session of [...model.epochs.flatMap((epoch) => epoch.sessions), ...model.unassigned]) {
+  for (const session of model.sessions) {
     for (const message of session.messages) {
       const at = time(message.at ?? "");
       if (at === Number.NEGATIVE_INFINITY) continue;
@@ -95,14 +95,6 @@ export function isMessageHash(id: string): boolean {
 export function shortHash(id: string): string {
   return isMessageHash(id) ? id.slice(0, 8) : id;
 }
-
-/** Outline group key of an epoch; epochs are only tags on the map now. */
-export function epochId(id: string): string {
-  return `epoch:${id}`;
-}
-
-/** Outline group key for sessions with no epoch (or an unknown one). */
-export const UNASSIGNED_EPOCH_ID = "unassigned";
 
 /**
  * Node ids are flat per session: the outline and the map agree on the same id

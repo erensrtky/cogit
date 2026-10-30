@@ -8,7 +8,6 @@ import {
   stepHitIndex,
 } from "../../cli/src/view/search.js";
 import { BackToPanel, Brand } from "./Brand.js";
-import { formatTime } from "./format.js";
 import { Graph } from "./Graph.js";
 import { Inbox } from "./Inbox.js";
 import { type MapSearchState, SearchBox } from "./MapSearch.js";
@@ -17,9 +16,6 @@ import { SettingsButton } from "./SettingsModal.js";
 import { ThemeButton } from "./ThemeButton.js";
 
 export function App({ model }: { model: LineageViewModel }) {
-  const sessionCount =
-    model.epochs.reduce((sum, epoch) => sum + epoch.sessions.length, 0) + model.unassigned.length;
-
   // The search state lives here because the box sits in the page head and the
   // map needs the hits; `useDeferredValue` keeps typing responsive while the
   // scan runs over every message and conversation.
@@ -78,12 +74,6 @@ export function App({ model }: { model: LineageViewModel }) {
           <div>
             <ProjectSwitcher model={model} />
             <BackToPanel />
-          </div>
-          <div className="meta">
-            <span>
-              {model.epochs.length} epochs · {sessionCount} sessions
-            </span>
-            <span className="muted">generated {formatTime(model.project.generatedAt)}</span>
           </div>
         </header>
 

@@ -37,7 +37,6 @@ function Row({
   bigChangeLines,
   onSelect,
   onUnfold,
-  onContinue,
 }: {
   row: GitRow;
   /** The row above is on the same day, so this one shows only the time. */
@@ -54,7 +53,6 @@ function Row({
   bigChangeLines: number;
   onSelect: (row: GitMessageRow) => void;
   onUnfold: (segmentId: string) => void;
-  onContinue: (continues: NonNullable<ViewNode["continues"]>) => void;
 }) {
   const style = {
     top: row.y - row.height / 2,
@@ -139,18 +137,6 @@ function Row({
           {formatChange(message.change)}
         </span>
       ) : null}
-      {message.continues ? (
-        <span
-          className="git-continues"
-          title={`Open ${message.continues.sessionTitle} at ${message.continues.label ?? message.continues.id}`}
-          onClick={(event: MouseEvent) => {
-            event.stopPropagation();
-            onContinue(message.continues as NonNullable<ViewNode["continues"]>);
-          }}
-        >
-          ↑ {message.continues.label ?? message.continues.id}
-        </span>
-      ) : null}
       {row.head ? <span className="left-off">left off here</span> : null}
       {message.unsummarized ? <span className="unsummarized">not summarized yet</span> : null}
     </button>
@@ -167,7 +153,6 @@ export function GitGraph({
   bigChangeLines,
   onSelect,
   onUnfold,
-  onContinue,
 }: {
   git: GitLayout;
   /** Message id of the open drill-down, if it belongs to this session. */
@@ -184,8 +169,6 @@ export function GitGraph({
   bigChangeLines: number;
   onSelect: (row: GitMessageRow) => void;
   onUnfold: (segmentId: string) => void;
-  /** Opens the earlier session this message continues, at that message. */
-  onContinue: (continues: NonNullable<ViewNode["continues"]>) => void;
 }) {
   const branches = useMemo(
     () => new Map(git.segments.map((segment) => [segment.id, segment])),
@@ -280,7 +263,6 @@ export function GitGraph({
               bigChangeLines={bigChangeLines}
               onSelect={onSelect}
               onUnfold={onUnfold}
-              onContinue={onContinue}
             />
           );
         })}

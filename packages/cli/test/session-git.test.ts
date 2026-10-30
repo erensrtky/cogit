@@ -60,7 +60,6 @@ describe("the record travels with the repo (Story 9.3)", () => {
     sessionId: id,
     agent: "claude-code",
     title,
-    epoch: null,
     startedAt: T0,
     updatedAt: T0,
     status: { goal: "", done: [], pending: [], next: "" },
@@ -71,7 +70,7 @@ describe("the record travels with the repo (Story 9.3)", () => {
   const makeProject = async (): Promise<void> => {
     const paths = projectPaths(root);
     await mkdir(paths.sessions, { recursive: true });
-    await writeFile(paths.project, projectJson({ schema: 1, name: "proj", epochs: [] }));
+    await writeFile(paths.project, projectJson({ schema: 1, name: "proj" }));
     await writeFile(paths.session("s1"), JSON.stringify(session("s1", "My session")));
     await writeFile(paths.events("s1"), "");
   };
@@ -202,20 +201,8 @@ describe("the record travels with the repo (Story 9.3)", () => {
     expect(await sessionAuthor(root, noName)).toBe(userInfo().username);
   });
 
-  it("writes stable project.json with one epoch per line", () => {
-    expect(projectJson({ schema: 1, name: "p", epochs: [] })).toBe(
-      '{\n  "epochs": [],\n  "name": "p",\n  "schema": 1\n}\n',
-    );
-    const text = projectJson({
-      schema: 1,
-      name: "p",
-      epochs: [{ id: "e1", title: "One", createdAt: T0 }],
-    });
-    expect(text).toBe(
-      `{\n  "epochs": [\n    {"createdAt": ${JSON.stringify(T0)}, "id": "e1", "title": "One"}\n  ],\n  "name": "p",\n  "schema": 1\n}\n`,
-    );
-    // Each epoch is its own line, so two people add different ones without a conflict.
-    expect(text.split("\n").filter((line) => line.includes('"id"'))).toHaveLength(1);
+  it("writes stable project.json, one sorted key per line", () => {
+    expect(projectJson({ schema: 1, name: "p" })).toBe('{\n  "name": "p",\n  "schema": 1\n}\n');
   });
 });
 
@@ -240,10 +227,7 @@ describe("ignore files and git hooks", () => {
     await git("config", "user.email", "t@example.com");
     await git("config", "user.name", "Tester");
     await mkdir(projectPaths(root).base, { recursive: true });
-    await writeFile(
-      projectPaths(root).project,
-      projectJson({ schema: 1, name: "proj", epochs: [] }),
-    );
+    await writeFile(projectPaths(root).project, projectJson({ schema: 1, name: "proj" }));
   });
 
   it("adds and removes the root ignore line with the policy", async () => {
@@ -421,7 +405,6 @@ describe("ignore files and git hooks", () => {
       sessionId: "s0",
       agent: "claude-code",
       title: "Earlier work",
-      epoch: null,
       startedAt: T0,
       updatedAt: T0,
       status: { goal: "", done: [], pending: [], next: "" },

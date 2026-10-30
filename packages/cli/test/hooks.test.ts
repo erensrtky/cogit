@@ -86,7 +86,6 @@ describe("session start handoff", () => {
     sessionId: id,
     agent: "claude-code",
     title: id,
-    epoch: null,
     startedAt,
     updatedAt,
     status: { goal: "", done: [], pending: [], next: "" },

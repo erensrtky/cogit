@@ -21,18 +21,6 @@
       "type": "string",
       "maxLength": 200
     },
-    "epoch": {
-      "default": null,
-      "anyOf": [
-        {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "startedAt": {
       "type": "string",
       "format": "date-time",
@@ -406,7 +394,6 @@
     "sessionId",
     "agent",
     "title",
-    "epoch",
     "startedAt",
     "updatedAt",
     "status",

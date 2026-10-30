@@ -21,27 +21,18 @@ const model: LineageViewModel = {
   schema: 1,
   project: { name: "p", path: "/tmp/p", generatedAt: AT },
   status: { goal: "", done: [], pending: [], next: "", lastActivity: null },
-  epochs: [
+  sessions: [
     {
-      id: "e1",
-      title: "Epoch one",
-      createdAt: AT,
-      sessions: [
-        {
-          sessionId: "s1",
-          agent: "claude-code",
-          title: "One",
-          epoch: "e1",
-          startedAt: AT,
-          updatedAt: AT,
-          status: { goal: "", done: [], pending: [], next: "" },
-          messages: [message("m1"), message("m2", "2026-10-21T10:01:00.000Z", "m1")],
-          transcriptAvailable: true,
-        },
-      ],
+      sessionId: "s1",
+      agent: "claude-code",
+      title: "One",
+      startedAt: AT,
+      updatedAt: AT,
+      status: { goal: "", done: [], pending: [], next: "" },
+      messages: [message("m1"), message("m2", "2026-10-21T10:01:00.000Z", "m1")],
+      transcriptAvailable: true,
     },
   ],
-  unassigned: [],
 };
 
 describe("headOf", () => {
@@ -52,23 +43,19 @@ describe("headOf", () => {
   it("has no message for a session without any, and is null for an empty map", () => {
     const empty: LineageViewModel = {
       ...model,
-      epochs: [
-        {
-          ...model.epochs[0]!,
-          sessions: [{ ...model.epochs[0]!.sessions[0]!, messages: [] }],
-        },
-      ],
+      sessions: [{ ...model.sessions[0]!, messages: [] }],
     };
     expect(headOf(empty)).toEqual({ sessionId: "s1", messageId: null });
-    expect(headOf({ ...model, epochs: [], unassigned: [] })).toBeNull();
+    expect(headOf({ ...model, sessions: [] })).toBeNull();
   });
 
   it("follows the newest message, not the most recently updated record", () => {
     const fixedLater: LineageViewModel = {
       ...model,
-      unassigned: [
+      sessions: [
+        ...model.sessions,
         {
-          ...model.epochs[0]!.sessions[0]!,
+          ...model.sessions[0]!,
           sessionId: "u1",
           // Its record was touched last (say, an old pending item was fixed),
           // but its message is older than s1's newest one.
@@ -81,8 +68,9 @@ describe("headOf", () => {
 
     const newerMessage: LineageViewModel = {
       ...fixedLater,
-      unassigned: [
-        { ...fixedLater.unassigned[0]!, messages: [message("m9", "2026-10-22T00:00:00.000Z")] },
+      sessions: [
+        ...model.sessions,
+        { ...fixedLater.sessions[1]!, messages: [message("m9", "2026-10-22T00:00:00.000Z")] },
       ],
     };
     expect(headOf(newerMessage)).toEqual({ sessionId: "u1", messageId: "m9" });
@@ -91,15 +79,10 @@ describe("headOf", () => {
   it("falls back to the most recently updated session when messages carry no time", () => {
     const untimed: LineageViewModel = {
       ...model,
-      epochs: [
+      sessions: [
         {
-          ...model.epochs[0]!,
-          sessions: [
-            {
-              ...model.epochs[0]!.sessions[0]!,
-              messages: [{ id: "m1", kind: "message", title: "m1", parent: null }],
-            },
-          ],
+          ...model.sessions[0]!,
+          messages: [{ id: "m1", kind: "message", title: "m1", parent: null }],
         },
       ],
     };

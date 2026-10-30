@@ -2,7 +2,6 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { configGet, configPrune, configSet } from "../src/commands/config.js";
-import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import { CliError } from "../src/io.js";
 import { globalPaths } from "../src/store/paths.js";
@@ -150,33 +149,5 @@ describe("config prune", () => {
     await writeFile(globalPaths(env).registry, "{not json");
     await expect(configPrune({}, fakeIo(env))).rejects.toBeInstanceOf(CliError);
     await expect(configPrune({}, fakeIo(env))).rejects.toThrow(/registry: invalid JSON/);
-  });
-});
-
-describe("epoch add", () => {
-  let root: string;
-  beforeEach(async () => {
-    root = join(dir, "proj");
-    await mkdir(root);
-  });
-
-  it("adds an epoch once and accepts a repeat with the same title", async () => {
-    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(env));
-    const io = fakeIo(env);
-    await epochAdd(root, "e2e", "E2E setup", io);
-    await epochAdd(root, "e2e", "E2E setup", io);
-    expect(io.lines).toEqual(["Added epoch e2e: E2E setup", "Epoch e2e already exists"]);
-    expect(await loadProject(root)).toMatchObject({
-      data: { epochs: [{ id: "e2e", title: "E2E setup", createdAt: "2026-10-21T10:00:00.000Z" }] },
-    });
-    await expect(epochAdd(root, "e2e", "Other", io)).rejects.toThrow(/already exists/);
-  });
-
-  it("rejects bad ids and uninitialized or corrupt projects", async () => {
-    await expect(epochAdd(root, "../x", "t", fakeIo(env))).rejects.toThrow(/invalid epoch id/);
-    await expect(epochAdd(root, "e1", "t", fakeIo(env))).rejects.toThrow(/not initialized/);
-    await mkdir(join(root, ".cogit"));
-    await writeFile(join(root, ".cogit", "project.json"), '{"schema":1}');
-    await expect(epochAdd(root, "e1", "t", fakeIo(env))).rejects.toThrow(/name/);
   });
 });

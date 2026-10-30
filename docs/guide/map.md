@@ -24,8 +24,7 @@ was deleted or moved stays as a card marked "missing"; `cogit config prune` remo
 
 The map reads like a git graph of your conversations. Time runs down the page.
 
-- **A session** is one Claude Code chat. Its header shows the title, the feature it belongs
-  to (an *epoch*) and when it ran.
+- **A session** is one Claude Code chat. Its header shows the title and when it ran.
 - **A row** is one message you sent, titled in your words and saying what came of it.
 - **A branch** is a chain of messages that answer each other. It gets its own coloured lane;
   its first message is a hollow ring carrying the branch's title. A new topic in the same chat

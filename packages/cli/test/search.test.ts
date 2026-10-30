@@ -33,7 +33,6 @@ function session(over: Partial<Session> & { sessionId: string }): Session {
     schema: 1,
     agent: "claude-code",
     title: "",
-    epoch: null,
     startedAt: T0,
     updatedAt: T0,
     status: { goal: "", done: [], pending: [], next: "" },
@@ -229,31 +228,22 @@ describe("hash jump", () => {
     schema: 1,
     project: { name: "p", path: "/tmp/p", generatedAt: T0 },
     status: { goal: "", done: [], pending: [], next: "", lastActivity: null },
-    epochs: [
+    sessions: [
       {
-        id: "e1",
-        title: "Epoch one",
-        createdAt: T0,
-        sessions: [
-          {
-            sessionId: "s1",
-            agent: "claude-code",
-            title: "One",
-            epoch: "e1",
-            startedAt: T0,
-            updatedAt: T0,
-            status: { goal: "", done: [], pending: [], next: "" },
-            messages: [
-              message({ id: A, title: "First", at: T0, label: "m1" }),
-              message({ id: B, title: "Second", at: T0, label: "m2" }),
-              message({ id: C, title: "Third", at: T0, label: "m3" }),
-            ],
-            transcriptAvailable: true,
-          },
+        sessionId: "s1",
+        agent: "claude-code",
+        title: "One",
+        startedAt: T0,
+        updatedAt: T0,
+        status: { goal: "", done: [], pending: [], next: "" },
+        messages: [
+          message({ id: A, title: "First", at: T0, label: "m1" }),
+          message({ id: B, title: "Second", at: T0, label: "m2" }),
+          message({ id: C, title: "Third", at: T0, label: "m3" }),
         ],
+        transcriptAvailable: true,
       },
     ],
-    unassigned: [],
   };
 
   it("recognises a hash and resolves only a unique prefix", () => {
@@ -315,7 +305,6 @@ describe("cogit search", () => {
     const s1 = session({
       sessionId: "s1",
       title: "Ship the parser",
-      epoch: "e8",
       startedAt: "2026-10-20T09:00:00.000Z",
       updatedAt: "2026-10-20T10:00:00.000Z",
       nodes: [

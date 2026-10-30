@@ -165,15 +165,14 @@ describe("withLock", () => {
 describe("stores", () => {
   it("creates and updates project.json under the lock", async () => {
     expect(await loadProject(dir)).toEqual({ found: false });
-    await updateProject(dir, (cur) => cur ?? { schema: 1, name: "p", epochs: [] });
+    await updateProject(dir, (cur) => cur ?? { schema: 1, name: "p" });
     await updateProject(dir, (cur) => ({
-      ...(cur ?? { schema: 1, name: "p", epochs: [] }),
-      epochs: [{ id: "e1", title: "E", createdAt: T0 }],
+      ...(cur ?? { schema: 1, name: "p" }),
     }));
     expect(await loadProject(dir)).toMatchObject({
       found: true,
       ok: true,
-      data: { epochs: [{ id: "e1" }] },
+      data: { name: "p" },
     });
   });
 
@@ -181,7 +180,7 @@ describe("stores", () => {
     const p = projectPaths(dir);
     await mkdir(p.base, { recursive: true });
     await writeFile(p.project, "{broken");
-    await expect(updateProject(dir, () => ({ schema: 1, name: "p", epochs: [] }))).rejects.toThrow(
+    await expect(updateProject(dir, () => ({ schema: 1, name: "p" }))).rejects.toThrow(
       /invalid JSON/,
     );
     expect(await readFile(p.project, "utf8")).toBe("{broken");
@@ -197,7 +196,6 @@ describe("stores", () => {
             sessionId: "s1",
             agent: "claude-code",
             title: "",
-            epoch: null,
             startedAt: T0,
             updatedAt: T0,
             status: { goal: "", done: [], pending: [], next: "" },

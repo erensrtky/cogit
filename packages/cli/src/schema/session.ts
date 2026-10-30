@@ -115,7 +115,6 @@ export const Session = z.object({
   sessionId: Slug,
   agent: z.string().min(1).max(64).default("claude-code"),
   title: z.string().max(200).default(""),
-  epoch: Slug.nullable().default(null),
   startedAt: IsoDate,
   updatedAt: IsoDate,
   status: Status.default({ goal: "", done: [], pending: [], next: "" }),
@@ -152,13 +151,13 @@ export const LineageNodeInput = LineageNode.omit({
 
 /**
  * What the agent sends to `session write`. Everything but the id is optional;
- * the CLI owns `schema`, `startedAt` and `updatedAt`.
+ * the CLI owns `schema`, `startedAt` and `updatedAt`. An `epoch` from an older
+ * skill is dropped with the other unknown keys: epochs are gone.
  */
 export const SessionInput = z.object({
   sessionId: Slug,
   agent: z.string().min(1).max(64).optional(),
   title: z.string().max(200).optional(),
-  epoch: Slug.nullable().optional(),
   status: Status.optional(),
   leftOff: z.string().max(400).optional(),
   nodes: z.array(LineageNodeInput).optional(),

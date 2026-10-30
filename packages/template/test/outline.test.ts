@@ -8,12 +8,11 @@ function message(id: string, at = AT, parent: string | null = null): ViewNode {
   return { id, kind: "message", title: id, at, parent };
 }
 
-function session(id: string, epoch: string | null, messages: ViewNode[]): ViewSession {
+function session(id: string, messages: ViewNode[]): ViewSession {
   return {
     sessionId: id,
     agent: "claude-code",
     title: id,
-    epoch,
     startedAt: AT,
     updatedAt: AT,
     status: { goal: "", done: [], pending: [], next: "" },
@@ -27,34 +26,20 @@ const model: LineageViewModel = {
   schema: 1,
   project: { name: "p", path: "/tmp/p", generatedAt: AT },
   status: { goal: "", done: [], pending: [], next: "", lastActivity: null },
-  epochs: [
-    {
-      id: "e1",
-      title: "Epoch one",
-      createdAt: AT,
-      sessions: [
-        session("s1", "e1", [message("m1"), message("m2", "2026-10-21T10:01:00.000Z", "m1")]),
-      ],
-    },
+  sessions: [
+    session("s1", [message("m1"), message("m2", "2026-10-21T10:01:00.000Z", "m1")]),
+    session("u1", []),
   ],
-  unassigned: [session("u1", null, [])],
 };
 
 describe("outlinePath", () => {
-  it("returns the epoch for an epoch row", () => {
-    expect(outlinePath(model, "epoch:e1")).toEqual(["epoch:e1"]);
+  it("returns a session row alone", () => {
+    expect(outlinePath(model, "session:s1")).toEqual(["session:s1"]);
+    expect(outlinePath(model, "session:u1")).toEqual(["session:u1"]);
   });
 
-  it("returns the owning epoch for a session row", () => {
-    expect(outlinePath(model, "session:s1")).toEqual(["epoch:e1"]);
-  });
-
-  it("returns the epoch and session for a message row", () => {
-    expect(outlinePath(model, "node:session:s1:m2")).toEqual(["epoch:e1", "session:s1"]);
-  });
-
-  it("places unassigned sessions under the unassigned group", () => {
-    expect(outlinePath(model, "session:u1")).toEqual(["unassigned"]);
+  it("returns the session and then the message for a message row", () => {
+    expect(outlinePath(model, "node:session:s1:m2")).toEqual(["session:s1", "node:session:s1:m2"]);
   });
 
   it("returns null for an id outside the model", () => {

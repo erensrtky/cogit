@@ -116,7 +116,6 @@ export function mergeSession(
     sessionId: input.sessionId,
     agent: "claude-code",
     title: "",
-    epoch: null,
     startedAt: now,
     updatedAt: now,
     status: { goal: "", done: [], pending: [], next: "" },
@@ -191,7 +190,6 @@ export function mergeSession(
     ...base,
     agent: input.agent ?? base.agent,
     title: input.title ?? base.title,
-    epoch: input.epoch === undefined ? base.epoch : input.epoch,
     status: input.status ?? base.status,
     ...(input.leftOff === undefined && base.leftOff === undefined
       ? {}

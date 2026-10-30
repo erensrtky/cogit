@@ -32,7 +32,6 @@ function session(
     sessionId,
     agent: "claude-code",
     title: `Session ${sessionId}`,
-    epoch: "e1",
     startedAt: at(startedAt),
     updatedAt: at(updatedAt),
     status: { goal: "", done: [], pending: [], next: "" },
@@ -59,8 +58,7 @@ function modelOf(sessions: ViewSession[]): LineageViewModel {
     schema: 1,
     project: { name: "p", path: "/tmp/p", generatedAt: at(0) },
     status: { goal: "", done: [], pending: [], next: "", lastActivity: null },
-    epochs: [{ id: "e1", title: "Epoch one", createdAt: at(0), sessions }],
-    unassigned: [],
+    sessions: [...sessions],
   };
 }
 
@@ -79,9 +77,9 @@ describe("sessionParentOf", () => {
 });
 
 describe("layoutSessionGraph", () => {
-  it("lists every session in start order across epochs and unassigned", () => {
+  it("lists every session in start order", () => {
     const model = modelOf([session("late", 60, 120), session("early", 0, 30)]);
-    model.unassigned = [session("scratch", 30, 40)];
+    model.sessions.push(session("scratch", 30, 40));
     expect(allSessions(model).map((session) => session.sessionId)).toEqual([
       "early",
       "scratch",

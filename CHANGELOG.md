@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Map rows show the date only on a day's first row (the rest show the time), the `mN` label is quieter, and "↑ continues <session> · m37" is now "↑ m37" with the session in its tooltip.
 
 ### Removed
+- Epochs are gone: no `cogit epoch` command, no epoch in the record skill or the closing pass, and the Outline lists sessions in start order instead of grouping them. Older `project.json` and session files still read; their epoch fields are ignored.
+- The map header's "N epochs · N sessions" counter and "generated …" line, and the "↑ mN" mark on a session's first message row (the session row keeps it).
 - The map is quieter: no "experimental" badge or "you" labels in the Outline, no dot grid, minimap or React Flow credit, and the toolbar shows only the session count. The author shows only when more than one person recorded sessions.
 - The map no longer draws the dashed return arrow and the "↩ mN" mark (a branch already shows the return; the details panel still lists it), nor the epoch tag on session rows.
 

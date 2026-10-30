@@ -3,7 +3,6 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { claudeConfigDir, collectTranscriptIds } from "../src/agents/claude/transcripts.js";
 import { buildProject } from "../src/commands/build.js";
-import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import type { Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
@@ -15,7 +14,6 @@ function session(over: Partial<Session> & { sessionId: string }): Session {
     schema: 1,
     agent: "claude-code",
     title: "",
-    epoch: null,
     startedAt: T0,
     updatedAt: T0,
     status: { goal: "", done: [], pending: [], next: "" },
@@ -84,16 +82,9 @@ describe("buildProject transcript availability", () => {
     root = join(dir, "proj");
     await mkdir(root);
     await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
-    await epochAdd(root, "e1", "First", fakeIo(envFor(dir)));
     const paths = projectPaths(root);
-    await writeFile(
-      paths.session("alive"),
-      JSON.stringify(session({ sessionId: "alive", epoch: "e1" })),
-    );
-    await writeFile(
-      paths.session("gone"),
-      JSON.stringify(session({ sessionId: "gone", epoch: "e1" })),
-    );
+    await writeFile(paths.session("alive"), JSON.stringify(session({ sessionId: "alive" })));
+    await writeFile(paths.session("gone"), JSON.stringify(session({ sessionId: "gone" })));
   });
 
   it("marks sessions whose transcript file exists", async () => {
@@ -103,7 +94,7 @@ describe("buildProject transcript availability", () => {
     await writeFile(join(projectDir, "alive.jsonl"), "{}\n");
 
     const model = await buildProject({ dir: root, io: fakeIo(env) });
-    const sessions = model.epochs[0]?.sessions ?? [];
+    const sessions = model.sessions ?? [];
     expect(sessions.map((s) => [s.sessionId, s.transcriptAvailable])).toEqual([
       ["alive", true],
       ["gone", false],

@@ -78,14 +78,11 @@ describe("commands through the CLI", () => {
     expect(await cli("init", root, "--yes", "--retention", "90", "--language", "auto")).toBe("");
   });
 
-  it("runs config get/set and epoch add", async () => {
+  it("runs config get/set", async () => {
     await cli("config", "set", "updateEveryTurns", "7");
     expect((await loadConfig(io.env)).updateEveryTurns).toBe(7);
     await cli("config", "get", "updateEveryTurns");
     expect(io.lines.at(-1)).toBe("7");
-    await cli("init", root, "--yes", "--retention", "keep");
-    await cli("epoch", "add", "e1", "First", "-C", root);
-    expect(io.lines.at(-1)).toBe("Added epoch e1: First");
   });
 
   it("runs why from the CLI", async () => {
@@ -104,7 +101,6 @@ describe("commands through the CLI", () => {
       sessionId: "s1",
       agent: "claude-code",
       title: "CLI session",
-      epoch: null,
       startedAt: T0,
       updatedAt: T0,
       status: { goal: "", done: [], pending: [], next: "" },
@@ -278,7 +274,6 @@ describe("commands through the CLI", () => {
       sessionId: "s1",
       agent: "claude-code",
       title: "CLI session",
-      epoch: null,
       startedAt: T0,
       updatedAt: T0,
       status: { goal: "", done: [], pending: [], next: "" },

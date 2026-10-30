@@ -26,7 +26,7 @@ describe("Session schema", () => {
   it("fills defaults for a minimal session", () => {
     const s = Session.parse({ schema: 1, sessionId: "abc", startedAt: T0, updatedAt: T0 });
     expect(s.agent).toBe("claude-code");
-    expect(s.epoch).toBeNull();
+    expect(s).not.toHaveProperty("epoch");
     expect(s.status).toEqual({ goal: "", done: [], pending: [], next: "" });
     expect(s.nodes).toEqual([]);
   });
@@ -104,8 +104,11 @@ describe("Session schema", () => {
 });
 
 describe("Project and Config schemas", () => {
-  it("defaults epochs and settings", () => {
-    expect(Project.parse({ schema: 1, name: "p" }).epochs).toEqual([]);
+  it("drops an old project's epochs and defaults the settings", () => {
+    expect(Project.parse({ schema: 1, name: "p", epochs: [{ id: "e1" }] })).toEqual({
+      schema: 1,
+      name: "p",
+    });
     expect(Config.parse({ schema: 1 })).toMatchObject({
       language: "auto",
       updateEveryTurns: 15,
@@ -242,19 +245,18 @@ describe("mergeSession", () => {
   it("replaces status when sent and keeps fields that were not sent", () => {
     const first = mergeSession(
       undefined,
-      input({ sessionId: "s1", title: "t", epoch: "e2e", status: { goal: "g", done: ["a"] } }),
+      input({ sessionId: "s1", title: "t", status: { goal: "g", done: ["a"] } }),
       T0,
     ).session;
     const kept = mergeSession(first, input({ sessionId: "s1" }), T1).session;
-    expect(kept).toMatchObject({ title: "t", epoch: "e2e" });
+    expect(kept).toMatchObject({ title: "t" });
     expect(kept.status.done).toEqual(["a"]);
 
     const replaced = mergeSession(
       first,
-      input({ sessionId: "s1", epoch: null, status: { goal: "g2" } }),
+      input({ sessionId: "s1", status: { goal: "g2" } }),
       T1,
     ).session;
-    expect(replaced.epoch).toBeNull();
     expect(replaced.status).toEqual({ goal: "g2", done: [], pending: [], next: "" });
   });
 

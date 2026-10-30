@@ -17,7 +17,6 @@ function session(over: Partial<Session> & { sessionId: string }): Session {
     schema: 1,
     agent: "claude-code",
     title: "",
-    epoch: null,
     startedAt: T0,
     updatedAt: T0,
     status: { goal: "", done: [], pending: [], next: "" },

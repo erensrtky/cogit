@@ -261,9 +261,7 @@ export function rowHeight(
     (message.label ?? message.id).length * 7 +
     Math.min(row.tags, TAGS_PER_LINE) * TAG_WIDTH +
     (row.head ? 92 : 0) +
-    (message.unsummarized ? 116 : 0) +
-    // The "↑ m67" mark sits in the row, next to the title; its session is in the tooltip.
-    (message.continues ? 34 + (message.continues.label ?? message.continues.id).length * 7 : 0);
+    (message.unsummarized ? 116 : 0);
   const room = Math.max(TITLE_MIN_WIDTH, rowWidth - fixed);
   const titleLines = Math.max(1, Math.ceil((message.title.length * TITLE_CHAR) / room));
   const tagLines = Math.ceil(row.tags / TAGS_PER_LINE);

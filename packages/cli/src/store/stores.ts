@@ -53,37 +53,13 @@ async function update<S extends z.ZodType, R extends z.infer<S>>(
 export const loadProject = (root: string) =>
   load(projectPaths(root).project, Project, PROJECT_SCHEMA);
 
-/** One object on one line, its keys sorted, so diffs stay line-sized. */
-function stableInline(value: object): string {
-  const entries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
-  return `{${entries.map(([key, v]) => `${JSON.stringify(key)}: ${JSON.stringify(v)}`).join(", ")}}`;
-}
-
 /**
- * `project.json` as git should see it (Story 9.3): sorted keys and one epoch per
- * line, so two people adding different epochs merge without a conflict. Epochs
- * are the only array that grows; everything else is a single line.
+ * `project.json` as git should see it (Story 9.3): sorted keys, one per line.
+ * Older files also carry an `epochs` list; a rewrite drops it with the rest of
+ * the epochs.
  */
-export function projectJson(project: {
-  schema: number;
-  name: string;
-  epochs: readonly object[];
-}): string {
-  const epochs =
-    project.epochs.length === 0
-      ? '  "epochs": [],'
-      : [
-          '  "epochs": [',
-          project.epochs.map((epoch) => `    ${stableInline(epoch)}`).join(",\n"),
-          "  ],",
-        ].join("\n");
-  return `${[
-    "{",
-    epochs,
-    `  "name": ${JSON.stringify(project.name)},`,
-    `  "schema": ${project.schema}`,
-    "}",
-  ].join("\n")}\n`;
+export function projectJson(project: { schema: number; name: string }): string {
+  return `${["{", `  "name": ${JSON.stringify(project.name)},`, `  "schema": ${project.schema}`, "}"].join("\n")}\n`;
 }
 
 /**

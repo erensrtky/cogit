@@ -13,7 +13,6 @@ const session: ViewSession = {
   agent: "claude-code",
   title: "Session one",
   author: "Eren",
-  epoch: "e1",
   startedAt: T0,
   updatedAt: T0,
   status: { goal: "", done: [], pending: [], next: "" },
@@ -28,8 +27,7 @@ function modelOf(current: ViewSession): LineageViewModel {
     schema: 1,
     project: { name: "p", path: "/p", generatedAt: T0 },
     status: { goal: "", done: [], pending: [], next: "", lastActivity: T0 },
-    epochs: [{ id: "e1", title: "E", createdAt: T0, sessions: [current] }],
-    unassigned: [],
+    sessions: [current],
   };
 }
 
@@ -50,9 +48,12 @@ describe("Story 9.3 on the map", () => {
     expect(render(modelOf(session))).not.toContain("session-author");
 
     const two = modelOf(session);
-    two.unassigned = [
-      { ...session, sessionId: "s2", author: "Ada", startedAt: "2026-10-26T11:00:00.000Z" },
-    ];
+    two.sessions.push({
+      ...session,
+      sessionId: "s2",
+      author: "Ada",
+      startedAt: "2026-10-26T11:00:00.000Z",
+    });
     const html = render(two);
     expect(html).toContain('class="muted session-author"');
     expect(html).toContain("Eren");

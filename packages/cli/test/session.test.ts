@@ -6,7 +6,6 @@ import { Readable } from "node:stream";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import { configSet } from "../src/commands/config.js";
-import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import { readStdin, sessionShow, sessionWrite } from "../src/commands/session.js";
 import { messageHash } from "../src/messages.js";
@@ -70,7 +69,6 @@ describe("session write", () => {
     await mkdir(root);
     io = fakeIo(envFor(dir));
     await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
-    await epochAdd(root, "e2e", "E2E", fakeIo(envFor(dir)));
   });
 
   it("drops a side message node the transcript does not have", async () => {
@@ -210,7 +208,6 @@ describe("session write", () => {
     await write({
       sessionId: "s1",
       title: "setup",
-      epoch: "e2e",
       nodes: [{ id: "n1", kind: "phase", title: "start" }],
     });
     await write({
@@ -218,7 +215,7 @@ describe("session write", () => {
       nodes: [{ id: "n2", parent: "n1", kind: "decision", title: "use elk", why: "nesting" }],
     });
     const s = await loadSession(root, "s1");
-    expect(s).toMatchObject({ ok: true, data: { title: "setup", epoch: "e2e" } });
+    expect(s).toMatchObject({ ok: true, data: { title: "setup" } });
     expect(s.found && s.ok && s.data.nodes.map((n) => n.id)).toEqual(["n1", "n2"]);
     expect(io.lines).toEqual(["Saved session s1 (1 nodes)", "Saved session s1 (2 nodes)"]);
     expect(io.warnings).toEqual([]);
@@ -234,15 +231,13 @@ describe("session write", () => {
     expect(io.warnings).toEqual(["redacted 1 secret-looking value(s)"]);
   });
 
-  it("warns about unknown epochs and repaired trees but still saves", async () => {
+  it("warns about repaired trees but still saves", async () => {
     await write({
       sessionId: "s1",
-      epoch: "nope",
       nodes: [{ id: "a", parent: "ghost", kind: "step", title: "x" }],
     });
-    expect(io.warnings[0]).toMatch(/epoch "nope" is not in project.json/);
-    expect(io.warnings[1]).toMatch(/parent ghost not found/);
-    expect(await loadSession(root, "s1")).toMatchObject({ ok: true, data: { epoch: "nope" } });
+    expect(io.warnings[0]).toMatch(/parent ghost not found/);
+    expect(await loadSession(root, "s1")).toMatchObject({ ok: true });
   });
 
   it("repairs a message parent to the previous message and drops bad links", async () => {
@@ -311,7 +306,6 @@ describe("session write", () => {
         sessionId: "late",
         agent: "claude-code",
         title: "",
-        epoch: null,
         startedAt: "2026-10-22T00:00:00.000Z",
         updatedAt: "2026-10-22T00:00:00.000Z",
         status: { goal: "", done: [], pending: [], next: "" },
@@ -378,9 +372,8 @@ describe("session show", () => {
     expect(shown()).toMatchObject({ initialized: false, error: expect.stringMatching(/JSON/) });
   });
 
-  it("shows epochs, language and a compact record without summaries", async () => {
+  it("shows the language and a compact record without summaries", async () => {
     await init(root, { name: "p", retention: "keep", language: "tr" }, fakeIo(envFor(dir)));
-    await epochAdd(root, "e2e", "E2E", fakeIo(envFor(dir)));
     await sessionShow(root, "s1", io);
     expect(shown()).toEqual({
       initialized: true,
@@ -388,7 +381,6 @@ describe("session show", () => {
       project: "p",
       language: "tr",
       messageSummaries: false,
-      epochs: [{ id: "e2e", title: "E2E" }],
       session: null,
       newMessages: null,
       lastMessages: [],
@@ -399,7 +391,6 @@ describe("session show", () => {
       JSON.stringify({
         sessionId: "s1",
         title: "t",
-        epoch: "e2e",
         status: { goal: "g" },
         nodes: [{ id: "a", kind: "phase", title: "A", summary: "long text", why: "because" }],
       }),
@@ -408,7 +399,6 @@ describe("session show", () => {
     expect(shown().session).toEqual({
       sessionId: "s1",
       title: "t",
-      epoch: "e2e",
       status: { goal: "g", done: [], pending: [], next: "" },
       nodes: [{ id: "a", parent: null, kind: "phase", title: "A" }],
     });

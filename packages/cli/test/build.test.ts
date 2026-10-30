@@ -7,7 +7,6 @@ import { gzipSync } from "node:zlib";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildProject } from "../src/commands/build.js";
 import { configSet } from "../src/commands/config.js";
-import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
 import { cogitGitignore } from "../src/git.js";
@@ -48,7 +47,6 @@ function session(over: Partial<Session> & { sessionId: string }): Session {
     schema: 1,
     agent: "claude-code",
     title: "",
-    epoch: null,
     startedAt: T0,
     updatedAt: T0,
     status: { goal: "", done: [], pending: [], next: "" },
@@ -146,17 +144,15 @@ describe("buildMessages", () => {
 });
 
 describe("buildViewModel", () => {
-  it("orders epochs by project order, sessions by startedAt and groups unknown epochs", () => {
+  it("lists every session by startedAt", () => {
     const sessions = [
       session({
         sessionId: "late",
-        epoch: "e1",
         startedAt: "2026-01-02T00:00:00.000Z",
         updatedAt: "2026-01-02T00:00:00.000Z",
       }),
       session({
         sessionId: "early",
-        epoch: "e1",
         startedAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-05T00:00:00.000Z",
         status: {
@@ -168,13 +164,11 @@ describe("buildViewModel", () => {
       }),
       session({
         sessionId: "ghost",
-        epoch: "nope",
         startedAt: "2026-01-04T00:00:00.000Z",
         updatedAt: "2026-01-04T00:00:00.000Z",
       }),
       session({
         sessionId: "none",
-        epoch: null,
         startedAt: "2026-01-03T00:00:00.000Z",
         updatedAt: "2026-01-03T00:00:00.000Z",
       }),
@@ -183,20 +177,13 @@ describe("buildViewModel", () => {
       project: {
         schema: 1,
         name: "p",
-        epochs: [
-          { id: "e2", title: "Second", createdAt: T0 },
-          { id: "e1", title: "First", createdAt: T0 },
-        ],
       },
       sessions,
       path: "/tmp/p",
       generatedAt: T0,
     });
 
-    expect(model.epochs.map((e) => e.id)).toEqual(["e2", "e1"]);
-    expect(model.epochs[1]?.sessions.map((s) => s.sessionId)).toEqual(["early", "late"]);
-    expect(model.epochs[0]?.sessions).toEqual([]);
-    expect(model.unassigned.map((s) => s.sessionId)).toEqual(["none", "ghost"]);
+    expect(model.sessions.map((s) => s.sessionId)).toEqual(["early", "late", "none", "ghost"]);
     expect(model.status).toEqual({
       goal: "ship",
       done: ["a"],
@@ -209,7 +196,7 @@ describe("buildViewModel", () => {
 
   it("appends unrecorded messages to the end of the chain", () => {
     const model = buildViewModel({
-      project: { schema: 1, name: "p", epochs: [] },
+      project: { schema: 1, name: "p" },
       sessions: [
         session({
           sessionId: "s",
@@ -232,7 +219,7 @@ describe("buildViewModel", () => {
         ],
       ]),
     });
-    const messages = model.unassigned[0]?.messages ?? [];
+    const messages = model.sessions[0]?.messages ?? [];
     expect(messages.map((message) => message.title)).toEqual([
       "Recorded message",
       "Second message",
@@ -252,7 +239,7 @@ describe("buildViewModel", () => {
 
   it("turns a cross-session parent into a continues mark and a root", () => {
     const model = buildViewModel({
-      project: { schema: 1, name: "p", epochs: [] },
+      project: { schema: 1, name: "p" },
       sessions: [
         session({
           sessionId: "first",
@@ -270,24 +257,24 @@ describe("buildViewModel", () => {
       path: "/tmp/p",
       generatedAt: T0,
     });
-    const second = model.unassigned.find((s) => s.sessionId === "second");
+    const second = model.sessions.find((s) => s.sessionId === "second");
     expect(second?.messages[0]).toMatchObject({
       parent: null,
       continues: { sessionId: "first", sessionTitle: "Earlier chat", id: "h1", label: "m1" },
     });
     // The other session is untouched: its own message stays a root.
-    expect(model.unassigned[0]?.messages[0]?.continues).toBeUndefined();
+    expect(model.sessions[0]?.messages[0]?.continues).toBeUndefined();
   });
 
   it("has an empty status card without sessions", () => {
     const model = buildViewModel({
-      project: { schema: 1, name: "p", epochs: [] },
+      project: { schema: 1, name: "p" },
       sessions: [],
       path: "/tmp/p",
       generatedAt: T0,
     });
     expect(model.status).toEqual({ goal: "", done: [], pending: [], next: "", lastActivity: null });
-    expect(model.unassigned).toEqual([]);
+    expect(model.sessions).toEqual([]);
   });
 });
 
@@ -410,7 +397,7 @@ describe("statusCard", () => {
 
 describe("embedViewModel", () => {
   const model = buildViewModel({
-    project: { schema: 1, name: "p", epochs: [] },
+    project: { schema: 1, name: "p" },
     sessions: [],
     path: "/tmp/p",
     generatedAt: T0,
@@ -459,7 +446,6 @@ describe("cogit build", () => {
     await mkdir(root);
     io = fakeIo(envFor(dir));
     await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
-    await epochAdd(root, "e1", "First", fakeIo(envFor(dir)));
   });
 
   it("writes the map, keeping good sessions and warning about bad ones", async () => {
@@ -468,7 +454,6 @@ describe("cogit build", () => {
       session({
         sessionId: "s1",
         title: "one",
-        epoch: "e1",
         startedAt: "2026-01-02T00:00:00.000Z",
         nodes: [
           node("m1", "message", "A", null, {
@@ -483,7 +468,6 @@ describe("cogit build", () => {
       session({
         sessionId: "s2",
         title: "two",
-        epoch: "e1",
         startedAt: "2026-01-01T00:00:00.000Z",
       }),
     );
@@ -491,7 +475,6 @@ describe("cogit build", () => {
       "s3",
       session({
         sessionId: "s3",
-        epoch: "missing",
         startedAt: "2026-01-05T00:00:00.000Z",
         updatedAt: "2026-12-01T00:00:00.000Z",
         status: {
@@ -502,14 +485,11 @@ describe("cogit build", () => {
         },
       }),
     );
-    await saveSession(
-      "s4",
-      session({ sessionId: "s4", epoch: null, startedAt: "2026-01-03T00:00:00.000Z" }),
-    );
+    await saveSession("s4", session({ sessionId: "s4", startedAt: "2026-01-03T00:00:00.000Z" }));
     await writeFile(paths().session("bad"), "{nope");
     await writeFile(paths().session("partial"), '{"schema":1,"sessionId":"p"}');
     await saveSession("newer", {
-      ...session({ sessionId: "newer", epoch: "e1" }),
+      ...session({ sessionId: "newer" }),
       schema: 2,
     });
     await writeFile(join(paths().sessions, "notes.txt"), "ignored");
@@ -530,9 +510,8 @@ describe("cogit build", () => {
     // The panel reads the same project again; its warnings must not repeat.
     expect(io.warnings.filter((line) => line.startsWith("skipping session bad:"))).toHaveLength(1);
 
-    expect(model.epochs[0]?.sessions.map((s) => s.sessionId)).toEqual(["s2", "s1", "newer"]);
-    expect(model.unassigned.map((s) => s.sessionId)).toEqual(["s4", "s3"]);
-    expect(model.epochs[0]?.sessions[1]?.messages[0]?.summary).toBe("token [REDACTED]");
+    expect(model.sessions.map((s) => s.sessionId)).toEqual(["s2", "s1", "s4", "s3", "newer"]);
+    expect(model.sessions[1]?.messages[0]?.summary).toBe("token [REDACTED]");
     expect(model.status.goal).toBe("latest");
 
     const html = await readFile(paths().html, "utf8");
@@ -554,7 +533,6 @@ describe("cogit build", () => {
       session({
         sessionId: "s1",
         title: "one",
-        epoch: "e1",
         startedAt: "2026-01-02T00:00:00.000Z",
         nodes: [
           node("h1", "message", "Write a", null, {
@@ -624,17 +602,11 @@ describe("cogit build", () => {
     const transcript = lines.map((line) => JSON.stringify(line)).join("\n");
     await writeFile(join(folder, "s1.jsonl"), transcript);
     await writeFile(join(folder, "s2.jsonl"), transcript);
-    await saveSession(
-      "s1",
-      session({ sessionId: "s1", epoch: "e1", nodes: [node("m1", "message", "Fix it")] }),
-    );
-    await saveSession(
-      "s2",
-      session({ sessionId: "s2", epoch: "e1", nodes: [node("a", "step", "Old record")] }),
-    );
+    await saveSession("s1", session({ sessionId: "s1", nodes: [node("m1", "message", "Fix it")] }));
+    await saveSession("s2", session({ sessionId: "s2", nodes: [node("a", "step", "Old record")] }));
 
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    const [s1, s2] = model.epochs[0]?.sessions ?? [];
+    const [s1, s2] = model.sessions ?? [];
     const raw = "Fix the card <system-reminder>x</system-reminder>";
     const turn = {
       id: messageHash("s1", { at: T0, text: raw }),
@@ -669,8 +641,8 @@ describe("cogit build", () => {
     await writeFile(paths().readState, "[]");
 
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(model.unassigned.map((s) => s.sessionId)).toEqual(["s3"]);
-    expect(model.unassigned[0]?.messages).toEqual([
+    expect(model.sessions.map((s) => s.sessionId)).toEqual(["s3"]);
+    expect(model.sessions[0]?.messages).toEqual([
       expect.objectContaining({ title: "Start the work", unsummarized: true }),
     ]);
     await expect(readFile(paths().session("s3"), "utf8")).rejects.toThrow();
@@ -689,13 +661,12 @@ describe("cogit build", () => {
       "s1",
       session({
         sessionId: "s1",
-        epoch: "e1",
         nodes: [node("m1", "message", "Ship it", null, { commits: [short] })],
       }),
     );
 
     const first = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(first.epochs[0]?.sessions[0]?.messages[0]?.commitTags).toEqual([
+    expect(first.sessions[0]?.messages[0]?.commitTags).toEqual([
       { hash: short, subject: "feat: first commit", files: ["a.txt"] },
     ]);
 
@@ -705,12 +676,11 @@ describe("cogit build", () => {
       "s1",
       session({
         sessionId: "s1",
-        epoch: "e1",
         nodes: [node("m1", "message", "Ship it", null, { commits: [short, "0000000"] })],
       }),
     );
     const second = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(second.epochs[0]?.sessions[0]?.messages[0]?.commitTags).toEqual([
+    expect(second.sessions[0]?.messages[0]?.commitTags).toEqual([
       { hash: short, subject: "feat: first commit", files: ["a.txt"] },
       { hash: "0000000" },
     ]);
@@ -740,10 +710,7 @@ describe("cogit build", () => {
     ];
     const transcript = join(folder, "s1.jsonl");
     await writeFile(transcript, lines.map((line) => JSON.stringify(line)).join("\n"));
-    await saveSession(
-      "s1",
-      session({ sessionId: "s1", epoch: "e1", nodes: [node("m1", "message", "First")] }),
-    );
+    await saveSession("s1", session({ sessionId: "s1", nodes: [node("m1", "message", "First")] }));
 
     const hash = (uuid: string, at: string, text: string) => messageHash("s1", { uuid, at, text });
     const hashes = [
@@ -752,7 +719,7 @@ describe("cogit build", () => {
       hash("u3", T0, "Third"),
     ];
     const first = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(first.epochs[0]?.sessions[0]?.chat?.map((t) => t.id)).toEqual(hashes.slice(0, 2));
+    expect(first.sessions[0]?.chat?.map((t) => t.id)).toEqual(hashes.slice(0, 2));
     expect((await readConversationStore(root, "s1")).map((t) => [t.uuid, t.text])).toEqual([
       ["u1", "First"],
       ["u2", "Second"],
@@ -761,11 +728,7 @@ describe("cogit build", () => {
     // A later turn is appended to the store, not to a rewritten file.
     await appendFile(transcript, `\n${JSON.stringify(userLine("u3", "Third", T0))}`);
     const second = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(second.epochs[0]?.sessions[0]?.chat?.map((t) => t.text)).toEqual([
-      "First",
-      "Second",
-      "Third",
-    ]);
+    expect(second.sessions[0]?.chat?.map((t) => t.text)).toEqual(["First", "Second", "Third"]);
     expect((await readConversationStore(root, "s1")).map((t) => t.uuid)).toEqual([
       "u1",
       "u2",
@@ -775,7 +738,7 @@ describe("cogit build", () => {
     // Claude Code deletes the transcript; the store still feeds the drill-down.
     await rm(transcript);
     const third = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(third.epochs[0]?.sessions[0]).toMatchObject({
+    expect(third.sessions[0]).toMatchObject({
       transcriptAvailable: false,
       chat: [
         { id: hashes[0], text: "First", replies: ["Answer one"] },
@@ -787,11 +750,7 @@ describe("cogit build", () => {
     // An unreadable transcript falls back to the store instead of a lost chat.
     await mkdir(transcript);
     const fourth = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(fourth.epochs[0]?.sessions[0]?.chat?.map((t) => t.text)).toEqual([
-      "First",
-      "Second",
-      "Third",
-    ]);
+    expect(fourth.sessions[0]?.chat?.map((t) => t.text)).toEqual(["First", "Second", "Third"]);
     expect(io.warnings).toEqual(
       expect.arrayContaining([expect.stringMatching(/^could not read the conversation of s1: /)]),
     );
@@ -823,21 +782,18 @@ describe("cogit build", () => {
       paths().conversation("s1"),
       gzipSync(Buffer.from(`${JSON.stringify(stored)}\n`)),
     );
-    await saveSession(
-      "s1",
-      session({ sessionId: "s1", epoch: "e1", nodes: [node("m1", "message", "First")] }),
-    );
+    await saveSession("s1", session({ sessionId: "s1", nodes: [node("m1", "message", "First")] }));
     const id = messageHash("s1", { uuid: "u1", at: T0, text: "First" });
 
     const first = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(first.epochs[0]?.sessions[0]?.messages[0]?.id).toBe(id);
+    expect(first.sessions[0]?.messages[0]?.id).toBe(id);
     expect((await readConversationStore(root, "s1"))[0]?.hash).toBe(id);
 
     // The transcript goes; the stored hash keeps the same id and the record matches.
     await rm(transcript);
     const second = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(second.epochs[0]?.sessions[0]?.messages.map((m) => m.id)).toEqual([id]);
-    expect(second.epochs[0]?.sessions[0]?.messages[0]?.unsummarized).toBeUndefined();
+    expect(second.sessions[0]?.messages.map((m) => m.id)).toEqual([id]);
+    expect(second.sessions[0]?.messages[0]?.unsummarized).toBeUndefined();
   });
 
   it("writes the project ignore rules once, also in an existing project", async () => {
@@ -863,15 +819,12 @@ describe("cogit build", () => {
         message: { content: "Hi" },
       }),
     );
-    await saveSession(
-      "s1",
-      session({ sessionId: "s1", epoch: "e1", nodes: [node("m1", "message", "Hi")] }),
-    );
+    await saveSession("s1", session({ sessionId: "s1", nodes: [node("m1", "message", "Hi")] }));
     // A file where the store's directory belongs makes the append fail.
     await writeFile(paths().conversations, "not a directory");
 
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(model.epochs[0]?.sessions[0]?.chat?.[0]?.text).toBe("Hi");
+    expect(model.sessions[0]?.chat?.[0]?.text).toBe("Hi");
     expect(io.warnings).toEqual(
       expect.arrayContaining([expect.stringMatching(/^could not store the conversation of s1: /)]),
     );
@@ -883,7 +836,7 @@ describe("cogit build", () => {
     await rm(ignore, { force: true });
     await mkdir(ignore);
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(model.epochs[0]?.id).toBe("e1");
+    expect(model.sessions).toEqual([]);
     expect(io.warnings).toEqual(
       expect.arrayContaining([expect.stringMatching(/^could not update \.cogit\/\.gitignore: /)]),
     );
@@ -907,7 +860,6 @@ describe("cogit build", () => {
       "s1",
       session({
         sessionId: "s1",
-        epoch: "e1",
         nodes: [
           node("topic", "phase", "Topic"),
           node("m1", "message", "First", "topic", { at: T0 }),
@@ -916,7 +868,7 @@ describe("cogit build", () => {
     );
 
     const before = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    const messages = before.epochs[0]?.sessions[0]?.messages ?? [];
+    const messages = before.sessions[0]?.messages ?? [];
     expect(messages.map((message) => message.title)).toEqual([
       "First",
       "Second message, with the card",
@@ -946,7 +898,7 @@ describe("cogit build", () => {
       expect.stringMatching(/m2: parent topic is not an earlier message of this session, using m1/),
     ]);
     const after = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(after.epochs[0]?.sessions[0]?.messages.map((message) => message.title)).toEqual([
+    expect(after.sessions[0]?.messages.map((message) => message.title)).toEqual([
       "First",
       "Second message",
     ]);
@@ -964,24 +916,20 @@ describe("cogit build", () => {
       "s1",
       session({
         sessionId: "s1",
-        epoch: "e1",
         nodes: [node("m1", "message", "One", null, { at: T0 })],
       }),
     );
     // A session with no transcript must not break the count.
-    await saveSession("s2", session({ sessionId: "s2", epoch: "e1" }));
+    await saveSession("s2", session({ sessionId: "s2" }));
 
     const on = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    const recorded = (model: typeof on) =>
-      model.epochs[0]?.sessions.find((s) => s.sessionId === "s1");
+    const recorded = (model: typeof on) => model.sessions.find((s) => s.sessionId === "s1");
     expect(recorded(on)).not.toHaveProperty("unrecordedMessages");
 
     await configSet("sessionEndCatchUp", "false", fakeIo(envFor(dir)));
     const off = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
     expect(recorded(off)?.unrecordedMessages).toBe(1);
-    expect(off.epochs[0]?.sessions.find((s) => s.sessionId === "s2")).not.toHaveProperty(
-      "unrecordedMessages",
-    );
+    expect(off.sessions.find((s) => s.sessionId === "s2")).not.toHaveProperty("unrecordedMessages");
   });
 
   it("builds without printing when quiet and survives a missing sessions directory", async () => {
@@ -989,8 +937,7 @@ describe("cogit build", () => {
     await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
     expect(io.lines).toEqual([]);
     expect(embedded(await readFile(paths().html, "utf8"))).toMatchObject({
-      epochs: [{ id: "e1", sessions: [] }],
-      unassigned: [],
+      sessions: [],
     });
   });
 
@@ -1013,20 +960,20 @@ describe("cogit build", () => {
       /schema version/,
     );
 
-    await writeFile(paths().project, JSON.stringify({ schema: 2, name: "future", epochs: [] }));
+    await writeFile(paths().project, JSON.stringify({ schema: 2, name: "future" }));
     await buildProject({ dir: root, io, templateHtml: TEMPLATE });
     expect(io.warnings).toContain("schema v2 is newer than supported v1; reading best-effort");
   });
 
   it("rebuilds quietly after a session write with the bundled template", async () => {
     await sessionWrite({ dir: root }, io, async () =>
-      JSON.stringify({ sessionId: "s1", title: "written", epoch: "e1" }),
+      JSON.stringify({ sessionId: "s1", title: "written" }),
     );
     expect(io.lines).toEqual(["Saved session s1 (0 nodes)"]);
     const html = await readFile(paths().html, "utf8");
     expect(html).toContain('<div id="root">');
     expect(embedded(html)).toMatchObject({
-      epochs: [{ id: "e1", sessions: [{ sessionId: "s1", title: "written" }] }],
+      sessions: [{ sessionId: "s1", title: "written" }],
     });
   });
 

@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildProject } from "../src/commands/build.js";
 import { configSet } from "../src/commands/config.js";
-import { epochAdd } from "../src/commands/epoch.js";
 import { init } from "../src/commands/init.js";
 import { sessionShow, sessionWrite } from "../src/commands/session.js";
 import { runHook } from "../src/hooks/run.js";
@@ -109,7 +108,7 @@ describe("commands in a worktree", () => {
 
     const templateHtml = `<script id="${DATA_ELEMENT_ID}" type="application/json"></script>`;
     const model = await buildProject({ dir: wt, io: fakeIo(env), templateHtml });
-    expect(model.unassigned[0]?.worktree).toEqual({ path: wt, branch: "feature" });
+    expect(model.sessions[0]?.worktree).toEqual({ path: wt, branch: "feature" });
   });
 
   it("shows the main record, the worktree as dir and the inbox under it", async () => {
@@ -136,12 +135,6 @@ describe("commands in a worktree", () => {
       dir: other.wt,
       store: other.main,
     });
-  });
-
-  it("adds epochs to the main project", async () => {
-    await epochAdd(wt, "e1", "Epoch", fakeIo(env));
-    const project = await loadProject(main);
-    expect(project.found && project.ok && project.data.epochs.map((e) => e.id)).toEqual(["e1"]);
   });
 
   it("counts hook turns for a worktree session in the main checkout", async () => {

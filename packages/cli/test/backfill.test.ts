@@ -114,7 +114,6 @@ describe("catchUpPrompt", () => {
         sessionId: "s1",
         agent: "claude-code",
         title: "",
-        epoch: null,
         startedAt: T0,
         updatedAt: T0,
         status: { goal: "", done: [], pending: [], next: "" },
@@ -167,10 +166,9 @@ describe("headless output", () => {
     expect(
       withoutNulls({
         status: null,
-        epoch: null,
         nodes: [{ id: "m1", parent: null, why: null, decidedBy: null, title: "t" }, 3],
       }),
-    ).toEqual({ epoch: null, nodes: [{ id: "m1", parent: null, title: "t" }, 3] });
+    ).toEqual({ nodes: [{ id: "m1", parent: null, title: "t" }, 3] });
     expect(withoutNulls({ nodes: "x" })).toEqual({ nodes: "x" });
   });
 

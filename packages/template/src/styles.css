@@ -311,6 +311,7 @@ main.map-page {
 
 .page-title .muted {
   margin: 2px 0 0;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

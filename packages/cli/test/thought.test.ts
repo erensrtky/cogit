@@ -51,7 +51,7 @@ const TEMPLATE = `<!doctype html><html><body><div id="root"></div>
 const DATA_PREFIX = `<script id="${DATA_ELEMENT_ID}" type="application/json">`;
 
 function embedded(html: string): {
-  unassigned: { messages: { commits?: string[] }[] }[];
+  sessions: { messages: { commits?: string[] }[] }[];
 } {
   const start = html.indexOf(DATA_PREFIX);
   const end = html.indexOf("</script>", start);
@@ -64,7 +64,6 @@ function session(nodes: Session["nodes"], id = "s1"): Session {
     sessionId: id,
     agent: "claude-code",
     title: "Ship it",
-    epoch: null,
     startedAt: T0,
     updatedAt: T0,
     status: { goal: "", done: [], pending: [], next: "" },
@@ -89,7 +88,7 @@ describe("the thought behind a commit (Story 9.4)", () => {
   const writeProject = async (nodes: Session["nodes"]): Promise<void> => {
     const paths = projectPaths(root);
     await mkdir(paths.sessions, { recursive: true });
-    await writeFile(paths.project, projectJson({ schema: 1, name: "proj", epochs: [] }));
+    await writeFile(paths.project, projectJson({ schema: 1, name: "proj" }));
     await writeFile(paths.session("s1"), JSON.stringify(session(nodes)));
   };
 
@@ -537,7 +536,7 @@ describe("the thought behind a commit (Story 9.4)", () => {
 
     await buildProject({ dir: root, io, templateHtml: TEMPLATE });
     const html = await readFile(projectPaths(root).html, "utf8");
-    expect(embedded(html).unassigned[0]?.messages[0]?.commits).toContain(full);
+    expect(embedded(html).sessions[0]?.messages[0]?.commits).toContain(full);
 
     const effective = await loadEffectiveSessions(root, io);
     const commits = effective[0]?.messages[0]?.commits ?? [];

@@ -53,7 +53,7 @@ describe("init", () => {
     await mkdir(join(root, ".codelineage"), { recursive: true });
     await writeFile(
       join(root, ".codelineage", "project.json"),
-      `${JSON.stringify({ schema: 1, name: "old", epochs: [] })}\n`,
+      `${JSON.stringify({ schema: 1, name: "old" })}\n`,
     );
     const io = fakeIo(env);
 
@@ -67,7 +67,7 @@ describe("init", () => {
   it("creates the project with defaults and registers it", async () => {
     const io = fakeIo(env);
     await init(root, {}, io);
-    expect(await loadProject(root)).toMatchObject({ ok: true, data: { name: "proj", epochs: [] } });
+    expect(await loadProject(root)).toMatchObject({ ok: true, data: { name: "proj" } });
     expect(await readdir(join(root, ".cogit"))).toContain("sessions");
     expect(await loadRegistry(env)).toMatchObject({
       ok: true,

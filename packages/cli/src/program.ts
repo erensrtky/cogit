@@ -12,7 +12,6 @@ import {
   configPrune,
   configSet,
 } from "./commands/config.js";
-import { epochAdd } from "./commands/epoch.js";
 import { hooksInstall, hooksUninstall } from "./commands/hooks.js";
 import { type InitOptions, init } from "./commands/init.js";
 import { formatShow, log, logFile, logUnread, show } from "./commands/log.js";
@@ -403,22 +402,6 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
           );
         await backfillTail(opts.dir, sessionId, makeIo(false), { close: opts.close === true });
       }),
-    );
-
-  const epoch = program
-    .command("epoch")
-    .description("manage epochs (features, epics)")
-    .helpGroup("Set up:")
-    .addHelpText("after", examples('cogit epoch add e2e "End-to-end"'));
-  epoch
-    .command("add")
-    .argument("<id>", "short id, e.g. e2e")
-    .argument("<title>")
-    .option("-C, --dir <dir>", "project directory", ".")
-    .action(
-      run(async (id: string, title: string, opts: { dir: string }) =>
-        epochAdd(opts.dir, id, title, makeIo(false)),
-      ),
     );
 
   const session = program

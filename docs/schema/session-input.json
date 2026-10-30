@@ -15,17 +15,6 @@
       "type": "string",
       "maxLength": 200
     },
-    "epoch": {
-      "anyOf": [
-        {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "status": {
       "type": "object",
       "properties": {

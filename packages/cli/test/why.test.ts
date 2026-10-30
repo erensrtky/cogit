@@ -32,7 +32,6 @@ function session(over: Partial<Session> = {}): Session {
     sessionId: "s1",
     agent: "claude-code",
     title: "Ship the parser",
-    epoch: null,
     startedAt: "2026-10-20T09:00:00.000Z",
     updatedAt: "2026-10-20T10:00:00.000Z",
     status: { goal: "", done: [], pending: [], next: "" },

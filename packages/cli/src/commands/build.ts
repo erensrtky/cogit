@@ -120,7 +120,6 @@ async function unrecordedSessions(
       sessionId: id,
       agent: "claude-code",
       title: "",
-      epoch: null,
       startedAt,
       updatedAt: info.mtime.toISOString(),
       status: { goal: "", done: [], pending: [], next: "" },

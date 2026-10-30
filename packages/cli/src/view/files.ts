@@ -95,7 +95,7 @@ export function buildFileHistory(
   return files.sort((a, b) => timeOf(b.lastAt) - timeOf(a.lastAt) || a.path.localeCompare(b.path));
 }
 
-/** Every session of a built page, epoch order and then the unassigned ones. */
+/** Every session of a built page, in start order. */
 export function modelSessions(model: LineageViewModel): FileSourceSession[] {
-  return [...model.epochs.flatMap((epoch) => epoch.sessions), ...model.unassigned];
+  return model.sessions;
 }

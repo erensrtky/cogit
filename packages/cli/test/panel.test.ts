@@ -235,7 +235,6 @@ describe("panel card unread count (10.3)", () => {
       sessionId: "s1",
       agent: "claude-code",
       title: "t",
-      epoch: null,
       startedAt: T0,
       updatedAt: T0,
       status: { goal: "", done: [], pending: [], next: "" },
@@ -251,7 +250,7 @@ describe("panel card unread count (10.3)", () => {
       ],
     };
     await mkdir(paths.sessions, { recursive: true });
-    await writeFile(paths.project, JSON.stringify({ schema: 1, name: "proj", epochs: [] }));
+    await writeFile(paths.project, JSON.stringify({ schema: 1, name: "proj" }));
     await writeFile(paths.session("s1"), JSON.stringify(session));
     // A directory where read.json belongs: reading it is an error, not "empty".
     await mkdir(paths.readState, { recursive: true });

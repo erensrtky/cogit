@@ -31,7 +31,6 @@ function session(over: Partial<Session> & { sessionId: string }): Session {
     schema: 1,
     agent: "claude-code",
     title: "",
-    epoch: null,
     startedAt: T0,
     updatedAt: T0,
     status: { goal: "", done: [], pending: [], next: "" },
@@ -56,7 +55,6 @@ describe("cogit log and show", () => {
       sessionId: "s1",
       title: "Ship the parser",
       author: "Eren",
-      epoch: "e8",
       startedAt: "2026-10-20T09:00:00.000Z",
       updatedAt: "2026-10-20T10:00:00.000Z",
       nodes: [
@@ -208,7 +206,7 @@ describe("cogit log and show", () => {
   it("prints sessions newest first with labels, return marks and commits", async () => {
     const model = await log({ dir: root, io });
     const lines = formatLog(model);
-    expect(lines[0]).toContain("## Later chat (s2) · unassigned");
+    expect(lines[0]).toContain("## Later chat (s2) · ");
     const byAuthor = lines.find((line) => line.startsWith("## Ship the parser"));
     expect(byAuthor).toContain("· by Eren ·");
     expect(lines[0]).toContain(stamp("2026-10-21T10:00:00.000Z"));

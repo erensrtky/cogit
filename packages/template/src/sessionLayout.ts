@@ -7,7 +7,7 @@ import { headOf } from "./graph.js";
  * graph, laid out by the same engine as a session's messages. A session's
  * parent is the session its first message continues (8.6), so a new chat that
  * picks up earlier work grows out of that earlier session; everything else is a
- * root. Epochs are not boxes any more, just tags on the dots.
+ * root.
  */
 
 /** Wider than a message row: a session row carries a title, a count and a tag. */
@@ -45,9 +45,9 @@ export function sessionParentOf(session: ViewSession, known: ReadonlySet<string>
   return known.has(other) ? other : null;
 }
 
-/** Every session of the map in start order, across epochs and unassigned. */
+/** Every session of the map in start order. */
 export function allSessions(model: LineageViewModel): ViewSession[] {
-  const all = [...model.epochs.flatMap((epoch) => epoch.sessions), ...model.unassigned];
+  const all = model.sessions;
   return all.sort(
     (a, b) => time(a.startedAt) - time(b.startedAt) || a.sessionId.localeCompare(b.sessionId),
   );

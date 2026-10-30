@@ -114,11 +114,6 @@ export async function sessionWrite(
   // know is made up; its node is dropped instead of stored beside the real one.
   const input = nameMessages(redacted, messages, io, opts.by === "side");
   if (count > 0) io.warn(`redacted ${count} secret-looking value(s)`);
-  if (input.epoch && !project.data.epochs.some((e) => e.id === input.epoch)) {
-    io.warn(
-      `epoch "${input.epoch}" is not in project.json; the session shows as unassigned until you run \`cogit epoch add ${input.epoch} <title>\``,
-    );
-  }
 
   // Cross-session parents (8.6) are checked against the other records before the
   // merge; `startedAt` is the current session's own start.
@@ -294,8 +289,8 @@ function structureChanges(
 }
 
 /**
- * What the skill injects before the agent updates its record: the project's
- * epochs, the summary language, a compact view of this session (node ids,
+ * What the skill injects before the agent updates its record: the summary
+ * language, a compact view of this session (node ids,
  * parents, kinds and titles, without summaries, which merging keeps anyway) and
  * the user's messages from the transcript that have no node yet, so the agent
  * cannot skip or reorder one.
@@ -340,18 +335,16 @@ export async function sessionShow(
     project: project.data.name,
     language: config.language,
     messageSummaries: config.messageSummaries,
-    epochs: project.data.epochs.map(({ id, title }) => ({ id, title })),
     session: null,
   };
   const messages = await readSessionMessages(root, sessionId, io.env);
   const labels = hashesToLabels(messages);
   const effective = await effectiveRecord(root, sessionId, loaded, messages);
   if (effective) {
-    const { title, epoch, status, nodes } = effective;
+    const { title, status, nodes } = effective;
     view.session = {
       sessionId,
       title,
-      epoch,
       status,
       nodes: nodes.map(({ id, parent, kind, title }) => {
         const label = labels.get(id);

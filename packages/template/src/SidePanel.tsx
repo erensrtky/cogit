@@ -35,12 +35,7 @@ export type Selection =
   | { type: "session"; sessionId: string };
 
 function findSession(model: LineageViewModel, sessionId: string): ViewSession | undefined {
-  for (const epoch of model.epochs) {
-    for (const session of epoch.sessions) {
-      if (session.sessionId === sessionId) return session;
-    }
-  }
-  return model.unassigned.find((session) => session.sessionId === sessionId);
+  return model.sessions.find((session) => session.sessionId === sessionId);
 }
 
 function findMessage(session: ViewSession, id: string): ViewNode | undefined {

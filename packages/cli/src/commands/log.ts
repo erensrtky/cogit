@@ -150,7 +150,6 @@ export interface LogSession {
   title: string;
   /** Who recorded the session (Story 9.3); absent on older records. */
   author?: string;
-  epoch: string | null;
   startedAt: string;
   updatedAt: string;
   /** Newest first. */
@@ -212,7 +211,6 @@ function toLogSession(effective: EffectiveSession): LogSession {
     sessionId: session.sessionId,
     title: session.title,
     ...(session.author === undefined ? {} : { author: session.author }),
-    epoch: session.epoch,
     startedAt: session.startedAt,
     updatedAt: session.updatedAt,
     messages: logMessages,
@@ -288,7 +286,7 @@ function sessionHeading(session: LogSession): string {
   const title = session.title.trim() === "" ? session.sessionId : oneLine(session.title);
   const author = session.author === undefined ? "" : ` · by ${session.author}`;
   return (
-    `## ${title} (${session.sessionId})${author} · ${session.epoch ?? "unassigned"} · ` +
+    `## ${title} (${session.sessionId})${author} · ` +
     `${stamp(session.startedAt)} → ${stamp(session.updatedAt)}`
   );
 }
@@ -467,7 +465,6 @@ export interface ShowModel {
   summary?: string;
   sessionId: string;
   sessionTitle: string;
-  epoch: string | null;
   at?: string;
   parent: ShowRef | null;
   children: ShowRef[];
@@ -602,7 +599,6 @@ export async function show(opts: ShowOptions): Promise<ShowModel> {
     ...(message.summary === undefined ? {} : { summary: message.summary }),
     sessionId,
     sessionTitle: session.title,
-    epoch: session.epoch,
     ...(message.at === undefined ? {} : { at: message.at }),
     parent:
       message.parent === null || message.parent === undefined
@@ -638,7 +634,7 @@ export function formatShow(model: ShowModel): string[] {
   const title = oneLine(model.sessionTitle) || model.sessionId;
   const lines: string[] = [
     `${model.id}  ${model.label}  ${model.title}`,
-    `Session: ${title} (${model.sessionId}) · ${model.epoch ?? "unassigned"} · ${stamp(model.at)}`,
+    `Session: ${title} (${model.sessionId}) · ${stamp(model.at)}`,
   ];
   if (model.parent !== null) lines.push(`Parent: ${refText(model.parent, model.sessionId)}`);
   if (model.children.length > 0)

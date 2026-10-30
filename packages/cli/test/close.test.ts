@@ -80,7 +80,6 @@ function session(nodes: Partial<Session["nodes"][number]>[]): Session {
     sessionId: "s1",
     agent: "claude-code",
     title: "",
-    epoch: null,
     startedAt: T0,
     updatedAt: T0,
     status: { goal: "", done: [], pending: [], next: "" },

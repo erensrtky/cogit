@@ -192,7 +192,6 @@ export interface ViewSession {
   title: string;
   /** Who recorded the session (Story 9.3); absent on records written before it. */
   author?: string;
-  epoch: string | null;
   startedAt: string;
   updatedAt: string;
   status: ViewStatus;
@@ -216,13 +215,6 @@ export interface ViewSession {
    * transcript. It lives only in the generated page, never in the session file.
    */
   chat?: ViewChatTurn[];
-}
-
-export interface ViewEpoch {
-  id: string;
-  title: string;
-  createdAt: string;
-  sessions: ViewSession[];
 }
 
 /**
@@ -284,9 +276,8 @@ export interface LineageViewModel {
     generatedAt: string;
   };
   status: StatusCard;
-  epochs: ViewEpoch[];
-  /** Sessions with no epoch, or with an epoch that no longer exists. */
-  unassigned: ViewSession[];
+  /** Every session, in start order. */
+  sessions: ViewSession[];
   /**
    * Every registered project, most recently active first, for the map's
    * switcher (Story 8.12). Missing directories are left out; older pages simply

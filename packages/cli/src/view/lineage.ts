@@ -8,7 +8,6 @@ import {
   type StatusCard,
   VIEW_SCHEMA,
   type ViewChatTurn,
-  type ViewEpoch,
   type ViewNode,
   type ViewPendingMessage,
   type ViewSession,
@@ -258,7 +257,6 @@ function toViewSession(
     agent: session.agent,
     title: sessionTitle(session),
     ...(session.author === undefined ? {} : { author: session.author }),
-    epoch: session.epoch,
     startedAt: session.startedAt,
     updatedAt: session.updatedAt,
     status: session.status,
@@ -328,15 +326,8 @@ export function resolveContinues(sessions: ViewSession[]): void {
   }
 }
 
-/**
- * Builds the page model: epochs in project order, sessions by `startedAt`, and
- * every session whose epoch is null or unknown in the `unassigned` group.
- */
+/** Builds the page model: every session, by `startedAt`. */
 export function buildViewModel(input: ViewModelInput): LineageViewModel {
-  const buckets = new Map<string, ViewSession[]>(
-    input.project.epochs.map((epoch) => [epoch.id, []]),
-  );
-  const unassigned: ViewSession[] = [];
   const sessions = [...input.sessions].sort(byStartedAt);
   const views: ViewSession[] = [];
 
@@ -350,26 +341,16 @@ export function buildViewModel(input: ViewModelInput): LineageViewModel {
       input.commitSubjects,
       input.commitFiles,
     );
-    const bucket = session.epoch === null ? undefined : buckets.get(session.epoch);
-    (bucket ?? unassigned).push(view);
     views.push(view);
   }
   resolveContinues(views);
-
-  const epochs: ViewEpoch[] = input.project.epochs.map((epoch) => ({
-    id: epoch.id,
-    title: epoch.title,
-    createdAt: epoch.createdAt,
-    sessions: buckets.get(epoch.id) ?? [],
-  }));
 
   return {
     kind: "lineage",
     schema: VIEW_SCHEMA,
     project: { name: input.project.name, path: input.path, generatedAt: input.generatedAt },
     status: statusCard(sessions, input.generatedAt),
-    epochs,
-    unassigned,
+    sessions: views,
     ...(input.settings === undefined ? {} : { settings: input.settings }),
   };
 }

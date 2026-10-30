@@ -157,13 +157,11 @@ export function agentRecord(text: string): Record<string, unknown> {
 /**
  * A small model writes `null` for a note it has nothing for (`"why": null`).
  * The schema wants such a field left out, and one null would fail the whole
- * write, so they are dropped; a node's `parent: null` (a root) and `epoch: null` stay.
+ * write, so they are dropped; a node's `parent: null` (a root) stays.
  */
 export function withoutNulls(record: Record<string, unknown>): Record<string, unknown> {
-  // `epoch: null` means "no epoch"; any other null at the top is a missing field.
-  const top = Object.fromEntries(
-    Object.entries(record).filter(([key, value]) => value !== null || key === "epoch"),
-  );
+  // Any null at the top is a missing field.
+  const top = Object.fromEntries(Object.entries(record).filter(([, value]) => value !== null));
   if (!Array.isArray(top.nodes)) return top;
   return {
     ...top,

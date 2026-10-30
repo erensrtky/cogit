@@ -53,7 +53,6 @@ describe("createProgram", () => {
       "open",
       "config",
       "hooks",
-      "epoch",
       "session",
       "backfill",
       "hook",

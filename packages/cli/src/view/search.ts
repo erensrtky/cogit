@@ -280,11 +280,10 @@ export type HashRefResult =
 /** A pasted hash (or a unique prefix) as the map resolves it, like `show`. */
 export function resolveHashPrefix(model: LineageViewModel, ref: string): HashRefResult {
   const prefix = ref.trim().toLowerCase();
-  const found = [...model.epochs.flatMap((epoch) => epoch.sessions), ...model.unassigned].flatMap(
-    (session) =>
-      session.messages
-        .filter((message) => message.id.startsWith(prefix))
-        .map((message) => ({ session, message })),
+  const found = model.sessions.flatMap((session) =>
+    session.messages
+      .filter((message) => message.id.startsWith(prefix))
+      .map((message) => ({ session, message })),
   );
   if (found.length === 0) return { kind: "none" };
   if (found.length > 1) return { kind: "ambiguous", count: found.length };
@@ -300,7 +299,7 @@ export function resolveHashPrefix(model: LineageViewModel, ref: string): HashRef
 
 /** The map's search: every session of the page as a source, in page order. */
 export function searchLineage(model: LineageViewModel, query: string): SearchHit[] {
-  const sessions = [...model.epochs.flatMap((epoch) => epoch.sessions), ...model.unassigned];
+  const sessions = model.sessions;
   return searchSources(
     sessions.map((session) => ({
       sessionId: session.sessionId,

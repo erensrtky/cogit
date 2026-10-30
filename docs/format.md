@@ -14,7 +14,7 @@ fails when a file and the code disagree.
 
 ```
 <project>/.cogit/
-  project.json                    # name, epochs, schema version (shared, versioned)
+  project.json                    # name, schema version (shared, versioned)
   sessions/<session-id>.json      # one file per session, the notes (versioned)
   sessions/<session-id>.events.jsonl  # append-only structure facts (versioned)
   conversations/<session-id>.jsonl.gz # the conversation store (local by default)
@@ -75,18 +75,15 @@ of a document must do it in code (a migration), not by hand-editing old files.
 
 ```json
 {
-  "epochs": [
-    {"createdAt": "2026-10-26T12:00:00.000Z", "id": "e2e", "title": "End-to-end"}
-  ],
   "name": "cogit",
   "schema": 1
 }
 ```
 
-An **epoch** is a named stretch of work (a feature, an epic); a session points at
-one through the session file's `epoch` field. `project.json` is the only file two
-people write; cogit writes it with sorted keys and one epoch per line so git
-merges concurrent epoch additions line by line.
+`project.json` is the only file two people write; cogit writes it with sorted keys,
+one per line. Older files also list `epochs` (named stretches of work that sessions
+pointed at through an `epoch` field); cogit no longer groups sessions that way, so
+readers drop both fields and a rewrite leaves them out.
 
 ## sessions/<session-id>.json
 
@@ -99,7 +96,6 @@ slug (`[A-Za-z0-9][A-Za-z0-9_.-]{0,127}`), normally the agent's session id.
   "sessionId": "9c32…",
   "agent": "claude-code",
   "title": "e2e setup flow",
-  "epoch": "e2e",
   "startedAt": "2026-10-26T10:00:00.000Z",
   "updatedAt": "2026-10-26T10:30:00.000Z",
   "status": {

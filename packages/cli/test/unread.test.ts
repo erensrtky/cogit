@@ -37,7 +37,6 @@ function session(nodes: Session["nodes"]): Session {
     sessionId: "s1",
     agent: "claude-code",
     title: "Ship the parser",
-    epoch: null,
     startedAt: T0,
     updatedAt: T0,
     status: { goal: "Parse the file", done: [], pending: [], next: "" },
@@ -57,7 +56,7 @@ function message(id: string, title: string, commits?: string[]): Session["nodes"
 }
 
 interface Embedded {
-  unassigned: {
+  sessions: {
     messages: {
       id: string;
       change?: { added: number; removed: number; files: number };
@@ -85,7 +84,7 @@ describe("how much code landed per message (10.3)", () => {
   const writeProject = async (nodes: Session["nodes"]): Promise<void> => {
     const paths = projectPaths(root);
     await mkdir(paths.sessions, { recursive: true });
-    await writeFile(paths.project, projectJson({ schema: 1, name: "proj", epochs: [] }));
+    await writeFile(paths.project, projectJson({ schema: 1, name: "proj" }));
     await writeFile(paths.session("s1"), JSON.stringify(session(nodes)));
   };
 
@@ -137,7 +136,7 @@ describe("how much code landed per message (10.3)", () => {
     await createCommits();
     await buildProject({ dir: root, io, templateHtml: TEMPLATE });
     const html = await readFile(projectPaths(root).html, "utf8");
-    const messages = embedded(html).unassigned[0]?.messages ?? [];
+    const messages = embedded(html).sessions[0]?.messages ?? [];
     const a = messages.find((node) => node.id === A);
     const b = messages.find((node) => node.id === B);
     const c = messages.find((node) => node.id === C);

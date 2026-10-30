@@ -105,16 +105,8 @@ function SessionMessages({
   highlights: ReadonlySet<string> | undefined;
   activeHitId: string | null;
 }) {
-  const {
-    selection,
-    readIds,
-    bigChangeLines,
-    openNode,
-    openContinue,
-    unfold,
-    resizeRows,
-    storeRowWidth,
-  } = useContext(GraphActions);
+  const { selection, readIds, bigChangeLines, openNode, unfold, resizeRows, storeRowWidth } =
+    useContext(GraphActions);
   const own = selection?.sessionId === session.sessionId;
   if (git.rows.length === 0)
     return <p className="graph-status empty">No messages recorded in this session yet.</p>;
@@ -130,7 +122,6 @@ function SessionMessages({
         bigChangeLines={bigChangeLines}
         onSelect={(row) => openNode(session.sessionId, row.message.id, row.segmentId)}
         onUnfold={unfold}
-        onContinue={(continues) => openContinue(continues.sessionId, continues.id)}
       />
       <RowEdge
         git={git}
@@ -232,11 +223,7 @@ function sameSet(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
 }
 
 function findSession(model: LineageViewModel, id: string): ViewSession | undefined {
-  for (const epoch of model.epochs) {
-    const session = epoch.sessions.find((candidate) => candidate.sessionId === id);
-    if (session) return session;
-  }
-  return model.unassigned.find((session) => session.sessionId === id);
+  return model.sessions.find((session) => session.sessionId === id);
 }
 
 function Flow({ model, search }: { model: LineageViewModel; search: MapSearchState }) {
@@ -361,14 +348,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     },
     [model.project.path],
   );
-  const unread = useMemo(
-    () =>
-      unreadViewMessages(
-        [...model.epochs.flatMap((epoch) => epoch.sessions), ...model.unassigned],
-        readIds,
-      ),
-    [model, readIds],
-  );
+  const unread = useMemo(() => unreadViewMessages(model.sessions, readIds), [model, readIds]);
   const unreadBig = useMemo(
     () =>
       unread.filter((message) => message.change.added + message.change.removed >= bigChangeLines),

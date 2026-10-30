@@ -244,7 +244,7 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
   await askProjectSettings(io, root, opts);
   await askLanguage(io, opts);
 
-  await updateProject(root, (cur) => cur ?? { schema: 1, name, epochs: [] });
+  await updateProject(root, (cur) => cur ?? { schema: 1, name });
   await mkdir(projectPaths(root).sessions, { recursive: true });
   await applyGitPolicy(io, root, policy, config.shareConversations);
   await register(io, root, name);

@@ -1,56 +1,34 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { kindLabel } from "./format.js";
-import { epochId, nodeId, sessionId, UNASSIGNED_EPOCH_ID } from "./graph.js";
+import { nodeId, sessionId } from "./graph.js";
 import type { Selection } from "./SidePanel.js";
 
 /**
- * Experimental outline tree (epoch → session → messages) that sits next to the
- * map. Selecting a row opens its session's message graph (or goes back to the
- * session graph for an epoch) and opens the same drill-down a map click would.
+ * Outline tree (session → messages) that sits next to the map, sessions in the
+ * map's start order. Selecting a row opens its session's message graph and the
+ * same drill-down a map click would.
  */
 
 export interface OutlineTarget {
   /** The session to open; null returns the map to the session level. */
   sessionId: string | null;
-  /** Highlight key: `epoch:…`, `session:…` or `node:…`. */
+  /** Highlight key: `session:…` or `node:…`. */
   focusId: string;
-  /** Drill-down content; `null` for epochs. */
+  /** Drill-down content. */
   selection: Selection | null;
 }
 
-interface Group {
-  id: string;
-  title: string;
-  sessions: ViewSession[];
-}
-
-function groups(model: LineageViewModel): Group[] {
-  const result: Group[] = model.epochs.map((epoch) => ({
-    id: epochId(epoch.id),
-    title: epoch.title,
-    sessions: epoch.sessions,
-  }));
-  if (model.unassigned.length > 0) {
-    result.push({ id: UNASSIGNED_EPOCH_ID, title: "Unassigned", sessions: model.unassigned });
-  }
-  return result;
-}
-
 /**
- * Ancestor chain of an outline item, including the item itself: the epoch for a
- * session, the epoch and session for a message. `null` when the id does not
- * belong to this model.
+ * Chain of an outline item, the item itself last: a session alone, or the
+ * session and then the message. `null` when the id does not belong to this model.
  */
 export function outlinePath(model: LineageViewModel, targetId: string): string[] | null {
-  for (const group of groups(model)) {
-    if (group.id === targetId) return [group.id];
-    for (const session of group.sessions) {
-      const key = sessionId(session.sessionId);
-      if (key === targetId) return [group.id];
-      if (session.messages.some((message) => nodeId(key, message.id) === targetId)) {
-        return [group.id, key];
-      }
+  for (const session of model.sessions) {
+    const key = sessionId(session.sessionId);
+    if (key === targetId) return [key];
+    if (session.messages.some((message) => nodeId(key, message.id) === targetId)) {
+      return [key, targetId];
     }
   }
   return null;
@@ -171,12 +149,8 @@ export function Outline({
   onSelect: (target: OutlineTarget) => void;
   onClose: () => void;
 }) {
-  const allGroups = useMemo(() => groups(model), [model]);
-  // Epochs start open so the tree lists every session; sessions close their
-  // messages until asked, mirroring the map's collapsed default.
-  const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(allGroups.map((group) => group.id)),
-  );
+  // Sessions close their messages until asked, mirroring the map's collapsed default.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
   // Map clicks drive the highlight too; reveal the row when it is nested.
   useEffect(() => {
@@ -217,53 +191,20 @@ export function Outline({
         </button>
       </header>
       <div className="outline-scroll">
-        {allGroups.length === 0 ? (
+        {model.sessions.length === 0 ? (
           <p className="empty">No sessions recorded yet.</p>
         ) : (
           <ul className="outline-list">
-            {allGroups.map((group) => {
-              const open = expanded.has(group.id) && group.sessions.length > 0;
-              return (
-                <li key={group.id}>
-                  <div className="outline-row">
-                    <ExpandToggle
-                      id={group.id}
-                      hasChildren={group.sessions.length > 0}
-                      expanded={expanded.has(group.id)}
-                      onToggle={toggle}
-                    />
-                    <button
-                      type="button"
-                      className={`outline-item${activeId === group.id ? " is-active" : ""}`}
-                      onClick={() =>
-                        onSelect({
-                          sessionId: null,
-                          focusId: group.id,
-                          selection: null,
-                        })
-                      }
-                    >
-                      <span className="label">{group.title}</span>
-                      <span className="outline-count">{group.sessions.length}</span>
-                    </button>
-                  </div>
-                  {open ? (
-                    <ul>
-                      {group.sessions.map((session) => (
-                        <SessionRow
-                          key={session.sessionId}
-                          session={session}
-                          activeId={activeId}
-                          expanded={expanded}
-                          onToggle={toggle}
-                          onSelect={onSelect}
-                        />
-                      ))}
-                    </ul>
-                  ) : null}
-                </li>
-              );
-            })}
+            {model.sessions.map((session) => (
+              <SessionRow
+                key={session.sessionId}
+                session={session}
+                activeId={activeId}
+                expanded={expanded}
+                onToggle={toggle}
+                onSelect={onSelect}
+              />
+            ))}
           </ul>
         )}
       </div>

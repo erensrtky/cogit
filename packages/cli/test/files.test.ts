@@ -112,38 +112,27 @@ describe("buildFileHistory", () => {
     expect(buildFileHistory([source("s1", "Empty", [])])).toEqual([]);
   });
 
-  it("flattens a page's epochs and unassigned sessions for the union", () => {
+  it("lists a page's sessions for the union", () => {
     const sessions = modelSessions({
       kind: "lineage",
       schema: 1,
       project: { name: "p", path: "/p", generatedAt: T0 },
       status: { goal: "", done: [], pending: [], next: "", lastActivity: null },
-      epochs: [
+      sessions: [
         {
-          id: "e1",
-          title: "One",
-          createdAt: T0,
-          sessions: [
-            {
-              sessionId: "s1",
-              agent: "claude-code",
-              title: "Epoch chat",
-              epoch: "e1",
-              startedAt: T0,
-              updatedAt: T0,
-              status: { goal: "", done: [], pending: [], next: "" },
-              messages: [],
-              transcriptAvailable: true,
-            },
-          ],
+          sessionId: "s1",
+          agent: "claude-code",
+          title: "Epoch chat",
+          startedAt: T0,
+          updatedAt: T0,
+          status: { goal: "", done: [], pending: [], next: "" },
+          messages: [],
+          transcriptAvailable: true,
         },
-      ],
-      unassigned: [
         {
           sessionId: "s2",
           agent: "claude-code",
           title: "Loose chat",
-          epoch: null,
           startedAt: T0,
           updatedAt: T0,
           status: { goal: "", done: [], pending: [], next: "" },
@@ -190,7 +179,6 @@ describe("cogit log --file", () => {
       schema: 1,
       agent: "claude-code",
       title: "",
-      epoch: null,
       startedAt: T0,
       updatedAt: T0,
       status: { goal: "", done: [], pending: [], next: "" },
