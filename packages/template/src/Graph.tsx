@@ -138,7 +138,8 @@ function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
       <SessionMap
         model={data.model}
         graph={data.graph}
-        selectedSessionId={selection?.sessionId ?? null}
+        // Only the session itself: a selected message is highlighted on its own row.
+        selectedSessionId={selection?.type === "session" ? selection.sessionId : null}
         openIds={openIds}
         highlightSessionIds={data.sessionHits}
         onOpen={openSession}

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - Clicking a message on the map selects only that message, as the outline does, instead of also tinting its whole branch; the side panel shows the message's branch either way.
+- A selected message no longer also highlights its session's row; the session row is highlighted only when the session itself is selected.
 
 ## [0.23.1] - 2026-10-30
 ### Fixed
