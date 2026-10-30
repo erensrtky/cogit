@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.24.0] - 2026-10-30
 ### Fixed
 - A forked session (`claude --resume <id> --fork-session`, the map's **Fork** button) is no longer recorded as a copy of the session it came from: the messages it copied are left out, and its first own message hangs from the last message it shares with the original.
 - Sessions the map search opened no longer stay open after a reload: they close again when the search is cleared or stops matching them, unless you clicked into one.
