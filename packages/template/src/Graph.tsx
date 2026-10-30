@@ -14,7 +14,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { unreadViewMessages } from "../../cli/src/view/change.js";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
-import { pageToken, saveRead, saveRowWidth } from "./data.js";
+import { loadRowWidths, pageToken, saveRead, saveRowWidth } from "./data.js";
 import { type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
@@ -250,6 +250,17 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
   /** Each session's message row width, dragged at the rows' right edge. */
   const [rowWidths, setRowWidths] = useState<RowWidths>(() => rowWidthsOf(model.rowWidths));
+  // The embedded widths are as of the last build; a reload right after a drag
+  // can beat the rebuild, so a served page asks for the stored ones once.
+  useEffect(() => {
+    const token = pageToken();
+    if (token === null) return;
+    void loadRowWidths(model.project.path, token)
+      .then((widths) => setRowWidths(rowWidthsOf(widths)))
+      .catch(() => {
+        // The embedded widths stay; they are at most one drag behind.
+      });
+  }, [model.project.path]);
   const resizeRows = useCallback((sessionId: string, width: number) => {
     setRowWidths((previous) => {
       // Back at the default (double-click): forget the session.

@@ -945,6 +945,28 @@ describe("row width endpoint", () => {
     expect((await widthWrite(server, token, { ...good, pad: "x".repeat(5000) })).status).toBe(413);
   });
 
+  it("reads the stored widths back for a reload that beats the rebuild", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    await widthWrite(server, token, { dir: root, sessionId: SESSION, width: 840 });
+    const headers = { origin: `http://127.0.0.1:${server.port}`, [CONFIG_TOKEN_HEADER]: token };
+    const url = `${server.url}/api/row-width?dir=${encodeURIComponent(root)}`;
+    const reply = await request(url, headers);
+    expect(reply.status).toBe(200);
+    expect(JSON.parse(reply.body)).toEqual({ ok: true, widths: { [SESSION]: 840 } });
+    expect((await request(url, { ...headers, [CONFIG_TOKEN_HEADER]: "nope" })).status).toBe(403);
+    expect((await request(`${server.url}/api/row-width`, headers)).status).toBe(400);
+    expect(
+      (
+        await request(
+          `${server.url}/api/row-width?dir=${encodeURIComponent(join(dir, "elsewhere"))}`,
+          headers,
+        )
+      ).status,
+    ).toBe(403);
+    expect((await request(url, headers, "HEAD")).status).toBe(405);
+  });
+
   it("answers 500 instead of crashing when the state cannot be written", async () => {
     const server = await start();
     const token = await panelToken(server);

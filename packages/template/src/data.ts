@@ -99,6 +99,23 @@ export async function saveRead(
 }
 
 /**
+ * The stored row widths as they are now. The page embeds them at build time,
+ * but a reload right after a drag can beat the rebuild, so the page asks too.
+ */
+export async function loadRowWidths(dir: string, token: string): Promise<unknown> {
+  const response = await fetch(`/api/row-width?dir=${encodeURIComponent(dir)}`, {
+    headers: { "x-cogit-token": token },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const text = (await response.text()).trim();
+    throw new Error(text || `could not read the row widths (HTTP ${response.status})`);
+  }
+  const body = (await response.json()) as { widths?: unknown };
+  return body.widths;
+}
+
+/**
  * Stores how wide one session's message rows are, or forgets it (`null`). The
  * state lives in the project's `.cogit/state/`, so this needs the local server;
  * over `file://` the width lasts for the open page only.

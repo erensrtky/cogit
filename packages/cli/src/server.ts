@@ -21,7 +21,7 @@ import { dismissInboxSession } from "./store/inbox-state.js";
 import { LockBusyError } from "./store/lock.js";
 import { globalPaths, projectPaths } from "./store/paths.js";
 import { setMessageRead } from "./store/read-state.js";
-import { setRowWidth } from "./store/row-widths.js";
+import { readRowWidths, setRowWidth } from "./store/row-widths.js";
 import { loadConfig, loadRegistry, updateConfig } from "./store/stores.js";
 import { isPanelEditableKey, LIVE_META_NAME, TOKEN_META_NAME } from "./view/model.js";
 import { buildPanel, panelSettings } from "./view/panel.js";
@@ -400,6 +400,42 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       "cache-control": "no-store",
     });
     res.end(JSON.stringify({ ok: true, settings: editableSettings(panelSettings(config)) }));
+  }
+
+  /**
+   * `GET /api/row-width?dir`: the stored row widths as they are now. The page
+   * embeds them at build time, but a reload can come before the rebuild that a
+   * drag's write starts, so the page asks here too. Same Origin and token checks
+   * as the settings read, and a registered project only.
+   */
+  async function readRowWidthsRequest(
+    req: IncomingMessage,
+    res: ServerResponse,
+    port: number,
+    url: URL,
+  ): Promise<void> {
+    if (
+      !readOriginAllowed(req.headers.origin, port) ||
+      !tokenMatches(req.headers[CONFIG_TOKEN_HEADER])
+    ) {
+      respond(res, 403, "forbidden");
+      return;
+    }
+    const dir = url.searchParams.get("dir");
+    if (!dir) {
+      respond(res, 400, "dir is required");
+      return;
+    }
+    const root = await registeredRoot(env, dir);
+    if (root === null) {
+      respond(res, 403, "not a registered project");
+      return;
+    }
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify({ ok: true, widths: await readRowWidths(root) }));
   }
 
   /**
@@ -791,6 +827,14 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
         return;
       }
       await readDiff(req, res, port, url);
+      return;
+    }
+    if (url.pathname === "/api/row-width") {
+      if (req.method !== "GET") {
+        respond(res, 405, "method not allowed");
+        return;
+      }
+      await readRowWidthsRequest(req, res, port, url);
       return;
     }
     if (url.pathname === "/api/config") {
