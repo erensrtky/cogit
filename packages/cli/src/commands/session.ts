@@ -1,8 +1,11 @@
 import { readFile, rm } from "node:fs/promises";
-import { userInfo } from "node:os";
 import { resolve } from "node:path";
 import { defaultAgent } from "../agents/index.js";
-import { commitBetween, findGitRoot, gitUserName } from "../git.js";
+import { type Author, sameAuthor, sessionIdentity, stampedIdentity } from "../author.js";
+
+export { sessionAuthor } from "../author.js";
+
+import { commitBetween, findGitRoot } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import {
   hashesToLabels,
@@ -44,25 +47,6 @@ export async function readStdin(stream: NodeJS.ReadableStream = process.stdin): 
   const chunks: Buffer[] = [];
   for await (const c of stream) chunks.push(typeof c === "string" ? Buffer.from(c) : c);
   return Buffer.concat(chunks).toString("utf8");
-}
-
-/**
- * Who gets credited for a session (Story 9.3): the git name this repository
- * commits with, else the OS user. Recorded once, on the first write; a record
- * made on another machine keeps its own author.
- */
-export async function sessionAuthor(
-  root: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<string | undefined> {
-  const gitRoot = await findGitRoot(root);
-  const fromGit = gitRoot === undefined ? undefined : await gitUserName(gitRoot, env);
-  if (fromGit !== undefined) return fromGit;
-  try {
-    return userInfo().username || undefined;
-  } catch {
-    return env.USER ?? env.USERNAME ?? undefined;
-  }
 }
 
 export interface SessionWriteOptions {
@@ -124,11 +108,18 @@ export async function sessionWrite(
   // merge; `startedAt` is the current session's own start.
   const current = await loadSession(root, input.sessionId);
   const startedAt = current.found && current.ok ? current.data.startedAt : io.now();
-  const author =
-    current.found && current.ok && current.data.author
-      ? current.data.author
-      : await sessionAuthor(root, io.env);
-  const crossTargets = await crossSessionTargets(root, input.sessionId, startedAt, input, io.env);
+  const identity = stampedIdentity(
+    current.found && current.ok ? current.data : undefined,
+    await sessionIdentity(root, io.env),
+  );
+  const crossTargets = await crossSessionTargets(
+    root,
+    input.sessionId,
+    startedAt,
+    input,
+    io.env,
+    identity,
+  );
   let warnings: string[] = [];
   const saved = await updateSession(root, input.sessionId, async (cur) => {
     // A record written before 8.5 still names messages `m1`, `m2`, …; the file is
@@ -158,7 +149,7 @@ export async function sessionWrite(
     // Story 12.1: the Stop hook tells an agent write from a side one.
     const stamped = { ...stored, lastRecordedBy: by };
     // Story 9.3: the first write stamps who recorded the session.
-    return stamped.author === undefined && author !== undefined ? { ...stamped, author } : stamped;
+    return { ...stamped, ...stampedIdentity(stamped, identity) };
   });
   for (const w of warnings) io.warn(w);
   if (opts.file && opts.consume) await rm(opts.file, { force: true });
@@ -260,8 +251,9 @@ export function withForkParent(
 
 /**
  * The `<sessionId>:<id>` parents and links the input sends, kept only when the
- * other session belongs to this project, started no later than this one and holds
- * that message (Story 8.6). The rest reach the merge as unknown references and
+ * other session belongs to this project, started no later than this one, holds
+ * that message (Story 8.6) and was recorded by the same person: a session never
+ * grows out of a teammate's. The rest reach the merge as unknown references and
  * are warned about there; nothing is dropped silently.
  */
 export async function crossSessionTargets(
@@ -270,6 +262,7 @@ export async function crossSessionTargets(
   startedAt: string,
   input: SessionInput,
   env: NodeJS.ProcessEnv = process.env,
+  author: Author = {},
 ): Promise<Set<string>> {
   const refs = new Set<string>();
   for (const node of input.nodes ?? []) {
@@ -282,7 +275,7 @@ export async function crossSessionTargets(
     const { sessionId: otherId, id } = parseMessageRef(value);
     if (otherId === null || otherId === sessionId) continue;
     const loaded = await loadSession(root, otherId);
-    if (!loaded.found || !loaded.ok) continue;
+    if (!loaded.found || !loaded.ok || !sameAuthor(loaded.data, author)) continue;
     const otherStart = Date.parse(loaded.data.startedAt);
     if (Number.isNaN(otherStart) || otherStart > Date.parse(startedAt)) continue;
     const messages = await readSessionMessages(root, otherId, env);
@@ -573,11 +566,17 @@ export async function candidateSessions(
   env: NodeJS.ProcessEnv,
   limit = CANDIDATE_SESSIONS,
 ): Promise<CandidateSession[]> {
+  // Only this person's sessions: a teammate's thoughts are never a continuation.
+  const current = await loadSession(root, sessionId);
+  const me = stampedIdentity(
+    current.found && current.ok ? current.data : undefined,
+    await sessionIdentity(root, env),
+  );
   const recent: Session[] = [];
   for (const id of await listSessionIds(projectPaths(root).sessions)) {
     if (id === sessionId) continue;
     const loaded = await loadSession(root, id);
-    if (loaded.found && loaded.ok) recent.push(loaded.data);
+    if (loaded.found && loaded.ok && sameAuthor(loaded.data, me)) recent.push(loaded.data);
   }
   recent.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const out: CandidateSession[] = [];

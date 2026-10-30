@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { promisify } from "node:util";
@@ -712,6 +712,32 @@ ${line("second", 2)}
         },
       ],
     });
+  });
+
+  it("offers only this person's sessions, never a teammate's", async () => {
+    await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    const one = (sessionId: string) =>
+      JSON.stringify({
+        sessionId,
+        nodes: [{ id: "m1", kind: "message", title: "One", at: "2026-10-22T09:00:00.000Z" }],
+      });
+    await sessionWrite({ dir: root }, fakeIo(envFor(dir)), async () => one("mine"));
+    await sessionWrite({ dir: root }, fakeIo(envFor(dir)), async () => one("theirs"));
+    // A teammate's record, as `git pull` brings it in.
+    const file = join(root, ".cogit", "sessions", "theirs.json");
+    const record = JSON.parse(await readFile(file, "utf8"));
+    await writeFile(file, JSON.stringify({ ...record, author: "Ayşe", authorEmail: "a@x.dev" }));
+    const folder = join(dir, "claude", "projects", "-p");
+    await mkdir(folder, { recursive: true });
+    const line = { type: "user", timestamp: "2026-10-22T10:00:00.000Z" };
+    await writeFile(
+      join(folder, "second.jsonl"),
+      JSON.stringify({ ...line, message: { role: "user", content: "Devam" } }),
+    );
+
+    await sessionShow(root, "second", io);
+    const sessions = (shown().candidates as { sessions: { sessionId: string }[] }).sessions;
+    expect(sessions.map((session) => session.sessionId)).toEqual(["mine"]);
   });
 
   it("sets the continues hint when the transcript read a handoff file", async () => {

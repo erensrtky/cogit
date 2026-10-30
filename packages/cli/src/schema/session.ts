@@ -133,6 +133,12 @@ export const Session = z.object({
    */
   author: z.string().min(1).max(200).optional(),
   /**
+   * The recorder's git `user.email`, stamped with `author`: like git, a person is
+   * told apart by email, so two people with one name stay two and a renamed
+   * one stays one. Records from before it have none.
+   */
+  authorEmail: z.string().min(3).max(320).optional(),
+  /**
    * Who wrote the record last (Story 12.1): the Stop hook counts the main
    * agent's turns separately when the side model keeps writing in between.
    */

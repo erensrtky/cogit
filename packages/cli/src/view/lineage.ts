@@ -1,3 +1,4 @@
+import { type Author, sameAuthor } from "../author.js";
 import type { Project } from "../schema/project.js";
 import type { LineageNode, Session } from "../schema/session.js";
 import {
@@ -257,6 +258,7 @@ function toViewSession(
     agent: session.agent,
     title: sessionTitle(session),
     ...(session.author === undefined ? {} : { author: session.author }),
+    ...(session.authorEmail === undefined ? {} : { authorEmail: session.authorEmail }),
     startedAt: session.startedAt,
     updatedAt: session.updatedAt,
     status: session.status,
@@ -295,13 +297,17 @@ export interface ViewModelInput {
   commitFiles?: ReadonlyMap<string, string[]> | undefined;
   /** Settings embedded for the modal's `file://` view (Story 8.13). */
   settings?: PanelSettings | undefined;
+  /** The git identity of whoever builds the page, to tell their sessions from others'. */
+  viewer?: Author | undefined;
 }
 
 /**
  * Turns a `<sessionId>:<id>` parent into the `continues` mark the map draws and
  * leaves the message a root of its own session, so one session's graph never
  * leaks into another's (8.6). Runs once every session's labels are known.
- * A target the map no longer holds still gets the mark, with the raw id.
+ * A target the map no longer holds still gets the mark, with the raw id. A
+ * session never continues another person's: such a parent (written before that
+ * rule) leaves the message a plain root.
  */
 export function resolveContinues(sessions: ViewSession[]): void {
   const byId = new Map(sessions.map((session) => [session.sessionId, session]));
@@ -316,6 +322,7 @@ export function resolveContinues(sessions: ViewSession[]): void {
       const other = byId.get(otherId);
       const target = other?.messages.find((candidate) => candidate.id === id);
       message.parent = null;
+      if (other && !sameAuthor(session, other)) continue;
       message.continues = {
         sessionId: otherId,
         sessionTitle: other?.title || otherId,
@@ -352,6 +359,14 @@ export function buildViewModel(input: ViewModelInput): LineageViewModel {
     status: statusCard(sessions, input.generatedAt),
     sessions: views,
     ...(input.settings === undefined ? {} : { settings: input.settings }),
+    ...(input.viewer === undefined ? {} : { viewer: viewerOf(input.viewer) }),
+  };
+}
+
+function viewerOf(viewer: Author): NonNullable<LineageViewModel["viewer"]> {
+  return {
+    ...(viewer.author === undefined ? {} : { author: viewer.author }),
+    ...(viewer.authorEmail === undefined ? {} : { authorEmail: viewer.authorEmail }),
   };
 }
 

@@ -381,6 +381,11 @@
       "minLength": 1,
       "maxLength": 200
     },
+    "authorEmail": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 320
+    },
     "lastRecordedBy": {
       "type": "string",
       "enum": [

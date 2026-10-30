@@ -436,10 +436,26 @@ export async function gitUserName(
   root: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<string | undefined> {
+  return gitConfig(root, "user.name", env);
+}
+
+/** `git config user.email`; undefined when it is not set. */
+export async function gitUserEmail(
+  root: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string | undefined> {
+  return gitConfig(root, "user.email", env);
+}
+
+async function gitConfig(
+  root: string,
+  key: string,
+  env: NodeJS.ProcessEnv,
+): Promise<string | undefined> {
   try {
-    const { stdout } = await exec("git", ["-C", root, "config", "user.name"], { env });
-    const name = stdout.trim();
-    return name === "" ? undefined : name;
+    const { stdout } = await exec("git", ["-C", root, "config", key], { env });
+    const value = stdout.trim();
+    return value === "" ? undefined : value;
   } catch {
     return undefined;
   }

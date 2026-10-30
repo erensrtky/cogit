@@ -2,6 +2,7 @@ import { readdir, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import pkg from "../../package.json" with { type: "json" };
 import { type ChatTurn, defaultAgent } from "../agents/index.js";
+import { sessionIdentity } from "../author.js";
 import {
   type CommitChange,
   findGitRoot,
@@ -351,6 +352,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         // Over `file://` the settings modal shows these; a server page reads the
         // live values instead, so a map built before a change still agrees.
         settings: panelSettings(config),
+        viewer: await sessionIdentity(root, io.env),
         // With the catch-up on, the hook records the tail at session end, so the
         // count would only be a stale warning about work already scheduled.
         unrecorded: config.sessionEndCatchUp ? undefined : views.unrecorded,

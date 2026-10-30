@@ -52,6 +52,11 @@ cogit hooks uninstall    # remove only the cogit block
 3. Each person's sessions are committed with their code. After a pull, teammates' sessions
    appear on the map with their author, and "Unread" lists what changed most.
 
+A session belongs to the person who recorded it: cogit stamps it with their git `user.name`
+and `user.email`, and like git it tells people apart by email. Your sessions only ever
+continue your own earlier sessions; a teammate's session is never taken for the start of
+yours, so everyone's line of thought stays their own on the map.
+
 Raw conversations stay on each author's machine unless they turn `shareConversations` on, so
 teammates see the record (titles, decisions, reasons) but not the chat itself.
 

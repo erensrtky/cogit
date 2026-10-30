@@ -192,6 +192,8 @@ export interface ViewSession {
   title: string;
   /** Who recorded the session (Story 9.3); absent on records written before it. */
   author?: string;
+  /** Their git email, which tells people apart; absent on older records. */
+  authorEmail?: string;
   startedAt: string;
   updatedAt: string;
   status: ViewStatus;
@@ -278,6 +280,11 @@ export interface LineageViewModel {
   status: StatusCard;
   /** Every session, in start order. */
   sessions: ViewSession[];
+  /**
+   * Who is looking: the git identity of the machine that built the page, so the
+   * map can tell your sessions from your teammates'. Absent when unknown.
+   */
+  viewer?: { author?: string; authorEmail?: string };
   /**
    * Every registered project, most recently active first, for the map's
    * switcher (Story 8.12). Missing directories are left out; older pages simply
