@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Sessions the map search opened no longer stay open after a reload: they close again when the search is cleared or stops matching them, unless you clicked into one.
+
 ### Changed
 - The large "Copy resume command" button is now two small buttons for the session: **Resume** copies `claude --resume <id>`, and **Fork** copies the same with `--fork-session`, so the chat goes on as a new session and the original stays. The command shows only when copying fails.
 - Dates read the same everywhere: the side panel, the inbox and the project panel show `2026-10-30 21:09` like the map's rows, and the project tabs `10-30`, instead of the browser's locale (`10/30/2026, 9:09:30 PM`, `Oct 30`).

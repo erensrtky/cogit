@@ -32,6 +32,7 @@ import { RowEdge, type RowWidths, rowWidthsOf } from "./RowEdge.js";
 import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
 import { usePageWheel } from "./scroll.js";
+import { applySearchHits, storedOpen } from "./searchOpen.js";
 import { layoutSessionGraph, openAtLoad, type SessionGraph } from "./sessionLayout.js";
 import { useTheme } from "./ThemeButton.js";
 import { UnreadView } from "./UnreadView.js";
@@ -239,6 +240,17 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   const [openIds, setOpenIds] = useState<ReadonlySet<string>>(() =>
     openAtLoad(model, model.openSessions, initial),
   );
+  /** Open sessions only the search opened: closed again when they stop matching, never stored. */
+  const [searchOpened, setSearchOpened] = useState<ReadonlySet<string>>(() => new Set());
+  /** The user took a search-opened session over (a click in it): it stays and is stored. */
+  const keep = useCallback((sessionId: string) => {
+    setSearchOpened((previous) => {
+      if (!previous.has(sessionId)) return previous;
+      const next = new Set(previous);
+      next.delete(sessionId);
+      return next;
+    });
+  }, []);
   const [selection, setSelection] = useState<Selection | null>(() => {
     if (initial === null || initial.quiet) return null;
     if (initial.messageId === undefined) return { type: "session", sessionId: initial.sessionId };
@@ -279,12 +291,13 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     const token = pageToken();
     if (token === null || !viewLoaded.current) return;
     const timer = window.setTimeout(() => {
-      void saveOpenSessions(model.project.path, [...openIds], token).catch((err: unknown) => {
+      const stored = storedOpen({ open: openIds, bySearch: searchOpened });
+      void saveOpenSessions(model.project.path, stored, token).catch((err: unknown) => {
         console.warn("cogit: could not save the open sessions", err);
       });
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [openIds, model.project.path]);
+  }, [openIds, searchOpened, model.project.path]);
   const resizeRows = useCallback((sessionId: string, width: number) => {
     setRowWidths((previous) => {
       // Back at the default (double-click): forget the session.
@@ -385,19 +398,20 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   );
   const hitSessions = useMemo(() => hitSessionIds(search.hits), [search.hits]);
 
-  // Opening the accordion for every match is what makes the highlights visible.
+  // Opening the accordion for every match is what makes the highlights visible;
+  // a session the search opened closes again once it no longer matches. Read
+  // through refs so a user's own open or close does not rerun the search's.
+  const openRef = useRef(openIds);
+  openRef.current = openIds;
+  const searchOpenedRef = useRef(searchOpened);
+  searchOpenedRef.current = searchOpened;
   useEffect(() => {
-    if (hitSessions.length === 0) return;
-    setOpenIds((previous) => {
-      let changed = false;
-      const next = new Set(previous);
-      for (const id of hitSessions) {
-        if (next.has(id)) continue;
-        next.add(id);
-        changed = true;
-      }
-      return changed ? next : previous;
-    });
+    const next = applySearchHits(
+      { open: openRef.current, bySearch: searchOpenedRef.current },
+      hitSessions,
+    );
+    if (!sameSet(next.open, openRef.current)) setOpenIds(next.open);
+    if (!sameSet(next.bySearch, searchOpenedRef.current)) setSearchOpened(next.bySearch);
   }, [hitSessions]);
 
   /** The open drill-down's message, if any. */
@@ -552,13 +566,18 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     [search.step, searchPoint],
   );
 
-  const ensureOpen = useCallback((sessionId: string) => {
-    setOpenIds((previous) =>
-      previous.has(sessionId) ? previous : new Set([...previous, sessionId]),
-    );
-  }, []);
+  const ensureOpen = useCallback(
+    (sessionId: string) => {
+      keep(sessionId);
+      setOpenIds((previous) =>
+        previous.has(sessionId) ? previous : new Set([...previous, sessionId]),
+      );
+    },
+    [keep],
+  );
   const toggleSession = useCallback(
     (sessionId: string) => {
+      keep(sessionId);
       if (openIds.has(sessionId)) {
         const next = new Set(openIds);
         next.delete(sessionId);
@@ -571,7 +590,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       setOpenIds(new Set([...openIds, sessionId]));
       setFocusedId(`session:${sessionId}`);
     },
-    [openIds],
+    [openIds, keep],
   );
   const openNode = useCallback(
     (sessionId: string, messageId: string) => {
@@ -732,6 +751,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
               // "All" means the whole map: every session opens (or closes), not
               // only the folded branches of the sessions already open.
               setOpenIds(openAll ? new Set() : new Set(sessionGraph.sessions.keys()));
+              setSearchOpened(new Set());
               if (openAll) setFits((value) => value + 1);
               setOpenAll((value) => !value);
               setUnfolded(new Set());
