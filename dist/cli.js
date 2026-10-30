@@ -5530,7 +5530,7 @@ var program = new Command();
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "0.23.0",
+  version: "0.23.1",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [
@@ -5570,7 +5570,7 @@ var package_default = {
   scripts: {
     prebuild: "node ../../scripts/sync-version.mjs",
     build: "tsup",
-    prepack: "node ../../scripts/sync-version.mjs && node ../../scripts/copy-docs.mjs"
+    prepack: "npm --prefix ../.. run build && node ../../scripts/copy-docs.mjs"
   },
   devDependencies: {
     "@inquirer/prompts": "^8.7.4",
