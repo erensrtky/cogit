@@ -1,12 +1,13 @@
 import { type SpawnOptions, spawn } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { type FSWatcher, watch } from "node:fs";
+import { existsSync, type FSWatcher, watch } from "node:fs";
 import { readFile } from "node:fs/promises";
 import {
   createServer as createHttpServer,
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
+import { createRequire } from "node:module";
 import type { AddressInfo } from "node:net";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,6 +77,8 @@ export interface MapServerOptions {
   idleMs?: number;
   /** Quiet time after the last transcript write before a map rebuild (tests use a short one). */
   transcriptDebounceMs?: number;
+  /** The Mermaid file the map's diagrams load; defaults to `mermaidFile()`. */
+  mermaidFile?: string;
 }
 
 export interface MapServer {
@@ -153,6 +156,34 @@ async function pageTarget(env: NodeJS.ProcessEnv, url: URL): Promise<PageTarget 
     return { file: paths.html, dir: paths.base, root };
   }
   return null;
+}
+
+/**
+ * Mermaid for the Shape diagrams (Story 13.6). It is too big to embed in every
+ * map, so the build copies it next to `dist/cli.js` and the map loads it from
+ * here; from source (tests, `tsx`) the package's own copy is used.
+ */
+export const MERMAID_PATH = "/assets/mermaid.js";
+
+export function mermaidFile(): string {
+  const bundled = fileURLToPath(new URL("./mermaid.min.js", import.meta.url));
+  if (existsSync(bundled)) return bundled;
+  return createRequire(import.meta.url).resolve("mermaid/dist/mermaid.min.js");
+}
+
+async function serveMermaid(res: ServerResponse, file: string): Promise<void> {
+  let body: Buffer;
+  try {
+    body = await readFile(file);
+  } catch {
+    respond(res, 404, "not found");
+    return;
+  }
+  res.writeHead(200, {
+    "content-type": "text/javascript; charset=utf-8",
+    "cache-control": "public, max-age=86400",
+  });
+  res.end(body);
 }
 
 /** URL of a project's map on a running server. */
@@ -895,6 +926,10 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
         return;
       }
       await readConfig(req, res, port);
+      return;
+    }
+    if (url.pathname === MERMAID_PATH) {
+      await serveMermaid(res, opts.mermaidFile ?? mermaidFile());
       return;
     }
     if (url.pathname === "/health") {

@@ -2668,6 +2668,12 @@ time {
   border-radius: 6px;
 }
 
+.shape-note {
+  margin: 6px 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .shape-diagram {
   padding: 10px;
   overflow: auto;

@@ -22,7 +22,9 @@ import {
   injectLiveMeta,
   injectTokenMeta,
   type MapServer,
+  MERMAID_PATH,
   mapPageUrl,
+  mermaidFile,
   spawnServerProcess,
   startMapServer,
   stopStaleServer,
@@ -315,6 +317,20 @@ describe("map server", () => {
     const fromCli = await fetch(`${server.url}/api/stop`, { method: "POST" });
     expect(fromCli.status).toBe(200);
     await server.closed;
+  });
+
+  it("hands out Mermaid for the Shape diagrams", async () => {
+    const server = await start();
+    const reply = await request(`${server.url}${MERMAID_PATH}`);
+    expect(reply.status).toBe(200);
+    expect(reply.body.length).toBeGreaterThan(1_000_000);
+    expect(mermaidFile()).toMatch(/mermaid\.min\.js$/);
+  });
+
+  it("answers 404 when the Mermaid file is missing", async () => {
+    const server = await startMapServer({ env, port: 0, mermaidFile: join(dir, "nope.js") });
+    servers.push(server);
+    expect((await request(`${server.url}${MERMAID_PATH}`)).status).toBe(404);
   });
 
   it("rejects a foreign Host header", async () => {

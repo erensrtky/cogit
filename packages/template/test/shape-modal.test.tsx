@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { ViewNode } from "../../cli/src/view/model.js";
+import { MermaidDiagram, mermaidAvailable } from "../src/MermaidDiagram.js";
 import { ShapeLayers } from "../src/ShapeModal.js";
 
 /** The three layers render as the panel shows them (Story 13.6). */
@@ -88,5 +89,21 @@ describe("Intent, Shape and Code", () => {
     expect(html).toContain("Intent");
     expect(html).toContain("Shape");
     expect(html).toContain("Code");
+  });
+});
+
+describe("the Mermaid diagram", () => {
+  it("is drawn only on a page the cogit server sent", () => {
+    expect(mermaidAvailable("http:")).toBe(true);
+    expect(mermaidAvailable("https:")).toBe(true);
+    expect(mermaidAvailable("file:")).toBe(false);
+  });
+
+  it("shows the source as text, with a hint, away from the server", () => {
+    const html = renderToStaticMarkup(
+      createElement(MermaidDiagram, { source: "flowchart TD\n  A --> B" }),
+    );
+    expect(html).toContain('<pre class="shape-source">flowchart TD');
+    expect(html).toContain("cogit open");
   });
 });
