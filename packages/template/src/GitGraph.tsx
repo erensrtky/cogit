@@ -1,4 +1,4 @@
-import { type MouseEvent, type ReactElement, useMemo } from "react";
+import { type MouseEvent, useMemo } from "react";
 import { formatChange, isBigChange } from "../../cli/src/view/change.js";
 import type { ViewNode } from "../../cli/src/view/model.js";
 import { formatStamp } from "./format.js";
@@ -8,13 +8,11 @@ import {
   type GitMessageRow,
   type GitRow,
   LANE_COLORS,
-  linkArrow,
-  linkPath,
 } from "./gitLayout.js";
 
 /**
  * Draws one session's messages as a git graph (Story 8.2): time-ordered rows on
- * the right, dots, lanes, branch starts and returns on the left. The geometry
+ * the right, dots, lanes and branch starts on the left. The geometry
  * comes from `gitLayout.ts`; this file only renders it.
  */
 
@@ -25,19 +23,6 @@ function color(index: number): string {
 function rowRange(row: GitRow): string {
   if (row.kind === "more") return "";
   return row.message.at ? formatStamp(row.message.at) : "";
-}
-
-function returnMark(row: GitMessageRow): ReactElement | null {
-  if (row.returns.length === 0) return null;
-  return (
-    <span className="git-returns">
-      {row.returns.map((back) => (
-        <span key={back.id} className="git-return" style={{ color: color(back.colorIndex) }}>
-          ↩ {back.label}
-        </span>
-      ))}
-    </span>
-  );
 }
 
 function Row({
@@ -163,7 +148,6 @@ function Row({
           {message.continues.label ?? message.continues.id}
         </span>
       ) : null}
-      {returnMark(row)}
       {row.head ? <span className="left-off">left off here</span> : null}
       {message.unsummarized ? <span className="unsummarized">not summarized yet</span> : null}
     </button>
@@ -204,12 +188,6 @@ export function GitGraph({
     () => new Map(git.segments.map((segment) => [segment.id, segment])),
     [git.segments],
   );
-  const segmentOf = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const segment of git.segments) for (const id of segment.ids) map.set(id, segment.id);
-    return map;
-  }, [git.segments]);
-
   return (
     <div className="git-graph" style={{ width: git.width, height: git.height }}>
       <svg
@@ -239,18 +217,6 @@ export function GitGraph({
                   />
                 );
               })}
-            </g>
-          );
-        })}
-        {git.links.map((link) => {
-          const target = segmentOf.get(link.toId);
-          const from = segmentOf.get(link.fromId);
-          const targetX = git.laneX[branches.get(target ?? "")?.lane ?? 0] ?? 0;
-          const fromX = git.laneX[branches.get(from ?? "")?.lane ?? 0] ?? 0;
-          return (
-            <g key={`${link.fromId}-${link.toId}`} fill="none" stroke={color(link.colorIndex)}>
-              <path d={linkPath(link, targetX, fromX)} strokeWidth={1.8} strokeDasharray="5 3" />
-              <path d={linkArrow(link, fromX)} strokeWidth={1.8} />
             </g>
           );
         })}

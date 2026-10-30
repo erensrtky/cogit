@@ -106,7 +106,7 @@ describe("map layout (Story 9.2)", () => {
     // floor; the height follows the title, not the chips next to it.
     const message = { id: "x", label: "m1", title: "a".repeat(120) };
     // A narrow map: the chips leave the title only its minimum width.
-    const height = rowHeight(message, { returns: 2, tags: 3, head: false }, 300);
+    const height = rowHeight(message, { tags: 3, head: false }, 300);
     expect(height).toBeGreaterThanOrEqual(12 + Math.ceil((120 * 6.4) / TITLE_MIN_WIDTH) * 16);
   });
 
@@ -114,7 +114,7 @@ describe("map layout (Story 9.2)", () => {
     expect(declarations(".git-tags")).toMatch(/flex-wrap:\s*wrap/);
     expect(declarations(".git-tags")).not.toMatch(/overflow:\s*hidden/);
     expect(declarations(".git-tag")).toMatch(/flex:\s*none/);
-    const row = { returns: 0, head: false };
+    const row = { head: false };
     const message = { id: "x", label: "m28", title: "short" };
     expect(rowHeight(message, { ...row, tags: TAGS_PER_LINE })).toBe(ROW_HEIGHT);
     // A third tag starts a second line, so the row grows to hold it.

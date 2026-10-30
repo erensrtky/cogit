@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- The map no longer draws the dashed return arrow and the "↩ mN" mark (a branch already shows the return; the details panel still lists it), nor the epoch tag on session rows.
+
 ### Changed
 - Each session on the map now keeps its own message row width: dragging one session's edge leaves the others alone. The width is stored in the project's local `.cogit/state/row-widths.json` (never committed, so teammates keep their own), and survives a reload or a different browser.
 

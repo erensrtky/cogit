@@ -2,15 +2,15 @@ import type { ViewNode } from "../../cli/src/view/model.js";
 
 /**
  * Lays a git graph out (Stories 8.2 and 8.7): one row per item in send order,
- * one lane per branch, branch starts curving out of the item they react to,
- * returns routed through a channel left of the lanes. Pure: the React component
- * draws exactly what this returns.
+ * one lane per branch, branch starts curving out of the item they react to.
+ * Pure: the React component draws exactly what this returns.
  *
  * The same code lays out both levels: a session's messages (a message is a
  * commit, `parent` is the message it reacts to) and the project's sessions (a
  * session is a commit, `parent` is the session it continues). Git terms: a root
- * starts something new, a branch is a chain of items with only one child each,
- * and `links` are returns to older items.
+ * starts something new, and a branch is a chain of items with only one child
+ * each. A message's `links` stay in the record and the details panel; the map
+ * does not draw them, since a branch already shows the return.
  */
 
 /**
@@ -24,7 +24,6 @@ export interface GitNode {
   summary?: string | undefined;
   at?: string | undefined;
   parent?: string | null | undefined;
-  links?: string[] | undefined;
   branch?: ViewNode["branch"];
   continues?: ViewNode["continues"];
   commits?: string[] | undefined;
@@ -48,9 +47,6 @@ export const FOLD_LIMIT = 4;
 export const ROOT_GAP = 24;
 /** Distance between lanes; also the dot column spacing. */
 export const LANE_GAP = 20;
-/** Distance between the return channels on the left. */
-export const CHANNEL_GAP = 12;
-const CHANNEL_PAD = 8;
 const LANE_PAD = 10;
 const LANE_TAIL = 6;
 /** Width reserved for the row text right of the dots. */
@@ -144,14 +140,6 @@ function tagsOf(message: GitNode): GitCommitTag[] {
   return tags;
 }
 
-export interface GitReturn {
-  /** The older message this row returns to. */
-  id: string;
-  /** Its `m22` label, which the row shows instead of the stable id. */
-  label: string;
-  colorIndex: number;
-}
-
 export interface GitMessageRow {
   kind: "message";
   message: GitNode;
@@ -163,7 +151,6 @@ export interface GitMessageRow {
   first: boolean;
   /** A new root starts here, with a gap above it. */
   gap: boolean;
-  returns: GitReturn[];
   /** Code commits the record lists for this message; empty for most rows. */
   tags: GitCommitTag[];
   /** "left off here": the newest message or session. */
@@ -189,25 +176,12 @@ export interface GitMoreRow {
 
 export type GitRow = GitMessageRow | GitMoreRow;
 
-export interface GitLink {
-  /** The message that returns. */
-  fromId: string;
-  /** The older message it returns to. */
-  toId: string;
-  fromY: number;
-  toY: number;
-  /** The column left of the lanes this link runs through. */
-  channelX: number;
-  colorIndex: number;
-}
-
 export interface GitLayout {
   segments: GitSegment[];
   rows: GitRow[];
-  links: GitLink[];
   /** Dot x per lane. */
   laneX: number[];
-  /** Width of the channel + lanes area; the row text starts after it. */
+  /** Width of the lanes area; the row text starts after it. */
   graphWidth: number;
   /** Width of the row text right of the dots. */
   rowWidth: number;
@@ -279,13 +253,12 @@ const ROW_FIXED = 106;
  */
 export function rowHeight(
   message: GitNode,
-  row: { returns: number; tags: number; head: boolean },
+  row: { tags: number; head: boolean },
   rowWidth = ROW_WIDTH,
 ): number {
   const fixed =
     ROW_FIXED +
     (message.label ?? message.id).length * 7 +
-    row.returns * 44 +
     Math.min(row.tags, TAGS_PER_LINE) * TAG_WIDTH +
     (row.head ? 92 : 0) +
     (message.unsummarized ? 116 : 0) +
@@ -449,7 +422,6 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
       ? rowHeight(
           message,
           {
-            returns: (message.links ?? []).filter((id) => segOf.has(id)).length,
             tags: tagsOf(message).length,
             head: message.id === headId,
           },
@@ -504,29 +476,11 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
   }
 
   const laneCount = Math.max(0, ...segments.map((segment) => segment.lane + 1));
-  const links: GitLink[] = [];
-  for (const message of messages) {
-    for (const target of message.links ?? []) {
-      const from = rowOf.get(message.id);
-      const to = rowOf.get(target);
-      if (!from || !to) continue;
-      links.push({
-        fromId: message.id,
-        toId: target,
-        fromY: from.y,
-        toY: to.y,
-        channelX: 6 + links.length * CHANNEL_GAP,
-        colorIndex: segOf.get(target)?.colorIndex ?? 0,
-      });
-    }
-  }
-
-  const channelWidth = links.length > 0 ? links.length * CHANNEL_GAP + CHANNEL_PAD : 0;
   const laneX = Array.from(
     { length: Math.max(laneCount, 1) },
-    (_, lane) => channelWidth + LANE_PAD + lane * LANE_GAP,
+    (_, lane) => LANE_PAD + lane * LANE_GAP,
   );
-  const graphWidth = channelWidth + LANE_PAD + Math.max(laneCount, 1) * LANE_GAP + LANE_TAIL;
+  const graphWidth = LANE_PAD + Math.max(laneCount, 1) * LANE_GAP + LANE_TAIL;
 
   const rows: GitRow[] = raw.map((row): GitRow => {
     if (row.kind === "more") {
@@ -541,15 +495,6 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
     }
     const message = byId.get(row.id ?? "");
     if (!message) throw new Error(`message ${String(row.id)} vanished from the layout`);
-    const returns: GitReturn[] = [];
-    for (const target of message.links ?? []) {
-      if (!rowOf.has(target)) continue;
-      returns.push({
-        id: target,
-        label: byId.get(target)?.label ?? target,
-        colorIndex: segOf.get(target)?.colorIndex ?? 0,
-      });
-    }
     return {
       kind: "message",
       message,
@@ -558,7 +503,6 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
       y: row.y,
       first: row.segment.ids[0] === message.id,
       gap: row.gap,
-      returns,
       tags: tagsOf(message),
       head: message.id === headId,
       height: row.height,
@@ -569,7 +513,6 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
   return {
     segments,
     rows,
-    links,
     laneX,
     graphWidth,
     rowWidth,
@@ -577,25 +520,6 @@ export function layoutGitGraph(messages: GitNode[], options: GitLayoutOptions = 
     height: cursor,
     headId,
   };
-}
-
-/** The dashed return route: target dot → left channel → arrow at the returning dot. */
-export function linkPath(link: GitLink, targetX: number, fromX: number): string {
-  const q = 6;
-  const g = link.channelX;
-  return [
-    `M${targetX},${link.toY}`,
-    `L${g + q},${link.toY}`,
-    `Q${g},${link.toY} ${g},${link.toY + q}`,
-    `L${g},${link.fromY - q}`,
-    `Q${g},${link.fromY} ${g + q},${link.fromY}`,
-    `L${fromX - 9},${link.fromY}`,
-  ].join(" ");
-}
-
-/** Arrowhead at the returning message, pointing at its dot. */
-export function linkArrow(link: GitLink, fromX: number): string {
-  return `M${fromX - 15},${link.fromY - 4} L${fromX - 8},${link.fromY} L${fromX - 15},${link.fromY + 4}`;
 }
 
 /** The curve a branch start draws from its parent's dot into its lane. */

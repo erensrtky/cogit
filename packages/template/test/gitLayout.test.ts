@@ -4,8 +4,6 @@ import {
   FOLD_LIMIT,
   type GitMessageRow,
   layoutGitGraph,
-  linkArrow,
-  linkPath,
   ROOT_GAP,
   ROW_HEIGHT,
 } from "../src/gitLayout.js";
@@ -218,40 +216,21 @@ describe("rows", () => {
   });
 });
 
-describe("returns", () => {
-  it("routes each return through its own channel left of every lane", () => {
+describe("links", () => {
+  it("draws no return arrow: a branch already shows the return", () => {
     const messages = [
       message("m1", null),
       message("m2", "m1"),
-      message("m3", "m2", { links: ["m1"] }),
-      message("m4", "m3", { links: ["m2"] }),
+      message("m3", "m1", { links: ["m2"] }),
     ];
     const { layout } = rowsOf(messages);
-    expect(layout.links.map((link) => link.channelX)).toEqual([6, 18]);
-    expect(layout.links.map((link) => link.toId)).toEqual(["m1", "m2"]);
-    expect(Math.max(...layout.links.map((link) => link.channelX))).toBeLessThan(
-      layout.laneX[0] ?? 0,
-    );
-
-    const link = layout.links[0]!;
-    const path = linkPath(link, 40, 60);
-    expect(path).toContain(`M40,${link.toY}`);
-    expect(path.endsWith(`L51,${link.fromY}`)).toBe(true);
-    expect(linkArrow(link, 60)).toContain(`M45,${link.fromY - 4}`);
-  });
-
-  it("marks the returning row and colours it like the branch it returns to", () => {
-    const messages = [
-      message("m1", null),
-      message("m2", "m1"),
-      message("m3", null),
-      message("m4", "m2", { links: ["m1"] }),
-    ];
-    const { layout } = rowsOf(messages);
+    expect(layout).not.toHaveProperty("links");
+    // No channel left of the lanes either: the first lane starts at the pad.
+    expect(layout.laneX[0]).toBe(10);
     const row = layout.rows.find(
       (candidate): candidate is GitMessageRow =>
-        candidate.kind === "message" && candidate.message.id === "m4",
+        candidate.kind === "message" && candidate.message.id === "m3",
     );
-    expect(row?.returns).toEqual([{ id: "m1", label: "m1", colorIndex: 0 }]);
+    expect(row).not.toHaveProperty("returns");
   });
 });

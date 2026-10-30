@@ -1176,25 +1176,6 @@ body:has(.map-shell.is-expanded) {
   white-space: nowrap;
 }
 
-/* An epoch is a tag on a session dot, not a box around sessions. */
-.epoch-tag {
-  display: inline-flex;
-  flex: 0 1 auto;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  max-width: 160px;
-  overflow: hidden;
-  padding: 1px 6px;
-  color: var(--muted);
-  font-size: 10px;
-  line-height: 14px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-}
-
 .left-off {
   display: inline-block;
   margin-top: 4px;
@@ -2236,15 +2217,6 @@ time {
   min-width: 180px;
   line-height: 16px;
   overflow-wrap: anywhere;
-}
-
-.git-returns {
-  display: flex;
-  flex: 0 1 auto;
-  gap: 4px;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 11px;
 }
 
 /* Commit tags on a message row (Story 8.8): a short hash, greyed when git no

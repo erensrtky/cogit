@@ -6,8 +6,8 @@ import type { SessionGraph } from "./sessionLayout.js";
 
 /**
  * Draws the project's sessions as a git graph (Story 8.7): one dot per session
- * in start order, lanes for branches of sessions, an epoch tag on each dot and
- * the session title as its label. Clicking a row opens that session's messages
+ * in start order, lanes for branches of sessions, and the session title as its
+ * label. Clicking a row opens that session's messages
  * in place. The geometry comes from `sessionLayout.ts`; this file only renders.
  */
 
@@ -18,25 +18,9 @@ function color(index: number): string {
   return `var(--l${index % LANE_COLORS})`;
 }
 
-/** A neutral, outlined epoch tag — deliberately unlike a branch label. */
-function TagIcon() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-      <path
-        d="M2 2h5.2l6.3 6.3-5.2 5.2L2 7.2V2z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <circle cx="5.2" cy="5.2" r="1.2" fill="currentColor" />
-    </svg>
-  );
-}
-
 function SessionRow({
   row,
   session,
-  epochTitle,
   selected,
   open,
   searchHit,
@@ -45,7 +29,6 @@ function SessionRow({
 }: {
   row: GitMessageRow;
   session: ViewSession;
-  epochTitle: string | null;
   selected: boolean;
   /** Its messages are open below the row. */
   open: boolean;
@@ -81,12 +64,6 @@ function SessionRow({
         {open ? "▾" : "▸"}
       </span>
       <span className="git-time">{session.startedAt ? formatStamp(session.startedAt) : ""}</span>
-      {epochTitle ? (
-        <span className="epoch-tag" title={`Epoch: ${epochTitle}`}>
-          <TagIcon />
-          {epochTitle}
-        </span>
-      ) : null}
       <span className="git-title">{session.title || session.sessionId}</span>
       {session.author ? (
         <span className="muted session-author" title={`Recorded by ${session.author}`}>
@@ -138,7 +115,6 @@ export function SessionMap({
   onContinue: (sessionId: string, messageId: string) => void;
 }) {
   const { git } = graph;
-  const epochTitles = new Map(model.epochs.map((epoch) => [epoch.id, epoch.title]));
   const segments = new Map(git.segments.map((segment) => [segment.id, segment]));
 
   const open: (row: GitRow) => void = (row) => {
@@ -223,13 +199,11 @@ export function SessionMap({
         {git.rows.map((row) => {
           const session = row.kind === "message" ? graph.sessions.get(row.message.id) : undefined;
           if (row.kind !== "message" || !session) return null;
-          const epochTitle = session.epoch ? (epochTitles.get(session.epoch) ?? null) : null;
           return (
             <SessionRow
               key={row.message.id}
               row={row}
               session={session}
-              epochTitle={epochTitle}
               selected={selectedSessionId === session.sessionId}
               open={openIds.has(session.sessionId)}
               searchHit={highlightSessionIds.has(session.sessionId)}
