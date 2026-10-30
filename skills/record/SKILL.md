@@ -68,6 +68,8 @@ Every message grows from an earlier one; a thread that starts something new is a
   branches with the message each ends at (`last`), and its last messages. Read `leftOff`
   first, then the branches; the usual target is a branch's `last`. The target must be a
   message of an earlier session of this project.
+- `forkedFrom` (a forked session): the first message's parent is that value; no candidates
+  are listed, and the CLI sets it when you send none.
 - Unsure: use the previous message. A wrong "continue" hides a branch; a wrong branch breaks
   the chain.
 - `links`: up to 5 earlier messages it builds on besides the parent.

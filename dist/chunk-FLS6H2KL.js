@@ -43,8 +43,8 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 
 // src/git-hooks.ts
 import { realpathSync } from "fs";
-import { chmod, mkdir as mkdir5, readFile as readFile5, rm as rm3, stat as stat4 } from "fs/promises";
-import { join as join7 } from "path";
+import { chmod, mkdir as mkdir5, readFile as readFile5, rm as rm3, stat as stat6 } from "fs/promises";
+import { join as join8 } from "path";
 
 // src/git.ts
 import { execFile } from "child_process";
@@ -20951,25 +20951,107 @@ async function writeProjectSetup(root) {
 }
 
 // src/agents/claude/transcripts.ts
-import { createReadStream } from "fs";
-import { access, open as open3, readdir as readdir2 } from "fs/promises";
+import { createReadStream as createReadStream2 } from "fs";
+import { access, open as open3, readdir as readdir3, stat as stat5 } from "fs/promises";
 import { homedir as homedir3 } from "os";
-import { join as join6 } from "path";
+import { join as join7 } from "path";
+import { createInterface as createInterface2 } from "readline";
+
+// src/agents/claude/fork.ts
+import { createReadStream } from "fs";
+import { readdir as readdir2, stat as stat4 } from "fs/promises";
+import { basename as basename2, dirname as dirname4, join as join6 } from "path";
 import { createInterface } from "readline";
+var MAX_DEPTH = 8;
+var USER_LINE = /"type":"user"/;
+var LINE_UUID = /"uuid":"([^"]+)"/;
+var firstUuids = /* @__PURE__ */ new Map();
+async function firstMessageUuid(file2, isMessage) {
+  const known = firstUuids.get(file2);
+  if (known !== void 0) return known;
+  const input2 = createReadStream(file2, "utf8");
+  const lines = createInterface({ input: input2, crlfDelay: Infinity });
+  let found = null;
+  try {
+    for await (const raw of lines) {
+      if (!USER_LINE.test(raw)) continue;
+      const line = parseLine(raw);
+      if (line === null || !isMessage(line)) continue;
+      found = LINE_UUID.exec(raw)?.[1] ?? null;
+      break;
+    }
+  } finally {
+    lines.close();
+    input2.destroy();
+  }
+  if (found !== null) firstUuids.set(file2, found);
+  return found;
+}
+function parseLine(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+async function bornAt(file2) {
+  const birth = (await stat4(file2).catch(() => null))?.birthtimeMs ?? 0;
+  return birth > 0 ? birth : null;
+}
+function sharedPrefix(a, b) {
+  let count = 0;
+  while (count < a.length && count < b.length) {
+    const uuid3 = a[count]?.uuid;
+    if (uuid3 === void 0 || uuid3 !== b[count]?.uuid) break;
+    count++;
+  }
+  return count;
+}
+async function forkOrigin(file2, turns, readTurns, isMessage, depth = 0) {
+  const first = turns[0];
+  if (first?.uuid === void 0 || depth > MAX_DEPTH) return null;
+  const born = await bornAt(file2);
+  const dir = dirname4(file2);
+  const names = (await readdir2(dir).catch(() => [])).filter(
+    (name) => name.endsWith(".jsonl")
+  );
+  let best = null;
+  for (const name of names) {
+    const other = join6(dir, name);
+    if (other === file2) continue;
+    if (await firstMessageUuid(other, isMessage).catch(() => null) !== first.uuid) continue;
+    const otherBorn = await bornAt(other) ?? 0;
+    if (born !== null && otherBorn >= born) continue;
+    const shared = sharedPrefix(turns, await readTurns(other).catch(() => []));
+    if (shared > 0 && (best === null || shared > best.shared || shared === best.shared && otherBorn > best.born))
+      best = { file: other, shared, born: otherBorn };
+  }
+  if (best === null) return null;
+  const last = turns[best.shared - 1];
+  if (last?.uuid === void 0) return null;
+  const copy = { uuid: last.uuid, at: last.at, text: last.text };
+  const parentTurns = await readTurns(best.file).catch(() => null);
+  const deeper = parentTurns ? await forkOrigin(best.file, parentTurns, readTurns, isMessage, depth + 1) : null;
+  if (deeper && best.shared <= deeper.copied)
+    return { sessionId: deeper.sessionId, copied: best.shared, last: copy };
+  return { sessionId: basename2(best.file, ".jsonl"), copied: best.shared, last: copy };
+}
+
+// src/agents/claude/transcripts.ts
 function claudeConfigDir(env = process.env) {
-  return env.CLAUDE_CONFIG_DIR ?? join6(homedir3(), ".claude");
+  return env.CLAUDE_CONFIG_DIR ?? join7(homedir3(), ".claude");
 }
 async function findTranscript(sessionId, env = process.env) {
-  const projectsDir = join6(claudeConfigDir(env), "projects");
+  const projectsDir = join7(claudeConfigDir(env), "projects");
   let dirs;
   try {
-    dirs = await readdir2(projectsDir, { withFileTypes: true });
+    dirs = await readdir3(projectsDir, { withFileTypes: true });
   } catch {
     return null;
   }
   for (const dir of dirs) {
     if (!dir.isDirectory()) continue;
-    const file2 = join6(projectsDir, dir.name, `${sessionId}.jsonl`);
+    const file2 = join7(projectsDir, dir.name, `${sessionId}.jsonl`);
     try {
       await access(file2);
       return file2;
@@ -20980,24 +21062,24 @@ async function findTranscript(sessionId, env = process.env) {
 }
 async function collectTranscripts(env = process.env) {
   const found = /* @__PURE__ */ new Map();
-  const projectsDir = join6(claudeConfigDir(env), "projects");
+  const projectsDir = join7(claudeConfigDir(env), "projects");
   let projectDirs;
   try {
-    projectDirs = await readdir2(projectsDir, { withFileTypes: true });
+    projectDirs = await readdir3(projectsDir, { withFileTypes: true });
   } catch {
     return found;
   }
   for (const entry of projectDirs) {
     if (!entry.isDirectory()) continue;
-    const dir = join6(projectsDir, entry.name);
+    const dir = join7(projectsDir, entry.name);
     let files;
     try {
-      files = await readdir2(dir);
+      files = await readdir3(dir);
     } catch {
       continue;
     }
     for (const file2 of files) {
-      if (file2.endsWith(".jsonl")) found.set(file2.slice(0, -".jsonl".length), join6(dir, file2));
+      if (file2.endsWith(".jsonl")) found.set(file2.slice(0, -".jsonl".length), join7(dir, file2));
     }
   }
   return found;
@@ -21067,7 +21149,7 @@ function displayTurn(turn, roots) {
 }
 var EDIT_TOOLS = /* @__PURE__ */ new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 var CLEAR = /<command-name>\s*\/clear\s*<\/command-name>/;
-var LINE_UUID = /"uuid":"([^"]+)"/;
+var LINE_UUID2 = /"uuid":"([^"]+)"/;
 var LINE_PARENT = /"parentUuid":"([^"]+)"/;
 var LIST_LIMIT = 40;
 function addOnce(tools, key, text) {
@@ -21103,13 +21185,38 @@ function addAssistant(turn, line) {
   }
 }
 async function readConversation(file2) {
+  const turns = await readAllTurns(file2);
+  const origin = await forkOrigin(file2, turns, readTranscriptTurns, isMessageLine);
+  if (origin === null) return turns;
+  return turns.slice(origin.copied).map((turn, index) => {
+    const { resumed: _, ...rest } = turn;
+    return { ...index === 0 ? rest : turn, id: `m${index + 1}` };
+  });
+}
+async function readForkOrigin(file2) {
+  return forkOrigin(file2, await readAllTurns(file2), readTranscriptTurns, isMessageLine);
+}
+function isMessageLine(line) {
+  return messageText(line) !== null && typeof line.timestamp === "string";
+}
+var turnCache = /* @__PURE__ */ new Map();
+async function readTranscriptTurns(file2) {
+  const size = (await stat5(file2)).size;
+  const cached2 = turnCache.get(file2);
+  if (cached2 && cached2.size === size) return cached2.turns;
+  const turns = readAllTurns(file2);
+  turnCache.set(file2, { size, turns });
+  turns.catch(() => turnCache.delete(file2));
+  return turns;
+}
+async function readAllTurns(file2) {
   const turns = [];
   const seen = /* @__PURE__ */ new Set();
   let pendingResume = false;
-  const lines = createInterface({ input: createReadStream(file2, "utf8"), crlfDelay: Infinity });
+  const lines = createInterface2({ input: createReadStream2(file2, "utf8"), crlfDelay: Infinity });
   for await (const raw of lines) {
     if (raw.includes("<command-name>") && CLEAR.test(raw)) pendingResume = true;
-    const uuid3 = LINE_UUID.exec(raw)?.[1];
+    const uuid3 = LINE_UUID2.exec(raw)?.[1];
     const parent = LINE_PARENT.exec(raw)?.[1];
     if (seen.size > 0 && parent !== void 0 && !seen.has(parent) && !raw.includes('"isSidechain":true'))
       pendingResume = true;
@@ -21223,7 +21330,7 @@ async function readLastTurn(file2) {
   }
 }
 async function readsHandoff(file2) {
-  const lines = createInterface({ input: createReadStream(file2, "utf8"), crlfDelay: Infinity });
+  const lines = createInterface2({ input: createReadStream2(file2, "utf8"), crlfDelay: Infinity });
   for await (const raw of lines) {
     if (!raw.includes("handoff")) continue;
     if (/"name":"(?:Read|Bash)"/.test(raw) && /"file_path":"[^"]*handoff[^"]*"/i.test(raw))
@@ -21234,7 +21341,7 @@ async function readsHandoff(file2) {
 }
 async function countUserLines(file2) {
   let count = 0;
-  const lines = createInterface({ input: createReadStream(file2, "utf8"), crlfDelay: Infinity });
+  const lines = createInterface2({ input: createReadStream2(file2, "utf8"), crlfDelay: Infinity });
   for await (const raw of lines) {
     if (!raw.includes('"type":"user"')) continue;
     try {
@@ -21277,6 +21384,7 @@ var claude = {
   collectTranscripts,
   collectTranscriptIds,
   readConversation,
+  readForkOrigin,
   readsHandoff,
   readLastTurn,
   countUserLines,
@@ -21307,7 +21415,7 @@ import { createHash } from "crypto";
 
 // src/store/conversations.ts
 import { appendFile, mkdir as mkdir4, readFile as readFile4 } from "fs/promises";
-import { dirname as dirname4 } from "path";
+import { dirname as dirname5 } from "path";
 import { constants as constants2, gunzipSync, gzipSync } from "zlib";
 
 // src/redact.ts
@@ -21421,7 +21529,7 @@ async function appendConversationTurns(root, sessionId, turns) {
   const chunk = `${value.map((turn) => JSON.stringify(turn)).join("\n")}
 `;
   const file2 = projectPaths(root).conversation(sessionId);
-  await mkdir4(dirname4(file2), { recursive: true });
+  await mkdir4(dirname5(file2), { recursive: true });
   await appendFile(file2, gzipSync(Buffer.from(chunk, "utf8")));
   return fresh.length;
 }
@@ -21433,7 +21541,7 @@ async function appendConversationHashes(root, sessionId, hashes) {
   const chunk = `${fresh.map((turn) => JSON.stringify(turn)).join("\n")}
 `;
   const file2 = projectPaths(root).conversation(sessionId);
-  await mkdir4(dirname4(file2), { recursive: true });
+  await mkdir4(dirname5(file2), { recursive: true });
   await appendFile(file2, gzipSync(Buffer.from(chunk, "utf8")));
   return fresh.length;
 }
@@ -21741,8 +21849,8 @@ async function installGitHook(root, event) {
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return false;
   await mkdir5(dir, { recursive: true });
-  const file2 = join7(dir, event);
-  const exists = await stat4(file2).then(
+  const file2 = join8(dir, event);
+  const exists = await stat6(file2).then(
     () => true,
     () => false
   );
@@ -21775,7 +21883,7 @@ async function refreshGitHooks(root) {
   if (dir === void 0) return [];
   const refreshed = [];
   for (const event of GIT_HOOK_EVENTS) {
-    const current = await readFile5(join7(dir, event), "utf8").catch(() => void 0);
+    const current = await readFile5(join8(dir, event), "utf8").catch(() => void 0);
     if (current === void 0 || !current.includes(BLOCK_START)) continue;
     if (await installGitHook(root, event)) refreshed.push(event);
   }
@@ -21788,7 +21896,7 @@ async function uninstallGitHooks(root) {
   if (dir === void 0) return [];
   const removed = [];
   for (const event of GIT_HOOK_EVENTS) {
-    const file2 = join7(dir, event);
+    const file2 = join8(dir, event);
     const current = await readFile5(file2, "utf8").catch(() => void 0);
     if (current === void 0 || !current.includes(BLOCK_START)) continue;
     const next = withoutHookBlock(current);
@@ -21838,6 +21946,7 @@ export {
   appendConversationTurns,
   appendConversationHashes,
   MESSAGE_HASH,
+  messageHash,
   hashTurns,
   readSessionMessages,
   storedMessages,
