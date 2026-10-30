@@ -84,12 +84,6 @@ describe("layoutSessionGraph", () => {
     ]);
   });
 
-  it("ends the session rows at the dragged map width", () => {
-    const model = modelOf([session("a", 0, 60)]);
-    expect(layoutSessionGraph(model).git.rowWidth).toBe(720);
-    expect(layoutSessionGraph(model, undefined, 1020).git.rowWidth).toBe(1020);
-  });
-
   it("runs a child session in the parent's lane", () => {
     const earlier = session("a", 0, 60);
     const later = session("b", 90, 120, { sessionId: "a", id: "h1", sessionTitle: "Session a" });

@@ -4,45 +4,39 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  clampMapWidth,
-  MAP_WIDTH,
-  MAP_WIDTH_MAX,
-  MAP_WIDTH_MIN,
-  messageRowWidth,
-  TITLE_MIN_WIDTH,
+  clampRowWidth,
+  layoutGitGraph,
+  ROW_WIDTH,
+  ROW_WIDTH_MAX,
+  ROW_WIDTH_MIN,
 } from "../src/gitLayout.js";
-import { loadMapWidth, RowEdge, saveMapWidth } from "../src/RowEdge.js";
+import { loadRowWidths, RowEdge, saveRowWidths } from "../src/RowEdge.js";
 
-describe("dragging the map's right edge", () => {
+const T0 = "2026-10-26T10:00:00.000Z";
+
+describe("dragging the message rows wider", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("keeps a dragged width in range and reads junk as the default", () => {
-    expect(clampMapWidth(10)).toBe(MAP_WIDTH_MIN);
-    expect(clampMapWidth(99_999)).toBe(MAP_WIDTH_MAX);
-    expect(clampMapWidth(700.4)).toBe(700);
-    expect(clampMapWidth(Number.NaN)).toBe(MAP_WIDTH);
-    expect(clampMapWidth("wide")).toBe(MAP_WIDTH);
+    expect(clampRowWidth(10)).toBe(ROW_WIDTH_MIN);
+    expect(clampRowWidth(99_999)).toBe(ROW_WIDTH_MAX);
+    expect(clampRowWidth(700.4)).toBe(700);
+    expect(clampRowWidth(Number.NaN)).toBe(ROW_WIDTH);
+    expect(clampRowWidth("wide")).toBe(ROW_WIDTH);
   });
 
-  it("ends an open session's messages where the session rows end", () => {
-    // 900 wide, 60 of it lanes, 8 gap: the text gets the rest.
-    expect(messageRowWidth(900, 60)).toBe(832);
-    // Lanes wider than the map still leave a readable title.
-    expect(messageRowWidth(600, 500)).toBe(TITLE_MIN_WIDTH * 2);
-  });
-
-  it("puts a full-height grab strip on the map's right edge", () => {
+  it("puts a full-height grab strip on the rows' right edge", () => {
+    const git = layoutGitGraph(
+      [{ id: "a", kind: "message", title: "A message", at: T0, parent: null }],
+      { rowWidth: 700 },
+    );
     const html = renderToStaticMarkup(
-      createElement(
-        ReactFlowProvider,
-        null,
-        createElement(RowEdge, { left: 800, height: 1200, width: 720, onResize: () => {} }),
-      ),
+      createElement(ReactFlowProvider, null, createElement(RowEdge, { git, onResize: () => {} })),
     );
     expect(html).toContain('role="separator"');
     // At zoom 1 the strip is 12px wide, centred on the edge.
-    expect(html).toContain("left:794px");
-    expect(html).toContain("height:1200px");
+    expect(html).toContain(`left:${git.width - 6}px`);
+    expect(html).toContain(`height:${git.height}px`);
   });
 
   it("takes the pointer although React Flow turns it off inside map nodes", () => {
@@ -50,7 +44,7 @@ describe("dragging the map's right edge", () => {
     expect(css).toMatch(/\.row-edge,[^{]*\{\s*pointer-events:\s*all/);
   });
 
-  it("remembers the width, and reads a blocked or empty storage as the default", () => {
+  it("remembers each session's width, and reads blocked, empty or junk storage as none", () => {
     const store = new Map<string, string>();
     vi.stubGlobal("window", {
       localStorage: {
@@ -58,9 +52,13 @@ describe("dragging the map's right edge", () => {
         setItem: (key: string, value: string) => store.set(key, value),
       },
     });
-    expect(loadMapWidth()).toBe(MAP_WIDTH);
-    saveMapWidth(840);
-    expect(loadMapWidth()).toBe(840);
+    expect(loadRowWidths()).toEqual({});
+    saveRowWidths({ a: 840, b: 600 });
+    expect(loadRowWidths()).toEqual({ a: 840, b: 600 });
+    store.set("cogit.sessionRowWidths", JSON.stringify({ a: 99_999, b: "wide" }));
+    expect(loadRowWidths()).toEqual({ a: ROW_WIDTH_MAX, b: ROW_WIDTH });
+    store.set("cogit.sessionRowWidths", "[1,2]");
+    expect(loadRowWidths()).toEqual({});
 
     vi.stubGlobal("window", {
       localStorage: {
@@ -72,7 +70,7 @@ describe("dragging the map's right edge", () => {
         },
       },
     });
-    expect(loadMapWidth()).toBe(MAP_WIDTH);
-    expect(() => saveMapWidth(600)).not.toThrow();
+    expect(loadRowWidths()).toEqual({});
+    expect(() => saveRowWidths({ a: 600 })).not.toThrow();
   });
 });

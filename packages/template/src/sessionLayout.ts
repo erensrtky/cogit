@@ -1,5 +1,5 @@
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
-import { type GitLayout, type GitNode, layoutGitGraph, MAP_WIDTH } from "./gitLayout.js";
+import { type GitLayout, type GitNode, layoutGitGraph } from "./gitLayout.js";
 import { headOf } from "./graph.js";
 
 /**
@@ -9,6 +9,9 @@ import { headOf } from "./graph.js";
  * picks up earlier work grows out of that earlier session; everything else is a
  * root. Epochs are not boxes any more, just tags on the dots.
  */
+
+/** Wider than a message row: a session row carries a title, a count and a tag. */
+export const SESSION_ROW_WIDTH = 720;
 
 function time(value: string | undefined): number {
   if (!value) return Number.NEGATIVE_INFINITY;
@@ -68,8 +71,6 @@ export function layoutSessionGraph(
   model: LineageViewModel,
   /** Room to leave under a session's row for its opened messages, by session id. */
   spaceAfter?: ReadonlyMap<string, number>,
-  /** The session rows' width: the map's right edge, which the user may drag. */
-  mapWidth: number = MAP_WIDTH,
 ): SessionGraph {
   const sessions = allSessions(model);
   const byId = new Map(sessions.map((session) => [session.sessionId, session]));
@@ -101,7 +102,7 @@ export function layoutSessionGraph(
 
   const git = layoutGitGraph(items, {
     fold: false,
-    rowWidth: mapWidth,
+    rowWidth: SESSION_ROW_WIDTH,
     headId: headOf(model)?.sessionId ?? null,
     itemEnd: endIndex,
     ...(spaceAfter === undefined ? {} : { spaceAfter }),
