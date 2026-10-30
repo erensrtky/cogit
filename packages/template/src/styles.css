@@ -1654,14 +1654,22 @@ button.file-row:hover {
   border-top: 1px solid var(--line);
 }
 
+/* Two small, equal controls: they copy a command, they do not run anything. */
+.resume-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
 .resume-button {
-  width: 100%;
-  padding: 8px 12px;
+  padding: 2px 10px;
   color: var(--text);
   background: var(--active);
   border: 1px solid var(--line);
   border-radius: 7px;
   font: inherit;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -1676,12 +1684,13 @@ button.file-row:hover {
 }
 
 .resume-note {
-  margin-top: 6px;
+  font-size: 12px;
 }
 
 .resume-command {
-  margin: 10px 0 0;
-  padding: 8px;
+  flex-basis: 100%;
+  margin: 0;
+  padding: 6px 8px;
   overflow-x: auto;
   background: var(--row-bg);
   border: 1px solid var(--line);
@@ -1792,27 +1801,6 @@ time {
 
 .inbox-actions a {
   color: var(--accent);
-}
-
-/* The shared resume button fills its side-panel column; an inbox row wants a
-   compact control next to the link and Dismiss. */
-.inbox-actions .resume-button {
-  width: auto;
-  padding: 2px 8px;
-  font-size: 12px;
-}
-
-.inbox-actions .resume-note {
-  margin: 0;
-  font-size: 12px;
-}
-
-.inbox-resume-command {
-  flex-basis: 100%;
-  margin: 0;
-  padding: 6px 8px;
-  overflow-wrap: anywhere;
-  font-size: 12px;
 }
 
 /* The close button in a row's top-right corner: hides the row until the agent

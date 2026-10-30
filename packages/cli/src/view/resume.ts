@@ -13,7 +13,11 @@ function sessionArg(sessionId: string): string {
   return /^[A-Za-z0-9._:/-]+$/.test(sessionId) ? sessionId : shellQuote(sessionId);
 }
 
-/** `cd '<project path>' && claude --resume <sessionId>` */
-export function resumeCommand(projectPath: string, sessionId: string): string {
-  return `cd ${shellQuote(projectPath)} && claude --resume ${sessionArg(sessionId)}`;
+/**
+ * `cd '<project path>' && claude --resume <sessionId>`; with `fork`, adds
+ * `--fork-session` so the chat continues as a new session and the original stays.
+ */
+export function resumeCommand(projectPath: string, sessionId: string, fork = false): string {
+  const command = `cd ${shellQuote(projectPath)} && claude --resume ${sessionArg(sessionId)}`;
+  return fork ? `${command} --fork-session` : command;
 }

@@ -6,7 +6,6 @@ import type {
   ViewNode,
   ViewSession,
 } from "../../cli/src/view/model.js";
-import { resumeCommand } from "../../cli/src/view/resume.js";
 import { type CopyState, copyText } from "./clipboard.js";
 import { parseSubject, splitPath, typeColour } from "./codeRefs.js";
 import { DiffView } from "./DiffView.js";
@@ -86,39 +85,13 @@ function MessageHash({ value }: { value: string }) {
 }
 
 function ResumeRow({ model, session }: { model: LineageViewModel; session: ViewSession }) {
-  const code = useRef<HTMLElement>(null);
-  const command = resumeCommand(model.project.path, session.sessionId);
-
-  if (!session.transcriptAvailable) {
-    return (
-      <div className="resume">
-        <button type="button" className="resume-button" disabled>
-          Copy resume command
-        </button>
-        <p className="muted resume-note">session no longer available</p>
-      </div>
-    );
-  }
-
   return (
     <div className="resume">
-      {/* Last resort on a failed copy: selecting the command allows Ctrl+C. */}
       <ResumeButton
         projectPath={model.project.path}
         sessionId={session.sessionId}
-        onFailed={() => {
-          const element = code.current;
-          if (!element) return;
-          const range = document.createRange();
-          range.selectNodeContents(element);
-          const selection = window.getSelection();
-          selection?.removeAllRanges();
-          selection?.addRange(range);
-        }}
+        available={session.transcriptAvailable}
       />
-      <pre className="resume-command">
-        <code ref={code}>{command}</code>
-      </pre>
     </div>
   );
 }

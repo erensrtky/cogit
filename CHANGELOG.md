@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- The large "Copy resume command" button is now two small buttons for the session: **Resume** copies `claude --resume <id>`, and **Fork** copies the same with `--fork-session`, so the chat goes on as a new session and the original stays. The command shows only when copying fails.
 
 ## [0.23.2] - 2026-10-30
 ### Changed

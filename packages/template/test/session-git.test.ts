@@ -82,4 +82,23 @@ describe("Story 9.3 on the map", () => {
     );
     expect(html).toContain('class="branch-detail fold"');
   });
+
+  it("offers Resume and Fork for the session, disabled when its chat is gone", () => {
+    const render = (current: ViewSession) =>
+      renderToStaticMarkup(
+        createElement(DrillDown, {
+          model: modelOf(current),
+          selection: { type: "node", sessionId: "s1", nodeId: "h1" },
+          onClose: () => {},
+        }),
+      );
+    const live = render({ ...session, transcriptAvailable: true });
+    expect(live).toContain(">Resume</button>");
+    expect(live).toContain(">Fork</button>");
+    expect(live).toContain("claude --resume s1 --fork-session");
+    expect(live).not.toContain("disabled");
+    const gone = render(session);
+    expect(gone).toContain("session no longer available");
+    expect(gone.match(/class="resume-button" disabled/g)).toHaveLength(2);
+  });
 });

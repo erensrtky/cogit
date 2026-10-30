@@ -51,8 +51,10 @@ Click a row to open its details on the right:
 - the commits and files, each one opening git's own diff
 - the conversation turn itself: your message as written and the agent's written replies (tool
   output is left out). This comes from your machine only; see [Privacy](privacy.md).
-- previous and next message buttons, and a **Copy resume command** button:
-  `cd '<project>' && claude --resume <session-id>` reopens that chat where it was.
+- previous and next message buttons, and two small buttons that copy a command for the
+  whole session: **Resume** (`cd '<project>' && claude --resume <session-id>`) reopens the
+  chat where it left off, and **Fork** adds `--fork-session`, so the chat goes on as a new
+  session with the same history and the original stays as it was.
 
 ## "Your turn"
 

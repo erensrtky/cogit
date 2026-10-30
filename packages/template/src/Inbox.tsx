@@ -149,7 +149,6 @@ export function Inbox({
                   projectPath={row.projectPath}
                   sessionId={row.sessionId}
                   available={row.transcriptAvailable}
-                  revealCommand
                 />
               </div>
             </li>

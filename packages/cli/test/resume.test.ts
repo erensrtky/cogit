@@ -34,6 +34,12 @@ describe("resumeCommand", () => {
     expect(resumeCommand("/tmp/it's here", "id")).toContain("cd '/tmp/it'\\''s here'");
   });
 
+  it("adds --fork-session for a fork", () => {
+    expect(resumeCommand("/p", "abc-123", true)).toBe(
+      "cd '/p' && claude --resume abc-123 --fork-session",
+    );
+  });
+
   it("quotes an unusual session id", () => {
     expect(resumeCommand("/p", "a b")).toBe("cd '/p' && claude --resume 'a b'");
   });
