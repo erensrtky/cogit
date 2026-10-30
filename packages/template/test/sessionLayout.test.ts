@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { LineageViewModel, ViewNode, ViewSession } from "../../cli/src/view/model.js";
-import { allSessions, layoutSessionGraph, sessionParentOf } from "../src/sessionLayout.js";
+import {
+  allSessions,
+  layoutSessionGraph,
+  openAtLoad,
+  sessionParentOf,
+} from "../src/sessionLayout.js";
 
 /** Minutes after 2026-10-24T10:00Z, so spans are easy to read. */
 function at(minutes: number): string {
@@ -138,5 +143,17 @@ describe("layoutSessionGraph", () => {
     expect(graph.git.headId).toBe("a");
     const head = graph.git.rows.find((row) => row.kind === "message" && row.message.id === "a");
     expect(head?.head).toBe(true);
+  });
+});
+
+describe("openAtLoad", () => {
+  it("reopens the stored sessions that still exist, plus the one the page lands on", () => {
+    const model = modelOf([session("a", 0, 30), session("b", 60, 90), session("c", 100, 120)]);
+    expect([...openAtLoad(model, ["a", "gone", 7, "b"], { sessionId: "c" })]).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+    expect([...openAtLoad(model, "junk", null)]).toEqual([]);
   });
 });

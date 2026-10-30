@@ -29,9 +29,9 @@ import {
 } from "../src/server.js";
 import { atomicWrite } from "../src/store/fs.js";
 import { readInboxDismissed } from "../src/store/inbox-state.js";
+import { readMapView } from "../src/store/map-view.js";
 import { globalPaths, projectPaths } from "../src/store/paths.js";
 import { readReadState } from "../src/store/read-state.js";
-import { readRowWidths } from "../src/store/row-widths.js";
 import { loadConfig, updateConfig } from "../src/store/stores.js";
 import { DATA_ELEMENT_ID, LIVE_META_NAME, TOKEN_META_NAME } from "../src/view/model.js";
 import { envFor, fakeIo, noGitProject, tempDir } from "./helpers.js";
@@ -913,9 +913,9 @@ describe("row width endpoint", () => {
     const reply = await widthWrite(server, token, { dir: root, sessionId: SESSION, width: 840 });
     expect(reply.status).toBe(200);
     expect(JSON.parse(reply.body)).toEqual({ ok: true, sessionId: SESSION, width: 840 });
-    expect(await readRowWidths(root)).toEqual({ [SESSION]: 840 });
+    expect((await readMapView(root)).rowWidths).toEqual({ [SESSION]: 840 });
     await widthWrite(server, token, { dir: root, sessionId: SESSION, width: null });
-    expect(await readRowWidths(root)).toEqual({});
+    expect((await readMapView(root)).rowWidths).toEqual({});
   });
 
   it("refuses a foreign project, a bad payload, a bad token and a bad body", async () => {
@@ -945,21 +945,36 @@ describe("row width endpoint", () => {
     expect((await widthWrite(server, token, { ...good, pad: "x".repeat(5000) })).status).toBe(413);
   });
 
-  it("reads the stored widths back for a reload that beats the rebuild", async () => {
+  it("stores the open sessions and reads the whole view back for a reload", async () => {
     const server = await start();
     const token = await panelToken(server);
     await widthWrite(server, token, { dir: root, sessionId: SESSION, width: 840 });
+    const post = (payload: unknown): Promise<Reply> =>
+      postConfig(`${server.url}/api/open-sessions`, JSON.stringify(payload), {
+        origin: `http://127.0.0.1:${server.port}`,
+        [CONFIG_TOKEN_HEADER]: token,
+      });
+    expect((await post({ dir: root, open: [SESSION] })).status).toBe(200);
+    expect((await post({ dir: root, open: ["bad id!"] })).status).toBe(400);
+    expect((await post({ dir: root, open: "x" })).status).toBe(400);
+    expect((await post({ dir: join(dir, "elsewhere"), open: [] })).status).toBe(403);
+    expect((await post({ open: [] })).status).toBe(400);
+
     const headers = { origin: `http://127.0.0.1:${server.port}`, [CONFIG_TOKEN_HEADER]: token };
-    const url = `${server.url}/api/row-width?dir=${encodeURIComponent(root)}`;
+    const url = `${server.url}/api/map-view?dir=${encodeURIComponent(root)}`;
     const reply = await request(url, headers);
     expect(reply.status).toBe(200);
-    expect(JSON.parse(reply.body)).toEqual({ ok: true, widths: { [SESSION]: 840 } });
+    expect(JSON.parse(reply.body)).toEqual({
+      ok: true,
+      rowWidths: { [SESSION]: 840 },
+      open: [SESSION],
+    });
     expect((await request(url, { ...headers, [CONFIG_TOKEN_HEADER]: "nope" })).status).toBe(403);
-    expect((await request(`${server.url}/api/row-width`, headers)).status).toBe(400);
+    expect((await request(`${server.url}/api/map-view`, headers)).status).toBe(400);
     expect(
       (
         await request(
-          `${server.url}/api/row-width?dir=${encodeURIComponent(join(dir, "elsewhere"))}`,
+          `${server.url}/api/map-view?dir=${encodeURIComponent(join(dir, "elsewhere"))}`,
           headers,
         )
       ).status,
@@ -970,9 +985,15 @@ describe("row width endpoint", () => {
   it("answers 500 instead of crashing when the state cannot be written", async () => {
     const server = await start();
     const token = await panelToken(server);
-    await mkdir(projectPaths(root).rowWidths, { recursive: true });
+    await mkdir(projectPaths(root).mapView, { recursive: true });
     const reply = await widthWrite(server, token, { dir: root, sessionId: SESSION, width: 700 });
     expect(reply.status).toBe(500);
+    const open = await postConfig(
+      `${server.url}/api/open-sessions`,
+      JSON.stringify({ dir: root, open: [SESSION] }),
+      { origin: `http://127.0.0.1:${server.port}`, [CONFIG_TOKEN_HEADER]: token },
+    );
+    expect(open.status).toBe(500);
   });
 });
 

@@ -29,10 +29,10 @@ import {
 import { applyEvents, readEvents } from "../store/events.js";
 import { atomicWrite } from "../store/fs.js";
 import { withLock } from "../store/lock.js";
+import { readMapView } from "../store/map-view.js";
 import { projectPaths } from "../store/paths.js";
 import { readReadState } from "../store/read-state.js";
 import { resolveProjectRoot } from "../store/root.js";
-import { readRowWidths } from "../store/row-widths.js";
 import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
 import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
 import { attachChanges } from "../view/change.js";
@@ -357,7 +357,9 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       });
       built.switcher = switcher;
       built.read = [...read].sort();
-      built.rowWidths = await readRowWidths(root);
+      const view = await readMapView(root);
+      built.rowWidths = view.rowWidths;
+      built.openSessions = view.open;
       // Story 11.1: the map head carries this project's rows only. The panel
       // already collected them from the registry; a project outside it (a
       // broken registry, a hand-made directory) is read here instead.

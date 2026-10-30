@@ -109,3 +109,20 @@ export function layoutSessionGraph(
   });
   return { git, sessions: byId, parents };
 }
+
+/**
+ * Sessions open when the page loads: the ones the user left open that still
+ * exist, plus the session the page lands on.
+ */
+export function openAtLoad(
+  model: LineageViewModel,
+  stored: unknown,
+  initial: { sessionId: string } | null,
+): ReadonlySet<string> {
+  const known = new Set(allSessions(model).map((session) => session.sessionId));
+  const open = new Set<string>();
+  if (Array.isArray(stored))
+    for (const id of stored) if (typeof id === "string" && known.has(id)) open.add(id);
+  if (initial !== null) open.add(initial.sessionId);
+  return open;
+}

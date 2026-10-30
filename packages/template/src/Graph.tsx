@@ -10,11 +10,19 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { unreadViewMessages } from "../../cli/src/view/change.js";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
-import { loadRowWidths, pageToken, saveRead, saveRowWidth } from "./data.js";
+import { loadMapView, pageToken, saveOpenSessions, saveRead, saveRowWidth } from "./data.js";
 import { type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
@@ -26,7 +34,7 @@ import { RowEdge, type RowWidths, rowWidthsOf } from "./RowEdge.js";
 import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
 import { usePageWheel } from "./scroll.js";
-import { layoutSessionGraph, type SessionGraph } from "./sessionLayout.js";
+import { layoutSessionGraph, openAtLoad, type SessionGraph } from "./sessionLayout.js";
 import { useTheme } from "./ThemeButton.js";
 import { UnreadView } from "./UnreadView.js";
 
@@ -221,6 +229,10 @@ function readTarget(model: LineageViewModel): Target | null {
   return { sessionId };
 }
 
+function sameSet(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+  return a.size === b.size && [...a].every((id) => b.has(id));
+}
+
 function findSession(model: LineageViewModel, id: string): ViewSession | undefined {
   for (const epoch of model.epochs) {
     const session = epoch.sessions.find((candidate) => candidate.sessionId === id);
@@ -239,8 +251,8 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     if (initial?.messageId !== undefined)
       document.querySelector(".lineage-map")?.scrollIntoView({ block: "start" });
   }, [initial]);
-  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(
-    () => new Set(initial === null ? [] : [initial.sessionId]),
+  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(() =>
+    openAtLoad(model, model.openSessions, initial),
   );
   const [selection, setSelection] = useState<Selection | null>(() => {
     if (initial === null || initial.quiet) return null;
@@ -250,17 +262,44 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
   /** Each session's message row width, dragged at the rows' right edge. */
   const [rowWidths, setRowWidths] = useState<RowWidths>(() => rowWidthsOf(model.rowWidths));
-  // The embedded widths are as of the last build; a reload right after a drag
-  // can beat the rebuild, so a served page asks for the stored ones once.
+  /** Bumped when the stored view opens other sessions than the embedded one did. */
+  const [refocus, setRefocus] = useState(0);
+  /** Open sessions are stored only once the stored view has been read. */
+  const viewLoaded = useRef(false);
+  // The embedded view is as of the last build; a reload right after a change
+  // can beat the rebuild, so a served page asks for the stored one once.
   useEffect(() => {
     const token = pageToken();
     if (token === null) return;
-    void loadRowWidths(model.project.path, token)
-      .then((widths) => setRowWidths(rowWidthsOf(widths)))
+    void loadMapView(model.project.path, token)
+      .then((view) => {
+        setRowWidths(rowWidthsOf(view.rowWidths));
+        const open = openAtLoad(model, view.open, initial);
+        setOpenIds((previous) => {
+          if (sameSet(previous, open)) return previous;
+          setRefocus((value) => value + 1);
+          return open;
+        });
+      })
       .catch(() => {
-        // The embedded widths stay; they are at most one drag behind.
+        // The embedded view stays; it is at most one change behind.
+      })
+      .finally(() => {
+        viewLoaded.current = true;
       });
-  }, [model.project.path]);
+    // Once per page: later model swaps carry the view the page itself wrote.
+  }, []);
+  // Every open or close is stored, so a reload opens the same sessions again.
+  useEffect(() => {
+    const token = pageToken();
+    if (token === null || !viewLoaded.current) return;
+    const timer = window.setTimeout(() => {
+      void saveOpenSessions(model.project.path, [...openIds], token).catch((err: unknown) => {
+        console.warn("cogit: could not save the open sessions", err);
+      });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [openIds, model.project.path]);
   const resizeRows = useCallback((sessionId: string, width: number) => {
     setRowWidths((previous) => {
       // Back at the default (double-click): forget the session.
@@ -818,6 +857,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
                 searchJump={searchJump}
                 fileJump={fileJump}
                 fit={fits}
+                refocus={refocus}
               />
             )}
             <DrillDown
@@ -855,6 +895,7 @@ function MapCanvas({
   searchJump,
   fileJump,
   fit,
+  refocus,
 }: {
   nodes: MapFlowNode[];
   /** Point to centre on at load; null fits the whole graph. */
@@ -867,6 +908,8 @@ function MapCanvas({
   fileJump: { key: number; point: { x: number; y: number } } | null;
   /** A new value frames the whole map again (after "Fold all"). */
   fit: number;
+  /** A new value centres on `focusRow` again: the stored view opened more sessions. */
+  refocus: number;
 }) {
   const { fitView, setViewport } = useReactFlow();
   const theme = useTheme();
@@ -911,6 +954,13 @@ function MapCanvas({
     if (fileKey === 0 || filePoint === null) return;
     centre(filePoint);
   }, [fileKey, filePoint]);
+
+  useEffect(() => {
+    if (refocus === 0 || focusRow === null) return;
+    const canvas = document.querySelector(".react-flow")?.getBoundingClientRect();
+    if (canvas) void setViewport(centreViewport(focusRow, canvas, 0.9));
+    // Only the stored view arriving moves the view; `focusRow` follows it.
+  }, [refocus]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

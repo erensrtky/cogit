@@ -19,9 +19,9 @@ import { Config } from "./schema/config.js";
 import { refreshShareConversations } from "./share.js";
 import { dismissInboxSession } from "./store/inbox-state.js";
 import { LockBusyError } from "./store/lock.js";
+import { MAX_OPEN, readMapView, setOpenSessions, setRowWidth } from "./store/map-view.js";
 import { globalPaths, projectPaths } from "./store/paths.js";
 import { setMessageRead } from "./store/read-state.js";
-import { readRowWidths, setRowWidth } from "./store/row-widths.js";
 import { loadConfig, loadRegistry, updateConfig } from "./store/stores.js";
 import { isPanelEditableKey, LIVE_META_NAME, TOKEN_META_NAME } from "./view/model.js";
 import { buildPanel, panelSettings } from "./view/panel.js";
@@ -403,12 +403,12 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
   }
 
   /**
-   * `GET /api/row-width?dir`: the stored row widths as they are now. The page
-   * embeds them at build time, but a reload can come before the rebuild that a
-   * drag's write starts, so the page asks here too. Same Origin and token checks
-   * as the settings read, and a registered project only.
+   * `GET /api/map-view?dir`: how the user left the map (open sessions, row
+   * widths) as stored now. The page embeds it at build time, but a reload can
+   * come before the rebuild that a write starts, so the page asks here too. Same
+   * Origin and token checks as the settings read, and a registered project only.
    */
-  async function readRowWidthsRequest(
+  async function readMapViewRequest(
     req: IncomingMessage,
     res: ServerResponse,
     port: number,
@@ -435,7 +435,8 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       "content-type": "application/json",
       "cache-control": "no-store",
     });
-    res.end(JSON.stringify({ ok: true, widths: await readRowWidths(root) }));
+    const view = await readMapView(root);
+    res.end(JSON.stringify({ ok: true, rowWidths: view.rowWidths, open: view.open }));
   }
 
   /**
@@ -698,23 +699,21 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
   }
 
   /**
-   * `POST /api/row-width` { dir, sessionId, width } : the map's row edge, sent
-   * when a drag ends. `width` null forgets the session (the double-click reset).
-   * It writes the project's local state file, never a committed one. Same Host,
-   * Origin, content-type and token checks as a read mark, and `dir` must be
-   * registered.
+   * The checks every map-view write shares: Origin and token, a JSON object body
+   * within the size cap, and a registered `dir`. Answers the request itself and
+   * returns null when one fails.
    */
-  async function writeRowWidth(
+  async function mapViewWrite(
     req: IncomingMessage,
     res: ServerResponse,
     port: number,
-  ): Promise<void> {
+  ): Promise<{ root: string; body: Record<string, unknown> } | null> {
     if (
       !originAllowed(req.headers.origin, port) ||
       !tokenMatches(req.headers[CONFIG_TOKEN_HEADER])
     ) {
       respond(res, 403, "forbidden");
-      return;
+      return null;
     }
     const type = req.headers["content-type"];
     if (
@@ -722,47 +721,61 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       type.split(";")[0]?.trim().toLowerCase() !== "application/json"
     ) {
       respond(res, 415, "content-type must be application/json");
-      return;
+      return null;
     }
-    const body = await readLimitedBody(req);
-    if (body === null) {
+    const raw = await readLimitedBody(req);
+    if (raw === null) {
       respond(res, 413, "request body too large");
-      return;
+      return null;
     }
     let parsed: unknown;
     try {
-      parsed = JSON.parse(body);
+      parsed = JSON.parse(raw);
     } catch {
       respond(res, 400, "invalid JSON");
-      return;
+      return null;
     }
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
       respond(res, 400, "expected a JSON object");
-      return;
+      return null;
     }
-    const { dir, sessionId, width } = parsed as Record<string, unknown>;
+    const body = parsed as Record<string, unknown>;
+    if (typeof body.dir !== "string") {
+      respond(res, 400, "dir is required");
+      return null;
+    }
+    const root = await registeredRoot(env, body.dir);
+    if (root === null) {
+      respond(res, 403, "not a registered project");
+      return null;
+    }
+    return { root, body };
+  }
+
+  /**
+   * `POST /api/row-width` { dir, sessionId, width }: the map's row edge, sent
+   * when a drag ends. `width` null forgets the session (the double-click reset).
+   * It writes the project's local state file, never a committed one.
+   */
+  async function writeRowWidth(
+    req: IncomingMessage,
+    res: ServerResponse,
+    port: number,
+  ): Promise<void> {
+    const write = await mapViewWrite(req, res, port);
+    if (write === null) return;
+    const { sessionId, width } = write.body;
     if (
-      typeof dir !== "string" ||
       typeof sessionId !== "string" ||
-      (width !== null && typeof width !== "number")
+      !/^[A-Za-z0-9._:-]{1,128}$/.test(sessionId) ||
+      (width !== null &&
+        !(typeof width === "number" && Number.isInteger(width) && width > 0 && width <= 10_000))
     ) {
       respond(res, 400, "expected { dir, sessionId, width }");
       return;
     }
-    if (
-      !/^[A-Za-z0-9._:-]{1,128}$/.test(sessionId) ||
-      (width !== null && !(Number.isInteger(width) && width > 0 && width <= 10_000))
-    ) {
-      respond(res, 400, "sessionId or width is not valid");
-      return;
-    }
-    const root = await registeredRoot(env, dir);
-    if (root === null) {
-      respond(res, 403, "not a registered project");
-      return;
-    }
     try {
-      await setRowWidth(root, sessionId, width);
+      await setRowWidth(write.root, sessionId, width);
     } catch {
       respond(res, 500, "could not write the row width");
       return;
@@ -772,6 +785,40 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       "cache-control": "no-store",
     });
     res.end(JSON.stringify({ ok: true, sessionId, width }));
+  }
+
+  /**
+   * `POST /api/open-sessions` { dir, open }: the sessions open on the map, sent
+   * whenever one opens or closes, so a reload opens them again. It writes the
+   * project's local state file, never a committed one.
+   */
+  async function writeOpenSessions(
+    req: IncomingMessage,
+    res: ServerResponse,
+    port: number,
+  ): Promise<void> {
+    const write = await mapViewWrite(req, res, port);
+    if (write === null) return;
+    const { open } = write.body;
+    if (
+      !Array.isArray(open) ||
+      open.length > MAX_OPEN ||
+      !open.every((id) => typeof id === "string" && /^[A-Za-z0-9._:-]{1,128}$/.test(id))
+    ) {
+      respond(res, 400, "expected { dir, open: [session ids] }");
+      return;
+    }
+    try {
+      await setOpenSessions(write.root, open as string[]);
+    } catch {
+      respond(res, 500, "could not write the open sessions");
+      return;
+    }
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify({ ok: true, open }));
   }
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -805,6 +852,10 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
         await writeRowWidth(req, res, port);
         return;
       }
+      if (url.pathname === "/api/open-sessions") {
+        await writeOpenSessions(req, res, port);
+        return;
+      }
       if (url.pathname !== "/api/config") {
         respond(res, 405, "method not allowed");
         return;
@@ -829,12 +880,12 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       await readDiff(req, res, port, url);
       return;
     }
-    if (url.pathname === "/api/row-width") {
+    if (url.pathname === "/api/map-view") {
       if (req.method !== "GET") {
         respond(res, 405, "method not allowed");
         return;
       }
-      await readRowWidthsRequest(req, res, port, url);
+      await readMapViewRequest(req, res, port, url);
       return;
     }
     if (url.pathname === "/api/config") {

@@ -40,8 +40,8 @@ export function projectPaths(root: string) {
     readState: join(base, "state", "read.json"),
     /** Inbox rows the user dismissed, per session (Story 11.1); also local. */
     inboxState: join(base, "state", "inbox.json"),
-    /** How wide the user dragged each session's message rows on the map; also local. */
-    rowWidths: join(base, "state", "row-widths.json"),
+    /** How the user left the map: open sessions and dragged row widths; also local. */
+    mapView: join(base, "state", "map.json"),
     /** What the detached hook children (build, side run) printed; local, capped. */
     detachedLog: join(base, "state", "detached.log"),
     locks: join(base, "locks"),

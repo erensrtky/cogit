@@ -99,20 +99,40 @@ export async function saveRead(
 }
 
 /**
- * The stored row widths as they are now. The page embeds them at build time,
- * but a reload right after a drag can beat the rebuild, so the page asks too.
+ * How the user left the map (open sessions, row widths) as stored now. The page
+ * embeds it at build time, but a reload right after a change can beat the
+ * rebuild, so the page asks too.
  */
-export async function loadRowWidths(dir: string, token: string): Promise<unknown> {
-  const response = await fetch(`/api/row-width?dir=${encodeURIComponent(dir)}`, {
+export async function loadMapView(
+  dir: string,
+  token: string,
+): Promise<{ rowWidths?: unknown; open?: unknown }> {
+  const response = await fetch(`/api/map-view?dir=${encodeURIComponent(dir)}`, {
     headers: { "x-cogit-token": token },
     cache: "no-store",
   });
   if (!response.ok) {
     const text = (await response.text()).trim();
-    throw new Error(text || `could not read the row widths (HTTP ${response.status})`);
+    throw new Error(text || `could not read the map view (HTTP ${response.status})`);
   }
-  const body = (await response.json()) as { widths?: unknown };
-  return body.widths;
+  return (await response.json()) as { rowWidths?: unknown; open?: unknown };
+}
+
+/** Stores which sessions are open, so a reload opens them again; needs the local server. */
+export async function saveOpenSessions(
+  dir: string,
+  open: readonly string[],
+  token: string,
+): Promise<void> {
+  const response = await fetch("/api/open-sessions", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-cogit-token": token },
+    body: JSON.stringify({ dir, open }),
+  });
+  if (!response.ok) {
+    const text = (await response.text()).trim();
+    throw new Error(text || `could not save the open sessions (HTTP ${response.status})`);
+  }
 }
 
 /**
