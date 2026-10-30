@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - The large "Copy resume command" button is now two small buttons for the session: **Resume** copies `claude --resume <id>`, and **Fork** copies the same with `--fork-session`, so the chat goes on as a new session and the original stays. The command shows only when copying fails.
+- Dates read the same everywhere: the side panel, the inbox and the project panel show `2026-10-30 21:09` like the map's rows, and the project tabs `10-30`, instead of the browser's locale (`10/30/2026, 9:09:30 PM`, `Oct 30`).
+- The side panel opens beside the map instead of over it, and the map column grows into the empty right margin while it is open; a narrow window still lays it over the map.
 
 ## [0.23.2] - 2026-10-30
 ### Changed

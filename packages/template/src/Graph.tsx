@@ -833,17 +833,19 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
                 refocus={refocus}
               />
             )}
-            <DrillDown
-              model={model}
-              selection={selection}
-              onClose={() => setSelection(null)}
-              onNavigate={selectFromOutline}
-              read={selection?.type === "node" ? readIds.has(selection.nodeId) : false}
-              onToggleRead={toggleRead}
-              bigChangeLines={bigChangeLines}
-              readError={readError}
-            />
           </div>
+          {/* Beside the map, not over it, so the rows it would cover stay readable;
+              a narrow window lays it over the map (styles.css). */}
+          <DrillDown
+            model={model}
+            selection={selection}
+            onClose={() => setSelection(null)}
+            onNavigate={selectFromOutline}
+            read={selection?.type === "node" ? readIds.has(selection.nodeId) : false}
+            onToggleRead={toggleRead}
+            bigChangeLines={bigChangeLines}
+            readError={readError}
+          />
         </div>
       </div>
     </GraphActions.Provider>

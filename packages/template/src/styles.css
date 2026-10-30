@@ -238,6 +238,16 @@ main.map-page {
   flex: none;
 }
 
+/* With the side panel open the map column grows into the empty right gutter, so
+   the panel takes that room instead of the map's. The left edge stays put. */
+@media (min-width: 1101px) {
+  .map-page .lineage-map:has(.drilldown) {
+    width: auto;
+    margin-right: 24px;
+    margin-left: 16.667%;
+  }
+}
+
 .map-page .lineage-map {
   display: flex;
   flex: 1 1 auto;
@@ -1226,19 +1236,29 @@ body:has(.map-shell.is-expanded) {
 }
 
 /* Drill-down panel: overlays the graph from the right, scrolls on its own. */
+/* A column beside the map: the canvas narrows instead of rows going under it. */
 .drilldown {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  bottom: 12px;
   z-index: 10;
   display: flex;
+  flex: none;
   flex-direction: column;
-  width: min(460px, calc(100% - 24px));
+  width: 460px;
   background: var(--translucent-panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: 0 12px 32px var(--shadow);
+  border-left: 1px solid var(--line);
+}
+
+/* Too narrow for two columns: the panel floats over the map again. */
+@media (max-width: 900px) {
+  .drilldown {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: min(460px, calc(100% - 24px));
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 12px 32px var(--shadow);
+  }
 }
 
 .drilldown-head {
