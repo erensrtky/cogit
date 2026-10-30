@@ -10,13 +10,14 @@ describe("format", () => {
   });
 
   it("renders a short date without the time of day", () => {
-    const iso = "2026-10-21T10:00:00.000Z";
-    const expected = new Date(iso).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-    });
-    expect(formatDate(iso)).toBe(expected);
-    expect(formatDate(iso)).not.toContain(":");
+    // A local time, so the expectation does not depend on the machine's zone.
+    const iso = new Date(2026, 9, 21, 10, 0).toISOString();
+    expect(formatDate(iso)).toBe("10-21");
+  });
+
+  it("renders a full time like the map rows, not in the browser's locale", () => {
+    const iso = new Date(2026, 9, 30, 21, 9, 30).toISOString();
+    expect(formatTime(iso)).toBe("2026-10-30 21:09");
   });
 });
 

@@ -1,17 +1,22 @@
-/** Renders an ISO timestamp for humans; an unparseable value is shown as-is. */
+const pad = (value: number): string => String(value).padStart(2, "0");
+
+/**
+ * A full local timestamp (`2026-10-30 21:09`), in the same shape as the map's
+ * rows rather than the browser's locale; an unparseable value is shown as-is.
+ */
 export function formatTime(iso: string | null): string {
   if (!iso) return "—";
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
+  if (Number.isNaN(date.getTime())) return iso;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-/** A compact date for tight headers; the full time belongs in a tooltip. */
+/** A compact date for tight headers (`10-30`); the full time belongs in a tooltip. */
 export function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const date = new Date(iso);
-  return Number.isNaN(date.getTime())
-    ? iso
-    : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (Number.isNaN(date.getTime())) return iso;
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 /** A compact stamp for dense rows ("10-24 00:10"); unparseable values pass through. */
@@ -19,7 +24,6 @@ export function formatStamp(iso: string | null): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  const pad = (value: number): string => String(value).padStart(2, "0");
   return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
@@ -34,7 +38,6 @@ export function dayOf(iso: string | undefined): string | null {
 export function formatClock(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  const pad = (value: number): string => String(value).padStart(2, "0");
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
