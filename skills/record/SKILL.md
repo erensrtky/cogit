@@ -36,8 +36,6 @@ One JSON object:
 
 - `sessionId`: always `"${CLAUDE_SESSION_ID}"`.
 - `title`: a few words; on the first write or when the focus changed.
-- `epoch`: an `epochs` id that fits; a distinct new feature first gets
-  `node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" epoch add <id> "<title>" -C "<dir>"`. Omit when unsure.
 - `status`: replaces all four fields, so send each: `goal` (one sentence), `done`, `pending`
   (`{ "text", "needsUser": true }` when it waits on the user), `next` (concrete step).
 - `nodes`: only new nodes or changed fields; the rest is kept.

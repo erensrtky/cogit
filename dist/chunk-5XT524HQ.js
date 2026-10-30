@@ -20171,6 +20171,8 @@ function projectPaths(root) {
     readState: join3(base, "state", "read.json"),
     /** Inbox rows the user dismissed, per session (Story 11.1); also local. */
     inboxState: join3(base, "state", "inbox.json"),
+    /** How the user left the map: open sessions and dragged row widths; also local. */
+    mapView: join3(base, "state", "map.json"),
     /** What the detached hook children (build, side run) printed; local, capped. */
     detachedLog: join3(base, "state", "detached.log"),
     locks: join3(base, "locks"),
@@ -20313,15 +20315,9 @@ function migrateConfig(config2) {
 
 // src/schema/project.ts
 var PROJECT_SCHEMA = 1;
-var Epoch = external_exports.object({
-  id: Slug,
-  title: external_exports.string().min(1).max(200),
-  createdAt: IsoDate
-});
 var Project = external_exports.object({
   schema: external_exports.literal(PROJECT_SCHEMA),
-  name: external_exports.string().min(1).max(200),
-  epochs: external_exports.array(Epoch).default([])
+  name: external_exports.string().min(1).max(200)
 });
 
 // src/schema/session.ts
@@ -20410,7 +20406,6 @@ var Session = external_exports.object({
   sessionId: Slug,
   agent: external_exports.string().min(1).max(64).default("claude-code"),
   title: external_exports.string().max(200).default(""),
-  epoch: Slug.nullable().default(null),
   startedAt: IsoDate,
   updatedAt: IsoDate,
   status: Status.default({ goal: "", done: [], pending: [], next: "" }),
@@ -20446,7 +20441,6 @@ var SessionInput = external_exports.object({
   sessionId: Slug,
   agent: external_exports.string().min(1).max(64).optional(),
   title: external_exports.string().max(200).optional(),
-  epoch: Slug.nullable().optional(),
   status: Status.optional(),
   leftOff: external_exports.string().max(400).optional(),
   nodes: external_exports.array(LineageNodeInput).optional()
@@ -20589,23 +20583,8 @@ async function update(file2, lockPath, schema, version2, fn, opts, resetUnreadab
   );
 }
 var loadProject = (root) => load(projectPaths(root).project, Project, PROJECT_SCHEMA);
-function stableInline(value) {
-  const entries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
-  return `{${entries.map(([key, v]) => `${JSON.stringify(key)}: ${JSON.stringify(v)}`).join(", ")}}`;
-}
 function projectJson(project) {
-  const epochs = project.epochs.length === 0 ? '  "epochs": [],' : [
-    '  "epochs": [',
-    project.epochs.map((epoch) => `    ${stableInline(epoch)}`).join(",\n"),
-    "  ],"
-  ].join("\n");
-  return `${[
-    "{",
-    epochs,
-    `  "name": ${JSON.stringify(project.name)},`,
-    `  "schema": ${project.schema}`,
-    "}"
-  ].join("\n")}
+  return `${["{", `  "name": ${JSON.stringify(project.name)},`, `  "schema": ${project.schema}`, "}"].join("\n")}
 `;
 }
 var updateProject = async (root, fn) => {
