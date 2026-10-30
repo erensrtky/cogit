@@ -24,6 +24,7 @@ import {
   displayTurn,
   excerpt,
   findTranscript,
+  isHeadlessTranscript,
   readConversation,
   readForkOrigin,
   readLastTurn,
@@ -60,6 +61,7 @@ export const claude: AgentAdapter = {
 
   parseHookInput,
   isHeadless,
+  isHeadlessTranscript,
   additionalContext,
   userNotice,
 

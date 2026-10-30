@@ -161,6 +161,8 @@ export interface AgentAdapter {
   parseHookInput(stdin: string): HookInput | undefined;
   /** Whether the hook runs in a session started without a person (`claude -p`, an SDK). */
   isHeadless(env: NodeJS.ProcessEnv): boolean;
+  /** The same for a transcript on disk: whether a headless run wrote it. */
+  isHeadlessTranscript(file: string): Promise<boolean>;
   /** Hook output that adds context for the agent, in the agent's own protocol. */
   additionalContext(event: string, text: string): Record<string, unknown>;
   /** A hook answer that shows one line to the user, not to the agent. */

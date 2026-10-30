@@ -208,6 +208,8 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
     if (!existing.ok) throw new CliError(`${projectPaths(root).project}: ${existing.error}`);
     await register(io, root, existing.data.name);
     if (opts.allowSkill !== undefined) await askSkillPermission(io, opts);
+    // `cogit doctor` suggests `init --retention 90` for a set-up project too.
+    if (opts.retention !== undefined) await askRetention(io, opts);
     if (opts.projectSettings !== undefined) await askProjectSettings(io, root, opts);
     await bestEffort(io, "could not refresh the project's Claude Code settings", async () => {
       const file = await agent.refreshProjectSetup(root);

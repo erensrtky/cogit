@@ -91,18 +91,26 @@ export async function projectTranscripts(
   return new Map([...all].filter(([, file]) => names.has(basename(dirname(file)))));
 }
 
-/** The transcript with the latest modification time, if there is one. */
+/**
+ * The transcript with the latest modification time that `skip` lets through,
+ * if there is one. Headless runs (Ralph, `claude -p`, other plugins' background
+ * sessions) are skipped unless they are recorded, so they never read as a tail
+ * someone forgot to record.
+ */
 async function newestTranscript(
   transcripts: ReadonlyMap<string, string>,
+  skip: (file: string) => Promise<boolean>,
 ): Promise<{ id: string; file: string } | undefined> {
-  let newest: { id: string; file: string; mtime: number } | undefined;
+  const dated: { id: string; file: string; mtime: number }[] = [];
   for (const [id, file] of transcripts) {
     const info = await stat(file).catch(() => undefined);
-    if (info === undefined) continue;
-    if (newest === undefined || info.mtimeMs > newest.mtime)
-      newest = { id, file, mtime: info.mtimeMs };
+    if (info !== undefined) dated.push({ id, file, mtime: info.mtimeMs });
   }
-  return newest === undefined ? undefined : { id: newest.id, file: newest.file };
+  dated.sort((a, b) => b.mtime - a.mtime);
+  for (const { id, file } of dated) {
+    if (!(await skip(file))) return { id, file };
+  }
+  return undefined;
 }
 
 /** The user messages in this transcript that the record has no node for. */
@@ -282,7 +290,7 @@ const CHECK_SPECS: CheckSpec[] = [
           id: "project",
           status: "warn",
           message: `initialized, but ${hooks.join(", ")}`,
-          fix: "cogit init",
+          fix: "cogit hooks install",
         };
       return {
         id: "project",
@@ -357,7 +365,10 @@ const CHECK_SPECS: CheckSpec[] = [
     run: async (ctx) => {
       const sessions = await ctx.sessions();
       const transcripts = await ctx.transcripts();
-      const newest = await newestTranscript(transcripts);
+      const { recordHeadless } = await ctx.config();
+      const newest = await newestTranscript(transcripts, (file) =>
+        recordHeadless ? Promise.resolve(false) : ctx.agent.isHeadlessTranscript(file),
+      );
       const tail =
         newest === undefined
           ? undefined
@@ -432,7 +443,12 @@ const CHECK_SPECS: CheckSpec[] = [
   },
 ];
 
-/** Hook files that are missing or carry a block an earlier CLI wrote. */
+/**
+ * Hook files that are missing or carry a block for another project or an
+ * earlier hook command. Only the `cogit hook …` line is compared: the fallback
+ * CLI path in the block names whichever CLI installed it (the plugin cache, a
+ * global install), which differs between runs and is refreshed by the plugin.
+ */
 async function hookProblems(ctx: DoctorContext): Promise<string[]> {
   const gitRoot = await ctx.gitRoot();
   if (gitRoot === undefined) return ["the git hooks are not installed"];
@@ -445,8 +461,9 @@ async function hookProblems(ctx: DoctorContext): Promise<string[]> {
       problems.push(`the ${event} hook is missing`);
       continue;
     }
-    const block = /# >>> cogit[\s\S]*?# <<< cogit/.exec(text)?.[0];
-    if (block !== hookBlock(event, ctx.root)) problems.push(`the ${event} hook is outdated`);
+    const block = /# >>> cogit[\s\S]*?# <<< cogit/.exec(text)?.[0] ?? "";
+    const command = hookBlock(event, ctx.root, null).split("\n")[2] ?? "";
+    if (!block.split("\n").includes(command)) problems.push(`the ${event} hook is outdated`);
   }
   return problems;
 }

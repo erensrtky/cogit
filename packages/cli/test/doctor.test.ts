@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -15,6 +15,7 @@ import {
   transcriptDirName,
 } from "../src/commands/doctor.js";
 import { init } from "../src/commands/init.js";
+import { hookBlock } from "../src/git-hooks.js";
 import { hashTurns } from "../src/messages.js";
 import { createProgram } from "../src/program.js";
 import { startMapServer } from "../src/server.js";
@@ -131,6 +132,20 @@ describe("doctor's building blocks", () => {
     );
   });
 
+  it("tells a headless transcript by its entrypoint", async () => {
+    const file = join(dir, "t.jsonl");
+    const agent = defaultAgent();
+    await writeFile(file, '{"type":"user","entrypoint":"sdk-cli"}\n');
+    expect(await agent.isHeadlessTranscript(file)).toBe(true);
+    await writeFile(file, '{"type":"system"}\n{"type":"user","entrypoint":"cli"}\n');
+    expect(await agent.isHeadlessTranscript(file)).toBe(false);
+    // Only the first lines are read; a file that names no entrypoint is a person's.
+    await writeFile(file, `${'{"type":"system"}\n'.repeat(60)}{"entrypoint":"sdk-cli"}\n`);
+    expect(await agent.isHeadlessTranscript(file)).toBe(false);
+    await writeFile(file, "");
+    expect(await agent.isHeadlessTranscript(file)).toBe(false);
+  });
+
   it("finds an error only in the last close pass", () => {
     const log = [
       "--- 2026-10-30T10:00:00.000Z backfill s1 --tail -C /p",
@@ -234,6 +249,14 @@ describe("doctor", () => {
     const stale = await check(root, "project");
     expect(stale.status).toBe("warn");
     expect(stale.message).toContain("prepare-commit-msg hook is outdated");
+    expect(stale.fix).toBe("cogit hooks install");
+
+    // A block another CLI installed (the plugin cache, a global install) is current.
+    await writeFile(
+      join(root, ".git", "hooks", "prepare-commit-msg"),
+      `#!/bin/sh\n\n${hookBlock("prepare-commit-msg", root, "/elsewhere/cogit/dist/cli.js")}\n`,
+    );
+    expect((await check(root, "project")).status).toBe("ok");
 
     await writeFile(join(root, ".cogit", "project.json"), "{ not json");
     const broken = await check(root, "project");
@@ -271,6 +294,19 @@ describe("doctor", () => {
     const ok = await check(root, "sessions");
     expect(ok.status).toBe("ok");
     expect(ok.message).toContain("1 session(s) recorded");
+
+    // A headless run (Ralph, `claude -p`) is newer, but nobody records it.
+    const headless = await transcript(root, "h1", ["ralph"]);
+    await writeFile(
+      headless,
+      `{"type":"system","entrypoint":"sdk-cli"}\n${await readFile(headless, "utf8")}`,
+    );
+    const later = new Date(Date.now() + 60_000);
+    await utimes(headless, later, later);
+    expect((await check(root, "sessions")).status).toBe("ok");
+    await updateConfig((config) => ({ ...config, recordHeadless: true }), env);
+    expect((await check(root, "sessions")).fix).toBe("cogit backfill h1 --tail");
+    await updateConfig((config) => ({ ...config, recordHeadless: false }), env);
 
     await transcript(root, "s2", ["new one"]);
     const newer = await check(root, "sessions");

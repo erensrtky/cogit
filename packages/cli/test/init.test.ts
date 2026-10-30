@@ -210,6 +210,19 @@ describe("init", () => {
     expect(io.lines.some((l) => l.includes("cleanupPeriodDays"))).toBe(false);
   });
 
+  it("applies a retention option to a project that is already set up", async () => {
+    const options = {
+      name: "p",
+      git: "commit",
+      allowSkill: false,
+      projectSettings: false,
+      language: "auto",
+    } as const;
+    await init(root, { ...options, retention: "keep" }, fakeIo(env, [], true));
+    await init(root, { ...options, retention: 90 }, fakeIo(env, [], true));
+    expect(await readRetention(env)).toBe(90);
+  });
+
   it("warns and moves on when Claude Code settings are unreadable", async () => {
     await mkdir(join(dir, "claude"));
     await writeFile(settingsFile(), "{oops");

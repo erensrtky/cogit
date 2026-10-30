@@ -238,6 +238,28 @@ export async function readConversation(file: string): Promise<ChatTurn[]> {
   });
 }
 
+const ENTRYPOINT = /"entrypoint":"([^"]*)"/;
+
+/**
+ * Whether nobody typed into this transcript: `claude -p` and the SDKs write
+ * `"entrypoint":"sdk-…"` on their lines, as `isHeadless` reads it from the
+ * environment. The first line that names an entrypoint decides.
+ */
+export async function isHeadlessTranscript(file: string): Promise<boolean> {
+  const lines = createInterface({ input: createReadStream(file, "utf8"), crlfDelay: Infinity });
+  try {
+    let read = 0;
+    for await (const raw of lines) {
+      const entrypoint = ENTRYPOINT.exec(raw)?.[1];
+      if (entrypoint !== undefined) return entrypoint.startsWith("sdk");
+      if ((read += 1) >= 50) break;
+    }
+    return false;
+  } finally {
+    lines.close();
+  }
+}
+
 /** Where a forked transcript came from; null for a session of its own. */
 export async function readForkOrigin(file: string): Promise<ForkOrigin | null> {
   return forkOrigin(file, await readAllTurns(file), readTranscriptTurns, isMessageLine);
