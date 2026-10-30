@@ -78,6 +78,27 @@ Every message grows from an earlier one; a thread that starts something new is a
 - Hints, not rules: `gapMinutes`, `resumed`, `commitBetween` (a real commit landed in this
   repo between them), `lastMessages`, and for a first message `candidates`/`continuesHint`.
 
+## Shape
+
+A message that landed commits gets a `shape`: a small representation of what the change does,
+between its Intent (the decision and reason above) and its Code (the diff). Add it on that
+message's node, with the node's commit hashes:
+
+```json
+"shape": { "tools": [{ "kind": "pseudo", "text": "1. ...\n2. ..." }], "commits": ["abc1234"] }
+```
+
+Two tools:
+
+- `pseudo`: numbered plain-language steps of the new logic, naming the functions and files.
+- `mermaid`: a Mermaid `flowchart TD` (or `LR`) of the new path between files or functions,
+  at most 15 nodes. Quote labels that hold spaces or punctuation.
+
+Pick one, both, or none (`{ "tools": [] }` means nothing worth showing). Skip messages whose
+commits are only release/version bumps, lockfiles or CHANGELOG, or change fewer than 5 lines
+in total. Write it in the conversation's language; the CLI validates each output and keeps an
+invalid diagram as text.
+
 ## Branch summary
 
 A branch starts at a root or where a message gets a second child. Its first message carries a

@@ -41,10 +41,176 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
+// ../../node_modules/cli-width/index.js
+var require_cli_width = __commonJS({
+  "../../node_modules/cli-width/index.js"(exports, module) {
+    "use strict";
+    module.exports = cliWidth2;
+    function normalizeOpts(options) {
+      const defaultOpts = {
+        defaultWidth: 0,
+        output: process.stdout,
+        tty: __require("tty")
+      };
+      if (!options) {
+        return defaultOpts;
+      }
+      Object.keys(defaultOpts).forEach(function(key) {
+        if (!options[key]) {
+          options[key] = defaultOpts[key];
+        }
+      });
+      return options;
+    }
+    function cliWidth2(options) {
+      const opts = normalizeOpts(options);
+      if (opts.output.getWindowSize) {
+        return opts.output.getWindowSize()[0] || opts.defaultWidth;
+      }
+      if (opts.tty.getWindowSize) {
+        return opts.tty.getWindowSize()[1] || opts.defaultWidth;
+      }
+      if (opts.output.columns) {
+        return opts.output.columns;
+      }
+      if (process.env.CLI_WIDTH) {
+        const width = parseInt(process.env.CLI_WIDTH, 10);
+        if (!isNaN(width) && width !== 0) {
+          return width;
+        }
+      }
+      return opts.defaultWidth;
+    }
+  }
+});
+
+// ../../node_modules/mute-stream/lib/index.js
+var require_lib = __commonJS({
+  "../../node_modules/mute-stream/lib/index.js"(exports, module) {
+    "use strict";
+    var Stream = __require("stream");
+    var MuteStream2 = class extends Stream {
+      #isTTY = null;
+      constructor(opts = {}) {
+        super(opts);
+        this.writable = this.readable = true;
+        this.muted = false;
+        this.on("pipe", this._onpipe);
+        this.replace = opts.replace;
+        this._prompt = opts.prompt || null;
+        this._hadControl = false;
+      }
+      #destSrc(key, def) {
+        if (this._dest) {
+          return this._dest[key];
+        }
+        if (this._src) {
+          return this._src[key];
+        }
+        return def;
+      }
+      #proxy(method, ...args) {
+        if (typeof this._dest?.[method] === "function") {
+          this._dest[method](...args);
+        }
+        if (typeof this._src?.[method] === "function") {
+          this._src[method](...args);
+        }
+      }
+      get isTTY() {
+        if (this.#isTTY !== null) {
+          return this.#isTTY;
+        }
+        return this.#destSrc("isTTY", false);
+      }
+      // basically just get replace the getter/setter with a regular value
+      set isTTY(val) {
+        this.#isTTY = val;
+      }
+      get rows() {
+        return this.#destSrc("rows");
+      }
+      get columns() {
+        return this.#destSrc("columns");
+      }
+      mute() {
+        this.muted = true;
+      }
+      unmute() {
+        this.muted = false;
+      }
+      _onpipe(src) {
+        this._src = src;
+      }
+      pipe(dest, options) {
+        this._dest = dest;
+        return super.pipe(dest, options);
+      }
+      pause() {
+        if (this._src) {
+          return this._src.pause();
+        }
+      }
+      resume() {
+        if (this._src) {
+          return this._src.resume();
+        }
+      }
+      write(c) {
+        if (this.muted) {
+          if (!this.replace) {
+            return true;
+          }
+          if (c.match(/^\u001b/)) {
+            if (c.indexOf(this._prompt) === 0) {
+              c = c.slice(this._prompt.length);
+              c = c.replace(/./g, this.replace);
+              c = this._prompt + c;
+            }
+            this._hadControl = true;
+            return this.emit("data", c);
+          } else {
+            if (this._prompt && this._hadControl && c.indexOf(this._prompt) === 0) {
+              this._hadControl = false;
+              this.emit("data", this._prompt);
+              c = c.slice(this._prompt.length);
+            }
+            c = c.toString().replace(/./g, this.replace);
+          }
+        }
+        this.emit("data", c);
+      }
+      end(c) {
+        if (this.muted) {
+          if (c && this.replace) {
+            c = c.toString().replace(/./g, this.replace);
+          } else {
+            c = null;
+          }
+        }
+        if (c) {
+          this.emit("data", c);
+        }
+        this.emit("end");
+      }
+      destroy(...args) {
+        return this.#proxy("destroy", ...args);
+      }
+      destroySoon(...args) {
+        return this.#proxy("destroySoon", ...args);
+      }
+      close(...args) {
+        return this.#proxy("close", ...args);
+      }
+    };
+    module.exports = MuteStream2;
+  }
+});
+
 // src/git-hooks.ts
 import { realpathSync } from "fs";
-import { chmod, mkdir as mkdir5, readFile as readFile5, rm as rm3, stat as stat6 } from "fs/promises";
-import { join as join8 } from "path";
+import { chmod, mkdir as mkdir6, readFile as readFile9, rm as rm3, stat as stat11 } from "fs/promises";
+import { join as join12 } from "path";
 
 // src/git.ts
 import { execFile } from "child_process";
@@ -56,9 +222,9 @@ import { promisify } from "util";
 import { randomBytes } from "crypto";
 import { mkdir, open, readFile, rename, rm, stat } from "fs/promises";
 import { basename, dirname, join } from "path";
-async function isDirectory(path) {
+async function isDirectory(path2) {
   try {
-    return (await stat(path)).isDirectory();
+    return (await stat(path2)).isDirectory();
   } catch {
     return false;
   }
@@ -113,6 +279,22 @@ async function findGitRoot(dir) {
     if (dirname2(cur) === cur) return void 0;
   }
 }
+async function resolveCommit(root, ref) {
+  try {
+    const { stdout } = await exec("git", [
+      "-C",
+      root,
+      "rev-parse",
+      "--verify",
+      "--quiet",
+      `${ref}^{commit}`
+    ]);
+    const hash2 = String(stdout).trim();
+    return hash2 === "" ? void 0 : hash2;
+  } catch {
+    return void 0;
+  }
+}
 var HEADER = "# cogit";
 var IGNORE_ALL = "/.cogit/";
 function gitignoreLines(policy) {
@@ -131,8 +313,8 @@ async function ensureGitignore(root, policy) {
   const missing = gitignoreLines(policy).filter((l) => !present.has(l));
   if (missing.length === 0) return [];
   const block = [present.has(HEADER) ? [] : [HEADER], missing].flat().join("\n");
-  const sep3 = text === "" || text.endsWith("\n") ? "" : "\n";
-  await atomicWrite(file2, `${text}${sep3}${block}
+  const sep7 = text === "" || text.endsWith("\n") ? "" : "\n";
+  await atomicWrite(file2, `${text}${sep7}${block}
 `);
   return missing;
 }
@@ -286,11 +468,11 @@ function parseChangeSections(stdout) {
     const parts = line.split("	");
     if (parts.length < 3) continue;
     const [added, removed, ...rest] = parts;
-    const path = rest.join("	").trim();
-    if (path === "") continue;
+    const path2 = rest.join("	").trim();
+    if (path2 === "") continue;
     current.added += Number.parseInt(added ?? "", 10) || 0;
     current.removed += Number.parseInt(removed ?? "", 10) || 0;
-    current.files.push(path);
+    current.files.push(path2);
   }
   return out;
 }
@@ -341,6 +523,57 @@ async function readCommitChanges(root, hashes) {
   }
   return out;
 }
+async function readCommitPatches(root, hashes, limit) {
+  const wanted = [...new Set(hashes)];
+  if (wanted.length === 0) return { diff: "", truncated: false };
+  const chunks = [];
+  let size = 0;
+  let truncated = false;
+  try {
+    const { stdout } = await exec("git", [
+      "-C",
+      root,
+      "log",
+      "--no-walk=unsorted",
+      "--format=commit %h %s",
+      "--patch",
+      "--no-color",
+      "--unified=3",
+      ...wanted
+    ]);
+    const text = stdout.trim();
+    if (text.length > limit) {
+      return { diff: text.slice(0, limit), truncated: true };
+    }
+    return { diff: text, truncated: false };
+  } catch {
+  }
+  for (const hash2 of wanted) {
+    if (size >= limit) {
+      truncated = true;
+      break;
+    }
+    try {
+      const { stdout } = await exec("git", [
+        "-C",
+        root,
+        "show",
+        "--format=commit %h %s",
+        "--patch",
+        "--no-color",
+        "--unified=3",
+        hash2
+      ]);
+      const remaining = limit - size;
+      const text = stdout.trim();
+      chunks.push(text.length > remaining ? text.slice(0, remaining) : text);
+      if (text.length > remaining) truncated = true;
+      size += Math.min(text.length, remaining);
+    } catch {
+    }
+  }
+  return { diff: chunks.join("\n\n"), truncated };
+}
 function commitShort(commit) {
   return commit.short === "" ? commit.full.slice(0, 7) : commit.short;
 }
@@ -369,10 +602,16 @@ async function blameCommitHashes(root, file2, line) {
   return [...out];
 }
 async function gitUserName(root, env = process.env) {
+  return gitConfig(root, "user.name", env);
+}
+async function gitUserEmail(root, env = process.env) {
+  return gitConfig(root, "user.email", env);
+}
+async function gitConfig(root, key, env) {
   try {
-    const { stdout } = await exec("git", ["-C", root, "config", "user.name"], { env });
-    const name = stdout.trim();
-    return name === "" ? void 0 : name;
+    const { stdout } = await exec("git", ["-C", root, "config", key], { env });
+    const value = stdout.trim();
+    return value === "" ? void 0 : value;
   } catch {
     return void 0;
   }
@@ -392,19 +631,22 @@ async function commitBetween(root, from, to, env = process.env) {
 async function gitHooksDir(root) {
   try {
     const { stdout } = await exec("git", ["-C", root, "rev-parse", "--git-path", "hooks"]);
-    const path = stdout.trim();
-    if (path === "") return void 0;
-    return isAbsolute(path) ? path : join2(root, path);
+    const path2 = stdout.trim();
+    if (path2 === "") return void 0;
+    return isAbsolute(path2) ? path2 : join2(root, path2);
   } catch {
     return void 0;
   }
 }
 
-// src/session-git.ts
-import { execFile as execFile2 } from "child_process";
-import { existsSync } from "fs";
-import { relative as relative2, sep as sep2 } from "path";
-import { promisify as promisify2 } from "util";
+// src/hooks/run.ts
+import { spawn } from "child_process";
+import { closeSync, existsSync as existsSync5, mkdirSync, openSync, statSync as statSync2, writeSync } from "fs";
+import { dirname as dirname10 } from "path";
+import { fileURLToPath } from "url";
+
+// src/agents/types.ts
+var DEFAULT_AGENT = "claude-code";
 
 // ../../node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -1223,10 +1465,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path) {
-  if (!path)
+function getElementAtPath(obj, path2) {
+  if (!path2)
     return obj;
-  return path.reduce((acc, key) => acc?.[key], obj);
+  return path2.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -1566,11 +1808,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path, issues) {
+function prefixIssues(path2, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path);
+    iss.path.unshift(path2);
     return iss;
   });
 }
@@ -2032,16 +2274,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path = []) => {
+  const processError = (error63, path2 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path2, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
       } else {
-        const fullpath = [...path, ...issue2.path];
+        const fullpath = [...path2, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -2080,17 +2322,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path = []) => {
+  const processError = (error63, path2 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path2, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
       } else {
-        const fullpath = [...path, ...issue2.path];
+        const fullpath = [...path2, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -2129,8 +2371,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path) {
+  const path2 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path2) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -2416,8 +2658,8 @@ function emoji() {
 }
 var ipv4 = /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$/;
 var ipv6 = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/;
-var mac = (delimiter) => {
-  const escapedDelim = escapeRegex(delimiter ?? ":");
+var mac = (delimiter2) => {
+  const escapedDelim = escapeRegex(delimiter2 ?? ":");
   return new RegExp(`^(?:[0-9A-F]{2}${escapedDelim}){5}[0-9A-F]{2}$|^(?:[0-9a-f]{2}${escapedDelim}){5}[0-9a-f]{2}$`);
 };
 var cidrv4 = /^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\/([0-9]|[1-2][0-9]|3[0-2])$/;
@@ -4426,7 +4668,7 @@ function handleIntersectionResults(result, left, right) {
   const unrecKeys = /* @__PURE__ */ new Map();
   let unrecIssue;
   const keyIssues = /* @__PURE__ */ new Map();
-  const collect = (iss, side) => {
+  const collect2 = (iss, side) => {
     let keys;
     if (iss.code === "unrecognized_keys" && !iss.path?.length) {
       unrecIssue ?? (unrecIssue = iss);
@@ -4447,11 +4689,11 @@ function handleIntersectionResults(result, left, right) {
     return true;
   };
   for (const iss of left.issues) {
-    if (!collect(iss, "l"))
+    if (!collect2(iss, "l"))
       result.issues.push(iss);
   }
   for (const iss of right.issues) {
-    if (!collect(iss, "r"))
+    if (!collect2(iss, "r"))
       result.issues.push(iss);
   }
   const bothKeys = [...unrecKeys].filter(([, f]) => f.l && f.r).map(([k]) => k);
@@ -5473,7 +5715,7 @@ var recursive = /* @__PURE__ */ new WeakMap();
 var NONE = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
-function isRecursive(inst, stack, resolve2) {
+function isRecursive(inst, stack, resolve7) {
   const cached2 = recursive.get(inst);
   if (cached2 !== void 0)
     return cached2 ? PROVEN : NONE;
@@ -5483,7 +5725,7 @@ function isRecursive(inst, stack, resolve2) {
   let result = NONE;
   const check2 = (child) => {
     if (result !== PROVEN && child?._zod) {
-      const answer = isRecursive(child, stack, resolve2);
+      const answer = isRecursive(child, stack, resolve7);
       if (answer > result)
         result = answer;
     }
@@ -5494,7 +5736,7 @@ function isRecursive(inst, stack, resolve2) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
       if (spread && !desc.enumerable)
         continue;
-      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve2) : NONE;
+      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve7) : NONE;
       if (child > answer)
         answer = child;
     }
@@ -5558,7 +5800,7 @@ function isRecursive(inst, stack, resolve2) {
       break;
     // `$ZodLazy` caches its inner on the def, so a resolved edge is followed exactly
     case "lazy": {
-      const inner = def._cachedInner ?? (resolve2 ? inst._zod.innerType : void 0);
+      const inner = def._cachedInner ?? (resolve7 ? inst._zod.innerType : void 0);
       merge2(inner ? isRecursive(inner, stack, false) : ASSUMED);
       break;
     }
@@ -19268,13 +19510,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path = ref.slice(1).split("/").filter(Boolean);
-  if (path.length === 0) {
+  const path2 = ref.slice(1).split("/").filter(Boolean);
+  if (path2.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path[0] === defsKey) {
-    const key = path[1] === void 0 ? void 0 : decodeJSONPointerSegment(path[1]);
+  if (path2[0] === defsKey) {
+    const key = path2[1] === void 0 ? void 0 : decodeJSONPointerSegment(path2[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -20123,631 +20365,6 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// src/schema/common.ts
-var Slug = external_exports.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/, "must be a slug: letters, digits, _ . -");
-var IsoDate = external_exports.iso.datetime({ offset: true });
-var MessageRef = external_exports.string().regex(
-  /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}(:[A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$/,
-  "must be a node id or <sessionId>:<messageId>"
-);
-function parseMessageRef(ref) {
-  const at = ref.indexOf(":");
-  return at === -1 ? { sessionId: null, id: ref } : { sessionId: ref.slice(0, at), id: ref.slice(at + 1) };
-}
-
-// src/store/paths.ts
-import { homedir } from "os";
-import { join as join3 } from "path";
-var DIR_NAME = ".cogit";
-var OLD_DIR_NAME = ".codelineage";
-var CONFIG_DIR_NAME = "cogit";
-var OLD_CONFIG_DIR_NAME = "codelineage";
-function configuredHome(env = process.env) {
-  return env.COGIT_HOME ?? env.CODELINEAGE_HOME;
-}
-function captureDisabled(env = process.env) {
-  return env.COGIT_DISABLE === "1" || env.CODELINEAGE_DISABLE === "1";
-}
-function projectPaths(root) {
-  const base = join3(root, DIR_NAME);
-  return {
-    base,
-    project: join3(base, "project.json"),
-    sessions: join3(base, "sessions"),
-    session: (id) => join3(base, "sessions", `${id}.json`),
-    /** Append-only structure events for a session (Story 8.5). */
-    events: (id) => join3(base, "sessions", `${id}.events.jsonl`),
-    /** Pre-migration copies of the record files. */
-    backup: (name) => join3(base, name),
-    /** The conversation store: what the drill-down needs, outliving the transcript. */
-    conversations: join3(base, "conversations"),
-    conversation: (id) => join3(base, "conversations", `${id}.jsonl.gz`),
-    state: (id) => join3(base, "state", `${id}.json`),
-    /**
-     * Which messages this user has marked read (Story 10.3). Local per-user
-     * state: never committed, never shared (`state/` stays ignored by both
-     * policies).
-     */
-    readState: join3(base, "state", "read.json"),
-    /** Inbox rows the user dismissed, per session (Story 11.1); also local. */
-    inboxState: join3(base, "state", "inbox.json"),
-    /** How the user left the map: open sessions and dragged row widths; also local. */
-    mapView: join3(base, "state", "map.json"),
-    /** What the detached hook children (build, side run) printed; local, capped. */
-    detachedLog: join3(base, "state", "detached.log"),
-    locks: join3(base, "locks"),
-    /** Where the skill drops session JSON for `session write --file`. */
-    inbox: (id) => join3(base, "inbox", `${id}.json`),
-    lock: (name) => join3(base, "locks", `${name}.lock`),
-    html: join3(base, "map.html"),
-    /**
-     * The session whose next code commit carries its record (Story 9.3), written
-     * by the UserPromptSubmit hook. Local state, never committed.
-     */
-    head: join3(base, "HEAD"),
-    /** The project-scoped ignore rules that keep local state out of git. */
-    gitignore: join3(base, ".gitignore")
-  };
-}
-function defaultConfigBase(name, env = process.env) {
-  return join3(env.XDG_CONFIG_HOME ?? join3(homedir(), ".config"), name);
-}
-function globalPaths(env = process.env) {
-  const base = configuredHome(env) ?? defaultConfigBase(CONFIG_DIR_NAME, env);
-  return {
-    base,
-    config: join3(base, "config.json"),
-    registry: join3(base, "projects.json"),
-    lock: join3(base, "registry.lock"),
-    panel: join3(base, "panel.html")
-  };
-}
-
-// src/store/stores.ts
-import { readdir } from "fs/promises";
-
-// src/schema/config.ts
-var CONFIG_SCHEMA = 1;
-var Config = external_exports.object({
-  schema: external_exports.literal(CONFIG_SCHEMA),
-  /** "auto" = the conversation's language, otherwise a fixed language name or code. */
-  language: external_exports.string().min(1).max(32).default("auto"),
-  /**
-   * How often the main agent is asked to record (Story 12.1). The default is the
-   * mixed mode's interval: the side model records in between, so the agent can
-   * check in rarely.
-   */
-  updateEveryTurns: external_exports.int().min(1).max(100).default(15),
-  sessionEndCatchUp: external_exports.boolean().default(true),
-  /**
-   * Who writes the record (Story 12.1): the main agent (`agent`), both (`mixed`,
-   * "Detailed" in the panel: a side model often, the agent rarely), or only the
-   * side model (`side`, "Economical", the default since 0.21: the agent is never
-   * interrupted and the session-end pass writes the branches).
-   */
-  recorder: external_exports.enum(["agent", "mixed", "side"]).default("side"),
-  /** Model the side runs use: the headless catch-up and the periodic records. */
-  sideModel: external_exports.string().trim().min(1).max(64).default("haiku"),
-  /** How often the side model records, in turns (Story 12.1). */
-  sideEveryTurns: external_exports.int().min(1).max(100).default(5),
-  /**
-   * @deprecated Renamed to `sideModel` in Story 12.1. Still read once and
-   * migrated, so a config written before the rename keeps its model.
-   */
-  catchUpModel: external_exports.string().trim().min(1).max(64).optional(),
-  /**
-   * Whether the agent writes a per-message `summary`. Off by default: the branch
-   * summary is the outer layer and the drill-down already shows the reply.
-   */
-  messageSummaries: external_exports.boolean().default(false),
-  /**
-   * Whether SessionStart hands the agent the lineage of the previous session and
-   * how to read the record (`log` / `show`). On by default; costs only tokens.
-   */
-  startupContext: external_exports.boolean().default(true),
-  /**
-   * Whether sessions started without a person (`claude -p`, an SDK) are recorded.
-   * Off by default: other plugins start them in the background, one per prompt,
-   * and they would fill the map and the inbox.
-   */
-  recordHeadless: external_exports.boolean().default(false),
-  /** Port the local map server binds on `127.0.0.1`. */
-  serverPort: external_exports.int().min(1).max(65535).default(4747),
-  /** Default for new projects; `init` asks per repo. Story 9.3: the record travels. */
-  gitPolicy: external_exports.enum(["ignore", "commit"]).default("commit"),
-  /**
-   * Whether `.cogit/conversations/` (the raw chat text) travels too. Off by
-   * default: the session record can be committed while the chat stays local.
-   */
-  shareConversations: external_exports.boolean().default(false),
-  /**
-   * What happens to the session files the last code commit left behind: ask the
-   * user at the next session start, commit them at session end, or do nothing.
-   */
-  recordCommit: external_exports.enum(["ask", "auto", "off"]).default("ask"),
-  /**
-   * How long `.cogit/HEAD` stays fresh for the `Thought:` trailer (Story 9.4).
-   * A commit made hours after the last message is probably not that message.
-   */
-  trailerMaxAgeHours: external_exports.int().min(1).max(8760).default(6),
-  /**
-   * An unread message whose commits changed at least this many lines gets the
-   * quiet "a lot landed here" highlight on the map (Story 10.3). A threshold,
-   * not a judgement: it never hides or ranks anything by itself.
-   */
-  bigChangeLines: external_exports.int().min(1).max(1e6).default(300),
-  /**
-   * Whether the agent is told, before editing a file, about options earlier
-   * thoughts considered and rejected for that file (Story 10.4). A note from
-   * the record, never a rule; off means silence.
-   */
-  tryBeforeNotes: external_exports.boolean().default(true),
-  /**
-   * How many days a session stays in the "your turn" inbox (Stories 11.1,
-   * 12.2). One day by default: the inbox is for work that is still fresh, not
-   * an archive. Raise it to keep rows longer. A config that holds an older value
-   * keeps it; only the default changed. Older sessions are hidden, nothing is
-   * deleted.
-   */
-  inboxMaxAgeDays: external_exports.int().min(1).max(3650).default(1),
-  agents: external_exports.array(external_exports.string().min(1)).default(["claude-code"]),
-  /** Project roots ("don't ask again" in this project) where the setup hint stays silent. */
-  setupHintOff: external_exports.array(external_exports.string().min(1)).default([])
-});
-var RegistryEntry = external_exports.object({
-  path: external_exports.string().min(1),
-  name: external_exports.string().min(1).max(200),
-  addedAt: IsoDate
-});
-var Registry = external_exports.object({
-  schema: external_exports.literal(CONFIG_SCHEMA),
-  projects: external_exports.array(RegistryEntry).default([])
-});
-var DEFAULT_SIDE_MODEL = "haiku";
-function migrateConfig(config2) {
-  if (config2.catchUpModel === void 0) return config2;
-  const { catchUpModel, ...rest } = config2;
-  return {
-    ...rest,
-    sideModel: config2.sideModel === DEFAULT_SIDE_MODEL ? catchUpModel : config2.sideModel
-  };
-}
-
-// src/schema/project.ts
-var PROJECT_SCHEMA = 1;
-var Project = external_exports.object({
-  schema: external_exports.literal(PROJECT_SCHEMA),
-  name: external_exports.string().min(1).max(200)
-});
-
-// src/schema/session.ts
-var SESSION_SCHEMA = 1;
-var NodeKind = external_exports.enum(["phase", "message", "step", "decision", "question"]);
-var DecidedBy = external_exports.enum(["user", "agent", "agreed"]);
-var Alternative = external_exports.object({
-  option: external_exports.string().min(1).max(200),
-  why: external_exports.string().max(500).default("")
-});
-var AgentDecision = external_exports.object({
-  title: external_exports.string().min(1).max(200),
-  why: external_exports.string().max(500).default(""),
-  alternatives: external_exports.array(Alternative).max(10).optional()
-});
-var MESSAGE_ID = /^m[1-9][0-9]*$/;
-var BranchSummary = external_exports.object({
-  title: external_exports.string().min(1).max(80),
-  asked: external_exports.string().min(1).max(300),
-  outcome: external_exports.string().min(1).max(600),
-  /** May be empty: a thread can leave nothing open. */
-  open: external_exports.string().max(300).default("")
-});
-var LineageNode = external_exports.object({
-  id: Slug,
-  /**
-   * For a message: the id of the earlier message it reacts to (`m3` for `m7`),
-   * `<sessionId>:<id>` for a message of an earlier session (Story 8.6), or null
-   * for a new root. For other kinds: the node it belongs to.
-   */
-  parent: MessageRef.nullable().default(null),
-  kind: NodeKind,
-  title: external_exports.string().min(1).max(200),
-  summary: external_exports.string().max(2e3).optional(),
-  why: external_exports.string().max(2e3).optional(),
-  at: IsoDate.optional(),
-  decidedBy: DecidedBy.optional(),
-  /** Options considered and rejected, mostly for decisions. */
-  alternatives: external_exports.array(Alternative).max(10).optional(),
-  /** Commits that carry this work out, as short or full hashes. */
-  commits: external_exports.array(external_exports.string().regex(/^[0-9a-f]{7,40}$/, "a commit hash")).max(20).optional(),
-  /** Files this work touched, relative to the project. */
-  files: external_exports.array(external_exports.string().min(1).max(300)).max(30).optional(),
-  /** For a message: earlier messages it returns to or builds on besides its parent. */
-  links: external_exports.array(MessageRef).max(5).optional(),
-  /** For the first message of a branch: the summary of that thread. */
-  branch: BranchSummary.optional(),
-  /** For a message: what the agent did about it, in short items. */
-  work: external_exports.array(external_exports.string().min(1).max(300)).max(20).optional(),
-  /** For a message: choices the agent made on its own along the way. */
-  agentDecisions: external_exports.array(AgentDecision).max(10).optional(),
-  /**
-   * Who wrote each optional field (Story 12.1): the main agent or the side
-   * model. A missing entry means the agent (every record written before the
-   * split was the agent's). The merge lets the side model fill a field only
-   * when it is empty or already the side model's own.
-   */
-  by: external_exports.record(external_exports.string().max(40), external_exports.enum(["agent", "side"])).optional(),
-  /** When `session write` first added this node; set by the CLI, never by the agent. */
-  addedAt: IsoDate.optional(),
-  /** When `session write` last added or changed this node; set by the CLI, never by the agent. */
-  touchedAt: IsoDate.optional(),
-  /**
-   * Numstat totals of the node's commits, attached at read time from git
-   * (Story 10.3). Never stored in the record: it is derived, so the record
-   * stays small and the numbers stay current after a rebase.
-   */
-  change: external_exports.object({
-    added: external_exports.number().int().min(0),
-    removed: external_exports.number().int().min(0),
-    files: external_exports.number().int().min(0)
-  }).optional()
-});
-var PendingItem = external_exports.object({
-  text: external_exports.string().min(1).max(500),
-  needsUser: external_exports.boolean().default(false)
-});
-var Status = external_exports.object({
-  goal: external_exports.string().max(500).default(""),
-  done: external_exports.array(external_exports.string().min(1).max(500)).default([]),
-  pending: external_exports.array(PendingItem).default([]),
-  next: external_exports.string().max(500).default("")
-});
-var Session = external_exports.object({
-  schema: external_exports.literal(SESSION_SCHEMA),
-  sessionId: Slug,
-  agent: external_exports.string().min(1).max(64).default("claude-code"),
-  title: external_exports.string().max(200).default(""),
-  startedAt: IsoDate,
-  updatedAt: IsoDate,
-  status: Status.default({ goal: "", done: [], pending: [], next: "" }),
-  /**
-   * One line on where the session left off (L0), so a later session can tell
-   * whether it continues this one without reading the branches. Written by the
-   * session-end pass; old records have none.
-   */
-  leftOff: external_exports.string().max(400).optional(),
-  nodes: external_exports.array(LineageNode).default([]),
-  /** The linked git worktree the session ran in; set by the CLI, never by the agent. */
-  worktree: external_exports.object({ path: external_exports.string().min(1), branch: external_exports.string().min(1).nullable() }).optional(),
-  /**
-   * Who recorded the session (git `user.name`, else the OS user); set by the CLI
-   * on the first write (Story 9.3). Old records have none.
-   */
-  author: external_exports.string().min(1).max(200).optional(),
-  /**
-   * Who wrote the record last (Story 12.1): the Stop hook counts the main
-   * agent's turns separately when the side model keeps writing in between.
-   */
-  lastRecordedBy: external_exports.enum(["agent", "side"]).optional()
-});
-var LineageNodeInput = LineageNode.omit({
-  addedAt: true,
-  touchedAt: true,
-  change: true,
-  by: true
-}).extend({
-  parent: MessageRef.nullable().optional()
-});
-var SessionInput = external_exports.object({
-  sessionId: Slug,
-  agent: external_exports.string().min(1).max(64).optional(),
-  title: external_exports.string().max(200).optional(),
-  status: Status.optional(),
-  leftOff: external_exports.string().max(400).optional(),
-  nodes: external_exports.array(LineageNodeInput).optional()
-});
-
-// src/schema/state.ts
-var STATE_SCHEMA = 1;
-var HookState = external_exports.object({
-  schema: external_exports.literal(STATE_SCHEMA),
-  /** Completed turns seen by the Stop hook (hook-driven continuations excluded). */
-  turns: external_exports.number().int().min(0).default(0),
-  /** Turns since the record last changed or the skill was last requested. */
-  turnsSinceUpdate: external_exports.number().int().min(0).default(0),
-  /** The record's `updatedAt` when the hook last looked; a change resets the count. */
-  recordUpdatedAt: IsoDate.nullable().default(null),
-  /** Turns since the side model last recorded (Story 12.1). */
-  turnsSinceSide: external_exports.number().int().min(0).default(0),
-  /**
-   * Project-relative files the PreToolUse hook has already told this session
-   * about (Story 10.4): the "tried before" note is once per file per session,
-   * and a file with nothing to say is remembered too, so every edit does not
-   * walk the history again.
-   */
-  notedFiles: external_exports.array(external_exports.string().min(1).max(500)).default([]),
-  /**
-   * Closing passes a later session started for this one because its own, at
-   * the session end, never finished (machine shut down, run hung or failed).
-   */
-  closeRetries: external_exports.number().int().min(0).optional()
-});
-
-// src/schema/versioned.ts
-function parseVersioned(raw, schema, current, migrations = {}) {
-  const warnings = [];
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    return { ok: false, error: "not a JSON object", warnings };
-  }
-  let doc = raw;
-  const version2 = doc.schema;
-  if (typeof version2 !== "number" || !Number.isInteger(version2) || version2 < 1) {
-    return { ok: false, error: "missing or invalid schema version", warnings };
-  }
-  if (version2 > current) {
-    warnings.push(`schema v${version2} is newer than supported v${current}; reading best-effort`);
-    doc = { ...doc, schema: current };
-  }
-  for (let v = version2; v < current; v++) {
-    const step = migrations[v];
-    if (!step) return { ok: false, error: `no migration from schema v${v}`, warnings };
-    doc = { ...step(doc), schema: v + 1 };
-  }
-  const result = schema.safeParse(doc);
-  if (!result.success) {
-    const issues = result.error.issues.slice(0, 5).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`);
-    return { ok: false, error: issues.join("; "), warnings };
-  }
-  return { ok: true, data: result.data, warnings };
-}
-
-// src/store/lock.ts
-import { mkdir as mkdir2, readFile as readFile3, rm as rm2, stat as stat3, writeFile } from "fs/promises";
-import { dirname as dirname3, join as join4 } from "path";
-import { setTimeout as sleep } from "timers/promises";
-var LockBusyError = class extends Error {
-  constructor(lockPath) {
-    super(`lock is held: ${lockPath}`);
-    this.lockPath = lockPath;
-  }
-  lockPath;
-};
-function alive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return err.code === "EPERM";
-  }
-}
-async function isStale(lockPath, staleMs) {
-  try {
-    const owner = Number.parseInt(await readFile3(join4(lockPath, "owner"), "utf8"), 10);
-    if (Number.isInteger(owner) && owner > 0 && !alive(owner)) return true;
-  } catch {
-  }
-  const info = await stat3(lockPath).catch(() => void 0);
-  return info !== void 0 && Date.now() - info.mtimeMs > staleMs;
-}
-async function acquire(lockPath, opts) {
-  const { timeoutMs = 1e4, staleMs = 6e4 } = opts;
-  const deadline = Date.now() + timeoutMs;
-  await mkdir2(dirname3(lockPath), { recursive: true });
-  for (let delay = 20; ; delay = Math.min(delay * 2, 250)) {
-    try {
-      await mkdir2(lockPath);
-      await writeFile(join4(lockPath, "owner"), String(process.pid));
-      return;
-    } catch (err) {
-      if (err.code !== "EEXIST") throw err;
-    }
-    if (await isStale(lockPath, staleMs)) {
-      await rm2(lockPath, { recursive: true, force: true });
-      continue;
-    }
-    if (Date.now() >= deadline) throw new LockBusyError(lockPath);
-    await sleep(delay);
-  }
-}
-async function isLockHeld(lockPath, staleMs = 6e4) {
-  const info = await stat3(lockPath).catch(() => void 0);
-  if (info === void 0) return false;
-  return !await isStale(lockPath, staleMs);
-}
-async function withLock(lockPath, fn, opts = {}) {
-  await acquire(lockPath, opts);
-  try {
-    return await fn();
-  } finally {
-    await rm2(lockPath, { recursive: true, force: true });
-  }
-}
-
-// src/store/stores.ts
-async function load(file2, schema, version2) {
-  const read = await readJson(file2);
-  if (!read.found) return { found: false };
-  if ("error" in read) return { found: true, ok: false, error: read.error, warnings: [] };
-  return { found: true, ...parseVersioned(read.value, schema, version2) };
-}
-async function update(file2, lockPath, schema, version2, fn, opts, resetUnreadable = false) {
-  return withLock(
-    lockPath,
-    async () => {
-      const cur = await load(file2, schema, version2);
-      if (cur.found && !cur.ok && !resetUnreadable) throw new Error(`${file2}: ${cur.error}`);
-      const next = await fn(cur.found && cur.ok ? cur.data : void 0);
-      await atomicWriteJson(file2, schema.parse(next));
-      return next;
-    },
-    opts
-  );
-}
-var loadProject = (root) => load(projectPaths(root).project, Project, PROJECT_SCHEMA);
-function projectJson(project) {
-  return `${["{", `  "name": ${JSON.stringify(project.name)},`, `  "schema": ${project.schema}`, "}"].join("\n")}
-`;
-}
-var updateProject = async (root, fn) => {
-  const p = projectPaths(root);
-  return withLock(p.lock("project"), async () => {
-    const cur = await loadProject(root);
-    if (cur.found && !cur.ok) throw new Error(`${p.project}: ${cur.error}`);
-    const next = Project.parse(await fn(cur.found && cur.ok ? cur.data : void 0));
-    await atomicWrite(p.project, projectJson(next));
-    return next;
-  });
-};
-var loadSession = (root, id) => load(projectPaths(root).session(id), Session, SESSION_SCHEMA);
-async function listSessionIds(dir) {
-  let entries;
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch (err) {
-    if (err.code === "ENOENT") return [];
-    throw err;
-  }
-  return entries.filter((entry) => entry.isFile() && entry.name.endsWith(".json")).map((entry) => entry.name.slice(0, -".json".length)).sort();
-}
-async function loadAllSessions(root, warn) {
-  const sessions = [];
-  for (const id of await listSessionIds(projectPaths(root).sessions)) {
-    const loaded = await loadSession(root, id);
-    if (!loaded.found) continue;
-    if (!loaded.ok) {
-      warn(`skipping session ${id}: ${loaded.error}`);
-      continue;
-    }
-    for (const warning of loaded.warnings) warn(`session ${id}: ${warning}`);
-    sessions.push(loaded.data);
-  }
-  return sessions;
-}
-var updateSession = (root, id, fn, opts) => {
-  const p = projectPaths(root);
-  return update(p.session(id), p.lock(`session-${id}`), Session, SESSION_SCHEMA, fn, opts);
-};
-var loadConfig = async (env) => {
-  const cur = await load(globalPaths(env).config, Config, CONFIG_SCHEMA);
-  return migrateConfig(cur.found && cur.ok ? cur.data : Config.parse({ schema: CONFIG_SCHEMA }));
-};
-var updateConfig = (fn, env, opts) => {
-  const g = globalPaths(env);
-  return update(
-    g.config,
-    `${g.config}.lock`,
-    Config,
-    CONFIG_SCHEMA,
-    (cur) => migrateConfig(fn(migrateConfig(cur ?? Config.parse({ schema: CONFIG_SCHEMA })))),
-    opts
-  );
-};
-var loadRegistry = (env) => load(globalPaths(env).registry, Registry, CONFIG_SCHEMA);
-var updateRegistry = (fn, env) => {
-  const g = globalPaths(env);
-  return update(
-    g.registry,
-    g.lock,
-    Registry,
-    CONFIG_SCHEMA,
-    (cur) => fn(cur ?? Registry.parse({ schema: CONFIG_SCHEMA }))
-  );
-};
-var updateState = (root, id, fn, opts) => {
-  const p = projectPaths(root);
-  return update(p.state(id), p.lock(`state-${id}`), HookState, STATE_SCHEMA, fn, opts, true);
-};
-
-// src/session-git.ts
-var exec2 = promisify2(execFile2);
-var SessionHead = external_exports.object({
-  sessionId: Slug,
-  transcriptPath: external_exports.string().optional(),
-  at: external_exports.string().optional()
-});
-async function readSessionHead(root) {
-  const read = await readJson(projectPaths(root).head);
-  if (!read.found || "error" in read) return void 0;
-  const parsed = SessionHead.safeParse(read.value);
-  return parsed.success ? parsed.data : void 0;
-}
-async function git(root, args, env = process.env) {
-  try {
-    const { stdout } = await exec2("git", ["-C", root, ...args], { env });
-    return { code: 0, stdout };
-  } catch (err) {
-    const failure2 = err;
-    return {
-      code: typeof failure2.code === "number" ? failure2.code : 1,
-      stdout: failure2.stdout ?? ""
-    };
-  }
-}
-async function sessionPaths(gitRoot, root, sessionId) {
-  const paths = projectPaths(root);
-  const session = [paths.session(sessionId), paths.events(sessionId)].filter(
-    (file2) => existsSync(file2)
-  );
-  if (session.length === 0) return [];
-  const shared = [paths.project, paths.gitignore].filter((file2) => existsSync(file2));
-  return [...session, ...shared].map((file2) => relative2(gitRoot, file2).split(sep2).join("/")).filter((file2) => file2 !== "" && !file2.startsWith(".."));
-}
-async function ignored(gitRoot, path, env) {
-  return (await git(gitRoot, ["check-ignore", "-q", "--", path], env)).code === 0;
-}
-async function hasStagedChanges(gitRoot, env) {
-  return (await git(gitRoot, ["diff", "--cached", "--quiet", "--exit-code"], env)).code !== 0;
-}
-async function uncommittedSession(root, sessionId, env = process.env) {
-  const gitRoot = await findGitRoot(root);
-  if (gitRoot === void 0) return false;
-  const paths = await sessionPaths(gitRoot, root, sessionId);
-  if (paths.length === 0) return false;
-  if (await ignored(gitRoot, paths[0], env)) return false;
-  return (await git(gitRoot, ["status", "--porcelain", "--", ...paths], env)).stdout.trim() !== "";
-}
-async function stageSessionFiles(root, env = process.env) {
-  const head = await readSessionHead(root);
-  if (head === void 0) return false;
-  const gitRoot = await findGitRoot(root);
-  if (gitRoot === void 0) return false;
-  const paths = await sessionPaths(gitRoot, root, head.sessionId);
-  if (paths.length === 0) return false;
-  if (await ignored(gitRoot, paths[0], env)) return false;
-  if (!await hasStagedChanges(gitRoot, env)) return false;
-  return (await git(gitRoot, ["add", "--", ...paths], env)).code === 0;
-}
-function recordMessage(title, sessionId) {
-  const clean = title.replace(/\s+/g, " ").trim() || sessionId;
-  return `chore(cogit): record ${clean.length > 120 ? `${clean.slice(0, 119)}\u2026` : clean}`;
-}
-async function commitSessionFiles(root, sessionId, title, env = process.env) {
-  const gitRoot = await findGitRoot(root);
-  if (gitRoot === void 0) return false;
-  const paths = await sessionPaths(gitRoot, root, sessionId);
-  if (paths.length === 0) return false;
-  if (await ignored(gitRoot, paths[0], env)) return false;
-  if ((await git(gitRoot, ["status", "--porcelain", "--", ...paths], env)).stdout.trim() === "")
-    return false;
-  if ((await git(gitRoot, ["add", "--", ...paths], env)).code !== 0) return false;
-  const message = recordMessage(title, sessionId);
-  return (await git(gitRoot, ["commit", "--no-verify", "-m", message, "--", ...paths], env)).code === 0;
-}
-async function maybeAutoCommit(root, sessionId, env) {
-  if ((await loadConfig(env)).recordCommit !== "auto") return false;
-  const loaded = await loadSession(root, sessionId);
-  const title = loaded.found && loaded.ok ? loaded.data.title : "";
-  return commitSessionFiles(root, sessionId, title, env);
-}
-
-// src/thought.ts
-import { execFile as execFile3 } from "child_process";
-import { access as access2 } from "fs/promises";
-import { isAbsolute as isAbsolute2, resolve } from "path";
-import { promisify as promisify3 } from "util";
-
-// src/agents/types.ts
-var DEFAULT_AGENT = "claude-code";
-
 // src/agents/claude/hooks.ts
 var ClaudeHookInput = external_exports.looseObject({
   session_id: external_exports.string(),
@@ -20782,12 +20399,12 @@ function additionalContext(event, text) {
 }
 
 // src/agents/claude/settings.ts
-import { constants, copyFile, mkdir as mkdir3, writeFile as writeFile2 } from "fs/promises";
-import { homedir as homedir2, tmpdir } from "os";
-import { join as join5 } from "path";
+import { constants, copyFile, mkdir as mkdir2, writeFile } from "fs/promises";
+import { homedir, tmpdir } from "os";
+import { join as join3 } from "path";
 var CLAUDE_DEFAULT_RETENTION = 30;
 function claudeSettingsPath(env) {
-  return join5(env.CLAUDE_CONFIG_DIR ?? join5(homedir2(), ".claude"), "settings.json");
+  return join3(env.CLAUDE_CONFIG_DIR ?? join3(homedir(), ".claude"), "settings.json");
 }
 async function readSettings(file2) {
   const read = await readJson(file2);
@@ -20815,14 +20432,14 @@ async function readSkillAllowed(env) {
   const allow = settings && allowList(settings);
   return allow ? allow.includes(SKILL_RULE) : void 0;
 }
-async function updateSettings(env, stamp, fn) {
+async function updateSettings(env, stamp2, fn) {
   const file2 = claudeSettingsPath(env);
   const settings = await readSettings(file2);
   if (!settings) throw new Error(`${file2} is not a valid JSON object; not changing it`);
   const next = fn(settings, file2);
   let backup;
   if (Object.keys(settings).length > 0) {
-    backup = `${file2}.cogit-bak-${stamp.replace(/[:.]/g, "-")}`;
+    backup = `${file2}.cogit-bak-${stamp2.replace(/[:.]/g, "-")}`;
     await copyFile(file2, backup, constants.COPYFILE_EXCL).catch((err) => {
       if (err.code !== "EEXIST") throw err;
     });
@@ -20830,13 +20447,13 @@ async function updateSettings(env, stamp, fn) {
   await atomicWriteJson(file2, next);
   return backup ? { file: file2, backup } : { file: file2 };
 }
-async function setRetention(days, env, stamp) {
+async function setRetention(days, env, stamp2) {
   if (!Number.isInteger(days) || days < 1)
     throw new Error("retention must be a whole number of days, at least 1");
-  return updateSettings(env, stamp, (s) => ({ ...s, cleanupPeriodDays: days }));
+  return updateSettings(env, stamp2, (s) => ({ ...s, cleanupPeriodDays: days }));
 }
-async function allowSkill(env, stamp) {
-  return updateSettings(env, stamp, (s, file2) => {
+async function allowSkill(env, stamp2) {
+  return updateSettings(env, stamp2, (s, file2) => {
     const allow = allowList(s);
     if (!allow) throw new Error(`${file2} has an unexpected permissions.allow; not changing it`);
     if (allow.includes(SKILL_RULE)) return s;
@@ -20848,22 +20465,46 @@ var PLUGIN_ID = "cogit@cogit";
 var MARKETPLACE = "cogit";
 var MARKETPLACE_REPO = "erensrtky/cogit";
 var INSTALL_COMMAND = `claude plugin install cogit --marketplace ${MARKETPLACE_REPO}`;
-async function readPluginInstalled(env) {
-  const base = env.CLAUDE_CONFIG_DIR ?? join5(homedir2(), ".claude");
-  const read = await readJson(join5(base, "plugins", "installed_plugins.json"));
+async function installedEntries(env) {
+  const base = env.CLAUDE_CONFIG_DIR ?? join3(homedir(), ".claude");
+  const read = await readJson(join3(base, "plugins", "installed_plugins.json"));
   if (!read.found || "error" in read) return void 0;
   const plugins = isObject2(read.value) ? read.value.plugins : void 0;
   if (!isObject2(plugins)) return void 0;
   const entries = plugins[PLUGIN_ID];
-  return Array.isArray(entries) && entries.length > 0;
+  return Array.isArray(entries) ? entries : [];
+}
+async function readPluginInstalled(env) {
+  const entries = await installedEntries(env);
+  return entries === void 0 ? void 0 : entries.length > 0;
+}
+async function readPluginVersion(env) {
+  const entries = await installedEntries(env);
+  for (const entry of entries ?? []) {
+    const version2 = isObject2(entry) ? entry.version : void 0;
+    if (typeof version2 === "string" && version2 !== "") return version2;
+  }
+  return void 0;
+}
+function pluginEnabledIn(settings) {
+  const plugins = isObject2(settings.enabledPlugins) ? settings.enabledPlugins : void 0;
+  return plugins?.[PLUGIN_ID] === true;
+}
+async function readPluginEnabled(env, root) {
+  const settings = await readSettings(claudeSettingsPath(env));
+  if (!settings) return void 0;
+  if (pluginEnabledIn(settings)) return true;
+  if (root === void 0) return false;
+  const project = await readSettings(projectSettingsPath(root));
+  return project !== void 0 && pluginEnabledIn(project);
 }
 function liveDir() {
-  return join5(tmpdir(), "cogit-live");
+  return join3(tmpdir(), "cogit-live");
 }
 async function markLive(sessionId) {
   if (!/^[\w-]+$/.test(sessionId)) return;
-  await mkdir3(liveDir(), { recursive: true });
-  await writeFile2(join5(liveDir(), sessionId), "");
+  await mkdir2(liveDir(), { recursive: true });
+  await writeFile(join3(liveDir(), sessionId), "");
 }
 var GUARD_REASON = `cogit: this session started without the cogit plugin, so nothing in it is recorded. Install it once with \`${INSTALL_COMMAND}\` (or start claude with --plugin-dir), then open a new session. Send the message again to continue without recording.`;
 var GUARD_COMMAND = "node -e '" + [
@@ -20879,7 +20520,7 @@ var GUARD_COMMAND = "node -e '" + [
 ].join("") + "' # cogit:guard";
 var GUARD_TAG = "# cogit:guard";
 function projectSettingsPath(root) {
-  return join5(root, ".claude", "settings.json");
+  return join3(root, ".claude", "settings.json");
 }
 function isObject2(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -20945,22 +20586,22 @@ async function writeProjectSetup(root) {
     },
     hooks: hasCurrentGuard(settings) ? hooks : { ...hooks, UserPromptSubmit: withCurrentGuard(submit) }
   };
-  await mkdir3(join5(root, ".claude"), { recursive: true });
+  await mkdir2(join3(root, ".claude"), { recursive: true });
   await atomicWriteJson(file2, next);
   return { file: file2 };
 }
 
 // src/agents/claude/transcripts.ts
 import { createReadStream as createReadStream2 } from "fs";
-import { access, open as open3, readdir as readdir3, stat as stat5 } from "fs/promises";
-import { homedir as homedir3 } from "os";
-import { join as join7 } from "path";
+import { access, open as open3, readdir as readdir2, stat as stat4 } from "fs/promises";
+import { homedir as homedir2 } from "os";
+import { join as join5 } from "path";
 import { createInterface as createInterface2 } from "readline";
 
 // src/agents/claude/fork.ts
 import { createReadStream } from "fs";
-import { readdir as readdir2, stat as stat4 } from "fs/promises";
-import { basename as basename2, dirname as dirname4, join as join6 } from "path";
+import { readdir, stat as stat3 } from "fs/promises";
+import { basename as basename2, dirname as dirname3, join as join4 } from "path";
 import { createInterface } from "readline";
 var MAX_DEPTH = 8;
 var USER_LINE = /"type":"user"/;
@@ -20995,7 +20636,7 @@ function parseLine(raw) {
   }
 }
 async function bornAt(file2) {
-  const birth = (await stat4(file2).catch(() => null))?.birthtimeMs ?? 0;
+  const birth = (await stat3(file2).catch(() => null))?.birthtimeMs ?? 0;
   return birth > 0 ? birth : null;
 }
 function sharedPrefix(a, b) {
@@ -21011,13 +20652,13 @@ async function forkOrigin(file2, turns, readTurns, isMessage, depth = 0) {
   const first = turns[0];
   if (first?.uuid === void 0 || depth > MAX_DEPTH) return null;
   const born = await bornAt(file2);
-  const dir = dirname4(file2);
-  const names = (await readdir2(dir).catch(() => [])).filter(
+  const dir = dirname3(file2);
+  const names = (await readdir(dir).catch(() => [])).filter(
     (name) => name.endsWith(".jsonl")
   );
   let best = null;
   for (const name of names) {
-    const other = join6(dir, name);
+    const other = join4(dir, name);
     if (other === file2) continue;
     if (await firstMessageUuid(other, isMessage).catch(() => null) !== first.uuid) continue;
     const otherBorn = await bornAt(other) ?? 0;
@@ -21039,19 +20680,19 @@ async function forkOrigin(file2, turns, readTurns, isMessage, depth = 0) {
 
 // src/agents/claude/transcripts.ts
 function claudeConfigDir(env = process.env) {
-  return env.CLAUDE_CONFIG_DIR ?? join7(homedir3(), ".claude");
+  return env.CLAUDE_CONFIG_DIR ?? join5(homedir2(), ".claude");
 }
 async function findTranscript(sessionId, env = process.env) {
-  const projectsDir = join7(claudeConfigDir(env), "projects");
+  const projectsDir = join5(claudeConfigDir(env), "projects");
   let dirs;
   try {
-    dirs = await readdir3(projectsDir, { withFileTypes: true });
+    dirs = await readdir2(projectsDir, { withFileTypes: true });
   } catch {
     return null;
   }
   for (const dir of dirs) {
     if (!dir.isDirectory()) continue;
-    const file2 = join7(projectsDir, dir.name, `${sessionId}.jsonl`);
+    const file2 = join5(projectsDir, dir.name, `${sessionId}.jsonl`);
     try {
       await access(file2);
       return file2;
@@ -21062,24 +20703,24 @@ async function findTranscript(sessionId, env = process.env) {
 }
 async function collectTranscripts(env = process.env) {
   const found = /* @__PURE__ */ new Map();
-  const projectsDir = join7(claudeConfigDir(env), "projects");
+  const projectsDir = join5(claudeConfigDir(env), "projects");
   let projectDirs;
   try {
-    projectDirs = await readdir3(projectsDir, { withFileTypes: true });
+    projectDirs = await readdir2(projectsDir, { withFileTypes: true });
   } catch {
     return found;
   }
   for (const entry of projectDirs) {
     if (!entry.isDirectory()) continue;
-    const dir = join7(projectsDir, entry.name);
+    const dir = join5(projectsDir, entry.name);
     let files;
     try {
-      files = await readdir3(dir);
+      files = await readdir2(dir);
     } catch {
       continue;
     }
     for (const file2 of files) {
-      if (file2.endsWith(".jsonl")) found.set(file2.slice(0, -".jsonl".length), join7(dir, file2));
+      if (file2.endsWith(".jsonl")) found.set(file2.slice(0, -".jsonl".length), join5(dir, file2));
     }
   }
   return found;
@@ -21131,7 +20772,7 @@ function displayTurn(turn, roots) {
     /<pasted_content[^>]*>([\s\S]*?)<\/pasted_content[^>]*>/g,
     "\n[Pasted]\n$1\n[/Pasted]\n"
   ).trim();
-  const relative3 = (file2) => {
+  const relative7 = (file2) => {
     for (const root of roots) if (file2.startsWith(`${root}/`)) return file2.slice(root.length + 1);
     return file2;
   };
@@ -21142,7 +20783,7 @@ function displayTurn(turn, roots) {
     // Steps and questions feed the recorder only; the map keeps the counts.
     tools: {
       commands: turn.tools.commands,
-      files: turn.tools.files.map(relative3),
+      files: turn.tools.files.map(relative7),
       other: turn.tools.other
     }
   };
@@ -21165,13 +20806,13 @@ function addAssistant(turn, line) {
       turn.replies.push(block.text);
     } else if (block?.type === "tool_use") {
       const input2 = block.input ?? {};
-      const path = input2.file_path;
+      const path2 = input2.file_path;
       if (block.name === "Bash") {
         turn.tools.commands += 1;
         if (typeof input2.description === "string" && input2.description.trim() !== "")
           addOnce(turn.tools, "steps", input2.description.trim());
-      } else if (EDIT_TOOLS.has(block.name) && typeof path === "string") {
-        if (!turn.tools.files.includes(path)) turn.tools.files.push(path);
+      } else if (EDIT_TOOLS.has(block.name) && typeof path2 === "string") {
+        if (!turn.tools.files.includes(path2)) turn.tools.files.push(path2);
       } else {
         turn.tools.other += 1;
         if (block.name === "AskUserQuestion" && Array.isArray(input2.questions))
@@ -21193,6 +20834,21 @@ async function readConversation(file2) {
     return { ...index === 0 ? rest : turn, id: `m${index + 1}` };
   });
 }
+var ENTRYPOINT = /"entrypoint":"([^"]*)"/;
+async function isHeadlessTranscript(file2) {
+  const lines = createInterface2({ input: createReadStream2(file2, "utf8"), crlfDelay: Infinity });
+  try {
+    let read = 0;
+    for await (const raw of lines) {
+      const entrypoint = ENTRYPOINT.exec(raw)?.[1];
+      if (entrypoint !== void 0) return entrypoint.startsWith("sdk");
+      if ((read += 1) >= 50) break;
+    }
+    return false;
+  } finally {
+    lines.close();
+  }
+}
 async function readForkOrigin(file2) {
   return forkOrigin(file2, await readAllTurns(file2), readTranscriptTurns, isMessageLine);
 }
@@ -21201,7 +20857,7 @@ function isMessageLine(line) {
 }
 var turnCache = /* @__PURE__ */ new Map();
 async function readTranscriptTurns(file2) {
-  const size = (await stat5(file2)).size;
+  const size = (await stat4(file2)).size;
   const cached2 = turnCache.get(file2);
   if (cached2 && cached2.size === size) return cached2.turns;
   const turns = readAllTurns(file2);
@@ -21392,10 +21048,13 @@ var claude = {
   excerpt,
   parseHookInput,
   isHeadless,
+  isHeadlessTranscript,
   additionalContext,
   userNotice,
   readRetention,
   readPluginInstalled,
+  readPluginVersion,
+  readPluginEnabled,
   readSkillAllowed,
   setRetention,
   allowSkill,
@@ -21410,12 +21069,2654 @@ function defaultAgent() {
   return claude;
 }
 
+// src/schema/common.ts
+var Slug = external_exports.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/, "must be a slug: letters, digits, _ . -");
+var IsoDate = external_exports.iso.datetime({ offset: true });
+var MessageRef = external_exports.string().regex(
+  /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}(:[A-Za-z0-9][A-Za-z0-9_.-]{0,127})?$/,
+  "must be a node id or <sessionId>:<messageId>"
+);
+function parseMessageRef(ref) {
+  const at = ref.indexOf(":");
+  return at === -1 ? { sessionId: null, id: ref } : { sessionId: ref.slice(0, at), id: ref.slice(at + 1) };
+}
+
+// src/store/paths.ts
+import { homedir as homedir3 } from "os";
+import { join as join6 } from "path";
+var DIR_NAME = ".cogit";
+var OLD_DIR_NAME = ".codelineage";
+var CONFIG_DIR_NAME = "cogit";
+var OLD_CONFIG_DIR_NAME = "codelineage";
+function configuredHome(env = process.env) {
+  return env.COGIT_HOME ?? env.CODELINEAGE_HOME;
+}
+function captureDisabled(env = process.env) {
+  return env.COGIT_DISABLE === "1" || env.CODELINEAGE_DISABLE === "1";
+}
+function projectPaths(root) {
+  const base = join6(root, DIR_NAME);
+  return {
+    base,
+    project: join6(base, "project.json"),
+    sessions: join6(base, "sessions"),
+    session: (id) => join6(base, "sessions", `${id}.json`),
+    /** Append-only structure events for a session (Story 8.5). */
+    events: (id) => join6(base, "sessions", `${id}.events.jsonl`),
+    /** Pre-migration copies of the record files. */
+    backup: (name) => join6(base, name),
+    /** The conversation store: what the drill-down needs, outliving the transcript. */
+    conversations: join6(base, "conversations"),
+    conversation: (id) => join6(base, "conversations", `${id}.jsonl.gz`),
+    state: (id) => join6(base, "state", `${id}.json`),
+    /**
+     * Which messages this user has marked read (Story 10.3). Local per-user
+     * state: never committed, never shared (`state/` stays ignored by both
+     * policies).
+     */
+    readState: join6(base, "state", "read.json"),
+    /** Inbox rows the user dismissed, per session (Story 11.1); also local. */
+    inboxState: join6(base, "state", "inbox.json"),
+    /** How the user left the map: open sessions and dragged row widths; also local. */
+    mapView: join6(base, "state", "map.json"),
+    /** What the detached hook children (build, side run) printed; local, capped. */
+    detachedLog: join6(base, "state", "detached.log"),
+    /** Commits waiting for their message's record before a Shape; local. */
+    shapeQueue: join6(base, "state", "shape-queue"),
+    locks: join6(base, "locks"),
+    /** Where the skill drops session JSON for `session write --file`. */
+    inbox: (id) => join6(base, "inbox", `${id}.json`),
+    lock: (name) => join6(base, "locks", `${name}.lock`),
+    html: join6(base, "map.html"),
+    /**
+     * The session whose next code commit carries its record (Story 9.3), written
+     * by the UserPromptSubmit hook. Local state, never committed.
+     */
+    head: join6(base, "HEAD"),
+    /** The project-scoped ignore rules that keep local state out of git. */
+    gitignore: join6(base, ".gitignore")
+  };
+}
+function defaultConfigBase(name, env = process.env) {
+  return join6(env.XDG_CONFIG_HOME ?? join6(homedir3(), ".config"), name);
+}
+function globalPaths(env = process.env) {
+  const base = configuredHome(env) ?? defaultConfigBase(CONFIG_DIR_NAME, env);
+  return {
+    base,
+    config: join6(base, "config.json"),
+    registry: join6(base, "projects.json"),
+    lock: join6(base, "registry.lock"),
+    panel: join6(base, "panel.html")
+  };
+}
+
+// src/store/root.ts
+import { existsSync as existsSync2 } from "fs";
+import { readFile as readFile4, stat as stat6 } from "fs/promises";
+import { dirname as dirname4, join as join8, relative as relative2, resolve as resolve2 } from "path";
+
+// src/store/migrate.ts
+import { existsSync } from "fs";
+import { readFile as readFile3, rename as rename2, stat as stat5 } from "fs/promises";
+import { join as join7, resolve, sep as sep2 } from "path";
+var checkedProjects = /* @__PURE__ */ new Set();
+var checkedGlobals = /* @__PURE__ */ new Set();
+var pendingWarnings = [];
+function takeMigrationWarnings() {
+  return pendingWarnings.splice(0, pendingWarnings.length);
+}
+function warn(line) {
+  if (!pendingWarnings.includes(line)) pendingWarnings.push(line);
+}
+function renameGitignoreLines(text) {
+  return text.split("\n").map((line) => {
+    if (line.trim() === "# codelineage") return line.replace("# codelineage", "# cogit");
+    return line.replace(/^(\s*)\/\.codelineage(?=\/|$)/, "$1/.cogit");
+  }).join("\n");
+}
+async function isDirectory2(path2) {
+  return stat5(path2).then(
+    (info) => info.isDirectory(),
+    () => false
+  );
+}
+async function moveDir(from, to) {
+  try {
+    await rename2(from, to);
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function migrateProject(root) {
+  const dir = resolve(root);
+  if (checkedProjects.has(dir)) return false;
+  checkedProjects.add(dir);
+  const oldDir = join7(dir, OLD_DIR_NAME);
+  const newDir = join7(dir, DIR_NAME);
+  const oldIsDir = await isDirectory2(oldDir);
+  if (!oldIsDir) return false;
+  if (existsSync(newDir)) {
+    warn(
+      `both ${OLD_DIR_NAME}/ and ${DIR_NAME}/ exist in ${dir}; using ${DIR_NAME}/ and leaving the old directory untouched`
+    );
+    return false;
+  }
+  if (!await moveDir(oldDir, newDir)) return false;
+  const gitignore = join7(dir, ".gitignore");
+  const text = await readFile3(gitignore, "utf8").catch(() => void 0);
+  if (text !== void 0) {
+    const next = renameGitignoreLines(text);
+    if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
+  }
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-DDPCNHQ6.js");
+  await installGitHooks2(dir).catch(() => void 0);
+  return true;
+}
+async function rewriteRegistryPaths(file2, oldBase, newBase) {
+  const text = await readFile3(file2, "utf8").catch(() => void 0);
+  if (text === void 0) return;
+  let json2;
+  try {
+    json2 = JSON.parse(text);
+  } catch {
+    return;
+  }
+  if (!Array.isArray(json2.projects)) return;
+  let changed = false;
+  for (const project of json2.projects) {
+    if (typeof project.path !== "string") continue;
+    if (project.path !== oldBase && !project.path.startsWith(`${oldBase}${sep2}`)) continue;
+    project.path = `${newBase}${project.path.slice(oldBase.length)}`;
+    changed = true;
+  }
+  if (changed) await atomicWriteJson(file2, json2).catch(() => void 0);
+}
+async function migrateGlobal(env = process.env) {
+  const key = `${env.XDG_CONFIG_HOME ?? ""}\0${env.COGIT_HOME ?? ""}\0${env.CODELINEAGE_HOME ?? ""}`;
+  if (checkedGlobals.has(key)) return false;
+  checkedGlobals.add(key);
+  if (configuredHome(env) !== void 0) return false;
+  const oldBase = defaultConfigBase(OLD_CONFIG_DIR_NAME, env);
+  const newBase = defaultConfigBase(CONFIG_DIR_NAME, env);
+  const oldIsDir = await isDirectory2(oldBase);
+  if (!oldIsDir) return false;
+  if (existsSync(newBase)) {
+    warn(
+      `both ${oldBase} and ${newBase} exist; using ${newBase} and leaving the old directory untouched`
+    );
+    return false;
+  }
+  if (!await moveDir(oldBase, newBase)) return false;
+  await rewriteRegistryPaths(join7(newBase, "projects.json"), oldBase, newBase);
+  return true;
+}
+
+// src/store/root.ts
+async function findLinkedWorktree(start) {
+  for (let dir = start; ; dir = dirname4(dir)) {
+    const dotGit = join8(dir, ".git");
+    const info = await stat6(dotGit).catch(() => void 0);
+    if (info?.isFile()) {
+      const match = /^gitdir:\s*(.+?)\s*$/m.exec(await readFile4(dotGit, "utf8"));
+      return match ? { top: dir, gitdir: resolve2(dir, match[1]) } : void 0;
+    }
+    if (info || dirname4(dir) === dir) return void 0;
+  }
+}
+async function readBranch(gitdir) {
+  const head = await readFile4(join8(gitdir, "HEAD"), "utf8").catch(() => "");
+  const match = /^ref:\s*refs\/heads\/(.+?)\s*$/m.exec(head);
+  return match ? match[1] : null;
+}
+async function resolveProjectRoot(dir) {
+  const start = resolve2(dir);
+  try {
+    const linked = await findLinkedWorktree(start);
+    if (!linked) {
+      await migrateProject(start);
+      return { root: start };
+    }
+    const worktree = { path: linked.top, branch: await readBranch(linked.gitdir) };
+    await migrateProject(start);
+    if (existsSync2(projectPaths(start).project)) return { root: start, worktree };
+    const common2 = (await readFile4(join8(linked.gitdir, "commondir"), "utf8")).trim();
+    const mainTop = dirname4(resolve2(linked.gitdir, common2));
+    const root = join8(mainTop, relative2(linked.top, start));
+    await migrateProject(root);
+    return { root, worktree };
+  } catch {
+    return { root: start };
+  }
+}
+
+// src/store/stores.ts
+import { readdir as readdir3 } from "fs/promises";
+
+// src/schema/config.ts
+var CONFIG_SCHEMA = 1;
+var Config = external_exports.object({
+  schema: external_exports.literal(CONFIG_SCHEMA),
+  /** "auto" = the conversation's language, otherwise a fixed language name or code. */
+  language: external_exports.string().min(1).max(32).default("auto"),
+  /**
+   * How often the main agent is asked to record (Story 12.1). The default is the
+   * mixed mode's interval: the side model records in between, so the agent can
+   * check in rarely.
+   */
+  updateEveryTurns: external_exports.int().min(1).max(100).default(15),
+  sessionEndCatchUp: external_exports.boolean().default(true),
+  /**
+   * Who writes the record (Story 12.1): the main agent (`agent`), both (`mixed`,
+   * "Detailed" in the panel: a side model often, the agent rarely), or only the
+   * side model (`side`, "Economical", the default since 0.21: the agent is never
+   * interrupted and the session-end pass writes the branches).
+   */
+  recorder: external_exports.enum(["agent", "mixed", "side"]).default("side"),
+  /** Model the side runs use: the headless catch-up and the periodic records. */
+  sideModel: external_exports.string().trim().min(1).max(64).default("haiku"),
+  /** How often the side model records, in turns (Story 12.1). */
+  sideEveryTurns: external_exports.int().min(1).max(100).default(5),
+  /**
+   * @deprecated Renamed to `sideModel` in Story 12.1. Still read once and
+   * migrated, so a config written before the rename keeps its model.
+   */
+  catchUpModel: external_exports.string().trim().min(1).max(64).optional(),
+  /**
+   * Whether the agent writes a per-message `summary`. Off by default: the branch
+   * summary is the outer layer and the drill-down already shows the reply.
+   */
+  messageSummaries: external_exports.boolean().default(false),
+  /**
+   * Whether a message that landed commits gets a Shape (Story 13.6): a small
+   * plain-language or diagram view of what the change does, written by whoever
+   * records. Off writes nothing; the map then says so.
+   */
+  shapes: external_exports.boolean().default(true),
+  /**
+   * Whether SessionStart hands the agent the lineage of the previous session and
+   * how to read the record (`log` / `show`). On by default; costs only tokens.
+   */
+  startupContext: external_exports.boolean().default(true),
+  /**
+   * Whether sessions started without a person (`claude -p`, an SDK) are recorded.
+   * Off by default: other plugins start them in the background, one per prompt,
+   * and they would fill the map and the inbox.
+   */
+  recordHeadless: external_exports.boolean().default(false),
+  /** Port the local map server binds on `127.0.0.1`. */
+  serverPort: external_exports.int().min(1).max(65535).default(4747),
+  /** Default for new projects; `init` asks per repo. Story 9.3: the record travels. */
+  gitPolicy: external_exports.enum(["ignore", "commit"]).default("commit"),
+  /**
+   * Whether `.cogit/conversations/` (the raw chat text) travels too. Off by
+   * default: the session record can be committed while the chat stays local.
+   */
+  shareConversations: external_exports.boolean().default(false),
+  /**
+   * What happens to the session files the last code commit left behind: ask the
+   * user at the next session start, commit them at session end, or do nothing.
+   */
+  recordCommit: external_exports.enum(["ask", "auto", "off"]).default("ask"),
+  /**
+   * How long `.cogit/HEAD` stays fresh for the `Thought:` trailer (Story 9.4).
+   * A commit made hours after the last message is probably not that message.
+   */
+  trailerMaxAgeHours: external_exports.int().min(1).max(8760).default(6),
+  /**
+   * An unread message whose commits changed at least this many lines gets the
+   * quiet "a lot landed here" highlight on the map (Story 10.3). A threshold,
+   * not a judgement: it never hides or ranks anything by itself.
+   */
+  bigChangeLines: external_exports.int().min(1).max(1e6).default(300),
+  /**
+   * Whether the agent is told, before editing a file, about options earlier
+   * thoughts considered and rejected for that file (Story 10.4). A note from
+   * the record, never a rule; off means silence.
+   */
+  tryBeforeNotes: external_exports.boolean().default(true),
+  /**
+   * How many days a session stays in the "your turn" inbox (Stories 11.1,
+   * 12.2). One day by default: the inbox is for work that is still fresh, not
+   * an archive. Raise it to keep rows longer. A config that holds an older value
+   * keeps it; only the default changed. Older sessions are hidden, nothing is
+   * deleted.
+   */
+  inboxMaxAgeDays: external_exports.int().min(1).max(3650).default(1),
+  agents: external_exports.array(external_exports.string().min(1)).default(["claude-code"]),
+  /** Project roots ("don't ask again" in this project) where the setup hint stays silent. */
+  setupHintOff: external_exports.array(external_exports.string().min(1)).default([])
+});
+var RegistryEntry = external_exports.object({
+  path: external_exports.string().min(1),
+  name: external_exports.string().min(1).max(200),
+  addedAt: IsoDate
+});
+var Registry = external_exports.object({
+  schema: external_exports.literal(CONFIG_SCHEMA),
+  projects: external_exports.array(RegistryEntry).default([])
+});
+var DEFAULT_SIDE_MODEL = "haiku";
+function migrateConfig(config2) {
+  if (config2.catchUpModel === void 0) return config2;
+  const { catchUpModel, ...rest } = config2;
+  return {
+    ...rest,
+    sideModel: config2.sideModel === DEFAULT_SIDE_MODEL ? catchUpModel : config2.sideModel
+  };
+}
+
+// src/schema/project.ts
+var PROJECT_SCHEMA = 1;
+var Project = external_exports.object({
+  schema: external_exports.literal(PROJECT_SCHEMA),
+  name: external_exports.string().min(1).max(200)
+});
+
+// src/schema/session.ts
+var SESSION_SCHEMA = 1;
+var NodeKind = external_exports.enum(["phase", "message", "step", "decision", "question"]);
+var DecidedBy = external_exports.enum(["user", "agent", "agreed"]);
+var Alternative = external_exports.object({
+  option: external_exports.string().min(1).max(200),
+  why: external_exports.string().max(500).default("")
+});
+var AgentDecision = external_exports.object({
+  title: external_exports.string().min(1).max(200),
+  why: external_exports.string().max(500).default(""),
+  alternatives: external_exports.array(Alternative).max(10).optional()
+});
+var MESSAGE_ID = /^m[1-9][0-9]*$/;
+var ShapeKind = external_exports.enum(["pseudo", "mermaid"]);
+var ShapeTool = external_exports.object({
+  kind: ShapeKind,
+  text: external_exports.string().min(1).max(4e3),
+  valid: external_exports.boolean().optional()
+});
+var Shape = external_exports.object({
+  tools: external_exports.array(ShapeTool).max(3).default([]),
+  /** Who wrote it: the main agent or the side model (the CLI stamps it). */
+  by: external_exports.enum(["agent", "side"]).optional(),
+  /** The message's commits this Shape was written from. */
+  commits: external_exports.array(external_exports.string().regex(/^[0-9a-f]{7,40}$/, "a commit hash")).max(20).default([]),
+  /** When it was written (the CLI stamps it). */
+  at: IsoDate.optional()
+});
+var ShapeInput = Shape.omit({ by: true, at: true }).extend({
+  tools: external_exports.array(ShapeTool.omit({ valid: true })).max(3)
+});
+var BranchSummary = external_exports.object({
+  title: external_exports.string().min(1).max(80),
+  asked: external_exports.string().min(1).max(300),
+  outcome: external_exports.string().min(1).max(600),
+  /** May be empty: a thread can leave nothing open. */
+  open: external_exports.string().max(300).default("")
+});
+var LineageNode = external_exports.object({
+  id: Slug,
+  /**
+   * For a message: the id of the earlier message it reacts to (`m3` for `m7`),
+   * `<sessionId>:<id>` for a message of an earlier session (Story 8.6), or null
+   * for a new root. For other kinds: the node it belongs to.
+   */
+  parent: MessageRef.nullable().default(null),
+  kind: NodeKind,
+  title: external_exports.string().min(1).max(200),
+  summary: external_exports.string().max(2e3).optional(),
+  why: external_exports.string().max(2e3).optional(),
+  at: IsoDate.optional(),
+  decidedBy: DecidedBy.optional(),
+  /** Options considered and rejected, mostly for decisions. */
+  alternatives: external_exports.array(Alternative).max(10).optional(),
+  /** Commits that carry this work out, as short or full hashes. */
+  commits: external_exports.array(external_exports.string().regex(/^[0-9a-f]{7,40}$/, "a commit hash")).max(20).optional(),
+  /** Files this work touched, relative to the project. */
+  files: external_exports.array(external_exports.string().min(1).max(300)).max(30).optional(),
+  /** For a message: earlier messages it returns to or builds on besides its parent. */
+  links: external_exports.array(MessageRef).max(5).optional(),
+  /** For the first message of a branch: the summary of that thread. */
+  branch: BranchSummary.optional(),
+  /** For a message: what the agent did about it, in short items. */
+  work: external_exports.array(external_exports.string().min(1).max(300)).max(20).optional(),
+  /** For a message: choices the agent made on its own along the way. */
+  agentDecisions: external_exports.array(AgentDecision).max(10).optional(),
+  /**
+   * For a message that landed commits: a small representation of what the
+   * change does (Story 13.6). Missing means nobody wrote one yet.
+   */
+  shape: Shape.optional(),
+  /**
+   * Who wrote each optional field (Story 12.1): the main agent or the side
+   * model. A missing entry means the agent (every record written before the
+   * split was the agent's). The merge lets the side model fill a field only
+   * when it is empty or already the side model's own.
+   */
+  by: external_exports.record(external_exports.string().max(40), external_exports.enum(["agent", "side"])).optional(),
+  /** When `session write` first added this node; set by the CLI, never by the agent. */
+  addedAt: IsoDate.optional(),
+  /** When `session write` last added or changed this node; set by the CLI, never by the agent. */
+  touchedAt: IsoDate.optional(),
+  /**
+   * Numstat totals of the node's commits, attached at read time from git
+   * (Story 10.3). Never stored in the record: it is derived, so the record
+   * stays small and the numbers stay current after a rebase.
+   */
+  change: external_exports.object({
+    added: external_exports.number().int().min(0),
+    removed: external_exports.number().int().min(0),
+    files: external_exports.number().int().min(0)
+  }).optional()
+});
+var PendingItem = external_exports.object({
+  text: external_exports.string().min(1).max(500),
+  needsUser: external_exports.boolean().default(false)
+});
+var Status = external_exports.object({
+  goal: external_exports.string().max(500).default(""),
+  done: external_exports.array(external_exports.string().min(1).max(500)).default([]),
+  pending: external_exports.array(PendingItem).default([]),
+  next: external_exports.string().max(500).default("")
+});
+var Session = external_exports.object({
+  schema: external_exports.literal(SESSION_SCHEMA),
+  sessionId: Slug,
+  agent: external_exports.string().min(1).max(64).default("claude-code"),
+  title: external_exports.string().max(200).default(""),
+  startedAt: IsoDate,
+  updatedAt: IsoDate,
+  status: Status.default({ goal: "", done: [], pending: [], next: "" }),
+  /**
+   * One line on where the session left off (L0), so a later session can tell
+   * whether it continues this one without reading the branches. Written by the
+   * session-end pass; old records have none.
+   */
+  leftOff: external_exports.string().max(400).optional(),
+  nodes: external_exports.array(LineageNode).default([]),
+  /** The linked git worktree the session ran in; set by the CLI, never by the agent. */
+  worktree: external_exports.object({ path: external_exports.string().min(1), branch: external_exports.string().min(1).nullable() }).optional(),
+  /**
+   * Who recorded the session (git `user.name`, else the OS user); set by the CLI
+   * on the first write (Story 9.3). Old records have none.
+   */
+  author: external_exports.string().min(1).max(200).optional(),
+  /**
+   * The recorder's git `user.email`, stamped with `author`: like git, a person is
+   * told apart by email, so two people with one name stay two and a renamed
+   * one stays one. Records from before it have none.
+   */
+  authorEmail: external_exports.string().min(3).max(320).optional(),
+  /**
+   * Who wrote the record last (Story 12.1): the Stop hook counts the main
+   * agent's turns separately when the side model keeps writing in between.
+   */
+  lastRecordedBy: external_exports.enum(["agent", "side"]).optional()
+});
+var LineageNodeInput = LineageNode.omit({
+  addedAt: true,
+  touchedAt: true,
+  change: true,
+  by: true
+}).extend({
+  parent: MessageRef.nullable().optional(),
+  // The CLI stamps `by`, `at` and each tool's `valid`; a writer sends only the
+  // answers and the commits they cover.
+  shape: ShapeInput.optional()
+});
+var SessionInput = external_exports.object({
+  sessionId: Slug,
+  agent: external_exports.string().min(1).max(64).optional(),
+  title: external_exports.string().max(200).optional(),
+  status: Status.optional(),
+  leftOff: external_exports.string().max(400).optional(),
+  nodes: external_exports.array(LineageNodeInput).optional()
+});
+
+// src/schema/state.ts
+var STATE_SCHEMA = 1;
+var HookState = external_exports.object({
+  schema: external_exports.literal(STATE_SCHEMA),
+  /** Completed turns seen by the Stop hook (hook-driven continuations excluded). */
+  turns: external_exports.number().int().min(0).default(0),
+  /** Turns since the record last changed or the skill was last requested. */
+  turnsSinceUpdate: external_exports.number().int().min(0).default(0),
+  /** The record's `updatedAt` when the hook last looked; a change resets the count. */
+  recordUpdatedAt: IsoDate.nullable().default(null),
+  /** Turns since the side model last recorded (Story 12.1). */
+  turnsSinceSide: external_exports.number().int().min(0).default(0),
+  /**
+   * Project-relative files the PreToolUse hook has already told this session
+   * about (Story 10.4): the "tried before" note is once per file per session,
+   * and a file with nothing to say is remembered too, so every edit does not
+   * walk the history again.
+   */
+  notedFiles: external_exports.array(external_exports.string().min(1).max(500)).default([]),
+  /**
+   * Closing passes a later session started for this one because its own, at
+   * the session end, never finished (machine shut down, run hung or failed).
+   */
+  closeRetries: external_exports.number().int().min(0).optional()
+});
+
+// src/schema/versioned.ts
+function parseVersioned(raw, schema, current, migrations = {}) {
+  const warnings = [];
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: "not a JSON object", warnings };
+  }
+  let doc = raw;
+  const version2 = doc.schema;
+  if (typeof version2 !== "number" || !Number.isInteger(version2) || version2 < 1) {
+    return { ok: false, error: "missing or invalid schema version", warnings };
+  }
+  if (version2 > current) {
+    warnings.push(`schema v${version2} is newer than supported v${current}; reading best-effort`);
+    doc = { ...doc, schema: current };
+  }
+  for (let v = version2; v < current; v++) {
+    const step = migrations[v];
+    if (!step) return { ok: false, error: `no migration from schema v${v}`, warnings };
+    doc = { ...step(doc), schema: v + 1 };
+  }
+  const result = schema.safeParse(doc);
+  if (!result.success) {
+    const issues = result.error.issues.slice(0, 5).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`);
+    return { ok: false, error: issues.join("; "), warnings };
+  }
+  return { ok: true, data: result.data, warnings };
+}
+
+// src/store/lock.ts
+import { mkdir as mkdir3, readFile as readFile5, rm as rm2, stat as stat7, writeFile as writeFile2 } from "fs/promises";
+import { dirname as dirname5, join as join9 } from "path";
+import { setTimeout as sleep } from "timers/promises";
+var LockBusyError = class extends Error {
+  constructor(lockPath) {
+    super(`lock is held: ${lockPath}`);
+    this.lockPath = lockPath;
+  }
+  lockPath;
+};
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err.code === "EPERM";
+  }
+}
+async function isStale(lockPath, staleMs) {
+  try {
+    const owner = Number.parseInt(await readFile5(join9(lockPath, "owner"), "utf8"), 10);
+    if (Number.isInteger(owner) && owner > 0 && !alive(owner)) return true;
+  } catch {
+  }
+  const info = await stat7(lockPath).catch(() => void 0);
+  return info !== void 0 && Date.now() - info.mtimeMs > staleMs;
+}
+async function acquire(lockPath, opts) {
+  const { timeoutMs = 1e4, staleMs = 6e4 } = opts;
+  const deadline = Date.now() + timeoutMs;
+  await mkdir3(dirname5(lockPath), { recursive: true });
+  for (let delay = 20; ; delay = Math.min(delay * 2, 250)) {
+    try {
+      await mkdir3(lockPath);
+      await writeFile2(join9(lockPath, "owner"), String(process.pid));
+      return;
+    } catch (err) {
+      if (err.code !== "EEXIST") throw err;
+    }
+    if (await isStale(lockPath, staleMs)) {
+      await rm2(lockPath, { recursive: true, force: true });
+      continue;
+    }
+    if (Date.now() >= deadline) throw new LockBusyError(lockPath);
+    await sleep(delay);
+  }
+}
+async function isLockHeld(lockPath, staleMs = 6e4) {
+  const info = await stat7(lockPath).catch(() => void 0);
+  if (info === void 0) return false;
+  return !await isStale(lockPath, staleMs);
+}
+async function withLock(lockPath, fn, opts = {}) {
+  await acquire(lockPath, opts);
+  try {
+    return await fn();
+  } finally {
+    await rm2(lockPath, { recursive: true, force: true });
+  }
+}
+
+// src/store/stores.ts
+async function load(file2, schema, version2) {
+  const read = await readJson(file2);
+  if (!read.found) return { found: false };
+  if ("error" in read) return { found: true, ok: false, error: read.error, warnings: [] };
+  return { found: true, ...parseVersioned(read.value, schema, version2) };
+}
+async function update(file2, lockPath, schema, version2, fn, opts, resetUnreadable = false) {
+  return withLock(
+    lockPath,
+    async () => {
+      const cur = await load(file2, schema, version2);
+      if (cur.found && !cur.ok && !resetUnreadable) throw new Error(`${file2}: ${cur.error}`);
+      const next = await fn(cur.found && cur.ok ? cur.data : void 0);
+      await atomicWriteJson(file2, schema.parse(next));
+      return next;
+    },
+    opts
+  );
+}
+var loadProject = (root) => load(projectPaths(root).project, Project, PROJECT_SCHEMA);
+function projectJson(project) {
+  return `${["{", `  "name": ${JSON.stringify(project.name)},`, `  "schema": ${project.schema}`, "}"].join("\n")}
+`;
+}
+var updateProject = async (root, fn) => {
+  const p = projectPaths(root);
+  return withLock(p.lock("project"), async () => {
+    const cur = await loadProject(root);
+    if (cur.found && !cur.ok) throw new Error(`${p.project}: ${cur.error}`);
+    const next = Project.parse(await fn(cur.found && cur.ok ? cur.data : void 0));
+    await atomicWrite(p.project, projectJson(next));
+    return next;
+  });
+};
+var loadSession = (root, id) => load(projectPaths(root).session(id), Session, SESSION_SCHEMA);
+async function listSessionIds(dir) {
+  let entries;
+  try {
+    entries = await readdir3(dir, { withFileTypes: true });
+  } catch (err) {
+    if (err.code === "ENOENT") return [];
+    throw err;
+  }
+  return entries.filter((entry) => entry.isFile() && entry.name.endsWith(".json")).map((entry) => entry.name.slice(0, -".json".length)).sort();
+}
+async function loadAllSessions(root, warn2) {
+  const sessions = [];
+  for (const id of await listSessionIds(projectPaths(root).sessions)) {
+    const loaded = await loadSession(root, id);
+    if (!loaded.found) continue;
+    if (!loaded.ok) {
+      warn2(`skipping session ${id}: ${loaded.error}`);
+      continue;
+    }
+    for (const warning of loaded.warnings) warn2(`session ${id}: ${warning}`);
+    sessions.push(loaded.data);
+  }
+  return sessions;
+}
+var updateSession = (root, id, fn, opts) => {
+  const p = projectPaths(root);
+  return update(p.session(id), p.lock(`session-${id}`), Session, SESSION_SCHEMA, fn, opts);
+};
+var loadConfig = async (env) => {
+  const cur = await load(globalPaths(env).config, Config, CONFIG_SCHEMA);
+  return migrateConfig(cur.found && cur.ok ? cur.data : Config.parse({ schema: CONFIG_SCHEMA }));
+};
+var updateConfig = (fn, env, opts) => {
+  const g = globalPaths(env);
+  return update(
+    g.config,
+    `${g.config}.lock`,
+    Config,
+    CONFIG_SCHEMA,
+    (cur) => migrateConfig(fn(migrateConfig(cur ?? Config.parse({ schema: CONFIG_SCHEMA })))),
+    opts
+  );
+};
+var loadRegistry = (env) => load(globalPaths(env).registry, Registry, CONFIG_SCHEMA);
+var updateRegistry = (fn, env) => {
+  const g = globalPaths(env);
+  return update(
+    g.registry,
+    g.lock,
+    Registry,
+    CONFIG_SCHEMA,
+    (cur) => fn(cur ?? Registry.parse({ schema: CONFIG_SCHEMA }))
+  );
+};
+var updateState = (root, id, fn, opts) => {
+  const p = projectPaths(root);
+  return update(p.state(id), p.lock(`state-${id}`), HookState, STATE_SCHEMA, fn, opts, true);
+};
+
+// src/hooks/pretooluse.ts
+import { isAbsolute as isAbsolute5, relative as relative6, resolve as resolve6, sep as sep6 } from "path";
+
+// src/commands/why.ts
+import { existsSync as existsSync4 } from "fs";
+import { stat as stat9 } from "fs/promises";
+import { dirname as dirname8, isAbsolute as isAbsolute4, join as join10, relative as relative5, resolve as resolve5, sep as sep5 } from "path";
+
+// ../../node_modules/@inquirer/core/dist/lib/key.js
+var keybindings = ["emacs", "vim"];
+var keybindingLookup = new Set(keybindings);
+function isKeybinding(value) {
+  return keybindingLookup.has(value);
+}
+function getDefaultKeybindings() {
+  const env = process.env["INQUIRER_KEYBINDINGS"];
+  if (!env)
+    return [];
+  return Array.from(new Set(env.toLowerCase().split(/[\s,]+/).filter(isKeybinding)));
+}
+var isUpKey = (key, keybindings2 = []) => (
+  // The up key
+  key.name === "up" || // Vim keybinding: hjkl keys map to left/down/up/right
+  keybindings2.includes("vim") && key.name === "k" || // Emacs keybinding: Ctrl+P means "previous" in Emacs navigation conventions
+  keybindings2.includes("emacs") && key.ctrl && key.name === "p"
+);
+var isDownKey = (key, keybindings2 = []) => (
+  // The down key
+  key.name === "down" || // Vim keybinding: hjkl keys map to left/down/up/right
+  keybindings2.includes("vim") && key.name === "j" || // Emacs keybinding: Ctrl+N means "next" in Emacs navigation conventions
+  keybindings2.includes("emacs") && key.ctrl && key.name === "n"
+);
+var isBackspaceKey = (key) => key.name === "backspace";
+var isTabKey = (key) => key.name === "tab";
+var isNumberKey = (key) => "1234567890".includes(key.name);
+var isEnterKey = (key) => key.name === "enter" || key.name === "return";
+
+// ../../node_modules/@inquirer/core/dist/lib/errors.js
+var AbortPromptError = class extends Error {
+  name = "AbortPromptError";
+  message = "Prompt was aborted";
+  constructor(options) {
+    super();
+    this.cause = options?.cause;
+  }
+};
+var CancelPromptError = class extends Error {
+  name = "CancelPromptError";
+  message = "Prompt was canceled";
+};
+var ExitPromptError = class extends Error {
+  name = "ExitPromptError";
+};
+var HookError = class extends Error {
+  name = "HookError";
+};
+var ValidationError = class extends Error {
+  name = "ValidationError";
+};
+
+// ../../node_modules/@inquirer/core/dist/lib/use-state.js
+import { AsyncResource as AsyncResource2 } from "async_hooks";
+
+// ../../node_modules/@inquirer/core/dist/lib/hook-engine.js
+import { AsyncLocalStorage, AsyncResource } from "async_hooks";
+var hookStorage = new AsyncLocalStorage();
+function createStore(rl) {
+  const store = {
+    rl,
+    hooks: [],
+    hooksCleanup: [],
+    hooksEffect: [],
+    index: 0,
+    handleChange() {
+    }
+  };
+  return store;
+}
+function withHooks(rl, cb) {
+  const store = createStore(rl);
+  function cycle(render) {
+    store.handleChange = () => {
+      store.index = 0;
+      render();
+    };
+    store.handleChange();
+  }
+  return hookStorage.run(store, () => cb(cycle));
+}
+function getStore() {
+  const store = hookStorage.getStore();
+  if (!store) {
+    throw new HookError("[Inquirer] Hook functions can only be called from within a prompt");
+  }
+  return store;
+}
+function readline() {
+  return getStore().rl;
+}
+function withUpdates(fn) {
+  const wrapped = (...args) => {
+    const store = getStore();
+    let shouldUpdate = false;
+    const oldHandleChange = store.handleChange;
+    store.handleChange = () => {
+      shouldUpdate = true;
+    };
+    const returnValue = fn(...args);
+    if (shouldUpdate) {
+      oldHandleChange();
+    }
+    store.handleChange = oldHandleChange;
+    return returnValue;
+  };
+  return AsyncResource.bind(wrapped);
+}
+function withPointer(cb) {
+  const store = getStore();
+  const { index } = store;
+  const pointer = {
+    get() {
+      return store.hooks[index];
+    },
+    set(value) {
+      store.hooks[index] = value;
+    },
+    initialized: index in store.hooks
+  };
+  const returnValue = cb(pointer);
+  store.index++;
+  return returnValue;
+}
+function handleChange() {
+  getStore().handleChange();
+}
+var effectScheduler = {
+  queue(cb) {
+    const store = getStore();
+    const { index } = store;
+    store.hooksEffect.push(() => {
+      store.hooksCleanup[index]?.();
+      const cleanFn = cb(readline());
+      if (cleanFn != null && typeof cleanFn !== "function") {
+        throw new ValidationError("useEffect return value must be a cleanup function or nothing.");
+      }
+      store.hooksCleanup[index] = cleanFn;
+    });
+  },
+  run() {
+    const store = getStore();
+    withUpdates(() => {
+      store.hooksEffect.forEach((effect) => {
+        effect();
+      });
+      store.hooksEffect.length = 0;
+    })();
+  },
+  clearAll() {
+    const store = getStore();
+    store.hooksCleanup.forEach((cleanFn) => {
+      cleanFn?.();
+    });
+    store.hooksEffect.length = 0;
+    store.hooksCleanup.length = 0;
+  }
+};
+
+// ../../node_modules/@inquirer/core/dist/lib/use-state.js
+function isFactory(value) {
+  return typeof value === "function";
+}
+function isReducer(value) {
+  return typeof value === "function";
+}
+function useState(defaultValue) {
+  return withPointer((pointer) => {
+    const setState = AsyncResource2.bind(function setState2(newValue) {
+      const currentValue = pointer.get();
+      const nextValue = isReducer(newValue) ? newValue(currentValue) : newValue;
+      if (!Object.is(currentValue, nextValue)) {
+        pointer.set(nextValue);
+        handleChange();
+      }
+    });
+    if (pointer.initialized) {
+      return [pointer.get(), setState];
+    }
+    const value = isFactory(defaultValue) ? defaultValue() : defaultValue;
+    pointer.set(value);
+    return [value, setState];
+  });
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/use-effect.js
+function useEffect(cb, depArray) {
+  withPointer((pointer) => {
+    const oldDeps = pointer.get();
+    const hasChanged = !Array.isArray(oldDeps) || depArray.some((dep, i) => !Object.is(dep, oldDeps[i]));
+    if (hasChanged) {
+      effectScheduler.queue(cb);
+    }
+    pointer.set(depArray);
+  });
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/theme.js
+import { styleText } from "util";
+
+// ../../node_modules/@inquirer/figures/dist/index.js
+import process2 from "process";
+function isUnicodeSupported() {
+  if (!process2.platform.startsWith("win")) {
+    return process2.env["TERM"] !== "linux";
+  }
+  return Boolean(process2.env["CI"]) || // CI environments generally support unicode
+  Boolean(process2.env["WT_SESSION"]) || // Windows Terminal
+  Boolean(process2.env["TERMINUS_SUBLIME"]) || // Terminus (<0.2.27)
+  process2.env["ConEmuTask"] === "{cmd::Cmder}" || // ConEmu and cmder
+  process2.env["TERM_PROGRAM"] === "Terminus-Sublime" || process2.env["TERM_PROGRAM"] === "vscode" || process2.env["TERM"] === "xterm-256color" || process2.env["TERM"] === "alacritty" || process2.env["TERMINAL_EMULATOR"] === "JetBrains-JediTerm";
+}
+var common = {
+  circleQuestionMark: "(?)",
+  questionMarkPrefix: "(?)",
+  square: "\u2588",
+  squareDarkShade: "\u2593",
+  squareMediumShade: "\u2592",
+  squareLightShade: "\u2591",
+  squareTop: "\u2580",
+  squareBottom: "\u2584",
+  squareLeft: "\u258C",
+  squareRight: "\u2590",
+  squareCenter: "\u25A0",
+  bullet: "\u25CF",
+  dot: "\u2024",
+  ellipsis: "\u2026",
+  pointerSmall: "\u203A",
+  triangleUp: "\u25B2",
+  triangleUpSmall: "\u25B4",
+  triangleDown: "\u25BC",
+  triangleDownSmall: "\u25BE",
+  triangleLeftSmall: "\u25C2",
+  triangleRightSmall: "\u25B8",
+  home: "\u2302",
+  heart: "\u2665",
+  musicNote: "\u266A",
+  musicNoteBeamed: "\u266B",
+  arrowUp: "\u2191",
+  arrowDown: "\u2193",
+  arrowLeft: "\u2190",
+  arrowRight: "\u2192",
+  arrowLeftRight: "\u2194",
+  arrowUpDown: "\u2195",
+  almostEqual: "\u2248",
+  notEqual: "\u2260",
+  lessOrEqual: "\u2264",
+  greaterOrEqual: "\u2265",
+  identical: "\u2261",
+  infinity: "\u221E",
+  subscriptZero: "\u2080",
+  subscriptOne: "\u2081",
+  subscriptTwo: "\u2082",
+  subscriptThree: "\u2083",
+  subscriptFour: "\u2084",
+  subscriptFive: "\u2085",
+  subscriptSix: "\u2086",
+  subscriptSeven: "\u2087",
+  subscriptEight: "\u2088",
+  subscriptNine: "\u2089",
+  oneHalf: "\xBD",
+  oneThird: "\u2153",
+  oneQuarter: "\xBC",
+  oneFifth: "\u2155",
+  oneSixth: "\u2159",
+  oneEighth: "\u215B",
+  twoThirds: "\u2154",
+  twoFifths: "\u2156",
+  threeQuarters: "\xBE",
+  threeFifths: "\u2157",
+  threeEighths: "\u215C",
+  fourFifths: "\u2158",
+  fiveSixths: "\u215A",
+  fiveEighths: "\u215D",
+  sevenEighths: "\u215E",
+  line: "\u2500",
+  lineBold: "\u2501",
+  lineDouble: "\u2550",
+  lineDashed0: "\u2504",
+  lineDashed1: "\u2505",
+  lineDashed2: "\u2508",
+  lineDashed3: "\u2509",
+  lineDashed4: "\u254C",
+  lineDashed5: "\u254D",
+  lineDashed6: "\u2574",
+  lineDashed7: "\u2576",
+  lineDashed8: "\u2578",
+  lineDashed9: "\u257A",
+  lineDashed10: "\u257C",
+  lineDashed11: "\u257E",
+  lineDashed12: "\u2212",
+  lineDashed13: "\u2013",
+  lineDashed14: "\u2010",
+  lineDashed15: "\u2043",
+  lineVertical: "\u2502",
+  lineVerticalBold: "\u2503",
+  lineVerticalDouble: "\u2551",
+  lineVerticalDashed0: "\u2506",
+  lineVerticalDashed1: "\u2507",
+  lineVerticalDashed2: "\u250A",
+  lineVerticalDashed3: "\u250B",
+  lineVerticalDashed4: "\u254E",
+  lineVerticalDashed5: "\u254F",
+  lineVerticalDashed6: "\u2575",
+  lineVerticalDashed7: "\u2577",
+  lineVerticalDashed8: "\u2579",
+  lineVerticalDashed9: "\u257B",
+  lineVerticalDashed10: "\u257D",
+  lineVerticalDashed11: "\u257F",
+  lineDownLeft: "\u2510",
+  lineDownLeftArc: "\u256E",
+  lineDownBoldLeftBold: "\u2513",
+  lineDownBoldLeft: "\u2512",
+  lineDownLeftBold: "\u2511",
+  lineDownDoubleLeftDouble: "\u2557",
+  lineDownDoubleLeft: "\u2556",
+  lineDownLeftDouble: "\u2555",
+  lineDownRight: "\u250C",
+  lineDownRightArc: "\u256D",
+  lineDownBoldRightBold: "\u250F",
+  lineDownBoldRight: "\u250E",
+  lineDownRightBold: "\u250D",
+  lineDownDoubleRightDouble: "\u2554",
+  lineDownDoubleRight: "\u2553",
+  lineDownRightDouble: "\u2552",
+  lineUpLeft: "\u2518",
+  lineUpLeftArc: "\u256F",
+  lineUpBoldLeftBold: "\u251B",
+  lineUpBoldLeft: "\u251A",
+  lineUpLeftBold: "\u2519",
+  lineUpDoubleLeftDouble: "\u255D",
+  lineUpDoubleLeft: "\u255C",
+  lineUpLeftDouble: "\u255B",
+  lineUpRight: "\u2514",
+  lineUpRightArc: "\u2570",
+  lineUpBoldRightBold: "\u2517",
+  lineUpBoldRight: "\u2516",
+  lineUpRightBold: "\u2515",
+  lineUpDoubleRightDouble: "\u255A",
+  lineUpDoubleRight: "\u2559",
+  lineUpRightDouble: "\u2558",
+  lineUpDownLeft: "\u2524",
+  lineUpBoldDownBoldLeftBold: "\u252B",
+  lineUpBoldDownBoldLeft: "\u2528",
+  lineUpDownLeftBold: "\u2525",
+  lineUpBoldDownLeftBold: "\u2529",
+  lineUpDownBoldLeftBold: "\u252A",
+  lineUpDownBoldLeft: "\u2527",
+  lineUpBoldDownLeft: "\u2526",
+  lineUpDoubleDownDoubleLeftDouble: "\u2563",
+  lineUpDoubleDownDoubleLeft: "\u2562",
+  lineUpDownLeftDouble: "\u2561",
+  lineUpDownRight: "\u251C",
+  lineUpBoldDownBoldRightBold: "\u2523",
+  lineUpBoldDownBoldRight: "\u2520",
+  lineUpDownRightBold: "\u251D",
+  lineUpBoldDownRightBold: "\u2521",
+  lineUpDownBoldRightBold: "\u2522",
+  lineUpDownBoldRight: "\u251F",
+  lineUpBoldDownRight: "\u251E",
+  lineUpDoubleDownDoubleRightDouble: "\u2560",
+  lineUpDoubleDownDoubleRight: "\u255F",
+  lineUpDownRightDouble: "\u255E",
+  lineDownLeftRight: "\u252C",
+  lineDownBoldLeftBoldRightBold: "\u2533",
+  lineDownLeftBoldRightBold: "\u252F",
+  lineDownBoldLeftRight: "\u2530",
+  lineDownBoldLeftBoldRight: "\u2531",
+  lineDownBoldLeftRightBold: "\u2532",
+  lineDownLeftRightBold: "\u252E",
+  lineDownLeftBoldRight: "\u252D",
+  lineDownDoubleLeftDoubleRightDouble: "\u2566",
+  lineDownDoubleLeftRight: "\u2565",
+  lineDownLeftDoubleRightDouble: "\u2564",
+  lineUpLeftRight: "\u2534",
+  lineUpBoldLeftBoldRightBold: "\u253B",
+  lineUpLeftBoldRightBold: "\u2537",
+  lineUpBoldLeftRight: "\u2538",
+  lineUpBoldLeftBoldRight: "\u2539",
+  lineUpBoldLeftRightBold: "\u253A",
+  lineUpLeftRightBold: "\u2536",
+  lineUpLeftBoldRight: "\u2535",
+  lineUpDoubleLeftDoubleRightDouble: "\u2569",
+  lineUpDoubleLeftRight: "\u2568",
+  lineUpLeftDoubleRightDouble: "\u2567",
+  lineUpDownLeftRight: "\u253C",
+  lineUpBoldDownBoldLeftBoldRightBold: "\u254B",
+  lineUpDownBoldLeftBoldRightBold: "\u2548",
+  lineUpBoldDownLeftBoldRightBold: "\u2547",
+  lineUpBoldDownBoldLeftRightBold: "\u254A",
+  lineUpBoldDownBoldLeftBoldRight: "\u2549",
+  lineUpBoldDownLeftRight: "\u2540",
+  lineUpDownBoldLeftRight: "\u2541",
+  lineUpDownLeftBoldRight: "\u253D",
+  lineUpDownLeftRightBold: "\u253E",
+  lineUpBoldDownBoldLeftRight: "\u2542",
+  lineUpDownLeftBoldRightBold: "\u253F",
+  lineUpBoldDownLeftBoldRight: "\u2543",
+  lineUpBoldDownLeftRightBold: "\u2544",
+  lineUpDownBoldLeftBoldRight: "\u2545",
+  lineUpDownBoldLeftRightBold: "\u2546",
+  lineUpDoubleDownDoubleLeftDoubleRightDouble: "\u256C",
+  lineUpDoubleDownDoubleLeftRight: "\u256B",
+  lineUpDownLeftDoubleRightDouble: "\u256A",
+  lineCross: "\u2573",
+  lineBackslash: "\u2572",
+  lineSlash: "\u2571"
+};
+var specialMainSymbols = {
+  tick: "\u2714",
+  info: "\u2139",
+  warning: "\u26A0",
+  cross: "\u2718",
+  squareSmall: "\u25FB",
+  squareSmallFilled: "\u25FC",
+  circle: "\u25EF",
+  circleFilled: "\u25C9",
+  circleDotted: "\u25CC",
+  circleDouble: "\u25CE",
+  circleCircle: "\u24DE",
+  circleCross: "\u24E7",
+  circlePipe: "\u24BE",
+  radioOn: "\u25C9",
+  radioOff: "\u25EF",
+  checkboxOn: "\u2612",
+  checkboxOff: "\u2610",
+  checkboxCircleOn: "\u24E7",
+  checkboxCircleOff: "\u24BE",
+  pointer: "\u276F",
+  triangleUpOutline: "\u25B3",
+  triangleLeft: "\u25C0",
+  triangleRight: "\u25B6",
+  lozenge: "\u25C6",
+  lozengeOutline: "\u25C7",
+  hamburger: "\u2630",
+  smiley: "\u32E1",
+  mustache: "\u0DF4",
+  star: "\u2605",
+  play: "\u25B6",
+  nodejs: "\u2B22",
+  oneSeventh: "\u2150",
+  oneNinth: "\u2151",
+  oneTenth: "\u2152"
+};
+var specialFallbackSymbols = {
+  tick: "\u221A",
+  info: "i",
+  warning: "\u203C",
+  cross: "\xD7",
+  squareSmall: "\u25A1",
+  squareSmallFilled: "\u25A0",
+  circle: "( )",
+  circleFilled: "(*)",
+  circleDotted: "( )",
+  circleDouble: "( )",
+  circleCircle: "(\u25CB)",
+  circleCross: "(\xD7)",
+  circlePipe: "(\u2502)",
+  radioOn: "(*)",
+  radioOff: "( )",
+  checkboxOn: "[\xD7]",
+  checkboxOff: "[ ]",
+  checkboxCircleOn: "(\xD7)",
+  checkboxCircleOff: "( )",
+  pointer: ">",
+  triangleUpOutline: "\u2206",
+  triangleLeft: "\u25C4",
+  triangleRight: "\u25BA",
+  lozenge: "\u2666",
+  lozengeOutline: "\u25CA",
+  hamburger: "\u2261",
+  smiley: "\u263A",
+  mustache: "\u250C\u2500\u2510",
+  star: "\u2736",
+  play: "\u25BA",
+  nodejs: "\u2666",
+  oneSeventh: "1/7",
+  oneNinth: "1/9",
+  oneTenth: "1/10"
+};
+var mainSymbols = {
+  ...common,
+  ...specialMainSymbols
+};
+var fallbackSymbols = {
+  ...common,
+  ...specialFallbackSymbols
+};
+var shouldUseMain = isUnicodeSupported();
+var figures = shouldUseMain ? mainSymbols : fallbackSymbols;
+var dist_default = figures;
+var replacements = Object.entries(specialMainSymbols);
+
+// ../../node_modules/@inquirer/core/dist/lib/theme.js
+var defaultTheme = {
+  prefix: {
+    idle: styleText("blue", "?"),
+    done: styleText("green", dist_default.tick)
+  },
+  spinner: {
+    interval: 80,
+    frames: ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"].map((frame) => styleText("yellow", frame))
+  },
+  keybindings: [],
+  style: {
+    answer: (text) => styleText("cyan", text),
+    message: (text) => styleText("bold", text),
+    error: (text) => styleText("red", `> ${text}`),
+    defaultAnswer: (text) => styleText("dim", `(${text})`),
+    help: (text) => styleText("dim", text),
+    highlight: (text) => styleText("cyan", text),
+    key: (text) => styleText("cyan", styleText("bold", `<${text}>`))
+  }
+};
+function getDefaultTheme() {
+  return {
+    ...defaultTheme,
+    keybindings: getDefaultKeybindings()
+  };
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/make-theme.js
+function isPlainObject2(value) {
+  if (typeof value !== "object" || value === null)
+    return false;
+  let proto = value;
+  while (Object.getPrototypeOf(proto) !== null) {
+    proto = Object.getPrototypeOf(proto);
+  }
+  return Object.getPrototypeOf(value) === proto;
+}
+function deepMerge(...objects) {
+  const output2 = {};
+  for (const obj of objects) {
+    for (const [key, value] of Object.entries(obj)) {
+      const prevValue = output2[key];
+      output2[key] = isPlainObject2(prevValue) && isPlainObject2(value) ? deepMerge(prevValue, value) : value;
+    }
+  }
+  return output2;
+}
+function makeTheme(...themes) {
+  const themesToMerge = [
+    getDefaultTheme(),
+    ...themes.filter((theme) => theme != null)
+  ];
+  return deepMerge(...themesToMerge);
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/use-prefix.js
+function usePrefix({ status = "idle", theme }) {
+  const [showLoader, setShowLoader] = useState(false);
+  const [tick, setTick] = useState(0);
+  const { prefix, spinner } = makeTheme(theme);
+  useEffect(() => {
+    if (status === "loading") {
+      let tickInterval;
+      let inc = -1;
+      const delayTimeout = setTimeout(() => {
+        setShowLoader(true);
+        tickInterval = setInterval(() => {
+          inc = inc + 1;
+          setTick(inc % spinner.frames.length);
+        }, spinner.interval);
+      }, 300);
+      return () => {
+        clearTimeout(delayTimeout);
+        clearInterval(tickInterval);
+      };
+    } else {
+      setShowLoader(false);
+    }
+  }, [status]);
+  if (showLoader) {
+    return spinner.frames[tick];
+  }
+  const iconName = status === "loading" ? "idle" : status;
+  return typeof prefix === "string" ? prefix : prefix[iconName] ?? prefix["idle"];
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/use-memo.js
+function useMemo(fn, dependencies) {
+  return withPointer((pointer) => {
+    const prev = pointer.get();
+    if (!pointer.initialized || prev.dependencies.length !== dependencies.length || prev.dependencies.some((dep, i) => dep !== dependencies[i])) {
+      const value = fn();
+      pointer.set({ value, dependencies });
+      return value;
+    }
+    return prev.value;
+  });
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/use-ref.js
+function useRef(val) {
+  return useState({ current: val })[0];
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/use-keypress.js
+function useKeypress(userHandler) {
+  const signal = useRef(userHandler);
+  signal.current = userHandler;
+  useEffect((rl) => {
+    let ignore = false;
+    const handler = withUpdates((_input, event) => {
+      if (ignore)
+        return;
+      void signal.current(event, rl);
+    });
+    rl.input.on("keypress", handler);
+    return () => {
+      ignore = true;
+      rl.input.removeListener("keypress", handler);
+    };
+  }, []);
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/utils.js
+var import_cli_width = __toESM(require_cli_width(), 1);
+
+// ../../node_modules/fast-string-truncated-width/dist/utils.js
+var getCodePointsLength = /* @__PURE__ */ (() => {
+  const SURROGATE_PAIR_RE = /[\uD800-\uDBFF][\uDC00-\uDFFF]/g;
+  return (input2) => {
+    let surrogatePairsNr = 0;
+    SURROGATE_PAIR_RE.lastIndex = 0;
+    while (SURROGATE_PAIR_RE.test(input2)) {
+      surrogatePairsNr += 1;
+    }
+    return input2.length - surrogatePairsNr;
+  };
+})();
+var isFullWidth = (x) => {
+  return x === 12288 || x >= 65281 && x <= 65376 || x >= 65504 && x <= 65510;
+};
+var isWideNotCJKTNotEmoji = (x) => {
+  return x === 8987 || x === 9001 || x >= 12272 && x <= 12287 || x >= 12289 && x <= 12350 || x >= 12441 && x <= 12543 || x >= 12549 && x <= 12591 || x >= 12593 && x <= 12686 || x >= 12688 && x <= 12771 || x >= 12783 && x <= 12830 || x >= 12832 && x <= 12871 || x >= 12880 && x <= 19903 || x >= 65040 && x <= 65049 || x >= 65072 && x <= 65106 || x >= 65108 && x <= 65126 || x >= 65128 && x <= 65131 || x >= 127488 && x <= 127490 || x >= 127504 && x <= 127547 || x >= 127552 && x <= 127560 || x >= 131072 && x <= 196605 || x >= 196608 && x <= 262141;
+};
+
+// ../../node_modules/fast-string-truncated-width/dist/index.js
+var ANSI_RE = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]|\u001b\]8;[^;]*;.*?(?:\u0007|\u001b\u005c)/y;
+var CONTROL_RE = /[\x00-\x08\x0A-\x1F\x7F-\x9F]{1,1000}/y;
+var CJKT_WIDE_RE = /(?:(?![\uFF61-\uFF9F\uFF00-\uFFEF])[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Tangut}]){1,1000}/yu;
+var TAB_RE = /\t{1,1000}/y;
+var EMOJI_RE = new RegExp("[\\u{1F1E6}-\\u{1F1FF}]{2}|\\u{1F3F4}[\\u{E0061}-\\u{E007A}]{2}[\\u{E0030}-\\u{E0039}\\u{E0061}-\\u{E007A}]{1,3}\\u{E007F}|(?:\\p{Emoji}\\uFE0F\\u20E3?|\\p{Emoji_Modifier_Base}\\p{Emoji_Modifier}?|\\p{Emoji_Presentation})(?:\\u200D(?:\\p{Emoji_Modifier_Base}\\p{Emoji_Modifier}?|\\p{Emoji_Presentation}|\\p{Emoji}\\uFE0F\\u20E3?))*", "yu");
+var LATIN_RE = /(?:[\x20-\x7E\xA0-\xFF](?!\uFE0F)){1,1000}/y;
+var MODIFIER_RE = new RegExp("\\p{M}+", "gu");
+var NO_TRUNCATION = { limit: Infinity, ellipsis: "" };
+var getStringTruncatedWidth = (input2, truncationOptions = {}, widthOptions = {}) => {
+  const LIMIT = truncationOptions.limit ?? Infinity;
+  const ELLIPSIS = truncationOptions.ellipsis ?? "";
+  const ELLIPSIS_WIDTH = truncationOptions?.ellipsisWidth ?? (ELLIPSIS ? getStringTruncatedWidth(ELLIPSIS, NO_TRUNCATION, widthOptions).width : 0);
+  const ANSI_WIDTH = 0;
+  const CONTROL_WIDTH = widthOptions.controlWidth ?? 0;
+  const TAB_WIDTH = widthOptions.tabWidth ?? 8;
+  const EMOJI_WIDTH = widthOptions.emojiWidth ?? 2;
+  const FULL_WIDTH_WIDTH = 2;
+  const REGULAR_WIDTH = widthOptions.regularWidth ?? 1;
+  const WIDE_WIDTH = widthOptions.wideWidth ?? FULL_WIDTH_WIDTH;
+  const PARSE_BLOCKS = [
+    [LATIN_RE, REGULAR_WIDTH],
+    [ANSI_RE, ANSI_WIDTH],
+    [CONTROL_RE, CONTROL_WIDTH],
+    [TAB_RE, TAB_WIDTH],
+    [EMOJI_RE, EMOJI_WIDTH],
+    [CJKT_WIDE_RE, WIDE_WIDTH]
+  ];
+  let indexPrev = 0;
+  let index = 0;
+  let length = input2.length;
+  let lengthExtra = 0;
+  let truncationEnabled = false;
+  let truncationIndex = length;
+  let truncationLimit = Math.max(0, LIMIT - ELLIPSIS_WIDTH);
+  let unmatchedStart = 0;
+  let unmatchedEnd = 0;
+  let width = 0;
+  let widthExtra = 0;
+  outer: while (true) {
+    if (unmatchedEnd > unmatchedStart || index >= length && index > indexPrev) {
+      const unmatched = input2.slice(unmatchedStart, unmatchedEnd) || input2.slice(indexPrev, index);
+      lengthExtra = 0;
+      for (const char of unmatched.replaceAll(MODIFIER_RE, "")) {
+        const codePoint = char.codePointAt(0) || 0;
+        if (isFullWidth(codePoint)) {
+          widthExtra = FULL_WIDTH_WIDTH;
+        } else if (isWideNotCJKTNotEmoji(codePoint)) {
+          widthExtra = WIDE_WIDTH;
+        } else {
+          widthExtra = REGULAR_WIDTH;
+        }
+        if (width + widthExtra > truncationLimit) {
+          truncationIndex = Math.min(truncationIndex, Math.max(unmatchedStart, indexPrev) + lengthExtra);
+        }
+        if (width + widthExtra > LIMIT) {
+          truncationEnabled = true;
+          break outer;
+        }
+        lengthExtra += char.length;
+        width += widthExtra;
+      }
+      unmatchedStart = unmatchedEnd = 0;
+    }
+    if (index >= length) {
+      break outer;
+    }
+    for (let i = 0, l = PARSE_BLOCKS.length; i < l; i++) {
+      const [BLOCK_RE, BLOCK_WIDTH] = PARSE_BLOCKS[i];
+      BLOCK_RE.lastIndex = index;
+      if (BLOCK_RE.test(input2)) {
+        lengthExtra = BLOCK_RE === CJKT_WIDE_RE ? getCodePointsLength(input2.slice(index, BLOCK_RE.lastIndex)) : BLOCK_RE === EMOJI_RE ? 1 : BLOCK_RE.lastIndex - index;
+        widthExtra = lengthExtra * BLOCK_WIDTH;
+        if (width + widthExtra > truncationLimit) {
+          truncationIndex = Math.min(truncationIndex, index + Math.floor((truncationLimit - width) / BLOCK_WIDTH));
+        }
+        if (width + widthExtra > LIMIT) {
+          truncationEnabled = true;
+          break outer;
+        }
+        width += widthExtra;
+        unmatchedStart = indexPrev;
+        unmatchedEnd = index;
+        index = indexPrev = BLOCK_RE.lastIndex;
+        continue outer;
+      }
+    }
+    index += 1;
+  }
+  return {
+    width: truncationEnabled ? truncationLimit : width,
+    index: truncationEnabled ? truncationIndex : length,
+    truncated: truncationEnabled,
+    ellipsed: truncationEnabled && LIMIT >= ELLIPSIS_WIDTH
+  };
+};
+var dist_default2 = getStringTruncatedWidth;
+
+// ../../node_modules/fast-string-width/dist/index.js
+var NO_TRUNCATION2 = {
+  limit: Infinity,
+  ellipsis: "",
+  ellipsisWidth: 0
+};
+var fastStringWidth = (input2, options = {}) => {
+  return dist_default2(input2, NO_TRUNCATION2, options).width;
+};
+var dist_default3 = fastStringWidth;
+
+// ../../node_modules/fast-wrap-ansi/lib/main.js
+var ESC = "\x1B";
+var CSI = "\x9B";
+var END_CODE = 39;
+var ANSI_ESCAPE_BELL = "\x07";
+var ANSI_CSI = "[";
+var ANSI_OSC = "]";
+var ANSI_SGR_TERMINATOR = "m";
+var ANSI_ESCAPE_LINK = `${ANSI_OSC}8;;`;
+var GROUP_REGEX = new RegExp(`(?:\\${ANSI_CSI}(?<code>\\d+)m|\\${ANSI_ESCAPE_LINK}(?<uri>.*)${ANSI_ESCAPE_BELL})`, "y");
+var getClosingCode = (openingCode) => {
+  if (openingCode >= 30 && openingCode <= 37)
+    return 39;
+  if (openingCode >= 90 && openingCode <= 97)
+    return 39;
+  if (openingCode >= 40 && openingCode <= 47)
+    return 49;
+  if (openingCode >= 100 && openingCode <= 107)
+    return 49;
+  if (openingCode === 1 || openingCode === 2)
+    return 22;
+  if (openingCode === 3)
+    return 23;
+  if (openingCode === 4)
+    return 24;
+  if (openingCode === 7)
+    return 27;
+  if (openingCode === 8)
+    return 28;
+  if (openingCode === 9)
+    return 29;
+  if (openingCode === 0)
+    return 0;
+  return void 0;
+};
+var wrapAnsiCode = (code) => `${ESC}${ANSI_CSI}${code}${ANSI_SGR_TERMINATOR}`;
+var wrapAnsiHyperlink = (url2) => `${ESC}${ANSI_ESCAPE_LINK}${url2}${ANSI_ESCAPE_BELL}`;
+var wrapWord = (rows, word, columns) => {
+  const characters = word[Symbol.iterator]();
+  let isInsideEscape = false;
+  let isInsideLinkEscape = false;
+  let lastRow = rows.at(-1);
+  let visible = lastRow === void 0 ? 0 : dist_default3(lastRow);
+  let currentCharacter = characters.next();
+  let nextCharacter = characters.next();
+  let rawCharacterIndex = 0;
+  while (!currentCharacter.done) {
+    const character = currentCharacter.value;
+    const characterLength = dist_default3(character);
+    if (visible + characterLength <= columns) {
+      rows[rows.length - 1] += character;
+    } else {
+      rows.push(character);
+      visible = 0;
+    }
+    if (character === ESC || character === CSI) {
+      isInsideEscape = true;
+      isInsideLinkEscape = word.startsWith(ANSI_ESCAPE_LINK, rawCharacterIndex + 1);
+    }
+    if (isInsideEscape) {
+      if (isInsideLinkEscape) {
+        if (character === ANSI_ESCAPE_BELL) {
+          isInsideEscape = false;
+          isInsideLinkEscape = false;
+        }
+      } else if (character === ANSI_SGR_TERMINATOR) {
+        isInsideEscape = false;
+      }
+    } else {
+      visible += characterLength;
+      if (visible === columns && !nextCharacter.done) {
+        rows.push("");
+        visible = 0;
+      }
+    }
+    currentCharacter = nextCharacter;
+    nextCharacter = characters.next();
+    rawCharacterIndex += character.length;
+  }
+  lastRow = rows.at(-1);
+  if (!visible && lastRow !== void 0 && lastRow.length && rows.length > 1) {
+    rows[rows.length - 2] += rows.pop();
+  }
+};
+var stringVisibleTrimSpacesRight = (string4) => {
+  const words = string4.split(" ");
+  let last = words.length;
+  while (last) {
+    if (dist_default3(words[last - 1])) {
+      break;
+    }
+    last--;
+  }
+  if (last === words.length) {
+    return string4;
+  }
+  return words.slice(0, last).join(" ") + words.slice(last).join("");
+};
+var exec2 = (string4, columns, options = {}) => {
+  if (options.trim !== false && string4.trim() === "") {
+    return "";
+  }
+  let returnValue = "";
+  let escapeCode;
+  let escapeUrl;
+  const words = string4.split(" ");
+  let rows = [""];
+  let rowLength = 0;
+  for (let index = 0; index < words.length; index++) {
+    const word = words[index];
+    if (options.trim !== false) {
+      const row = rows.at(-1) ?? "";
+      const trimmed = row.trimStart();
+      if (row.length !== trimmed.length) {
+        rows[rows.length - 1] = trimmed;
+        rowLength = dist_default3(trimmed);
+      }
+    }
+    if (index !== 0) {
+      if (rowLength >= columns && (options.wordWrap === false || options.trim === false)) {
+        rows.push("");
+        rowLength = 0;
+      }
+      if (rowLength || options.trim === false) {
+        rows[rows.length - 1] += " ";
+        rowLength++;
+      }
+    }
+    const wordLength = dist_default3(word);
+    if (options.hard && wordLength > columns) {
+      const remainingColumns = columns - rowLength;
+      const breaksStartingThisLine = 1 + Math.floor((wordLength - remainingColumns - 1) / columns);
+      const breaksStartingNextLine = Math.floor((wordLength - 1) / columns);
+      if (breaksStartingNextLine < breaksStartingThisLine) {
+        rows.push("");
+      }
+      wrapWord(rows, word, columns);
+      rowLength = dist_default3(rows.at(-1) ?? "");
+      continue;
+    }
+    if (rowLength + wordLength > columns && rowLength && wordLength) {
+      if (options.wordWrap === false && rowLength < columns) {
+        wrapWord(rows, word, columns);
+        rowLength = dist_default3(rows.at(-1) ?? "");
+        continue;
+      }
+      rows.push("");
+      rowLength = 0;
+    }
+    if (rowLength + wordLength > columns && options.wordWrap === false) {
+      wrapWord(rows, word, columns);
+      rowLength = dist_default3(rows.at(-1) ?? "");
+      continue;
+    }
+    rows[rows.length - 1] += word;
+    rowLength += wordLength;
+  }
+  if (options.trim !== false) {
+    rows = rows.map((row) => stringVisibleTrimSpacesRight(row));
+  }
+  const preString = rows.join("\n");
+  let inSurrogate = false;
+  for (let i = 0; i < preString.length; i++) {
+    const character = preString[i];
+    returnValue += character;
+    if (!inSurrogate) {
+      inSurrogate = character >= "\uD800" && character <= "\uDBFF";
+      if (inSurrogate) {
+        continue;
+      }
+    } else {
+      inSurrogate = false;
+    }
+    if (character === ESC || character === CSI) {
+      GROUP_REGEX.lastIndex = i + 1;
+      const groupsResult = GROUP_REGEX.exec(preString);
+      const groups = groupsResult?.groups;
+      if (groups?.code !== void 0) {
+        const code = Number.parseFloat(groups.code);
+        escapeCode = code === END_CODE ? void 0 : code;
+      } else if (groups?.uri !== void 0) {
+        escapeUrl = groups.uri.length === 0 ? void 0 : groups.uri;
+      }
+    }
+    if (preString[i + 1] === "\n") {
+      if (escapeUrl) {
+        returnValue += wrapAnsiHyperlink("");
+      }
+      const closingCode = escapeCode ? getClosingCode(escapeCode) : void 0;
+      if (escapeCode && closingCode) {
+        returnValue += wrapAnsiCode(closingCode);
+      }
+    } else if (character === "\n") {
+      if (escapeCode && getClosingCode(escapeCode)) {
+        returnValue += wrapAnsiCode(escapeCode);
+      }
+      if (escapeUrl) {
+        returnValue += wrapAnsiHyperlink(escapeUrl);
+      }
+    }
+  }
+  return returnValue;
+};
+var CRLF_OR_LF = /\r?\n/;
+function wrapAnsi(string4, columns, options) {
+  return String(string4).normalize().split(CRLF_OR_LF).map((line) => exec2(line, columns, options)).join("\n");
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/utils.js
+function breakLines(content, width) {
+  return content.split("\n").flatMap((line) => wrapAnsi(line, width, { trim: false, wordWrap: false }).split("\n").map((str) => str.trimEnd())).join("\n");
+}
+function readlineWidth() {
+  return (0, import_cli_width.default)({ defaultWidth: 80, output: readline().output });
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/pagination/use-pagination.js
+function usePointerPosition({ active, renderedItems, pageSize, loop }) {
+  const state = useRef({
+    lastPointer: active,
+    lastActive: void 0
+  });
+  const { lastPointer, lastActive: lastActive2 } = state.current;
+  const middle = Math.floor(pageSize / 2);
+  const renderedLength = renderedItems.reduce((acc, item) => acc + item.length, 0);
+  const defaultPointerPosition = renderedItems.slice(0, active).reduce((acc, item) => acc + item.length, 0);
+  let pointer = defaultPointerPosition;
+  if (renderedLength > pageSize) {
+    if (loop) {
+      pointer = lastPointer;
+      if (
+        // First render, skip this logic.
+        lastActive2 != null && // Only move the pointer down when the user moves down.
+        lastActive2 < active && // Check user didn't move up across page boundary.
+        active - lastActive2 < pageSize
+      ) {
+        pointer = Math.min(
+          // Furthest allowed position for the pointer is the middle of the list
+          middle,
+          Math.abs(active - lastActive2) === 1 ? Math.min(
+            // Move the pointer at most the height of the last active item.
+            lastPointer + (renderedItems[lastActive2]?.length ?? 0),
+            // If the user moved by one item, move the pointer to the natural position of the active item as
+            // long as it doesn't move the cursor up.
+            Math.max(defaultPointerPosition, lastPointer)
+          ) : (
+            // Otherwise, move the pointer down by the difference between the active and last active item.
+            lastPointer + active - lastActive2
+          )
+        );
+      }
+    } else {
+      const spaceUnderActive = renderedItems.slice(active).reduce((acc, item) => acc + item.length, 0);
+      pointer = spaceUnderActive < pageSize - middle ? (
+        // If the active item is near the end of the list, progressively move the cursor towards the end.
+        pageSize - spaceUnderActive
+      ) : (
+        // Otherwise, progressively move the pointer to the middle of the list.
+        Math.min(defaultPointerPosition, middle)
+      );
+    }
+  }
+  state.current.lastPointer = pointer;
+  state.current.lastActive = active;
+  return pointer;
+}
+function usePagination({ items, active, renderItem, pageSize, loop = true }) {
+  const width = readlineWidth();
+  const bound = (num) => (num % items.length + items.length) % items.length;
+  const renderedItems = items.map((item, index) => {
+    if (item == null)
+      return [];
+    return breakLines(renderItem({ item, index, isActive: index === active }), width).split("\n");
+  });
+  const renderedLength = renderedItems.reduce((acc, item) => acc + item.length, 0);
+  const renderItemAtIndex = (index) => renderedItems[index] ?? [];
+  const pointer = usePointerPosition({ active, renderedItems, pageSize, loop });
+  const activeItem = renderItemAtIndex(active).slice(0, pageSize);
+  const activeItemPosition = pointer + activeItem.length <= pageSize ? pointer : pageSize - activeItem.length;
+  const pageBuffer = Array.from({ length: pageSize });
+  pageBuffer.splice(activeItemPosition, activeItem.length, ...activeItem);
+  const itemVisited = /* @__PURE__ */ new Set([active]);
+  let bufferPointer = activeItemPosition + activeItem.length;
+  let itemPointer = bound(active + 1);
+  while (bufferPointer < pageSize && !itemVisited.has(itemPointer) && (loop && renderedLength > pageSize ? itemPointer !== active : itemPointer > active)) {
+    const lines = renderItemAtIndex(itemPointer);
+    const linesToAdd = lines.slice(0, pageSize - bufferPointer);
+    pageBuffer.splice(bufferPointer, linesToAdd.length, ...linesToAdd);
+    itemVisited.add(itemPointer);
+    bufferPointer += linesToAdd.length;
+    itemPointer = bound(itemPointer + 1);
+  }
+  bufferPointer = activeItemPosition - 1;
+  itemPointer = bound(active - 1);
+  while (bufferPointer >= 0 && !itemVisited.has(itemPointer) && (loop && renderedLength > pageSize ? itemPointer !== active : itemPointer < active)) {
+    const lines = renderItemAtIndex(itemPointer);
+    const linesToAdd = lines.slice(Math.max(0, lines.length - bufferPointer - 1));
+    pageBuffer.splice(bufferPointer - linesToAdd.length + 1, linesToAdd.length, ...linesToAdd);
+    itemVisited.add(itemPointer);
+    bufferPointer -= linesToAdd.length;
+    itemPointer = bound(itemPointer - 1);
+  }
+  return pageBuffer.filter((line) => typeof line === "string").join("\n");
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/create-prompt.js
+import * as readline2 from "readline";
+import { AsyncResource as AsyncResource3 } from "async_hooks";
+
+// ../../node_modules/@inquirer/type/dist/utils.js
+function withResolver() {
+  let resolve7;
+  let reject;
+  const promise2 = new Promise((res, rej) => {
+    resolve7 = res;
+    reject = rej;
+  });
+  return { promise: promise2, resolve: resolve7, reject };
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/create-prompt.js
+var import_mute_stream = __toESM(require_lib(), 1);
+
+// ../../node_modules/signal-exit/dist/mjs/signals.js
+var signals = [];
+signals.push("SIGHUP", "SIGINT", "SIGTERM");
+if (process.platform !== "win32") {
+  signals.push(
+    "SIGALRM",
+    "SIGABRT",
+    "SIGVTALRM",
+    "SIGXCPU",
+    "SIGXFSZ",
+    "SIGUSR2",
+    "SIGTRAP",
+    "SIGSYS",
+    "SIGQUIT",
+    "SIGIOT"
+    // should detect profiler and enable/disable accordingly.
+    // see #21
+    // 'SIGPROF'
+  );
+}
+if (process.platform === "linux") {
+  signals.push("SIGIO", "SIGPOLL", "SIGPWR", "SIGSTKFLT");
+}
+
+// ../../node_modules/signal-exit/dist/mjs/index.js
+var processOk = (process4) => !!process4 && typeof process4 === "object" && typeof process4.removeListener === "function" && typeof process4.emit === "function" && typeof process4.reallyExit === "function" && typeof process4.listeners === "function" && typeof process4.kill === "function" && typeof process4.pid === "number" && typeof process4.on === "function";
+var kExitEmitter = /* @__PURE__ */ Symbol.for("signal-exit emitter");
+var global = globalThis;
+var ObjectDefineProperty = Object.defineProperty.bind(Object);
+var Emitter = class {
+  emitted = {
+    afterExit: false,
+    exit: false
+  };
+  listeners = {
+    afterExit: [],
+    exit: []
+  };
+  count = 0;
+  id = Math.random();
+  constructor() {
+    if (global[kExitEmitter]) {
+      return global[kExitEmitter];
+    }
+    ObjectDefineProperty(global, kExitEmitter, {
+      value: this,
+      writable: false,
+      enumerable: false,
+      configurable: false
+    });
+  }
+  on(ev, fn) {
+    this.listeners[ev].push(fn);
+  }
+  removeListener(ev, fn) {
+    const list = this.listeners[ev];
+    const i = list.indexOf(fn);
+    if (i === -1) {
+      return;
+    }
+    if (i === 0 && list.length === 1) {
+      list.length = 0;
+    } else {
+      list.splice(i, 1);
+    }
+  }
+  emit(ev, code, signal) {
+    if (this.emitted[ev]) {
+      return false;
+    }
+    this.emitted[ev] = true;
+    let ret = false;
+    for (const fn of this.listeners[ev]) {
+      ret = fn(code, signal) === true || ret;
+    }
+    if (ev === "exit") {
+      ret = this.emit("afterExit", code, signal) || ret;
+    }
+    return ret;
+  }
+};
+var SignalExitBase = class {
+};
+var signalExitWrap = (handler) => {
+  return {
+    onExit(cb, opts) {
+      return handler.onExit(cb, opts);
+    },
+    load() {
+      return handler.load();
+    },
+    unload() {
+      return handler.unload();
+    }
+  };
+};
+var SignalExitFallback = class extends SignalExitBase {
+  onExit() {
+    return () => {
+    };
+  }
+  load() {
+  }
+  unload() {
+  }
+};
+var SignalExit = class extends SignalExitBase {
+  // "SIGHUP" throws an `ENOSYS` error on Windows,
+  // so use a supported signal instead
+  /* c8 ignore start */
+  #hupSig = process3.platform === "win32" ? "SIGINT" : "SIGHUP";
+  /* c8 ignore stop */
+  #emitter = new Emitter();
+  #process;
+  #originalProcessEmit;
+  #originalProcessReallyExit;
+  #sigListeners = {};
+  #loaded = false;
+  constructor(process4) {
+    super();
+    this.#process = process4;
+    this.#sigListeners = {};
+    for (const sig of signals) {
+      this.#sigListeners[sig] = () => {
+        const listeners = this.#process.listeners(sig);
+        let { count } = this.#emitter;
+        const p = process4;
+        if (typeof p.__signal_exit_emitter__ === "object" && typeof p.__signal_exit_emitter__.count === "number") {
+          count += p.__signal_exit_emitter__.count;
+        }
+        if (listeners.length === count) {
+          this.unload();
+          const ret = this.#emitter.emit("exit", null, sig);
+          const s = sig === "SIGHUP" ? this.#hupSig : sig;
+          if (!ret)
+            process4.kill(process4.pid, s);
+        }
+      };
+    }
+    this.#originalProcessReallyExit = process4.reallyExit;
+    this.#originalProcessEmit = process4.emit;
+  }
+  onExit(cb, opts) {
+    if (!processOk(this.#process)) {
+      return () => {
+      };
+    }
+    if (this.#loaded === false) {
+      this.load();
+    }
+    const ev = opts?.alwaysLast ? "afterExit" : "exit";
+    this.#emitter.on(ev, cb);
+    return () => {
+      this.#emitter.removeListener(ev, cb);
+      if (this.#emitter.listeners["exit"].length === 0 && this.#emitter.listeners["afterExit"].length === 0) {
+        this.unload();
+      }
+    };
+  }
+  load() {
+    if (this.#loaded) {
+      return;
+    }
+    this.#loaded = true;
+    this.#emitter.count += 1;
+    for (const sig of signals) {
+      try {
+        const fn = this.#sigListeners[sig];
+        if (fn)
+          this.#process.on(sig, fn);
+      } catch (_) {
+      }
+    }
+    this.#process.emit = (ev, ...a) => {
+      return this.#processEmit(ev, ...a);
+    };
+    this.#process.reallyExit = (code) => {
+      return this.#processReallyExit(code);
+    };
+  }
+  unload() {
+    if (!this.#loaded) {
+      return;
+    }
+    this.#loaded = false;
+    signals.forEach((sig) => {
+      const listener = this.#sigListeners[sig];
+      if (!listener) {
+        throw new Error("Listener not defined for signal: " + sig);
+      }
+      try {
+        this.#process.removeListener(sig, listener);
+      } catch (_) {
+      }
+    });
+    this.#process.emit = this.#originalProcessEmit;
+    this.#process.reallyExit = this.#originalProcessReallyExit;
+    this.#emitter.count -= 1;
+  }
+  #processReallyExit(code) {
+    if (!processOk(this.#process)) {
+      return 0;
+    }
+    this.#process.exitCode = code || 0;
+    this.#emitter.emit("exit", this.#process.exitCode, null);
+    return this.#originalProcessReallyExit.call(this.#process, this.#process.exitCode);
+  }
+  #processEmit(ev, ...args) {
+    const og = this.#originalProcessEmit;
+    if (ev === "exit" && processOk(this.#process)) {
+      if (typeof args[0] === "number") {
+        this.#process.exitCode = args[0];
+      }
+      const ret = og.call(this.#process, ev, ...args);
+      this.#emitter.emit("exit", this.#process.exitCode, null);
+      return ret;
+    } else {
+      return og.call(this.#process, ev, ...args);
+    }
+  }
+};
+var process3 = globalThis.process;
+var {
+  /**
+   * Called when the process is exiting, whether via signal, explicit
+   * exit, or running out of stuff to do.
+   *
+   * If the global process object is not suitable for instrumentation,
+   * then this will be a no-op.
+   *
+   * Returns a function that may be used to unload signal-exit.
+   */
+  onExit,
+  /**
+   * Load the listeners.  Likely you never need to call this, unless
+   * doing a rather deep integration with signal-exit functionality.
+   * Mostly exposed for the benefit of testing.
+   *
+   * @internal
+   */
+  load: load2,
+  /**
+   * Unload the listeners.  Likely you never need to call this, unless
+   * doing a rather deep integration with signal-exit functionality.
+   * Mostly exposed for the benefit of testing.
+   *
+   * @internal
+   */
+  unload
+} = signalExitWrap(processOk(process3) ? new SignalExit(process3) : new SignalExitFallback());
+
+// ../../node_modules/@inquirer/core/dist/lib/screen-manager.js
+import { stripVTControlCharacters } from "util";
+
+// ../../node_modules/@inquirer/ansi/dist/index.js
+var ESC2 = "\x1B[";
+var cursorLeft = ESC2 + "G";
+var cursorHide = ESC2 + "?25l";
+var cursorShow = ESC2 + "?25h";
+var cursorUp = (rows = 1) => rows > 0 ? `${ESC2}${rows}A` : "";
+var cursorDown = (rows = 1) => rows > 0 ? `${ESC2}${rows}B` : "";
+var cursorTo = (x, y) => {
+  if (typeof y === "number" && !Number.isNaN(y)) {
+    return `${ESC2}${y + 1};${x + 1}H`;
+  }
+  return `${ESC2}${x + 1}G`;
+};
+var eraseLine = ESC2 + "2K";
+var eraseLines = (lines) => lines > 0 ? (eraseLine + cursorUp(1)).repeat(lines - 1) + eraseLine + cursorLeft : "";
+
+// ../../node_modules/@inquirer/core/dist/lib/screen-manager.js
+var height = (content) => content.split("\n").length;
+var lastLine = (content) => content.split("\n").pop() ?? "";
+var ScreenManager = class {
+  // These variables are keeping information to allow correct prompt re-rendering
+  height = 0;
+  extraLinesUnderPrompt = 0;
+  cursorPos;
+  rl;
+  constructor(rl) {
+    this.rl = rl;
+    this.cursorPos = rl.getCursorPos();
+  }
+  write(content) {
+    this.rl.output.unmute();
+    this.rl.output.write(content);
+    this.rl.output.mute();
+  }
+  render(content, bottomContent = "") {
+    const promptLine = lastLine(content);
+    const rawPromptLine = stripVTControlCharacters(promptLine);
+    let prompt = rawPromptLine;
+    if (this.rl.line.length > 0) {
+      prompt = prompt.slice(0, -this.rl.line.length);
+    }
+    this.rl.setPrompt(prompt);
+    this.cursorPos = this.rl.getCursorPos();
+    const width = readlineWidth();
+    content = breakLines(content, width);
+    bottomContent = breakLines(bottomContent, width);
+    if (rawPromptLine.length % width === 0) {
+      content += "\n";
+    }
+    let output2 = content + (bottomContent ? "\n" + bottomContent : "");
+    const promptLineUpDiff = Math.floor(rawPromptLine.length / width) - this.cursorPos.rows;
+    const bottomContentHeight = promptLineUpDiff + (bottomContent ? height(bottomContent) : 0);
+    if (bottomContentHeight > 0)
+      output2 += cursorUp(bottomContentHeight);
+    output2 += cursorTo(this.cursorPos.cols);
+    this.write(cursorDown(this.extraLinesUnderPrompt) + eraseLines(this.height) + output2);
+    this.extraLinesUnderPrompt = bottomContentHeight;
+    this.height = height(output2);
+  }
+  checkCursorPos() {
+    const cursorPos = this.rl.getCursorPos();
+    if (cursorPos.cols !== this.cursorPos.cols) {
+      this.write(cursorTo(cursorPos.cols));
+      this.cursorPos = cursorPos;
+    }
+  }
+  done({ clearContent }) {
+    this.rl.setPrompt("");
+    let output2 = cursorDown(this.extraLinesUnderPrompt);
+    output2 += clearContent ? eraseLines(this.height) : "\n";
+    output2 += cursorLeft;
+    output2 += cursorShow;
+    this.write(output2);
+    this.rl.close();
+  }
+};
+
+// ../../node_modules/@inquirer/core/dist/lib/create-prompt.js
+import path from "path";
+var nativeSetImmediate = globalThis.setImmediate;
+var nativeClearImmediate = globalThis.clearImmediate;
+function listenTo(target, event, listener) {
+  if ("on" in target) {
+    target.on(event, listener);
+    return () => target.removeListener(event, listener);
+  }
+  target.addEventListener(event, listener);
+  return () => target.removeEventListener(event, listener);
+}
+function getCallSites() {
+  const savedPrepareStackTrace = Error.prepareStackTrace;
+  let result = [];
+  try {
+    Error.prepareStackTrace = (_, callSites) => {
+      const callSitesWithoutCurrent = callSites.slice(1);
+      result = callSitesWithoutCurrent;
+      return callSitesWithoutCurrent;
+    };
+    new Error().stack;
+  } catch {
+    return result;
+  }
+  Error.prepareStackTrace = savedPrepareStackTrace;
+  return result;
+}
+function createPrompt(view) {
+  const callSites = getCallSites();
+  const prompt = (config2, context = {}) => {
+    const { input: input2 = process.stdin, signal } = context;
+    const cleanups = /* @__PURE__ */ new Set();
+    const output2 = new import_mute_stream.default();
+    output2.pipe(context.output ?? process.stdout);
+    const rl = readline2.createInterface({
+      terminal: true,
+      input: input2,
+      output: output2
+    });
+    output2.mute();
+    const screen = new ScreenManager(rl);
+    const { promise: promise2, resolve: resolve7, reject } = withResolver();
+    return withHooks(rl, (cycle) => {
+      const clearEffects = AsyncResource3.bind(() => effectScheduler.clearAll());
+      const settlePrompt = (settle2) => {
+        try {
+          clearEffects();
+          settle2();
+        } catch (error62) {
+          reject(error62);
+        }
+      };
+      const resolvePrompt = (value) => settlePrompt(() => resolve7(value));
+      const rejectPrompt = (error62) => settlePrompt(() => reject(error62));
+      const promptPromise = Object.assign(promise2.finally(() => {
+        cleanups.forEach((cleanup) => cleanup());
+        screen.done({ clearContent: Boolean(context.clearPromptOnDone) });
+        output2.end();
+      }).then(() => promise2), { cancel: () => rejectPrompt(new CancelPromptError()) });
+      if (signal) {
+        const abort = () => rejectPrompt(new AbortPromptError({ cause: signal.reason }));
+        if (signal.aborted) {
+          abort();
+          return promptPromise;
+        }
+        cleanups.add(listenTo(signal, "abort", abort));
+      }
+      cleanups.add(onExit((code, signal2) => {
+        rejectPrompt(new ExitPromptError(`User force closed the prompt with ${code} ${signal2}`));
+      }));
+      cleanups.add(listenTo(rl, "SIGINT", () => rejectPrompt(new ExitPromptError(`User force closed the prompt with SIGINT`))));
+      cleanups.add(listenTo(rl, "close", clearEffects));
+      const startCycle = () => {
+        cleanups.add(listenTo(rl.input, "keypress", () => screen.checkCursorPos()));
+        let pendingDone = null;
+        cycle(() => {
+          let effectsSettled = false;
+          try {
+            const nextView = view(config2, (value) => {
+              if (effectsSettled) {
+                resolvePrompt(value);
+              } else {
+                pendingDone = { value };
+              }
+            });
+            if (nextView === void 0) {
+              let callerFilename = callSites[1]?.getFileName();
+              if (callerFilename && !callerFilename.startsWith("file://")) {
+                callerFilename = path.resolve(callerFilename);
+              }
+              throw new Error(`Prompt functions must return a string.
+    at ${callerFilename}`);
+            }
+            const [content, bottomContent] = typeof nextView === "string" ? [nextView] : nextView;
+            screen.render(content, bottomContent);
+            effectScheduler.run();
+          } catch (error62) {
+            rejectPrompt(error62);
+          }
+          effectsSettled = true;
+          if (pendingDone !== null) {
+            const { value } = pendingDone;
+            pendingDone = null;
+            resolvePrompt(value);
+          }
+        });
+      };
+      if ("readableFlowing" in input2) {
+        const immediate = nativeSetImmediate(startCycle);
+        cleanups.add(() => nativeClearImmediate(immediate));
+      } else {
+        startCycle();
+      }
+      return promptPromise;
+    });
+  };
+  return prompt;
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/Separator.js
+import { styleText as styleText2 } from "util";
+var Separator = class {
+  separator = styleText2("dim", Array.from({ length: 15 }).join(dist_default.line));
+  type = "separator";
+  constructor(separator) {
+    if (separator) {
+      this.separator = separator;
+    }
+  }
+  static isSeparator(choice) {
+    return Boolean(choice && typeof choice === "object" && "type" in choice && choice.type === "separator");
+  }
+};
+
+// ../../node_modules/@inquirer/confirm/dist/index.js
+import { styleText as styleText3 } from "util";
+var confirmTheme = {
+  keywords: {
+    yes: "Yes",
+    no: "No",
+    error: ({ yes, no }) => `You must answer with "${yes}" or "${no}"`
+  },
+  style: {
+    confirmDefault: (text) => {
+      const first = text[0] ?? "";
+      if (first.toLowerCase() === first.toUpperCase()) {
+        return styleText3("cyan", text);
+      }
+      return first.toUpperCase() + text.slice(1);
+    }
+  }
+};
+var dist_default4 = createPrompt((config2, done) => {
+  const [status, setStatus] = useState("idle");
+  const [value, setValue] = useState("");
+  const [errorMsg, setError] = useState();
+  const theme = makeTheme(confirmTheme, config2.theme);
+  const prefix = usePrefix({ status, theme });
+  const { yes, no } = theme.keywords;
+  const yesHint = (yes[0] ?? "").toLowerCase();
+  const noHint = (no[0] ?? "").toLowerCase();
+  const hint = config2.default === false ? `${yesHint}/${theme.style.confirmDefault(noHint)}` : `${theme.style.confirmDefault(yesHint)}/${noHint}`;
+  function boolToString(value2) {
+    return value2 ? yes : no;
+  }
+  const { transformer = boolToString } = config2;
+  function getBooleanValue(value2) {
+    const v = value2.trim().toLowerCase();
+    if (v === "")
+      return config2.default !== false;
+    if (yes.toLowerCase().startsWith(v))
+      return true;
+    if (no.toLowerCase().startsWith(v))
+      return false;
+    if ("yes".startsWith(v))
+      return true;
+    if ("no".startsWith(v))
+      return false;
+    return void 0;
+  }
+  useKeypress((key, rl) => {
+    if (status !== "idle")
+      return;
+    if (isEnterKey(key)) {
+      const answer = getBooleanValue(value);
+      if (answer === void 0) {
+        rl.write(value);
+        setError(theme.keywords.error({ yes, no }));
+        return;
+      }
+      setValue(transformer(answer));
+      setStatus("done");
+      done(answer);
+    } else if (isTabKey(key)) {
+      const answer = boolToString(!(getBooleanValue(value) ?? config2.default !== false));
+      rl.clearLine(0);
+      rl.write(answer);
+      setValue(answer);
+    } else {
+      setValue(rl.line);
+      setError(void 0);
+    }
+  });
+  let formattedValue = value;
+  let defaultValue = "";
+  if (status === "done") {
+    formattedValue = theme.style.answer(value);
+  } else {
+    defaultValue = ` ${theme.style.defaultAnswer(hint)}`;
+  }
+  const message = theme.style.message(config2.message, status);
+  let error62 = "";
+  if (errorMsg) {
+    error62 = theme.style.error(errorMsg);
+  }
+  return [`${prefix} ${message}${defaultValue} ${formattedValue}`, error62];
+});
+
+// ../../node_modules/@inquirer/input/dist/index.js
+var inputTheme = {
+  validationFailureMode: "keep"
+};
+var dist_default5 = createPrompt((config2, done) => {
+  const { prefill = "tab" } = config2;
+  const theme = makeTheme(inputTheme, config2.theme);
+  const [status, setStatus] = useState("idle");
+  const [defaultValue, setDefaultValue] = useState(String(config2.default ?? ""));
+  const [errorMsg, setError] = useState();
+  const [value, setValue] = useState("");
+  const prefix = usePrefix({ status, theme });
+  async function validate2(value2) {
+    const { required: required2, pattern, patternError = "Invalid input" } = config2;
+    if (required2 && !value2) {
+      return "You must provide a value";
+    }
+    if (pattern && !pattern.test(value2)) {
+      return patternError;
+    }
+    if (typeof config2.validate === "function") {
+      return await config2.validate(value2) || "You must provide a valid value";
+    }
+    return true;
+  }
+  useKeypress(async (key, rl) => {
+    if (status !== "idle") {
+      return;
+    }
+    if (isEnterKey(key)) {
+      const answer = value || defaultValue;
+      setStatus("loading");
+      const isValid = await validate2(answer);
+      if (isValid === true) {
+        setValue(answer);
+        setStatus("done");
+        done(answer);
+      } else {
+        if (theme.validationFailureMode === "clear") {
+          setValue("");
+        } else {
+          rl.write(value);
+        }
+        setError(isValid);
+        setStatus("idle");
+      }
+    } else if (isBackspaceKey(key) && !value) {
+      setDefaultValue("");
+    } else if (isTabKey(key) && !value) {
+      setDefaultValue("");
+      rl.clearLine(0);
+      rl.write(defaultValue);
+      setValue(defaultValue);
+    } else {
+      setValue(rl.line);
+      setError(void 0);
+    }
+  });
+  useEffect((rl) => {
+    if (prefill === "editable" && defaultValue) {
+      rl.write(defaultValue);
+      setValue(defaultValue);
+    }
+  }, []);
+  const message = theme.style.message(config2.message, status);
+  let formattedValue = value;
+  if (typeof config2.transformer === "function") {
+    formattedValue = config2.transformer(value, { isFinal: status === "done" });
+  } else if (status === "done") {
+    formattedValue = theme.style.answer(value);
+  }
+  let defaultStr;
+  if (defaultValue && status !== "done" && !value) {
+    defaultStr = theme.style.defaultAnswer(defaultValue);
+  }
+  let error62 = "";
+  if (errorMsg) {
+    error62 = theme.style.error(errorMsg);
+  }
+  return [
+    [prefix, message, defaultStr, formattedValue].filter((v) => v !== void 0).join(" "),
+    error62
+  ];
+});
+
+// ../../node_modules/@inquirer/select/dist/index.js
+import { styleText as styleText4 } from "util";
+var selectTheme = {
+  icon: { cursor: dist_default.pointer },
+  style: {
+    disabled: (text) => styleText4("dim", text),
+    description: (text) => styleText4("cyan", text),
+    keysHelpTip: (keys) => keys.map(([key, action]) => `${styleText4("bold", key)} ${styleText4("dim", action)}`).join(styleText4("dim", " \u2022 "))
+  },
+  i18n: { disabledError: "This option is disabled and cannot be selected." },
+  indexMode: "hidden"
+};
+function isSelectable(item) {
+  return !Separator.isSeparator(item) && !item.disabled;
+}
+function isNavigable(item) {
+  return !Separator.isSeparator(item);
+}
+function normalizeChoices(choices) {
+  return choices.map((choice) => {
+    if (Separator.isSeparator(choice))
+      return choice;
+    if (typeof choice !== "object" || choice === null || !("value" in choice)) {
+      const name2 = String(choice);
+      return {
+        value: choice,
+        name: name2,
+        short: name2,
+        disabled: false
+      };
+    }
+    const name = choice.name ?? String(choice.value);
+    const normalizedChoice = {
+      value: choice.value,
+      name,
+      short: choice.short ?? name,
+      disabled: choice.disabled ?? false
+    };
+    if (choice.description) {
+      normalizedChoice.description = choice.description;
+    }
+    return normalizedChoice;
+  });
+}
+var dist_default6 = createPrompt((config2, done) => {
+  const { loop = true, pageSize = 7 } = config2;
+  const theme = makeTheme(selectTheme, config2.theme);
+  const { keybindings: keybindings2 } = theme;
+  const [status, setStatus] = useState("idle");
+  const prefix = usePrefix({ status, theme });
+  const searchTimeoutRef = useRef();
+  const searchEnabled = !keybindings2.includes("vim");
+  const items = useMemo(() => normalizeChoices(config2.choices), [config2.choices]);
+  const bounds = useMemo(() => {
+    const first = items.findIndex(isNavigable);
+    const last = items.findLastIndex(isNavigable);
+    if (first === -1) {
+      throw new ValidationError("[select prompt] No selectable choices. All choices are disabled.");
+    }
+    return { first, last };
+  }, [items]);
+  const defaultItemIndex = useMemo(() => {
+    if (!("default" in config2))
+      return -1;
+    return items.findIndex((item) => isSelectable(item) && item.value === config2.default);
+  }, [config2.default, items]);
+  const [active, setActive] = useState(defaultItemIndex === -1 ? bounds.first : defaultItemIndex);
+  const selectedChoice = items[active];
+  if (selectedChoice == null || Separator.isSeparator(selectedChoice)) {
+    throw new Error("Active index does not point to a choice");
+  }
+  const [errorMsg, setError] = useState();
+  useKeypress((key, rl) => {
+    clearTimeout(searchTimeoutRef.current);
+    if (errorMsg) {
+      setError(void 0);
+    }
+    if (isEnterKey(key)) {
+      if (selectedChoice.disabled) {
+        setError(theme.i18n.disabledError);
+      } else {
+        setStatus("done");
+        done(selectedChoice.value);
+      }
+    } else if (isUpKey(key, keybindings2) || isDownKey(key, keybindings2)) {
+      rl.clearLine(0);
+      if (loop || isUpKey(key, keybindings2) && active !== bounds.first || isDownKey(key, keybindings2) && active !== bounds.last) {
+        const offset = isUpKey(key, keybindings2) ? -1 : 1;
+        let next = active;
+        do {
+          next = (next + offset + items.length) % items.length;
+        } while (!isNavigable(items[next]));
+        setActive(next);
+      }
+    } else if (isNumberKey(key) && !Number.isNaN(Number(rl.line))) {
+      const selectedIndex = Number(rl.line) - 1;
+      let selectableIndex = -1;
+      const position = items.findIndex((item2) => {
+        if (Separator.isSeparator(item2))
+          return false;
+        selectableIndex++;
+        return selectableIndex === selectedIndex;
+      });
+      const item = items[position];
+      if (item != null && isSelectable(item)) {
+        setActive(position);
+      }
+      searchTimeoutRef.current = setTimeout(() => {
+        rl.clearLine(0);
+      }, 700);
+    } else if (isBackspaceKey(key)) {
+      rl.clearLine(0);
+    } else if (searchEnabled) {
+      const searchTerm = rl.line.toLowerCase();
+      const matchIndex = items.findIndex((item) => {
+        if (Separator.isSeparator(item) || !isSelectable(item))
+          return false;
+        return item.name.toLowerCase().startsWith(searchTerm);
+      });
+      if (matchIndex !== -1) {
+        setActive(matchIndex);
+      }
+      searchTimeoutRef.current = setTimeout(() => {
+        rl.clearLine(0);
+      }, 700);
+    }
+  });
+  useEffect(() => () => {
+    clearTimeout(searchTimeoutRef.current);
+  }, []);
+  const message = theme.style.message(config2.message, status);
+  const helpLine = theme.style.keysHelpTip([
+    ["\u2191\u2193", "navigate"],
+    ["\u23CE", "select"]
+  ]);
+  let separatorCount = 0;
+  const page = usePagination({
+    items,
+    active,
+    renderItem({ item, isActive: isActive2, index }) {
+      if (Separator.isSeparator(item)) {
+        separatorCount++;
+        return ` ${item.separator}`;
+      }
+      const cursor = isActive2 ? theme.icon.cursor : " ";
+      const indexLabel = theme.indexMode === "number" ? `${index + 1 - separatorCount}. ` : "";
+      if (item.disabled) {
+        const disabledLabel = typeof item.disabled === "string" ? item.disabled : "(disabled)";
+        const disabledCursor = isActive2 ? theme.icon.cursor : "-";
+        return theme.style.disabled(`${disabledCursor} ${indexLabel}${item.name} ${disabledLabel}`);
+      }
+      const color = isActive2 ? theme.style.highlight : (x) => x;
+      return color(`${cursor} ${indexLabel}${item.name}`);
+    },
+    pageSize,
+    loop
+  });
+  if (status === "done") {
+    return [prefix, message, theme.style.answer(selectedChoice.short)].filter(Boolean).join(" ");
+  }
+  const { description } = selectedChoice;
+  const lines = [
+    [prefix, message].filter(Boolean).join(" "),
+    page,
+    " ",
+    description ? theme.style.description(description) : "",
+    errorMsg ? theme.style.error(errorMsg) : "",
+    helpLine
+  ].filter(Boolean).join("\n").trimEnd();
+  return `${lines}${cursorHide}`;
+});
+
+// src/io.ts
+var CliError = class extends Error {
+};
+var inquirerPrompter = {
+  select: (message, choices, fallback) => dist_default6({ message, choices, default: fallback }),
+  input: (message, fallback) => dist_default5({ message, default: fallback }),
+  confirm: (message, fallback) => dist_default4({ message, default: fallback })
+};
+var defaultsPrompter = {
+  select: async (_m, _c, fallback) => fallback,
+  input: async (_m, fallback) => fallback,
+  confirm: async (_m, fallback) => fallback
+};
+function processIo(interactive) {
+  return {
+    prompt: interactive ? inquirerPrompter : defaultsPrompter,
+    out: (line) => process.stdout.write(`${line}
+`),
+    warn: (line) => process.stderr.write(`warning: ${line}
+`),
+    env: process.env,
+    now: () => (/* @__PURE__ */ new Date()).toISOString()
+  };
+}
+function exitOnClosedPipe(stream = process.stdout, exit = process.exit) {
+  stream.on("error", (err) => {
+    if (err.code === "EPIPE") exit(0);
+    else throw err;
+  });
+}
+
+// src/commands/blame.ts
+import { stat as stat8 } from "fs/promises";
+import { isAbsolute as isAbsolute3, relative as relative4, resolve as resolve4, sep as sep4 } from "path";
+import { pathToFileURL } from "url";
+
+// src/thought.ts
+import { execFile as execFile3 } from "child_process";
+import { access as access2 } from "fs/promises";
+import { isAbsolute as isAbsolute2, resolve as resolve3 } from "path";
+import { promisify as promisify3 } from "util";
+
 // src/messages.ts
 import { createHash } from "crypto";
 
 // src/store/conversations.ts
-import { appendFile, mkdir as mkdir4, readFile as readFile4 } from "fs/promises";
-import { dirname as dirname5 } from "path";
+import { appendFile, mkdir as mkdir4, readFile as readFile6 } from "fs/promises";
+import { dirname as dirname6 } from "path";
 import { constants as constants2, gunzipSync, gzipSync } from "zlib";
 
 // src/redact.ts
@@ -21482,7 +23783,7 @@ function isStoredTurn(value) {
 async function readConversationStore(root, sessionId) {
   let text;
   try {
-    text = gunzipSync(await readFile4(projectPaths(root).conversation(sessionId)), {
+    text = gunzipSync(await readFile6(projectPaths(root).conversation(sessionId)), {
       finishFlush: constants2.Z_SYNC_FLUSH
     }).toString("utf8");
   } catch {
@@ -21529,7 +23830,7 @@ async function appendConversationTurns(root, sessionId, turns) {
   const chunk = `${value.map((turn) => JSON.stringify(turn)).join("\n")}
 `;
   const file2 = projectPaths(root).conversation(sessionId);
-  await mkdir4(dirname5(file2), { recursive: true });
+  await mkdir4(dirname6(file2), { recursive: true });
   await appendFile(file2, gzipSync(Buffer.from(chunk, "utf8")));
   return fresh.length;
 }
@@ -21541,7 +23842,7 @@ async function appendConversationHashes(root, sessionId, hashes) {
   const chunk = `${fresh.map((turn) => JSON.stringify(turn)).join("\n")}
 `;
   const file2 = projectPaths(root).conversation(sessionId);
-  await mkdir4(dirname5(file2), { recursive: true });
+  await mkdir4(dirname6(file2), { recursive: true });
   await appendFile(file2, gzipSync(Buffer.from(chunk, "utf8")));
   return fresh.length;
 }
@@ -21611,7 +23912,7 @@ function hashesToLabels(messages) {
 }
 function upgradeSessionIds(session, messages) {
   const byLabel = labelsToHashes(messages);
-  const rename2 = (id) => byLabel.get(id) ?? id;
+  const rename3 = (id) => byLabel.get(id) ?? id;
   const byId = /* @__PURE__ */ new Map();
   const stable = /* @__PURE__ */ new Set();
   for (const node2 of session.nodes) {
@@ -21619,12 +23920,12 @@ function upgradeSessionIds(session, messages) {
       byId.set(node2.id, node2);
       continue;
     }
-    const id = rename2(node2.id);
+    const id = rename3(node2.id);
     const next = {
       ...node2,
       id,
-      ...node2.parent === void 0 || node2.parent === null ? {} : { parent: rename2(node2.parent) },
-      ...node2.links === void 0 ? {} : { links: node2.links.map(rename2) }
+      ...node2.parent === void 0 || node2.parent === null ? {} : { parent: rename3(node2.parent) },
+      ...node2.links === void 0 ? {} : { links: node2.links.map(rename3) }
     };
     if (!byId.has(id)) {
       byId.set(id, next);
@@ -21639,19 +23940,105 @@ function upgradeSessionIds(session, messages) {
   return { ...session, nodes: [...byId.values()] };
 }
 
+// src/session-git.ts
+import { execFile as execFile2 } from "child_process";
+import { existsSync as existsSync3 } from "fs";
+import { relative as relative3, sep as sep3 } from "path";
+import { promisify as promisify2 } from "util";
+var exec3 = promisify2(execFile2);
+var SessionHead = external_exports.object({
+  sessionId: Slug,
+  transcriptPath: external_exports.string().optional(),
+  at: external_exports.string().optional()
+});
+async function readSessionHead(root) {
+  const read = await readJson(projectPaths(root).head);
+  if (!read.found || "error" in read) return void 0;
+  const parsed = SessionHead.safeParse(read.value);
+  return parsed.success ? parsed.data : void 0;
+}
+async function git(root, args, env = process.env) {
+  try {
+    const { stdout } = await exec3("git", ["-C", root, ...args], { env });
+    return { code: 0, stdout };
+  } catch (err) {
+    const failure2 = err;
+    return {
+      code: typeof failure2.code === "number" ? failure2.code : 1,
+      stdout: failure2.stdout ?? ""
+    };
+  }
+}
+async function sessionPaths(gitRoot, root, sessionId) {
+  const paths = projectPaths(root);
+  const session = [paths.session(sessionId), paths.events(sessionId)].filter(
+    (file2) => existsSync3(file2)
+  );
+  if (session.length === 0) return [];
+  const shared = [paths.project, paths.gitignore].filter((file2) => existsSync3(file2));
+  return [...session, ...shared].map((file2) => relative3(gitRoot, file2).split(sep3).join("/")).filter((file2) => file2 !== "" && !file2.startsWith(".."));
+}
+async function ignored(gitRoot, path2, env) {
+  return (await git(gitRoot, ["check-ignore", "-q", "--", path2], env)).code === 0;
+}
+async function hasStagedChanges(gitRoot, env) {
+  return (await git(gitRoot, ["diff", "--cached", "--quiet", "--exit-code"], env)).code !== 0;
+}
+async function uncommittedSession(root, sessionId, env = process.env) {
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === void 0) return false;
+  const paths = await sessionPaths(gitRoot, root, sessionId);
+  if (paths.length === 0) return false;
+  if (await ignored(gitRoot, paths[0], env)) return false;
+  return (await git(gitRoot, ["status", "--porcelain", "--", ...paths], env)).stdout.trim() !== "";
+}
+async function stageSessionFiles(root, env = process.env) {
+  const head = await readSessionHead(root);
+  if (head === void 0) return false;
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === void 0) return false;
+  const paths = await sessionPaths(gitRoot, root, head.sessionId);
+  if (paths.length === 0) return false;
+  if (await ignored(gitRoot, paths[0], env)) return false;
+  if (!await hasStagedChanges(gitRoot, env)) return false;
+  return (await git(gitRoot, ["add", "--", ...paths], env)).code === 0;
+}
+function recordMessage(title, sessionId) {
+  const clean = title.replace(/\s+/g, " ").trim() || sessionId;
+  return `chore(cogit): record ${clean.length > 120 ? `${clean.slice(0, 119)}\u2026` : clean}`;
+}
+async function commitSessionFiles(root, sessionId, title, env = process.env) {
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === void 0) return false;
+  const paths = await sessionPaths(gitRoot, root, sessionId);
+  if (paths.length === 0) return false;
+  if (await ignored(gitRoot, paths[0], env)) return false;
+  if ((await git(gitRoot, ["status", "--porcelain", "--", ...paths], env)).stdout.trim() === "")
+    return false;
+  if ((await git(gitRoot, ["add", "--", ...paths], env)).code !== 0) return false;
+  const message = recordMessage(title, sessionId);
+  return (await git(gitRoot, ["commit", "--no-verify", "-m", message, "--", ...paths], env)).code === 0;
+}
+async function maybeAutoCommit(root, sessionId, env) {
+  if ((await loadConfig(env)).recordCommit !== "auto") return false;
+  const loaded = await loadSession(root, sessionId);
+  const title = loaded.found && loaded.ok ? loaded.data.title : "";
+  return commitSessionFiles(root, sessionId, title, env);
+}
+
 // src/thought.ts
-var exec3 = promisify3(execFile3);
+var exec4 = promisify3(execFile3);
 var THOUGHT_TRAILER = "Thought";
 var THOUGHT_VALUE = /^h[0-9a-f]{12}$/;
 var FULL_HASH = /^[0-9a-f]{40}$/;
-async function readable(path) {
-  return access2(path).then(
+async function readable(path2) {
+  return access2(path2).then(
     () => true,
     () => false
   );
 }
 function messagePath(file2) {
-  return isAbsolute2(file2) ? file2 : resolve(process.cwd(), file2);
+  return isAbsolute2(file2) ? file2 : resolve3(process.cwd(), file2);
 }
 async function newestThought(agent, transcript, sessionId) {
   const turns = await agent.readConversation(transcript);
@@ -21659,7 +24046,7 @@ async function newestThought(agent, transcript, sessionId) {
   return newest === void 0 ? void 0 : messageHash(sessionId, newest);
 }
 async function writeTrailer(messageFile, value) {
-  await exec3("git", [
+  await exec4("git", [
     "interpret-trailers",
     "--in-place",
     "--if-exists",
@@ -21684,7 +24071,7 @@ async function addThoughtTrailer(opts) {
     await writeTrailer(opts.messageFile, value2);
     return true;
   }
-  const root = resolve(opts.dir);
+  const root = resolve3(opts.dir);
   const head = await readSessionHead(root);
   if (head === void 0 || head.at === void 0) return false;
   const written = Date.parse(head.at);
@@ -21726,7 +24113,7 @@ async function readThoughtTrailers(root, opts = {}) {
     ...opts.since === void 0 ? [] : [`--since=${opts.since}`]
   ];
   try {
-    const { stdout } = await exec3(
+    const { stdout } = await exec4(
       "git",
       args,
       opts.env === void 0 ? void 0 : { env: opts.env }
@@ -21741,7 +24128,7 @@ async function readCommitThought(root, ref, env) {
   if (gitRoot === void 0) return void 0;
   const args = ["-C", gitRoot, "log", "-1", "--format=%(trailers:key=Thought,valueonly)", ref];
   try {
-    const { stdout } = await exec3("git", args, env === void 0 ? void 0 : { env });
+    const { stdout } = await exec4("git", args, env === void 0 ? void 0 : { env });
     const value = String(stdout).trim().split("\n")[0]?.trim() ?? "";
     return THOUGHT_VALUE.test(value) ? value : void 0;
   } catch {
@@ -21792,6 +24179,1955 @@ function attachThoughtTrailers(sessions, trailers) {
   });
 }
 
+// src/author.ts
+import { userInfo } from "os";
+
+// src/view/people.ts
+function sameAuthor(a, b) {
+  if (a.authorEmail !== void 0 && b.authorEmail !== void 0)
+    return a.authorEmail.toLowerCase() === b.authorEmail.toLowerCase();
+  if (a.author !== void 0 && b.author !== void 0) return a.author === b.author;
+  return true;
+}
+
+// src/author.ts
+async function sessionAuthor(root, env = process.env) {
+  const gitRoot = await findGitRoot(root);
+  const fromGit = gitRoot === void 0 ? void 0 : await gitUserName(gitRoot, env);
+  if (fromGit !== void 0) return fromGit;
+  try {
+    return userInfo().username || void 0;
+  } catch {
+    return env.USER ?? env.USERNAME ?? void 0;
+  }
+}
+async function sessionIdentity(root, env = process.env) {
+  const gitRoot = await findGitRoot(root);
+  const email3 = gitRoot === void 0 ? void 0 : await gitUserEmail(gitRoot, env);
+  return { author: await sessionAuthor(root, env), authorEmail: email3 };
+}
+function stampedIdentity(stored, here) {
+  const author = stored?.author ?? here.author;
+  const authorEmail = stored?.authorEmail ?? (stored?.author === void 0 || stored.author === here.author ? here.authorEmail : void 0);
+  return {
+    ...author === void 0 ? {} : { author },
+    ...authorEmail === void 0 ? {} : { authorEmail }
+  };
+}
+
+// src/view/model.ts
+var DATA_ELEMENT_ID = "cogit-data";
+var LIVE_META_NAME = "cogit-live";
+var TOKEN_META_NAME = "cogit-token";
+var PANEL_EDITABLE_KEYS = [
+  "recorder",
+  "messageSummaries",
+  "startupContext",
+  "recordHeadless",
+  "tryBeforeNotes",
+  "shapes",
+  "language",
+  "shareConversations",
+  "recordCommit"
+];
+function isPanelEditableKey(key) {
+  return PANEL_EDITABLE_KEYS.includes(key);
+}
+var VIEW_SCHEMA = 1;
+
+// src/view/lineage.ts
+function buildMessages(nodes, pending = [], commitSubjects, commitFiles) {
+  const recorded = nodes.filter((node2) => node2.kind === "message");
+  const combined = [
+    ...recorded.map((node2, index) => ({ kind: "recorded", node: node2, index })),
+    ...pending.map(
+      (message, index) => ({ kind: "pending", message, index: recorded.length + index })
+    )
+  ].sort(
+    (a, b) => ((a.kind === "recorded" ? a.node.at : a.message.at) ?? "").localeCompare(
+      (b.kind === "recorded" ? b.node.at : b.message.at) ?? ""
+    ) || a.index - b.index
+  );
+  const idOf = (row) => row.kind === "recorded" ? row.node.id : row.message.id;
+  const known = new Set(combined.map(idOf));
+  const order = new Map(combined.map((row, index) => [idOf(row), index]));
+  const earlier = (other, id) => {
+    const otherAt = order.get(other);
+    const selfAt = order.get(id);
+    return otherAt !== void 0 && selfAt !== void 0 && otherAt < selfAt;
+  };
+  const out = [];
+  let previous = null;
+  const push = (message, parent) => {
+    message.parent = parent;
+    message.label = `m${out.length + 1}`;
+    out.push(message);
+    previous = message.id;
+  };
+  for (const row of combined) {
+    if (row.kind === "pending") {
+      push(
+        {
+          id: row.message.id,
+          kind: "message",
+          title: row.message.title,
+          at: row.message.at,
+          unsummarized: true
+        },
+        previous
+      );
+      continue;
+    }
+    const node2 = row.node;
+    const parentRef = node2.parent ?? null;
+    const cross = parentRef !== null && parentRef.includes(":");
+    const parent = parentRef === null ? null : cross ? parentRef : known.has(parentRef) && earlier(parentRef, node2.id) ? parentRef : previous;
+    const links = (node2.links ?? []).filter((link) => known.has(link) && earlier(link, node2.id));
+    push(
+      {
+        id: node2.id,
+        kind: node2.kind,
+        title: node2.title,
+        ...node2.summary === void 0 ? {} : { summary: node2.summary },
+        ...node2.why === void 0 ? {} : { why: node2.why },
+        ...node2.at === void 0 ? {} : { at: node2.at },
+        ...node2.decidedBy === void 0 ? {} : { decidedBy: node2.decidedBy },
+        ...node2.alternatives?.length ? { alternatives: node2.alternatives } : {},
+        ...node2.commits?.length ? { commits: node2.commits } : {},
+        // Story 10.3: the numstat totals the build attached to the record node.
+        ...node2.change === void 0 ? {} : { change: node2.change },
+        ...node2.commits?.length ? {
+          commitTags: node2.commits.map((hash2) => {
+            const subject = commitSubjects?.get(hash2);
+            const files = commitFiles?.get(hash2);
+            return {
+              hash: hash2,
+              ...subject === void 0 ? {} : { subject },
+              ...files === void 0 ? {} : { files }
+            };
+          })
+        } : {},
+        ...node2.files?.length ? { files: node2.files } : {},
+        ...node2.work?.length ? { work: node2.work } : {},
+        ...node2.agentDecisions?.length ? { agentDecisions: node2.agentDecisions } : {},
+        // Story 13.6: the Shape travels with the record, as written and validated.
+        ...node2.shape === void 0 ? {} : { shape: node2.shape },
+        ...node2.addedAt === void 0 ? {} : { addedAt: node2.addedAt },
+        ...node2.touchedAt === void 0 ? {} : { touchedAt: node2.touchedAt },
+        ...node2.branch === void 0 ? {} : { branch: node2.branch },
+        ...links.length ? { links } : {}
+      },
+      parent
+    );
+  }
+  return out;
+}
+var ACTIVE_WINDOW_DAYS = 7;
+var ACTIVE_WINDOW_MS = ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1e3;
+function timestamp(value) {
+  const time3 = Date.parse(value);
+  return Number.isNaN(time3) ? Number.NEGATIVE_INFINITY : time3;
+}
+function isActive(session, now) {
+  const updated = timestamp(session.updatedAt);
+  const reference = timestamp(now);
+  if (updated === Number.NEGATIVE_INFINITY || reference === Number.NEGATIVE_INFINITY) return false;
+  return reference - updated <= ACTIVE_WINDOW_MS;
+}
+function byUpdatedAt(a, b) {
+  return timestamp(b.updatedAt) - timestamp(a.updatedAt) || a.sessionId.localeCompare(b.sessionId);
+}
+function lastActivityOf(session) {
+  let value = session.updatedAt;
+  let time3 = Number.NEGATIVE_INFINITY;
+  for (const node2 of session.nodes) {
+    if (node2.kind !== "message" || node2.at === void 0) continue;
+    const at = timestamp(node2.at);
+    if (at > time3) {
+      time3 = at;
+      value = node2.at;
+    }
+  }
+  return { value, time: time3 === Number.NEGATIVE_INFINITY ? timestamp(value) : time3 };
+}
+function lastActive(session) {
+  return lastActivityOf(session).time;
+}
+function hasStatus(session) {
+  const { goal, done, pending, next } = session.status;
+  return goal !== "" || next !== "" || done.length > 0 || pending.length > 0;
+}
+function statusCard(sessions, now) {
+  const ordered = [...sessions].sort(byUpdatedAt);
+  const latest = ordered.find(hasStatus);
+  const pending = (latest?.status.pending ?? []).map((item) => ({ ...item }));
+  const seen = new Set(pending.map((item) => item.text));
+  const others = ordered.filter((session) => session !== latest);
+  for (const session of others) {
+    if (!isActive(session, now)) continue;
+    for (const item of session.status.pending) {
+      if (!item.needsUser || seen.has(item.text)) continue;
+      seen.add(item.text);
+      pending.push({ ...item });
+    }
+  }
+  const activity = ordered.map(lastActivityOf).reduce(
+    (best, current) => best === null || current.time > best.time ? current : best,
+    null
+  );
+  return {
+    goal: latest?.status.goal ?? "",
+    done: latest?.status.done ?? [],
+    pending,
+    next: latest?.status.next ?? "",
+    lastActivity: activity?.value ?? null
+  };
+}
+function sessionTitle(session) {
+  const own2 = session.title.trim();
+  if (own2) return own2;
+  return session.nodes.find((node2) => node2.kind === "message")?.title.trim() ?? "";
+}
+function toViewSession(session, transcripts, chat, unrecorded, pending, commitSubjects, commitFiles) {
+  return {
+    sessionId: session.sessionId,
+    agent: session.agent,
+    title: sessionTitle(session),
+    ...session.author === void 0 ? {} : { author: session.author },
+    ...session.authorEmail === void 0 ? {} : { authorEmail: session.authorEmail },
+    startedAt: session.startedAt,
+    updatedAt: session.updatedAt,
+    status: session.status,
+    messages: buildMessages(session.nodes, pending, commitSubjects, commitFiles),
+    // Undefined means the caller did not ask (fixtures, unit tests); then the
+    // record is shown as resumable rather than pretending the transcript is gone.
+    transcriptAvailable: transcripts === void 0 ? true : transcripts.has(session.sessionId),
+    ...session.worktree ? { worktree: session.worktree } : {},
+    ...unrecorded ? { unrecordedMessages: unrecorded } : {},
+    ...chat ? { chat } : {}
+  };
+}
+function byStartedAt(a, b) {
+  return a.startedAt.localeCompare(b.startedAt) || a.sessionId.localeCompare(b.sessionId);
+}
+function resolveContinues(sessions) {
+  const byId = new Map(sessions.map((session) => [session.sessionId, session]));
+  for (const session of sessions) {
+    for (const message of session.messages) {
+      const parent = message.parent;
+      if (typeof parent !== "string") continue;
+      const at = parent.indexOf(":");
+      if (at === -1) continue;
+      const otherId = parent.slice(0, at);
+      const id = parent.slice(at + 1);
+      const other = byId.get(otherId);
+      const target = other?.messages.find((candidate) => candidate.id === id);
+      message.parent = null;
+      if (other && !sameAuthor(session, other)) continue;
+      message.continues = {
+        sessionId: otherId,
+        sessionTitle: other?.title || otherId,
+        id,
+        ...target?.label === void 0 ? {} : { label: target.label }
+      };
+    }
+  }
+}
+function buildViewModel(input2) {
+  const sessions = [...input2.sessions].sort(byStartedAt);
+  const views = [];
+  for (const session of sessions) {
+    const view = toViewSession(
+      session,
+      input2.transcripts,
+      input2.chats?.get(session.sessionId),
+      input2.unrecorded?.get(session.sessionId),
+      input2.pending?.get(session.sessionId),
+      input2.commitSubjects,
+      input2.commitFiles
+    );
+    views.push(view);
+  }
+  resolveContinues(views);
+  return {
+    kind: "lineage",
+    schema: VIEW_SCHEMA,
+    project: { name: input2.project.name, path: input2.path, generatedAt: input2.generatedAt },
+    status: statusCard(sessions, input2.generatedAt),
+    sessions: views,
+    ...input2.settings === void 0 ? {} : { settings: input2.settings },
+    ...input2.viewer === void 0 ? {} : { viewer: viewerOf(input2.viewer) }
+  };
+}
+function viewerOf(viewer) {
+  return {
+    ...viewer.author === void 0 ? {} : { author: viewer.author },
+    ...viewer.authorEmail === void 0 ? {} : { authorEmail: viewer.authorEmail }
+  };
+}
+var EMPTY_DATA_ELEMENT = `<script id="${DATA_ELEMENT_ID}" type="application/json"></script>`;
+function escapeForScript(json2) {
+  return json2.replace(
+    /[<>&\u2028\u2029]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`
+  );
+}
+var BUILT_BY_META_NAME = "cogit-built-by";
+function markBuiltBy(html, version2) {
+  const meta3 = `<meta name="${BUILT_BY_META_NAME}" content="${version2}">`;
+  return html.replace(/<head(\s[^>]*)?>/i, (head) => `${head}${meta3}`);
+}
+function builtBy(html) {
+  const match = html.match(/<meta name="cogit-built-by" content="([^"]*)">/);
+  return match?.[1] ?? null;
+}
+function embedViewModel(template, model) {
+  if (!template.includes(EMPTY_DATA_ELEMENT)) {
+    throw new Error(`the template has no empty <script id="${DATA_ELEMENT_ID}"> element`);
+  }
+  const data = `<script id="${DATA_ELEMENT_ID}" type="application/json">${escapeForScript(
+    JSON.stringify(model)
+  )}</script>`;
+  return template.replace(EMPTY_DATA_ELEMENT, () => data);
+}
+
+// src/commands/blame.ts
+function parseBlameTarget(target) {
+  const match = /^(.*):([1-9][0-9]*)$/.exec(target);
+  if (match === null) return { file: target };
+  return { file: match[1], line: Number(match[2]) };
+}
+function sameCommit2(recorded, blamed) {
+  return blamed.startsWith(recorded) || recorded.startsWith(blamed);
+}
+function gitMessage(err) {
+  const stderr = err.stderr;
+  const text = typeof stderr === "string" && stderr.trim() !== "" ? stderr : String(err);
+  return text.trim().split("\n")[0] ?? "unknown git error";
+}
+function oneLine2(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
+async function thoughtsForCommits(root, commits, env, warn2) {
+  const loaded = [...await loadAllSessions(root, warn2 ?? (() => {
+  }))].sort(
+    (a, b) => a.startedAt.localeCompare(b.startedAt) || a.sessionId.localeCompare(b.sessionId)
+  );
+  const trailers = await readThoughtTrailers(root, {
+    ...env === void 0 ? {} : { env },
+    since: earliestSessionStart(loaded)
+  });
+  const sessions = attachThoughtTrailers(loaded, trailers);
+  const thoughts = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const commit of commits) {
+    for (const session of sessions) {
+      const sessionTitle2 = session.title.trim() === "" ? session.sessionId : session.title;
+      for (const message of buildMessages(session.nodes)) {
+        const recorded = (message.commits ?? []).find((hash2) => sameCommit2(hash2, commit));
+        if (recorded === void 0) continue;
+        const key = `${commit}:${message.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        thoughts.push({
+          commit,
+          sessionId: session.sessionId,
+          sessionTitle: sessionTitle2,
+          messageId: message.id,
+          label: message.label ?? message.id,
+          title: message.title,
+          ...message.summary === void 0 ? {} : { summary: message.summary },
+          at: message.at ?? session.startedAt,
+          node: message
+        });
+      }
+    }
+  }
+  return thoughts;
+}
+async function blame(opts) {
+  const { io } = opts;
+  const { root } = await resolveProjectRoot(opts.dir);
+  const project = await loadProject(root);
+  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
+  if (!project.ok) throw new CliError(project.error);
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === void 0)
+    throw new CliError(`${root} is not inside a git repository; blame needs one`);
+  const { file: file2, line } = parseBlameTarget(opts.target);
+  const absolute = resolve4(root, file2);
+  const path2 = relative4(gitRoot, absolute);
+  if (path2 === "" || path2.startsWith("..") || isAbsolute3(path2))
+    throw new CliError(`${file2} is outside ${gitRoot}`);
+  const exists = await stat8(absolute).then(
+    (info) => info.isFile(),
+    () => false
+  );
+  if (!exists) throw new CliError(`${file2} does not exist`);
+  const repoPath = path2.split(sep4).join("/");
+  let commits;
+  try {
+    commits = await blameCommitHashes(gitRoot, repoPath, line);
+  } catch (err) {
+    throw new CliError(`git could not read ${opts.target}: ${gitMessage(err)}`);
+  }
+  const thoughts = await thoughtsForCommits(root, commits, io.env, io.warn);
+  const mapUrl = pathToFileURL(projectPaths(root).html).href;
+  const hits = thoughts.map((thought) => ({
+    commit: thought.commit.slice(0, 7),
+    sessionId: thought.sessionId,
+    sessionTitle: thought.sessionTitle,
+    messageId: thought.messageId,
+    label: thought.label,
+    title: thought.title,
+    ...thought.summary === void 0 ? {} : { summary: thought.summary },
+    url: `${mapUrl}#s=${encodeURIComponent(thought.sessionId)}&m=${encodeURIComponent(
+      thought.messageId
+    )}`
+  }));
+  for (const hit of hits) {
+    io.out(`${hit.commit}  ${hit.sessionTitle} \xB7 ${hit.label} ${hit.title}`);
+    if (hit.summary !== void 0 && hit.summary.trim() !== "") io.out(`  ${oneLine2(hit.summary)}`);
+    io.out(`  ${hit.url}`);
+  }
+  if (hits.length === 0) {
+    const what = line === void 0 ? file2 : `${file2}:${line}`;
+    io.out(`No recorded message lists a commit that touched ${what}.`);
+  }
+  return hits;
+}
+
+// src/store/changes.ts
+async function readProjectChanges(root, hashes) {
+  const wanted = [...new Set(hashes)];
+  if (wanted.length === 0) return /* @__PURE__ */ new Map();
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === void 0) return /* @__PURE__ */ new Map();
+  const raw = await readCommitChanges(gitRoot, wanted);
+  if (gitRoot === root) return raw;
+  const files = projectFiles(
+    gitRoot,
+    root,
+    new Map([...raw].map(([hash2, change]) => [hash2, change.files]))
+  );
+  const out = /* @__PURE__ */ new Map();
+  for (const [hash2, change] of raw) {
+    out.set(hash2, { ...change, files: files.get(hash2) ?? [] });
+  }
+  return out;
+}
+
+// src/store/events.ts
+import { appendFile as appendFile2, mkdir as mkdir5, readFile as readFile7 } from "fs/promises";
+import { dirname as dirname7 } from "path";
+
+// src/schema/events.ts
+var SessionEvent = external_exports.object({
+  /** When the change was recorded. */
+  at: IsoDate,
+  type: external_exports.enum(["parent", "link", "unlink"]),
+  /** The message the event is about, by its stable id. */
+  msg: Slug,
+  /** The parent for `parent` (null = a new root), the other message for link/unlink. */
+  target: MessageRef.nullable(),
+  /** Who made the change: the agent's record, the side model, or the user. */
+  by: external_exports.enum(["agent", "user", "side"]).default("agent")
+});
+
+// src/store/events.ts
+async function readEvents(root, sessionId) {
+  let text;
+  try {
+    text = await readFile7(projectPaths(root).events(sessionId), "utf8");
+  } catch (err) {
+    const code = err.code;
+    if (code === "ENOENT" || code === "ENOTDIR") return [];
+    throw err;
+  }
+  const events = [];
+  for (const line of text.split("\n")) {
+    if (line.trim() === "") continue;
+    let value;
+    try {
+      value = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const parsed = SessionEvent.safeParse(value);
+    if (parsed.success) events.push(parsed.data);
+  }
+  return events;
+}
+async function appendEvents(root, sessionId, events) {
+  if (events.length === 0) return 0;
+  const file2 = projectPaths(root).events(sessionId);
+  await mkdir5(dirname7(file2), { recursive: true });
+  await appendFile2(file2, `${events.map((event) => JSON.stringify(event)).join("\n")}
+`);
+  return events.length;
+}
+function sideOwnedParents(events, nodes = []) {
+  const owners = /* @__PURE__ */ new Map();
+  for (const event of events) {
+    if (event.type === "parent") owners.set(event.msg, event.by);
+  }
+  const owned = /* @__PURE__ */ new Set();
+  for (const [msg, by] of owners) if (by === "side") owned.add(msg);
+  for (const node2 of nodes)
+    if (node2.kind === "message" && !owners.has(node2.id) && node2.by?.title === "side")
+      owned.add(node2.id);
+  return owned;
+}
+function replayEvents(events) {
+  const structure = /* @__PURE__ */ new Map();
+  const get = (id) => {
+    const found = structure.get(id);
+    if (found) return found;
+    const fresh = { parent: null, links: [] };
+    structure.set(id, fresh);
+    return fresh;
+  };
+  for (const event of events) {
+    const entry = get(event.msg);
+    if (event.type === "parent") {
+      entry.parent = event.target;
+    } else if (event.type === "link") {
+      if (event.target !== null && !entry.links.includes(event.target))
+        entry.links.push(event.target);
+    } else if (event.target !== null) {
+      entry.links = entry.links.filter((link) => link !== event.target);
+    }
+  }
+  return structure;
+}
+function applyEvents(nodes, events) {
+  if (events.length === 0) return nodes;
+  const structure = replayEvents(events);
+  return nodes.map((node2) => {
+    if (node2.kind !== "message") return node2;
+    const entry = structure.get(node2.id);
+    return {
+      ...node2,
+      parent: entry?.parent ?? null,
+      ...entry && entry.links.length > 0 ? { links: entry.links } : { links: void 0 }
+    };
+  });
+}
+function seedEvents(nodes, at) {
+  const events = [];
+  for (const node2 of nodes) {
+    if (node2.kind !== "message") continue;
+    events.push({ at, type: "parent", msg: node2.id, target: node2.parent ?? null, by: "agent" });
+    for (const link of node2.links ?? [])
+      events.push({ at, type: "link", msg: node2.id, target: link, by: "agent" });
+  }
+  return events;
+}
+
+// src/store/read-state.ts
+var READ_STATE_SCHEMA = 1;
+var MESSAGE_ID2 = /^h[0-9a-f]{12}$/;
+var ReadState = external_exports.object({
+  schema: external_exports.literal(READ_STATE_SCHEMA),
+  /** Read message ids (`h` plus 12 hex). */
+  read: external_exports.array(external_exports.string().regex(MESSAGE_ID2)).default([])
+});
+async function readReadState(root) {
+  const read = await readJson(projectPaths(root).readState);
+  if (!read.found || "error" in read) return /* @__PURE__ */ new Set();
+  const parsed = ReadState.safeParse(read.value);
+  return new Set(parsed.success ? parsed.data.read : []);
+}
+async function setMessageRead(root, id, read) {
+  if (!MESSAGE_ID2.test(id)) throw new Error(`not a message id: ${id}`);
+  const p = projectPaths(root);
+  await withLock(
+    p.lock("read-state"),
+    async () => {
+      const ids = await readReadState(root);
+      if (read) ids.add(id);
+      else ids.delete(id);
+      await atomicWriteJson(p.readState, {
+        schema: READ_STATE_SCHEMA,
+        read: [...ids].sort()
+      });
+    },
+    { timeoutMs: 2e3 }
+  );
+}
+
+// src/view/change.ts
+function messageChange(commits, changes) {
+  if (commits === void 0 || commits.length === 0) return void 0;
+  const seen = /* @__PURE__ */ new Set();
+  const files = /* @__PURE__ */ new Set();
+  let added = 0;
+  let removed = 0;
+  for (const hash2 of commits) {
+    const change = changes.get(hash2);
+    if (change === void 0 || seen.has(change.full)) continue;
+    seen.add(change.full);
+    added += change.added;
+    removed += change.removed;
+    for (const file2 of change.files) files.add(file2);
+  }
+  if (seen.size === 0) return void 0;
+  return { added, removed, files: files.size };
+}
+function attachChanges(sessions, changes) {
+  if (changes.size === 0) return sessions.map((session) => session);
+  return sessions.map((session) => {
+    let changed = false;
+    const nodes = session.nodes.map((node2) => {
+      if (node2.kind !== "message") return node2;
+      const change = messageChange(node2.commits, changes);
+      if (change === void 0) {
+        if (node2.change === void 0) return node2;
+        changed = true;
+        const { change: _dropped, ...rest } = node2;
+        return rest;
+      }
+      changed = true;
+      return { ...node2, change };
+    });
+    return changed ? { ...session, nodes } : session;
+  });
+}
+function changeLines(change) {
+  return change.added + change.removed;
+}
+function isBigChange(change, threshold) {
+  return changeLines(change) >= threshold;
+}
+function unreadMessages(sessions, read) {
+  const out = [];
+  for (const session of sessions) {
+    for (const node2 of session.nodes) {
+      if (node2.kind !== "message" || node2.change === void 0) continue;
+      if (read.has(node2.id)) continue;
+      out.push({
+        sessionId: session.sessionId,
+        sessionTitle: session.title,
+        sessionStartedAt: session.startedAt,
+        messageId: node2.id,
+        label: node2.label ?? node2.id,
+        title: node2.title,
+        ...node2.at === void 0 ? {} : { at: node2.at },
+        change: node2.change
+      });
+    }
+  }
+  return out.sort(
+    (a, b) => changeLines(b.change) - changeLines(a.change) || b.change.files - a.change.files || a.title.localeCompare(b.title) || a.messageId.localeCompare(b.messageId)
+  );
+}
+function countBigUnread(sessions, read, threshold) {
+  return unreadMessages(sessions, read).filter((message) => isBigChange(message.change, threshold)).length;
+}
+function grouped(value) {
+  return String(Math.max(0, Math.trunc(value))).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+function formatChange(change) {
+  const files = `${change.files} file${change.files === 1 ? "" : "s"}`;
+  return `+${grouped(change.added)} \u2212${grouped(change.removed)} \xB7 ${files}`;
+}
+
+// src/view/files.ts
+function timeOf(at) {
+  if (at === void 0) return Number.NEGATIVE_INFINITY;
+  const time3 = Date.parse(at);
+  return Number.isNaN(time3) ? Number.NEGATIVE_INFINITY : time3;
+}
+function byNewest(a, b) {
+  return timeOf(b.at) - timeOf(a.at) || a.sessionId.localeCompare(b.sessionId) || a.messageId.localeCompare(b.messageId);
+}
+function buildFileHistory(sessions, commitFiles = /* @__PURE__ */ new Map()) {
+  const byPath = /* @__PURE__ */ new Map();
+  for (const session of sessions) {
+    const sessionTitle2 = session.title.trim() === "" ? session.sessionId : session.title;
+    let branchTitle;
+    for (const message of session.messages) {
+      if (message.branch !== void 0) branchTitle = message.branch.title;
+      const commits = message.commits ?? [];
+      const fromCommits = /* @__PURE__ */ new Map();
+      for (const hash2 of commits) {
+        for (const path2 of commitFiles.get(hash2) ?? []) {
+          const list = fromCommits.get(path2) ?? [];
+          list.push(hash2);
+          fromCommits.set(path2, list);
+        }
+      }
+      const paths = /* @__PURE__ */ new Set([...message.files ?? [], ...fromCommits.keys()]);
+      const unknown2 = commits.filter((hash2) => !commitFiles.has(hash2));
+      for (const path2 of paths) {
+        const touching = [...fromCommits.get(path2) ?? [], ...unknown2];
+        const hit = {
+          sessionId: session.sessionId,
+          sessionTitle: sessionTitle2,
+          messageId: message.id,
+          label: message.label ?? message.id,
+          ...message.at === void 0 ? {} : { at: message.at },
+          title: message.title,
+          ...branchTitle === void 0 ? {} : { branch: branchTitle },
+          commits: [...new Set(touching)]
+        };
+        const list = byPath.get(path2) ?? [];
+        list.push(hit);
+        byPath.set(path2, list);
+      }
+    }
+  }
+  const files = [...byPath].map(([path2, hits]) => {
+    hits.sort(byNewest);
+    const newest = hits[0];
+    return {
+      path: path2,
+      hits,
+      count: hits.length,
+      ...newest?.at === void 0 ? {} : { lastAt: newest.at }
+    };
+  });
+  return files.sort((a, b) => timeOf(b.lastAt) - timeOf(a.lastAt) || a.path.localeCompare(b.path));
+}
+function modelSessions(model) {
+  return model.sessions;
+}
+
+// src/commands/log.ts
+async function loadEffectiveSessions(root, io) {
+  const sessions = await loadAllSessions(root, io.warn);
+  const trailers = await readThoughtTrailers(root, {
+    env: io.env,
+    since: earliestSessionStart(sessions)
+  });
+  const loaded = [];
+  for (const session of sessions) {
+    const turns = await readSessionMessages(root, session.sessionId, io.env);
+    const upgraded = turns ? upgradeSessionIds(session, turns) : session;
+    const events = await readEvents(root, session.sessionId);
+    const effective = { ...upgraded, nodes: applyEvents(upgraded.nodes, events) };
+    loaded.push({ session: effective, messages: buildMessages(effective.nodes), turns });
+  }
+  const withThoughts = attachThoughtTrailers(
+    loaded.map((entry) => entry.session),
+    trailers
+  );
+  const out = loaded.map((entry, index) => {
+    const session = withThoughts[index];
+    return session === entry.session ? entry : { ...entry, session, messages: buildMessages(session.nodes) };
+  });
+  return out.sort(
+    (a, b) => a.session.startedAt.localeCompare(b.session.startedAt) || a.session.sessionId.localeCompare(b.session.sessionId)
+  );
+}
+async function openProject(dir) {
+  const { root } = await resolveProjectRoot(dir);
+  const project = await loadProject(root);
+  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
+  if (!project.ok) throw new CliError(project.error);
+  return root;
+}
+var pad = (value) => String(value).padStart(2, "0");
+function stamp(iso) {
+  if (iso === void 0) return "\u2014";
+  const date5 = new Date(iso);
+  if (Number.isNaN(date5.getTime())) return iso;
+  return `${date5.getFullYear()}-${pad(date5.getMonth() + 1)}-${pad(date5.getDate())} ${pad(date5.getHours())}:${pad(date5.getMinutes())}`;
+}
+function clock(iso) {
+  if (iso === void 0) return "\u2014";
+  const date5 = new Date(iso);
+  if (Number.isNaN(date5.getTime())) return iso;
+  return `${pad(date5.getHours())}:${pad(date5.getMinutes())}`;
+}
+function shortHash(id) {
+  return /^h[0-9a-f]{12}$/.test(id) ? id.slice(0, 8) : id;
+}
+function oneLine3(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
+function branchesOf(sessionId, messages) {
+  const starts = messages.flatMap(
+    (message, index) => message.branch === void 0 ? [] : [{ index, branch: message.branch }]
+  );
+  return starts.map(({ index, branch }, position) => {
+    const end = (starts[position + 1]?.index ?? messages.length) - 1;
+    const first = messages[index];
+    const last = messages[end];
+    return {
+      sessionId,
+      title: branch.title,
+      asked: branch.asked,
+      outcome: branch.outcome,
+      open: branch.open,
+      start: { id: first.id, label: first.label ?? first.id },
+      end: { id: last.id, label: last.label ?? last.id },
+      count: end - index + 1
+    };
+  });
+}
+function toLogSession(effective) {
+  const { session, messages } = effective;
+  const labels = new Map(messages.map((message) => [message.id, message.label ?? message.id]));
+  const logMessages = [...messages].reverse().map((message) => {
+    const parentLabel = typeof message.parent === "string" ? labels.get(message.parent) : void 0;
+    return {
+      id: message.id,
+      label: message.label ?? message.id,
+      ...message.at === void 0 ? {} : { at: message.at },
+      title: message.title,
+      ...message.summary === void 0 ? {} : { summary: message.summary },
+      parent: message.parent ?? null,
+      ...parentLabel === void 0 ? {} : { parentLabel },
+      links: message.links ?? [],
+      linkLabels: (message.links ?? []).map((link) => labels.get(link) ?? link),
+      ...message.branch === void 0 ? {} : { branch: message.branch },
+      commits: message.commits ?? []
+    };
+  });
+  return {
+    sessionId: session.sessionId,
+    title: session.title,
+    ...session.author === void 0 ? {} : { author: session.author },
+    startedAt: session.startedAt,
+    updatedAt: session.updatedAt,
+    messages: logMessages,
+    branches: branchesOf(session.sessionId, messages)
+  };
+}
+function selectSessions(sessions, prefix) {
+  const exact = sessions.filter((entry) => entry.session.sessionId === prefix);
+  const matches2 = exact.length > 0 ? exact : sessions.filter((entry) => entry.session.sessionId.startsWith(prefix));
+  if (matches2.length === 0) throw new CliError(`no session matches ${prefix}`);
+  if (matches2.length > 1) {
+    const ids = matches2.map((entry) => entry.session.sessionId).join(", ");
+    throw new CliError(`"${prefix}" matches ${matches2.length} sessions: ${ids}`);
+  }
+  return matches2;
+}
+function buildLog(sessions, opts = {}) {
+  const selected = opts.session === void 0 ? sessions : selectSessions(sessions, opts.session);
+  const ordered = [...selected].sort(
+    (a, b) => b.session.startedAt.localeCompare(a.session.startedAt) || a.session.sessionId.localeCompare(b.session.sessionId)
+  );
+  const model = { sessions: ordered.map(toLogSession) };
+  if (opts.limit !== void 0 && opts.limit > 0) {
+    let left = opts.limit;
+    model.sessions = model.sessions.flatMap((session) => {
+      if (left === 0) return [];
+      if (opts.branchesOnly === true) {
+        const branches = session.branches.slice(0, left);
+        left -= branches.length;
+        return branches.length === 0 ? [] : [{ ...session, messages: [], branches }];
+      }
+      const messages = session.messages.slice(0, left);
+      left -= messages.length;
+      return messages.length === 0 ? [] : [{ ...session, messages }];
+    });
+  }
+  if (opts.branchesOnly === true) {
+    model.sessions = model.sessions.map((session) => ({ ...session, messages: [] }));
+  }
+  return model;
+}
+function sessionHeading(session) {
+  const title = session.title.trim() === "" ? session.sessionId : oneLine3(session.title);
+  const author = session.author === void 0 ? "" : ` \xB7 by ${session.author}`;
+  return `## ${title} (${session.sessionId})${author} \xB7 ${stamp(session.startedAt)} \u2192 ${stamp(session.updatedAt)}`;
+}
+function branchLines(branch) {
+  const count = `${branch.count} message${branch.count === 1 ? "" : "s"}`;
+  return [
+    `  \u256D ${branch.title}  ${branch.start.label}\u2013${branch.end.label}, ${count}`,
+    `    asked: ${branch.asked}`,
+    `    outcome: ${branch.outcome}`,
+    `    open: ${branch.open === "" ? "\u2014" : branch.open}`
+  ];
+}
+function messageLine(message) {
+  const parts = [
+    `  ${shortHash(message.id)}  ${message.label}  ${clock(message.at)}  ${message.branch === void 0 ? "" : `\u256D ${message.branch.title} \xB7 `}${oneLine3(message.title)}`
+  ];
+  if (message.linkLabels.length > 0) parts.push(`  \u21A9 ${message.linkLabels.join(", ")}`);
+  if (message.commits.length > 0)
+    parts.push(`  [${message.commits.map((hash2) => hash2.slice(0, 7)).join(" ")}]`);
+  return parts.join("");
+}
+function formatLog(model, branchesOnly = false) {
+  if (model.sessions.length === 0) return ["No recorded sessions yet."];
+  const lines = [];
+  for (const session of model.sessions) {
+    lines.push(sessionHeading(session));
+    if (branchesOnly) {
+      if (session.branches.length === 0) lines.push("  (no branch summaries)");
+      for (const branch of session.branches) lines.push(...branchLines(branch));
+    } else if (session.messages.length === 0) {
+      lines.push("  (no recorded messages)");
+    } else {
+      for (const message of session.messages) lines.push(messageLine(message));
+    }
+    lines.push("");
+  }
+  lines.pop();
+  return lines;
+}
+var HASH_REF = /^h[0-9a-f]{6,12}$/;
+var SESSION_LABEL_REF = /^([A-Za-z0-9][A-Za-z0-9_.-]{0,127}):m([1-9][0-9]*)$/;
+var COMMIT_REF = /^[0-9a-f]{7,40}$/;
+function sameCommit3(recorded, commit) {
+  return commit.startsWith(recorded) || recorded.startsWith(commit);
+}
+function resolveRef2(sessions, ref) {
+  if (HASH_REF.test(ref)) {
+    const hits = sessions.flatMap(
+      (entry2) => entry2.messages.filter((message2) => message2.id.startsWith(ref)).map((message2) => ({ entry: entry2, message: message2 }))
+    );
+    if (hits.length === 0) return { kind: "unknown", reason: `no recorded message matches ${ref}` };
+    if (hits.length > 1) {
+      return {
+        kind: "ambiguous",
+        candidates: hits.map(({ entry: entry2, message: message2 }) => ({
+          sessionId: entry2.session.sessionId,
+          id: message2.id,
+          label: message2.label ?? message2.id,
+          title: message2.title
+        }))
+      };
+    }
+    const hit = hits[0];
+    return {
+      kind: "ok",
+      hit: { session: hit.entry.session, messages: hit.entry.messages, message: hit.message }
+    };
+  }
+  if (COMMIT_REF.test(ref)) {
+    const hits = sessions.flatMap(
+      (entry2) => entry2.messages.filter((message2) => (message2.commits ?? []).some((hash2) => sameCommit3(hash2, ref))).map((message2) => ({ entry: entry2, message: message2 }))
+    );
+    if (hits.length === 0)
+      return { kind: "unknown", reason: `no recorded thought for commit ${ref}` };
+    if (hits.length > 1) {
+      return {
+        kind: "ambiguous",
+        candidates: hits.map(({ entry: entry2, message: message2 }) => ({
+          sessionId: entry2.session.sessionId,
+          id: message2.id,
+          label: message2.label ?? message2.id,
+          title: message2.title
+        }))
+      };
+    }
+    const hit = hits[0];
+    return {
+      kind: "ok",
+      hit: { session: hit.entry.session, messages: hit.entry.messages, message: hit.message }
+    };
+  }
+  const sessionLabel = SESSION_LABEL_REF.exec(ref);
+  if (sessionLabel === null)
+    return {
+      kind: "invalid",
+      reason: "use a message hash (h + 6..12 hex), <session-id-prefix>:mN, or a commit hash (7..40 hex)"
+    };
+  const prefix = sessionLabel[1];
+  const label = `m${sessionLabel[2]}`;
+  const exact = sessions.filter((entry2) => entry2.session.sessionId === prefix);
+  const matches2 = exact.length > 0 ? exact : sessions.filter((entry2) => entry2.session.sessionId.startsWith(prefix));
+  if (matches2.length === 0) return { kind: "unknown", reason: `no session matches ${prefix}` };
+  if (matches2.length > 1) {
+    return {
+      kind: "ambiguous",
+      candidates: matches2.map((entry2) => ({
+        sessionId: entry2.session.sessionId,
+        id: entry2.session.sessionId,
+        label: entry2.session.sessionId,
+        title: entry2.session.title
+      }))
+    };
+  }
+  const entry = matches2[0];
+  const message = entry.messages.find((candidate) => candidate.label === label);
+  if (message === void 0)
+    return {
+      kind: "unknown",
+      reason: `session ${entry.session.sessionId} has no recorded message ${label}`
+    };
+  return { kind: "ok", hit: { session: entry.session, messages: entry.messages, message } };
+}
+function refOf(sessions, ref, self) {
+  const colon = ref.indexOf(":");
+  const sessionId = colon === -1 ? self : ref.slice(0, colon);
+  const id = colon === -1 ? ref : ref.slice(colon + 1);
+  const entry = sessions.find((candidate) => candidate.session.sessionId === sessionId);
+  const message = entry?.messages.find((candidate) => candidate.id === id);
+  return {
+    sessionId,
+    id,
+    ...message?.label === void 0 ? {} : { label: message.label },
+    ...message?.title === void 0 ? {} : { title: message.title }
+  };
+}
+function branchAround(sessionId, messages, id) {
+  let start = null;
+  for (const message of messages) {
+    if (message.branch !== void 0) start = message;
+    if (message.id === id) break;
+  }
+  if (start === null) return null;
+  const branches = branchesOf(sessionId, messages);
+  return branches.find((branch) => branch.start.id === start?.id) ?? null;
+}
+function conversationTurn(messages, message) {
+  const turn = messages?.find(
+    (candidate) => candidate.hash === message.id || candidate.label === message.label
+  );
+  if (turn === void 0) return null;
+  return { text: turn.text, replies: turn.replies, tools: turn.tools };
+}
+async function show(opts) {
+  const root = await openProject(opts.dir);
+  const sessions = await loadEffectiveSessions(root, opts.io);
+  const result = resolveRef2(sessions, opts.ref);
+  if (result.kind === "invalid") throw new CliError(`invalid ref "${opts.ref}": ${result.reason}`);
+  if (result.kind === "unknown") {
+    const thought = COMMIT_REF.test(opts.ref) ? await readCommitThought(root, opts.ref, opts.io.env) : void 0;
+    if (thought !== void 0)
+      throw new CliError(
+        `commit ${opts.ref} comes from thought ${thought}, which is not recorded yet; it appears after the next record update`
+      );
+    throw new CliError(result.reason);
+  }
+  if (result.kind === "ambiguous") {
+    for (const candidate of result.candidates) {
+      opts.io.out(
+        `  ${candidate.sessionId} \xB7 ${candidate.label}${candidate.id === candidate.label ? "" : ` (${candidate.id})`}  ${candidate.title}`
+      );
+    }
+    throw new CliError(`"${opts.ref}" is ambiguous; use a longer prefix`);
+  }
+  const { session, messages, message } = result.hit;
+  const sessionId = session.sessionId;
+  const children = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const entry of sessions) {
+    for (const candidate of entry.messages) {
+      const parent = candidate.parent;
+      const child = entry.session.sessionId === sessionId && parent === message.id || parent === `${sessionId}:${message.id}`;
+      if (!child) continue;
+      const key = `${entry.session.sessionId}:${candidate.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const ref = refOf(sessions, key, entry.session.sessionId);
+      children.push(ref);
+    }
+  }
+  const subjects = message.commits === void 0 || message.commits.length === 0 ? /* @__PURE__ */ new Map() : await readCommitSubjects(root, message.commits);
+  const branch = branchAround(sessionId, messages, message.id);
+  const turn = opts.chat === false ? null : await readSessionMessages(root, sessionId, opts.io.env);
+  return {
+    id: message.id,
+    label: message.label ?? message.id,
+    title: message.title,
+    ...message.summary === void 0 ? {} : { summary: message.summary },
+    sessionId,
+    sessionTitle: session.title,
+    ...message.at === void 0 ? {} : { at: message.at },
+    parent: message.parent === null || message.parent === void 0 ? null : refOf(sessions, message.parent, sessionId),
+    children,
+    links: (message.links ?? []).map((link) => refOf(sessions, link, sessionId)),
+    branch: branch === null ? null : { ...branch, sessionId },
+    ...message.decidedBy === void 0 ? {} : { decidedBy: message.decidedBy },
+    ...message.why === void 0 ? {} : { why: message.why },
+    ...message.alternatives === void 0 ? {} : { alternatives: message.alternatives },
+    ...message.agentDecisions === void 0 ? {} : { agentDecisions: message.agentDecisions },
+    ...message.work === void 0 ? {} : { work: message.work },
+    commits: (message.commits ?? []).map((hash2) => {
+      const subject = subjects.get(hash2);
+      return subject === void 0 ? { hash: hash2 } : { hash: hash2, subject };
+    }),
+    ...message.files === void 0 ? {} : { files: message.files },
+    ...opts.chat === false ? {} : { chat: conversationTurn(turn, message) }
+  };
+}
+function refText(ref, selfSessionId) {
+  const label = ref.label === void 0 ? ref.id : `${ref.label} ${shortHash(ref.id)}`;
+  return selfSessionId !== void 0 && ref.sessionId === selfSessionId ? label : `${ref.sessionId}:${label}`;
+}
+function formatShow(model) {
+  const title = oneLine3(model.sessionTitle) || model.sessionId;
+  const lines = [
+    `${model.id}  ${model.label}  ${model.title}`,
+    `Session: ${title} (${model.sessionId}) \xB7 ${stamp(model.at)}`
+  ];
+  if (model.parent !== null) lines.push(`Parent: ${refText(model.parent, model.sessionId)}`);
+  if (model.children.length > 0)
+    lines.push(
+      `Children: ${model.children.map((ref) => refText(ref, model.sessionId)).join(", ")}`
+    );
+  if (model.links.length > 0)
+    lines.push(`Returns to: ${model.links.map((ref) => refText(ref, model.sessionId)).join(", ")}`);
+  if (model.branch !== null) {
+    const count = `${model.branch.count} message${model.branch.count === 1 ? "" : "s"}`;
+    lines.push(
+      `Branch: ${model.branch.title} (${model.branch.start.label}\u2013${model.branch.end.label}, ${count})`
+    );
+    lines.push(`  asked: ${model.branch.asked}`);
+    lines.push(`  outcome: ${model.branch.outcome}`);
+    lines.push(`  open: ${model.branch.open === "" ? "\u2014" : model.branch.open}`);
+  }
+  if (model.decidedBy !== void 0) lines.push(`Decided by: ${model.decidedBy}`);
+  if (model.why !== void 0) lines.push(`Why: ${model.why}`);
+  if (model.alternatives !== void 0 && model.alternatives.length > 0) {
+    lines.push("Considered and rejected:");
+    for (const alt of model.alternatives)
+      lines.push(`  - ${alt.option}${alt.why === "" ? "" : ` \u2014 ${alt.why}`}`);
+  }
+  if (model.agentDecisions !== void 0 && model.agentDecisions.length > 0) {
+    lines.push("Agent decisions:");
+    for (const decision of model.agentDecisions) {
+      lines.push(`  - ${decision.title}${decision.why === "" ? "" : ` \u2014 ${decision.why}`}`);
+      for (const alt of decision.alternatives ?? [])
+        lines.push(`    not: ${alt.option}${alt.why === "" ? "" : ` \u2014 ${alt.why}`}`);
+    }
+  }
+  if (model.work !== void 0 && model.work.length > 0) {
+    lines.push("What the agent did:");
+    for (const item of model.work) lines.push(`  - ${item}`);
+  }
+  if (model.commits.length > 0) {
+    lines.push("Commits:");
+    for (const commit of model.commits)
+      lines.push(
+        `  ${commit.hash}${commit.subject === void 0 ? " (not in this repository)" : ` ${commit.subject}`}`
+      );
+  }
+  if (model.files !== void 0 && model.files.length > 0) {
+    lines.push("Files:");
+    for (const file2 of model.files) lines.push(`  ${file2}`);
+  }
+  if (model.chat === null) {
+    lines.push("Conversation: not available (the transcript is gone and nothing was stored)");
+  } else if (model.chat !== void 0) {
+    lines.push("Conversation:");
+    lines.push(`  User: ${model.chat.text}`);
+    for (const reply of model.chat.replies) lines.push(`  Agent: ${reply}`);
+    const { commands, files, other } = model.chat.tools;
+    const fileText = files.length === 0 ? "" : `, ${files.length} file${files.length === 1 ? "" : "s"}`;
+    lines.push(
+      `  Tools: ${commands} command${commands === 1 ? "" : "s"}${fileText}, ${other} other`
+    );
+  }
+  return lines;
+}
+async function log(opts) {
+  const root = await openProject(opts.dir);
+  const sessions = await loadEffectiveSessions(root, opts.io);
+  const model = buildLog(sessions, opts);
+  if (opts.json === true) {
+    opts.io.out(JSON.stringify(model, null, 2));
+    return model;
+  }
+  for (const line of formatLog(model, opts.branchesOnly === true)) opts.io.out(line);
+  return model;
+}
+async function logUnread(opts) {
+  const root = await openProject(opts.dir);
+  const sessions = await loadEffectiveSessions(root, opts.io);
+  const hashes = new Set(
+    sessions.flatMap((entry) => entry.messages.flatMap((message) => message.commits ?? []))
+  );
+  const changes = hashes.size === 0 ? /* @__PURE__ */ new Map() : await readProjectChanges(root, hashes);
+  const read = await readReadState(root);
+  const unread = unreadMessages(
+    sessions.map(({ session, messages }) => ({
+      sessionId: session.sessionId,
+      title: session.title,
+      startedAt: session.startedAt,
+      nodes: messages.map((message) => ({
+        ...message,
+        change: messageChange(message.commits, changes)
+      }))
+    })),
+    read
+  );
+  if (opts.json === true) {
+    opts.io.out(JSON.stringify(unread, null, 2));
+    return unread;
+  }
+  for (const line of formatUnread(unread)) opts.io.out(line);
+  return unread;
+}
+function formatUnread(messages) {
+  if (messages.length === 0) return ["No unread messages with linked commits."];
+  return messages.map((message) => {
+    const parts = [
+      `  ${shortHash(message.messageId)}  ${message.label}  ${clock(message.at)}  ${formatChange(message.change)}  ${oneLine3(message.title)}`
+    ];
+    parts.push(`  \xB7 ${oneLine3(message.sessionTitle)}`);
+    return parts.join("");
+  });
+}
+function normalizeFilePath(file2) {
+  return file2.replace(/\\/g, "/").replace(/^(\.\/)+/, "").replace(/\/+$/, "");
+}
+function formatFileHistory(file2) {
+  const count = `${file2.count} message${file2.count === 1 ? "" : "s"}`;
+  const lines = [`${file2.path}  ${count}  (newest first)`];
+  for (const hit of file2.hits) {
+    const parts = [
+      `  ${stamp(hit.at)}  ${shortHash(hit.messageId)}  ${hit.label}  ${oneLine3(hit.title)}`
+    ];
+    parts.push(`  \xB7 ${oneLine3(hit.sessionTitle)}`);
+    if (hit.branch !== void 0) parts.push(` \u256D ${oneLine3(hit.branch)}`);
+    if (hit.commits.length > 0)
+      parts.push(`  [${hit.commits.map((hash2) => hash2.slice(0, 7)).join(" ")}]`);
+    lines.push(parts.join(""));
+  }
+  return lines;
+}
+async function logFile(opts) {
+  const root = await openProject(opts.dir);
+  const sessions = await loadEffectiveSessions(root, opts.io);
+  const hashes = new Set(
+    sessions.flatMap((entry) => entry.messages.flatMap((message) => message.commits ?? []))
+  );
+  let commitFiles = /* @__PURE__ */ new Map();
+  if (hashes.size > 0) {
+    const gitRoot = await findGitRoot(root);
+    if (gitRoot !== void 0)
+      commitFiles = projectFiles(gitRoot, root, await readCommitFiles(gitRoot, hashes));
+  }
+  const sources = sessions.map(({ session, messages }) => ({
+    sessionId: session.sessionId,
+    title: session.title,
+    messages
+  }));
+  const wanted = normalizeFilePath(opts.file);
+  const found = buildFileHistory(sources, commitFiles).find((file2) => file2.path === wanted);
+  if (found === void 0) {
+    opts.io.out(`No recorded message touched ${opts.file}.`);
+    return null;
+  }
+  if (opts.json === true) {
+    opts.io.out(JSON.stringify(found, null, 2));
+    return found;
+  }
+  for (const line of formatFileHistory(found)) opts.io.out(line);
+  return found;
+}
+
+// src/commands/why.ts
+var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function dayStamp(iso) {
+  const date5 = new Date(iso);
+  if (Number.isNaN(date5.getTime())) return iso;
+  return `${date5.getDate()} ${MONTHS[date5.getMonth()]}`;
+}
+function oneLine4(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
+function repositoryPath(gitRoot, root, file2) {
+  const rel = relative5(gitRoot, resolve5(root, file2));
+  if (rel === "" || rel.startsWith("..") || isAbsolute4(rel)) return void 0;
+  return rel.split(sep5).join("/");
+}
+function decisionsOf(message) {
+  const decisions = [];
+  const alternatives = message.alternatives ?? [];
+  if (alternatives.length > 0 || (message.why ?? "").trim() !== "") {
+    decisions.push({ title: message.title, why: message.why ?? "", alternatives });
+  }
+  for (const decision of message.agentDecisions ?? []) {
+    decisions.push({
+      title: decision.title,
+      why: decision.why,
+      alternatives: decision.alternatives ?? []
+    });
+  }
+  return decisions;
+}
+async function collectWhy(root, file2, env) {
+  return collect(root, file2, void 0, env, false);
+}
+async function collectWhyLine(root, file2, line, env) {
+  return collect(root, file2, line, env, true);
+}
+async function collect(root, file2, line, env, strict) {
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === void 0) return [];
+  const repoPath = repositoryPath(gitRoot, root, file2);
+  if (repoPath === void 0) return [];
+  let commits;
+  try {
+    commits = await blameCommitHashes(gitRoot, repoPath, line);
+  } catch (err) {
+    if (strict) throw err;
+    return [];
+  }
+  if (commits.length === 0) return [];
+  return hitsFromThoughts(await thoughtsForCommits(root, commits, env));
+}
+function hitsFromThoughts(thoughts) {
+  const hits = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const thought of thoughts) {
+    const decisions = decisionsOf(thought.node);
+    if (decisions.length === 0) continue;
+    const key = `${thought.sessionId}:${thought.messageId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    hits.push({
+      sessionId: thought.sessionId,
+      sessionTitle: thought.sessionTitle,
+      messageId: thought.messageId,
+      label: thought.label,
+      at: thought.at,
+      title: thought.title,
+      decisions
+    });
+  }
+  const time3 = (hit) => {
+    const parsed = Date.parse(hit.at);
+    return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
+  };
+  return hits.sort(
+    (a, b) => time3(b) - time3(a) || a.sessionId.localeCompare(b.sessionId) || a.messageId.localeCompare(b.messageId)
+  );
+}
+function formatWhy(hits) {
+  const lines = [];
+  for (const hit of hits) {
+    if (lines.length > 0) lines.push("");
+    lines.push(
+      `${shortHash(hit.messageId)}  ${hit.label}  ${stamp(hit.at)} \xB7 ${oneLine4(hit.title)}`
+    );
+    lines.push(`  ${oneLine4(hit.sessionTitle)} (${hit.sessionId})`);
+    for (const decision of hit.decisions) {
+      const why2 = oneLine4(decision.why);
+      lines.push(`  decision: ${oneLine4(decision.title)}${why2 === "" ? "" : ` \u2014 ${why2}`}`);
+      for (const alt of decision.alternatives) {
+        const reason = oneLine4(alt.why);
+        lines.push(`    not: ${oneLine4(alt.option)}${reason === "" ? "" : ` \u2014 ${reason}`}`);
+      }
+    }
+  }
+  return lines;
+}
+async function nearestProjectDir(start) {
+  for (let dir = resolve5(start); ; dir = dirname8(dir)) {
+    if (existsSync4(projectPaths(dir).project) || existsSync4(join10(dir, ".git"))) return dir;
+    if (dirname8(dir) === dir) return void 0;
+  }
+}
+async function why(opts) {
+  const { io } = opts;
+  if (opts.line !== void 0 && (!Number.isInteger(opts.line) || opts.line < 1))
+    throw new CliError("--line needs a positive line number");
+  let start = opts.dir ?? ".";
+  let target = opts.file;
+  if (opts.cwd !== void 0) {
+    start = await nearestProjectDir(opts.cwd) ?? opts.cwd;
+    target = relative5(start, resolve5(opts.cwd, opts.file));
+  }
+  const parsed = parseBlameTarget(target);
+  const file2 = parsed.file;
+  const line = opts.line ?? parsed.line;
+  const { root } = await resolveProjectRoot(start);
+  const project = await loadProject(root);
+  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
+  if (!project.ok) throw new CliError(project.error);
+  if (await findGitRoot(root) === void 0)
+    throw new CliError(`${root} is not inside a git repository; why needs one`);
+  const exists = await stat9(resolve5(root, file2)).then(
+    (info) => info.isFile(),
+    () => false
+  );
+  if (!exists) throw new CliError(`${opts.file} does not exist`);
+  if (line !== void 0) {
+    let lineHits;
+    try {
+      lineHits = await collectWhyLine(root, file2, line, io.env);
+    } catch (err) {
+      throw new CliError(`git could not read ${opts.file}: ${gitMessage(err)}`);
+    }
+    if (lineHits.length > 0) {
+      printHits(io, lineHits);
+      return lineHits;
+    }
+    const fileHits = await collectWhy(root, file2, io.env);
+    if (fileHits.length === 0) {
+      io.out(`No decisions or rejected alternatives recorded for ${file2}.`);
+      return fileHits;
+    }
+    io.out(`No thought recorded for ${file2}:${line}.`);
+    io.out("");
+    io.out("Thoughts behind the rest of the file:");
+    io.out("");
+    printHits(io, fileHits);
+    return fileHits;
+  }
+  const hits = await collectWhy(root, file2, io.env);
+  if (hits.length === 0) {
+    io.out(`No decisions or rejected alternatives recorded for ${file2}.`);
+    return hits;
+  }
+  printHits(io, hits);
+  return hits;
+}
+function printHits(io, hits) {
+  for (const line of formatWhy(hits)) io.out(line);
+  io.out("");
+  io.out("`cogit show <hash>` opens the thought; the record is the agent's summary.");
+}
+var TRY_BEFORE_MAX_ITEMS = 5;
+var TRY_BEFORE_MAX_CHARS = 600;
+function rejectedItems(hits) {
+  const items = [];
+  for (const hit of hits) {
+    for (const decision of hit.decisions) {
+      for (const alt of decision.alternatives) {
+        items.push({ ...alt, messageId: hit.messageId, at: hit.at });
+      }
+    }
+  }
+  return items;
+}
+function tryBeforeNote(file2, hits) {
+  const items = rejectedItems(hits);
+  if (items.length === 0) return void 0;
+  const header = "Earlier, for this file:";
+  const footer = "Decide knowingly.";
+  const more = `See \`cogit why ${file2}\` for more.`;
+  const lines = [];
+  for (const item of items.slice(0, TRY_BEFORE_MAX_ITEMS)) {
+    const reason = oneLine4(item.why) === "" ? "no reason recorded" : oneLine4(item.why);
+    const line = `- "${oneLine4(item.option)}" was considered and rejected (${shortHash(item.messageId)}, ${dayStamp(item.at)}): ${reason}`;
+    const truncated2 = lines.length + 1 < items.length;
+    const total = [header, ...lines, line, footer, ...truncated2 ? [more] : []].join("\n");
+    if (total.length <= TRY_BEFORE_MAX_CHARS) {
+      lines.push(line);
+      continue;
+    }
+    break;
+  }
+  if (lines.length === 0) {
+    const first = items[0];
+    if (first === void 0) return void 0;
+    const reason = oneLine4(first.why) === "" ? "no reason recorded" : oneLine4(first.why);
+    const full = `- "${oneLine4(first.option)}" was considered and rejected (${shortHash(first.messageId)}, ${dayStamp(first.at)}): ${reason}`;
+    const tail = [footer, ...items.length > 1 ? [more] : []].join("\n");
+    const room = TRY_BEFORE_MAX_CHARS - header.length - tail.length - 3;
+    if (room < 40) return void 0;
+    lines.push(full.length <= room ? full : `${full.slice(0, room - 1).trimEnd()}\u2026`);
+  }
+  const truncated = lines.length < items.length;
+  return [header, ...lines, footer, ...truncated ? [more] : []].join("\n");
+}
+
+// src/hooks/pretooluse.ts
+var WRITE_TOOLS = /* @__PURE__ */ new Set(["Edit", "Write", "MultiEdit"]);
+async function onPreToolUse(ctx) {
+  const tool = ctx.input.tool_name;
+  if (tool === void 0 || !WRITE_TOOLS.has(tool)) return void 0;
+  const filePath = ctx.input.tool_input?.file_path;
+  if (typeof filePath !== "string" || filePath.trim() === "") return void 0;
+  const config2 = await loadConfig(ctx.env);
+  if (!config2.tryBeforeNotes) return void 0;
+  const absolute = isAbsolute5(filePath) ? filePath : resolve6(ctx.input.cwd ?? ctx.root, filePath);
+  const rel = relative6(ctx.root, absolute);
+  if (rel === "" || rel.startsWith("..") || isAbsolute5(rel)) return void 0;
+  const key = rel.split(sep6).join("/");
+  let firstLook = false;
+  await updateState(
+    ctx.root,
+    ctx.sessionId,
+    (cur) => {
+      const noted = cur?.notedFiles ?? [];
+      if (noted.includes(key)) return cur ?? emptyState();
+      firstLook = true;
+      return { ...cur ?? emptyState(), notedFiles: [...noted, key].sort() };
+    },
+    { timeoutMs: 1500 }
+  );
+  if (!firstLook) return void 0;
+  const hits = await collectWhy(ctx.root, key, ctx.env);
+  const note = tryBeforeNote(key, hits);
+  return note === void 0 ? void 0 : ctx.agent.additionalContext("PreToolUse", note);
+}
+function emptyState() {
+  return {
+    schema: STATE_SCHEMA,
+    turns: 0,
+    turnsSinceUpdate: 0,
+    recordUpdatedAt: null,
+    turnsSinceSide: 0,
+    notedFiles: []
+  };
+}
+
+// src/hooks/promptsubmit.ts
+async function onPromptSubmit(ctx) {
+  if (!ctx.initialized) return void 0;
+  await atomicWriteJson(projectPaths(ctx.root).head, {
+    sessionId: ctx.sessionId,
+    ...ctx.input.transcript_path === void 0 ? {} : { transcriptPath: ctx.input.transcript_path },
+    at: ctx.now
+  });
+  await updateState(
+    ctx.root,
+    ctx.sessionId,
+    (cur) => cur ?? HookState.parse({ schema: STATE_SCHEMA }),
+    {
+      timeoutMs: 1500
+    }
+  );
+  await refreshGitHooks(ctx.root).catch(() => void 0);
+  return void 0;
+}
+
+// src/hooks/sessionend.ts
+async function onSessionEnd(ctx) {
+  if (!ctx.initialized) return void 0;
+  const config2 = await loadConfig(ctx.env);
+  const commitOnly = () => {
+    if (config2.recordCommit === "auto")
+      ctx.spawnDetached(["record-commit", ctx.sessionId, "-C", ctx.root]);
+  };
+  if (!config2.sessionEndCatchUp) {
+    commitOnly();
+    return void 0;
+  }
+  const messages = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
+  if (!messages || messages.length === 0) {
+    commitOnly();
+    return void 0;
+  }
+  ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "--close", "-C", ctx.root]);
+  return void 0;
+}
+
+// package.json
+var package_default = {
+  name: "@cogit/cli",
+  version: "0.25.0",
+  description: "Git remembers what changed. cogit remembers why.",
+  license: "MIT",
+  keywords: [
+    "git",
+    "ai",
+    "coding-agent",
+    "claude-code",
+    "history",
+    "lineage",
+    "commit",
+    "context"
+  ],
+  repository: {
+    type: "git",
+    url: "git+https://github.com/erensrtky/cogit.git"
+  },
+  homepage: "https://github.com/erensrtky/cogit#readme",
+  bugs: {
+    url: "https://github.com/erensrtky/cogit/issues"
+  },
+  type: "module",
+  bin: {
+    cogit: "dist/cli.js"
+  },
+  files: [
+    "dist",
+    ".claude-plugin",
+    "skills",
+    "hooks"
+  ],
+  publishConfig: {
+    access: "public"
+  },
+  engines: {
+    node: ">=22.13.0"
+  },
+  scripts: {
+    prebuild: "node ../../scripts/sync-version.mjs",
+    build: "tsup",
+    prepack: "npm --prefix ../.. run build && node ../../scripts/copy-docs.mjs"
+  },
+  devDependencies: {
+    "@inquirer/prompts": "^8.7.4",
+    commander: "^15.0.0",
+    mermaid: "^11.17.2",
+    tsup: "^9.0.0",
+    zod: "^4.6.7"
+  }
+};
+
+// src/cli-version.ts
+import { readFile as readFile8, realpath, stat as stat10 } from "fs/promises";
+import { delimiter, dirname as dirname9, join as join11 } from "path";
+var PACKAGE = "@cogit/cli";
+async function installedCliVersion(env) {
+  for (const dir of (env.PATH ?? "").split(delimiter)) {
+    if (dir === "") continue;
+    const bin = join11(dir, "cogit");
+    try {
+      if (!(await stat10(bin)).isFile()) continue;
+      const pkg = JSON.parse(
+        await readFile8(join11(dirname9(dirname9(await realpath(bin))), "package.json"), "utf8")
+      );
+      if (pkg.name === PACKAGE && typeof pkg.version === "string") return pkg.version;
+      return void 0;
+    } catch {
+    }
+  }
+  return void 0;
+}
+function compareVersions(a, b) {
+  const parts = (v) => (v.split("-")[0] ?? "").split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const [x, y] = [parts(a), parts(b)];
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0);
+    if (d !== 0) return Math.sign(d);
+  }
+  return 0;
+}
+function versionNotice(running, installed) {
+  if (installed === void 0) return void 0;
+  const order = compareVersions(running, installed);
+  if (order > 0)
+    return `cogit: the cogit command is ${installed}, the plugin ${running}. Update the command with \`npm install -g ${PACKAGE}\`.`;
+  if (order < 0)
+    return `cogit: the plugin is ${running}, the cogit command ${installed}. Update the plugin with \`claude plugin update cogit@cogit\`, or turn on auto-update in /plugin \u2192 Marketplaces \u2192 cogit.`;
+  return void 0;
+}
+
+// src/hooks/close-retry.ts
+import { statSync } from "fs";
+var CLOSE_RETRY_IDLE_MS = 10 * 6e4;
+var CLOSE_RETRY_WINDOW_MS = 3 * 24 * 60 * 6e4;
+var CLOSE_RETRY_LIMIT = 2;
+var CLOSE_RETRY_BATCH = 3;
+async function retryUnclosed(ctx) {
+  const config2 = await loadConfig(ctx.env);
+  if (!config2.sessionEndCatchUp) return;
+  const now = Date.parse(ctx.now);
+  const sessions = await loadAllSessions(ctx.root, () => {
+  });
+  const candidates = sessions.filter((session) => session.sessionId !== ctx.sessionId && unclosed(session, now)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  let started = 0;
+  for (const session of candidates) {
+    if (started >= CLOSE_RETRY_BATCH) break;
+    const id = session.sessionId;
+    const transcript = await ctx.agent.findTranscript(id, ctx.env);
+    const written = transcript ? statSync(transcript, { throwIfNoEntry: false })?.mtimeMs : void 0;
+    if (written !== void 0 && now - written < CLOSE_RETRY_IDLE_MS) continue;
+    let allowed = false;
+    await updateState(ctx.root, id, (cur) => {
+      const tries = cur?.closeRetries ?? 0;
+      if (tries >= CLOSE_RETRY_LIMIT) return cur ?? emptyState2();
+      allowed = true;
+      return { ...cur ?? emptyState2(), closeRetries: tries + 1 };
+    });
+    if (!allowed) continue;
+    ctx.spawnDetached(["backfill", id, "--tail", "--close", "-C", ctx.root]);
+    started += 1;
+  }
+}
+function unclosed(session, now) {
+  if (session.leftOff !== void 0) return false;
+  if (!session.nodes.some((node2) => node2.kind === "message")) return false;
+  const age = now - Date.parse(session.updatedAt);
+  return age >= CLOSE_RETRY_IDLE_MS && age <= CLOSE_RETRY_WINDOW_MS;
+}
+function emptyState2() {
+  return {
+    schema: STATE_SCHEMA,
+    turns: 0,
+    turnsSinceUpdate: 0,
+    recordUpdatedAt: null,
+    turnsSinceSide: 0,
+    notedFiles: []
+  };
+}
+
+// src/hooks/sessionstart.ts
+function compactRequestText(skill) {
+  return `cogit: this session was compacted and some of its user messages are not in the lineage record yet. Run the ${skill} skill now; \`session show\` lists the messages that have no node. It records only what is missing and replies "up to date" when nothing is; do not mention this request otherwise.`;
+}
+var COMPACT_REQUEST = compactRequestText(defaultAgent().skill);
+var STARTUP_CONTEXT_TOKEN_CAP = 1500;
+function estimateTokens(text) {
+  return Math.ceil(text.length / 4);
+}
+function cli(ctx) {
+  const root = ctx.env[ctx.agent.pluginRootEnv] ?? `\${${ctx.agent.pluginRootEnv}}`;
+  return `node "${root}/dist/cli.js"`;
+}
+function setupHint(ctx) {
+  return `cogit is not set up in this project, so no lineage map is recorded here. Say this once, in one line, and do not repeat it in later turns. If the user asks you to set it up, ask the install questions in the chat (whether to commit .cogit/, whether to keep transcripts longer, whether the lineage skill may run without asking, whether to turn the plugin on for the whole project and stop sessions that start without it, and the summary language), then run ${cli(ctx)} init --yes --git <ignore|commit> --retention <days|keep> --language <lang> (add --allow-skill and --project-settings for what the user agreed to). Never run init or register the project on your own. If the user wants no more hints here, run ${cli(ctx)} config hint-off. A plugin update reaches a running session only after /reload-plugins or a new chat.`;
+}
+async function onSessionStart(ctx) {
+  const output2 = await sessionStartOutput(ctx);
+  if (ctx.input.source !== "startup") return output2;
+  const notice = versionNotice(package_default.version, await installedCliVersion(ctx.env));
+  return notice === void 0 ? output2 : { ...output2, ...ctx.agent.userNotice(notice) };
+}
+async function sessionStartOutput(ctx) {
+  if (ctx.input.source === "compact") return compactRequest(ctx);
+  const source = ctx.input.source;
+  if (source !== "startup" && source !== "resume" && source !== "clear") return void 0;
+  if (!ctx.initialized) {
+    if (source === "clear") return void 0;
+    const config3 = await loadConfig(ctx.env);
+    if (config3.setupHintOff.includes(ctx.root)) return void 0;
+    if (await findGitRoot(ctx.root) === void 0) return void 0;
+    return additionalContext2(ctx, setupHint(ctx));
+  }
+  await retryUnclosed(ctx).catch(() => void 0);
+  const config2 = await loadConfig(ctx.env);
+  if (!config2.startupContext) return void 0;
+  return additionalContext2(ctx, await startupContext(ctx, config2.recordCommit));
+}
+function additionalContext2(ctx, text) {
+  return ctx.agent.additionalContext("SessionStart", text);
+}
+async function compactRequest(ctx) {
+  if (!ctx.initialized) return void 0;
+  const messages = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
+  if (!messages) return void 0;
+  const record2 = await loadSession(ctx.root, ctx.sessionId);
+  let recorded = /* @__PURE__ */ new Set();
+  if (record2.found && record2.ok) {
+    const upgraded = upgradeSessionIds(record2.data, messages);
+    const events = await readEvents(ctx.root, ctx.sessionId);
+    recorded = new Set(applyEvents(upgraded.nodes, events).map((node2) => node2.id));
+  }
+  if (messages.every((message) => isRecorded(recorded, message))) return void 0;
+  return additionalContext2(ctx, COMPACT_REQUEST);
+}
+function oneLine5(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
+function clip(text, max) {
+  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}\u2026`;
+}
+async function startupContext(ctx, recordCommit) {
+  const command = cli(ctx);
+  const header = `cogit records this project's lineage (one node per user message, hanging from the message it reacts to, grouped in sessions with branch summaries). Read it with \`${command} log -C "${ctx.root}"\`, find where something was discussed with \`${command} search "<text>" -C "${ctx.root}"\`, and one message with \`${command} show <ref> -C "${ctx.root}"\` (a ref is a message hash, an h+hex prefix of six or more characters, or <session-id>:mN). When the user mentions a message hash or another session's mN, run show before answering.`;
+  const sessions = await loadAllSessions(ctx.root, () => {
+  });
+  const previous = mostRecentOtherSession(sessions, ctx.sessionId);
+  if (previous === void 0) return header;
+  const events = await readEvents(ctx.root, previous.sessionId);
+  const messages = buildMessages(applyEvents(previous.nodes, events));
+  const recordLine = recordCommit === "ask" && await uncommittedSession(ctx.root, previous.sessionId, ctx.env) ? recordCommitLine(previous) : "";
+  return composeStartupContext(
+    header,
+    previous,
+    branchesOf(previous.sessionId, messages),
+    recordLine
+  );
+}
+function recordCommitLine(session) {
+  const title = session.title.trim() === "" ? session.sessionId : clip(oneLine5(session.title), 120);
+  return `The last session's record is not committed. Offer to commit it with the message \`chore(cogit): record ${title}\`, only the .cogit/sessions/ paths (never other staged changes), and run it only if the user agrees.`;
+}
+function mostRecentOtherSession(sessions, sessionId) {
+  return sessions.filter((session) => session.sessionId !== sessionId).sort(
+    (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.startedAt.localeCompare(a.startedAt) || a.sessionId.localeCompare(b.sessionId)
+  )[0];
+}
+function composeStartupContext(header, session, branches, recordLine = "") {
+  const head = [
+    header,
+    ...recordLine === "" ? [] : ["", recordLine],
+    "",
+    ...statusLines(session)
+  ];
+  const blocks = branches.map(branchLines2);
+  const cutNote = (cut2) => cut2 === 0 ? [] : [
+    `  \u2026 ${cut2} older branch summar${cut2 === 1 ? "y" : "ies"} cut; read them with \`log --branches\`.`
+  ];
+  const render = (kept2, cut2) => [...head, ...kept2.flat(), ...cutNote(cut2)].join("\n");
+  const kept = [...blocks];
+  let cut = 0;
+  while (kept.length > 0 && estimateTokens(render(kept, cut)) > STARTUP_CONTEXT_TOKEN_CAP) {
+    kept.shift();
+    cut += 1;
+  }
+  const text = render(kept, cut);
+  if (estimateTokens(text) <= STARTUP_CONTEXT_TOKEN_CAP) return text;
+  return `${text.slice(0, STARTUP_CONTEXT_TOKEN_CAP * 4 - 2).trimEnd()}\u2026`;
+}
+function statusLines(session) {
+  const title = session.title.trim() === "" ? session.sessionId : clip(oneLine5(session.title), 120);
+  const lines = [`Earlier session: ${title} (${session.sessionId})`];
+  const { goal, pending, next } = session.status;
+  if (goal.trim() !== "") lines.push(`  goal: ${clip(oneLine5(goal), 400)}`);
+  const shown = pending.slice(0, 5);
+  for (const item of shown) {
+    const needsUser = item.needsUser ? " (needs the user)" : "";
+    lines.push(`  pending: ${clip(oneLine5(item.text), 200)}${needsUser}`);
+  }
+  if (pending.length > shown.length)
+    lines.push(`  pending: \u2026 ${pending.length - shown.length} more`);
+  if (next.trim() !== "") lines.push(`  next: ${clip(oneLine5(next), 400)}`);
+  return lines;
+}
+function branchLines2(branch) {
+  const count = `${branch.count} message${branch.count === 1 ? "" : "s"}`;
+  return [
+    `  \u256D ${clip(oneLine5(branch.title), 80)}  ${branch.start.label}\u2013${branch.end.label}, ${count}`,
+    `    asked: ${clip(oneLine5(branch.asked), 300)}`,
+    `    outcome: ${clip(oneLine5(branch.outcome), 600)}`,
+    `    open: ${branch.open.trim() === "" ? "\u2014" : clip(oneLine5(branch.open), 300)}`
+  ];
+}
+
+// src/hooks/stop.ts
+function updateRequestText(skill) {
+  return `cogit: several turns have passed since this session's lineage record was last updated. Run the ${skill} skill now. It records only what changed and replies "up to date" when nothing did; do not mention this request otherwise.`;
+}
+var UPDATE_REQUEST = updateRequestText(defaultAgent().skill);
+function countTurn(state, recordUpdatedAt, everyTurns, opts = {}) {
+  const cur = state ?? {
+    schema: STATE_SCHEMA,
+    turns: 0,
+    turnsSinceUpdate: 0,
+    recordUpdatedAt,
+    turnsSinceSide: 0,
+    notedFiles: []
+  };
+  const changed = cur.recordUpdatedAt !== recordUpdatedAt;
+  const agentChanged = changed && opts.lastRecordedBy !== "side";
+  const turnsSinceUpdate = (agentChanged ? 0 : cur.turnsSinceUpdate) + 1;
+  const request = (opts.askAgent ?? true) && turnsSinceUpdate >= everyTurns;
+  const turnsSinceSide = (changed ? 0 : cur.turnsSinceSide) + 1;
+  const side = opts.sideEveryTurns !== void 0 && turnsSinceSide >= opts.sideEveryTurns;
+  return {
+    state: {
+      ...cur,
+      turns: cur.turns + 1,
+      // Reset on a request too, so an "up to date" answer is not asked again next turn.
+      turnsSinceUpdate: request ? 0 : turnsSinceUpdate,
+      recordUpdatedAt,
+      turnsSinceSide: side ? 0 : turnsSinceSide
+    },
+    request,
+    side
+  };
+}
+async function mapBusy(root, sessionId) {
+  const paths = projectPaths(root);
+  if (await isLockHeld(paths.lock("build"))) return true;
+  return isLockHeld(paths.lock(`session-${sessionId}`));
+}
+async function onStop(ctx) {
+  if (ctx.input.stop_hook_active) return void 0;
+  const { root, sessionId } = ctx;
+  if (!await mapBusy(root, sessionId)) ctx.spawnDetached(["build", root, "--quiet"]);
+  const config2 = await loadConfig(ctx.env);
+  const record2 = await loadSession(root, sessionId);
+  const recordUpdatedAt = record2.found && record2.ok ? record2.data.updatedAt : null;
+  const lastRecordedBy = record2.found && record2.ok ? record2.data.lastRecordedBy : void 0;
+  let request = false;
+  let side = false;
+  await updateState(
+    root,
+    sessionId,
+    (cur) => {
+      const next = countTurn(cur, recordUpdatedAt, config2.updateEveryTurns, {
+        // In agent mode the side model runs only at session end (Story 12.1).
+        ...config2.recorder === "agent" ? {} : { sideEveryTurns: config2.sideEveryTurns },
+        askAgent: config2.recorder !== "side",
+        ...lastRecordedBy === void 0 ? {} : { lastRecordedBy }
+      });
+      request = next.request;
+      side = next.side;
+      return next.state;
+    },
+    { timeoutMs: 2e3 }
+  );
+  if (side) ctx.spawnDetached(["backfill", sessionId, "--tail", "-C", root]);
+  if (!request) return void 0;
+  return ctx.agent.additionalContext("Stop", UPDATE_REQUEST);
+}
+
+// src/hooks/run.ts
+var HANDLERS = {
+  stop: onStop,
+  sessionstart: onSessionStart,
+  sessionend: onSessionEnd,
+  promptsubmit: onPromptSubmit,
+  pretooluse: onPreToolUse
+};
+var HOOK_EVENTS = Object.keys(HANDLERS);
+var LOG_LIMIT = 256 * 1024;
+function openLog(log2, args) {
+  try {
+    mkdirSync(dirname10(log2), { recursive: true });
+    let flag = "a";
+    try {
+      if (statSync2(log2).size > LOG_LIMIT) flag = "w";
+    } catch {
+    }
+    const fd = openSync(log2, flag);
+    writeSync(fd, `
+--- ${(/* @__PURE__ */ new Date()).toISOString()} ${args.join(" ")}
+`);
+    return fd;
+  } catch {
+    return void 0;
+  }
+}
+function spawnDetachedProcess(cli2, args, env, log2) {
+  const fd = log2 === void 0 ? void 0 : openLog(log2, args);
+  const out = fd ?? "ignore";
+  try {
+    spawn(process.execPath, [cli2, ...args], {
+      detached: true,
+      stdio: ["ignore", out, out],
+      env: { ...env, COGIT_DISABLE: "1" }
+    }).unref();
+  } finally {
+    if (fd !== void 0) closeSync(fd);
+  }
+}
+async function runHook(event, stdin, env, now, debug, deps = {}) {
+  try {
+    if (captureDisabled(env)) return void 0;
+    const handler = HANDLERS[event];
+    if (!handler) return void 0;
+    const agent = defaultAgent();
+    const input2 = agent.parseHookInput(stdin);
+    if (input2 === void 0) {
+      debug(`cogit ${event} hook: unreadable hook input`);
+      return void 0;
+    }
+    if (!Slug.safeParse(input2.session_id).success) return void 0;
+    if (handler === onSessionStart)
+      await agent.markLive(input2.session_id).catch((err) => debug(`cogit mark: ${err.message}`));
+    if (agent.isHeadless(env) && !(await loadConfig(env)).recordHeadless) return void 0;
+    const { root } = await resolveProjectRoot(env[agent.projectDirEnv] ?? input2.cwd ?? ".");
+    const initialized = existsSync5(projectPaths(root).project);
+    if (!initialized && handler !== onSessionStart) return void 0;
+    const cli2 = deps.cli ?? process.argv[1] ?? fileURLToPath(import.meta.url);
+    const startCatchUp = (args) => (deps.spawnDetached ?? spawnDetachedProcess)(cli2, args, env, projectPaths(root).detachedLog);
+    const out = await handler({
+      agent,
+      input: input2,
+      sessionId: input2.session_id,
+      root,
+      initialized,
+      env,
+      now,
+      spawnDetached: startCatchUp
+    });
+    return out === void 0 ? void 0 : JSON.stringify(out);
+  } catch (err) {
+    debug(`cogit ${event} hook: ${err.message}`);
+    return void 0;
+  }
+}
+
 // src/git-hooks.ts
 var BLOCK_START = "# >>> cogit";
 var BLOCK_END = "# <<< cogit";
@@ -21812,10 +26148,10 @@ function hookBlock(event, projectRoot, cliPath = currentCliPath() ?? null) {
     `  cogit ${args} || true`
   ];
   if (cliPath !== null) {
-    const cli = shellQuote(cliPath);
+    const cli2 = shellQuote(cliPath);
     lines.push(
-      `elif command -v node >/dev/null 2>&1 && [ -f ${cli} ]; then`,
-      `  node ${cli} ${args} || true`
+      `elif command -v node >/dev/null 2>&1 && [ -f ${cli2} ]; then`,
+      `  node ${cli2} ${args} || true`
     );
   }
   lines.push("fi", BLOCK_END);
@@ -21831,8 +26167,8 @@ function withHookBlock(text, block) {
 
 ${block}
 `;
-  const sep3 = text.endsWith("\n") ? "" : "\n";
-  return `${text}${sep3}
+  const sep7 = text.endsWith("\n") ? "" : "\n";
+  return `${text}${sep7}
 ${block}
 `;
 }
@@ -21848,13 +26184,13 @@ async function installGitHook(root, event) {
   if (gitRoot === void 0) return false;
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return false;
-  await mkdir5(dir, { recursive: true });
-  const file2 = join8(dir, event);
-  const exists = await stat6(file2).then(
+  await mkdir6(dir, { recursive: true });
+  const file2 = join12(dir, event);
+  const exists = await stat11(file2).then(
     () => true,
     () => false
   );
-  const current = exists ? await readFile5(file2, "utf8") : "";
+  const current = exists ? await readFile9(file2, "utf8") : "";
   const block = hookBlock(event, root);
   const next = exists ? withHookBlock(current, block) : `#!/bin/sh
 
@@ -21865,7 +26201,7 @@ ${block}
   await chmod(file2, 493);
   return true;
 }
-var GIT_HOOK_EVENTS = ["pre-commit", "prepare-commit-msg"];
+var GIT_HOOK_EVENTS = ["pre-commit", "prepare-commit-msg", "post-commit"];
 function isGitHookEvent(event) {
   return GIT_HOOK_EVENTS.includes(event);
 }
@@ -21883,7 +26219,7 @@ async function refreshGitHooks(root) {
   if (dir === void 0) return [];
   const refreshed = [];
   for (const event of GIT_HOOK_EVENTS) {
-    const current = await readFile5(join8(dir, event), "utf8").catch(() => void 0);
+    const current = await readFile9(join12(dir, event), "utf8").catch(() => void 0);
     if (current === void 0 || !current.includes(BLOCK_START)) continue;
     if (await installGitHook(root, event)) refreshed.push(event);
   }
@@ -21896,8 +26232,8 @@ async function uninstallGitHooks(root) {
   if (dir === void 0) return [];
   const removed = [];
   for (const event of GIT_HOOK_EVENTS) {
-    const file2 = join8(dir, event);
-    const current = await readFile5(file2, "utf8").catch(() => void 0);
+    const file2 = join12(dir, event);
+    const current = await readFile9(file2, "utf8").catch(() => void 0);
     if (current === void 0 || !current.includes(BLOCK_START)) continue;
     const next = withoutHookBlock(current);
     if (onlyGeneratedShebang(next)) await rm3(file2, { force: true });
@@ -21906,9 +26242,25 @@ async function uninstallGitHooks(root) {
   }
   return removed;
 }
-async function runGitHook(event, dir, env = process.env, args = [], now = /* @__PURE__ */ new Date()) {
+async function queueShape(dir, env, spawn2) {
+  if (captureDisabled(env)) return;
+  const config2 = await loadConfig(env).catch(() => void 0);
+  if (config2 === void 0 || !config2.shapes || config2.recorder === "agent") return;
+  const gitRoot = await findGitRoot(dir);
+  if (gitRoot === void 0) return;
+  const commit = await resolveCommit(gitRoot, "HEAD");
+  if (commit === void 0) return;
+  const cli2 = currentCliPath();
+  if (cli2 === void 0) return;
+  spawn2(cli2, ["shape", "--commit", commit, "-C", dir], env, projectPaths(dir).detachedLog);
+}
+async function runGitHook(event, dir, env = process.env, args = [], now = /* @__PURE__ */ new Date(), spawn2 = spawnDetachedProcess) {
   if (event === "pre-commit") {
     await stageSessionFiles(dir, env);
+    return;
+  }
+  if (event === "post-commit") {
+    await queueShape(dir, env, spawn2);
     return;
   }
   const [messageFile, source] = args;
@@ -21923,9 +26275,11 @@ async function runGitHook(event, dir, env = process.env, args = [], now = /* @__
 }
 
 export {
-  __require,
-  __commonJS,
-  __toESM,
+  CliError,
+  defaultsPrompter,
+  processIo,
+  exitOnClosedPipe,
+  package_default,
   external_exports,
   isDirectory,
   atomicWrite,
@@ -21933,14 +26287,7 @@ export {
   readJson,
   defaultAgent,
   redactDeep,
-  DIR_NAME,
-  OLD_DIR_NAME,
-  CONFIG_DIR_NAME,
-  OLD_CONFIG_DIR_NAME,
-  configuredHome,
-  captureDisabled,
   projectPaths,
-  defaultConfigBase,
   globalPaths,
   readConversationStore,
   appendConversationTurns,
@@ -21956,6 +26303,7 @@ export {
   hashesToLabels,
   upgradeSessionIds,
   findGitRoot,
+  resolveCommit,
   ensureGitignore,
   cogitIgnored,
   ensureCogitGitignore,
@@ -21963,13 +26311,14 @@ export {
   readCommitSubjects,
   readCommitFiles,
   readCommitChanges,
+  readCommitPatches,
   projectFiles,
-  blameCommitHashes,
   gitUserName,
+  gitUserEmail,
   commitBetween,
+  gitHooksDir,
   Slug,
   IsoDate,
-  MessageRef,
   parseMessageRef,
   Config,
   SESSION_SCHEMA,
@@ -21977,10 +26326,7 @@ export {
   BranchSummary,
   Status,
   SessionInput,
-  STATE_SCHEMA,
-  HookState,
   LockBusyError,
-  isLockHeld,
   withLock,
   loadProject,
   updateProject,
@@ -21992,13 +26338,54 @@ export {
   updateConfig,
   loadRegistry,
   updateRegistry,
-  updateState,
-  uncommittedSession,
+  readSessionHead,
   maybeAutoCommit,
+  readEvents,
+  appendEvents,
+  sideOwnedParents,
+  applyEvents,
+  seedEvents,
   readThoughtTrailers,
   readCommitThought,
   earliestSessionStart,
   attachThoughtTrailers,
+  sameAuthor,
+  sessionIdentity,
+  stampedIdentity,
+  LIVE_META_NAME,
+  TOKEN_META_NAME,
+  isPanelEditableKey,
+  VIEW_SCHEMA,
+  lastActive,
+  statusCard,
+  sessionTitle,
+  buildViewModel,
+  markBuiltBy,
+  builtBy,
+  embedViewModel,
+  blame,
+  readProjectChanges,
+  readReadState,
+  setMessageRead,
+  attachChanges,
+  countBigUnread,
+  buildFileHistory,
+  modelSessions,
+  loadEffectiveSessions,
+  openProject,
+  stamp,
+  shortHash,
+  selectSessions,
+  show,
+  formatShow,
+  log,
+  logUnread,
+  logFile,
+  why,
+  compareVersions,
+  versionNotice,
+  spawnDetachedProcess,
+  runHook,
   BLOCK_START,
   BLOCK_END,
   currentCliPath,
@@ -22011,5 +26398,9 @@ export {
   installGitHooks,
   refreshGitHooks,
   uninstallGitHooks,
-  runGitHook
+  runGitHook,
+  takeMigrationWarnings,
+  migrateProject,
+  migrateGlobal,
+  resolveProjectRoot
 };

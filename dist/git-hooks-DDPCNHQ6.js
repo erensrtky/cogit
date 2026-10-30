@@ -15,7 +15,7 @@ import {
   uninstallGitHooks,
   withHookBlock,
   withoutHookBlock
-} from "./chunk-FLS6H2KL.js";
+} from "./chunk-T7B243ZT.js";
 export {
   BLOCK_END,
   BLOCK_START,
