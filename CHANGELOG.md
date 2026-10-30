@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.23.2] - 2026-10-30
 ### Changed
 - Clicking a message on the map selects only that message, as the outline does, instead of also tinting its whole branch; the side panel shows the message's branch either way.
 - A selected message no longer also highlights its session's row; the session row is highlighted only when the session itself is selected.
