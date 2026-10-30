@@ -60,6 +60,7 @@ export const fixture: LineageViewModel = {
     startupContext: true,
     recordHeadless: false,
     tryBeforeNotes: true,
+    shapes: true,
     shareConversations: false,
     recordCommit: "ask",
     gitPolicy: "ignore",
@@ -95,6 +96,22 @@ export const fixture: LineageViewModel = {
         message("m4", "Build the dev fixture", "m3", "2026-10-24T09:41:00.000Z", {
           summary: "Three sessions in start order.",
           commits: ["1a2b3c4", "9f8e7d6"],
+          shape: {
+            by: "side",
+            commits: ["1a2b3c4", "9f8e7d6"],
+            tools: [
+              {
+                kind: "pseudo",
+                valid: true,
+                text: "1. Read the fixture data\n2. Render the map from it\n3. Keep the page offline",
+              },
+              {
+                kind: "mermaid",
+                valid: true,
+                text: "flowchart TD\n  Fixture[fixture.ts] --> Map[App.tsx]\n  Map --> DOM[cogit-data element]",
+              },
+            ],
+          },
           commitTags: [
             { hash: "1a2b3c4", subject: "feat(template): add the dev fixture" },
             { hash: "9f8e7d6" },

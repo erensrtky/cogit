@@ -41,6 +41,15 @@ To record less often, raise `sideEveryTurns` and `updateEveryTurns`. To spend no
 recording during the session, use `recorder: side` and turn `sessionEndCatchUp` off; the
 messages then wait until you record them.
 
+## Shapes
+
+A message that landed commits also gets a **Shape**: numbered steps or a small diagram of
+what the change does, shown beside its Intent and its Code. Whoever records writes it — the
+agent in the record skill, or after a commit the side model, detached, so a commit never
+waits. It is one small model call per such message, reading the combined diff (cut to about
+7 KB). Release/version bumps, lockfiles, CHANGELOG-only changes and changes under five lines
+are skipped. `shapes: false` writes none and the map says so.
+
 ## When something is not recorded
 
 A turn the side model has not reached yet shows on the map without a title for a while. If

@@ -35,6 +35,7 @@ export const PANEL_EDITABLE_KEYS = [
   "startupContext",
   "recordHeadless",
   "tryBeforeNotes",
+  "shapes",
   "language",
   "shareConversations",
   "recordCommit",
@@ -72,6 +73,23 @@ export interface ViewChange {
   added: number;
   removed: number;
   files: number;
+}
+
+/** What a message's change does, between Intent and Code (Story 13.6). */
+export interface ViewShapeTool {
+  kind: "pseudo" | "mermaid";
+  text: string;
+  /** False when the registry refused the output; the map shows it as text. */
+  valid?: boolean | undefined;
+}
+
+export interface ViewShape {
+  tools: ViewShapeTool[];
+  /** Who wrote it: the main agent or the side model. */
+  by?: "agent" | "side" | undefined;
+  /** The message's commits this Shape covers. */
+  commits: string[];
+  at?: string | undefined;
 }
 
 export interface ViewNode {
@@ -127,6 +145,12 @@ export interface ViewNode {
   addedAt?: string;
   /** When the node was last added or changed; marks where the work left off. */
   touchedAt?: string;
+  /**
+   * For a message that landed commits: a small representation of what the
+   * change does (Story 13.6). Missing means nobody wrote one (yet): the modal
+   * says why (queued or off).
+   */
+  shape?: ViewShape;
   /** A user message the record does not hold yet: the row is not summarized. */
   unsummarized?: true;
 }
@@ -400,6 +424,11 @@ export interface PanelSettings {
    * thoughts considered and rejected (Story 10.4).
    */
   tryBeforeNotes: boolean;
+  /**
+   * Whether a message that landed commits gets a Shape (Story 13.6): a small
+   * plain-language or diagram view of what the change does.
+   */
+  shapes: boolean;
   shareConversations: boolean;
   recordCommit: "ask" | "auto" | "off";
   gitPolicy: "ignore" | "commit";

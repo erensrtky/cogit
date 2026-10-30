@@ -52,6 +52,7 @@ const SIDE_FIELDS = [
   "branch",
   "work",
   "agentDecisions",
+  "shape",
 ] as const;
 
 type SideField = (typeof SIDE_FIELDS)[number];
@@ -292,6 +293,7 @@ const NODE_FIELDS = [
   "branch",
   "work",
   "agentDecisions",
+  "shape",
 ] as const;
 
 /** A resent node that changed nothing keeps its touch time. */

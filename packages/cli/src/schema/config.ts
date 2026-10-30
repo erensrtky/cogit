@@ -36,6 +36,12 @@ export const Config = z.object({
    */
   messageSummaries: z.boolean().default(false),
   /**
+   * Whether a message that landed commits gets a Shape (Story 13.6): a small
+   * plain-language or diagram view of what the change does, written by whoever
+   * records. Off writes nothing; the map then says so.
+   */
+  shapes: z.boolean().default(true),
+  /**
    * Whether SessionStart hands the agent the lineage of the previous session and
    * how to read the record (`log` / `show`). On by default; costs only tokens.
    */

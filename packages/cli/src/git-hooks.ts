@@ -2,8 +2,11 @@ import { realpathSync } from "node:fs";
 import { chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { findGitRoot, gitHooksDir } from "./git.js";
-import { stageSessionFiles } from "./session-git.js";
+import { spawnDetachedProcess } from "./hooks/run.js";
+import { readSessionHead, stageSessionFiles } from "./session-git.js";
 import { atomicWrite } from "./store/fs.js";
+import { captureDisabled, projectPaths } from "./store/paths.js";
+import { loadConfig } from "./store/stores.js";
 import { addThoughtTrailer } from "./thought.js";
 
 /**
@@ -109,12 +112,13 @@ export async function installGitHook(root: string, event: string): Promise<boole
 }
 
 /**
- * The git-side events cogit answers (Stories 9.3, 9.4). A git hook's stdin is
- * not the Claude Code hook JSON, so these never go through `runHook`.
+ * The git-side events cogit answers (Stories 9.3, 9.4, 13.6). A git hook's stdin
+ * is not the Claude Code hook JSON, so these never go through `runHook`.
  * `pre-commit` carries the session record with a code commit; `prepare-commit-msg`
- * adds the `Thought:` trailer that names the message behind it.
+ * adds the `Thought:` trailer that names the message behind it; `post-commit`
+ * queues the Shape of a message that landed commits, outside the commit.
  */
-export const GIT_HOOK_EVENTS = ["pre-commit", "prepare-commit-msg"] as const;
+export const GIT_HOOK_EVENTS = ["pre-commit", "prepare-commit-msg", "post-commit"] as const;
 export type GitHookEvent = (typeof GIT_HOOK_EVENTS)[number];
 
 export function isGitHookEvent(event: string): event is GitHookEvent {
@@ -172,6 +176,28 @@ export async function uninstallGitHooks(root: string): Promise<GitHookEvent[]> {
 }
 
 /**
+ * Queues the Shape of the session that just committed (Story 13.6). Detached
+ * and silent: a commit never waits for a side-model run, and a failure lands in
+ * the detached log like the session-end pass. In `agent` mode the record skill
+ * writes the Shape itself, so there is nothing to queue.
+ */
+async function queueShape(dir: string, env: NodeJS.ProcessEnv): Promise<void> {
+  if (captureDisabled(env)) return;
+  const config = await loadConfig(env).catch(() => undefined);
+  if (config === undefined || !config.shapes || config.recorder === "agent") return;
+  const head = await readSessionHead(dir);
+  if (head === undefined) return;
+  const cli = currentCliPath();
+  if (cli === undefined) return;
+  spawnDetachedProcess(
+    cli,
+    ["shape", head.sessionId, "-C", dir],
+    env,
+    projectPaths(dir).detachedLog,
+  );
+}
+
+/**
  * Runs one git hook. A git hook that fails would block the user's commit, so the
  * CLI calls this inside its own silence: nothing here throws or prints. `args`
  * are what the hook script was given (`$@`): for `prepare-commit-msg` the message
@@ -186,6 +212,10 @@ export async function runGitHook(
 ): Promise<void> {
   if (event === "pre-commit") {
     await stageSessionFiles(dir, env);
+    return;
+  }
+  if (event === "post-commit") {
+    await queueShape(dir, env);
     return;
   }
   const [messageFile, source] = args;

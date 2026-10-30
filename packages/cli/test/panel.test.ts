@@ -91,6 +91,7 @@ describe("buildPanel", () => {
         startupContext: true,
         recordHeadless: false,
         tryBeforeNotes: true,
+        shapes: true,
         shareConversations: false,
         recordCommit: "ask",
         gitPolicy: "commit",

@@ -378,8 +378,73 @@ export async function readCommitChanges(
   return out;
 }
 
-/** A commit's short hash, computed when git printed only the full one. */
-function commitShort(commit: CommitFiles): string {
+/**
+ * The patches of the given commits, concatenated and cut at `limit` characters
+ * (Story 13.6: the side writer reads enough of the change to name its path). A
+ * commit git no longer knows is skipped; `truncated` says the cut happened, so
+ * the prompt can say so instead of pretending the diff is complete.
+ */
+export async function readCommitPatches(
+  root: string,
+  hashes: Iterable<string>,
+  limit: number,
+): Promise<{ diff: string; truncated: boolean }> {
+  const wanted = [...new Set(hashes)];
+  if (wanted.length === 0) return { diff: "", truncated: false };
+  const chunks: string[] = [];
+  let size = 0;
+  let truncated = false;
+  try {
+    const { stdout } = await exec("git", [
+      "-C",
+      root,
+      "log",
+      "--no-walk=unsorted",
+      "--format=commit %h %s",
+      "--patch",
+      "--no-color",
+      "--unified=3",
+      ...wanted,
+    ]);
+    const text = stdout.trim();
+    if (text.length > limit) {
+      return { diff: text.slice(0, limit), truncated: true };
+    }
+    return { diff: text, truncated: false };
+  } catch {
+    // One hash git no longer knows makes the batch fail; ask for each alone.
+  }
+  for (const hash of wanted) {
+    if (size >= limit) {
+      truncated = true;
+      break;
+    }
+    try {
+      const { stdout } = await exec("git", [
+        "-C",
+        root,
+        "show",
+        "--format=commit %h %s",
+        "--patch",
+        "--no-color",
+        "--unified=3",
+        hash,
+      ]);
+      const remaining = limit - size;
+      const text = stdout.trim();
+      chunks.push(text.length > remaining ? text.slice(0, remaining) : text);
+      if (text.length > remaining) truncated = true;
+      size += Math.min(text.length, remaining);
+    } catch {
+      // gone from this repository (rebased away, or another checkout)
+    }
+  }
+  return { diff: chunks.join("\n\n"), truncated };
+}
+
+/** A commit's short hash, computed when git printed only the full one. */ function commitShort(
+  commit: CommitFiles,
+): string {
   return commit.short === "" ? commit.full.slice(0, 7) : commit.short;
 }
 

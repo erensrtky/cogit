@@ -22,6 +22,8 @@ export type NodeDetail = {
   files?: string[];
   work?: ViewNode["work"];
   agentDecisions?: ViewNode["agentDecisions"];
+  /** The Shape of what the change does (Story 13.6). */
+  shape?: ViewNode["shape"];
   addedAt?: string;
   touchedAt?: string;
   parent?: string | null;

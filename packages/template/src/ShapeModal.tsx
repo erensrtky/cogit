@@ -1,0 +1,317 @@
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import type { ViewNode } from "../../cli/src/view/model.js";
+import { shapePreview, shapeState } from "../../cli/src/view/shape.js";
+import { DiffView } from "./DiffView.js";
+import { isLivePage } from "./data.js";
+import { MermaidDiagram } from "./MermaidDiagram.js";
+
+/**
+ * Intent, Shape and Code (Story 13.6): the three layers of a message that
+ * landed commits, top to bottom, with 1/2/3 tabs. Opening on Shape shows what
+ * the change does first; Intent is the record, read but never rewritten here,
+ * and Code is the same diff the panel already shows.
+ */
+export type ShapeTab = "intent" | "shape" | "code";
+
+/** The fields the three layers read; a message node or the panel's detail both fit. */
+export interface ShapeNode {
+  title: string;
+  kind: ViewNode["kind"];
+  why?: string | undefined;
+  alternatives?: ViewNode["alternatives"];
+  agentDecisions?: ViewNode["agentDecisions"];
+  work?: ViewNode["work"];
+  decidedBy?: ViewNode["decidedBy"];
+  commits?: string[] | undefined;
+  commitTags?: ViewNode["commitTags"];
+  shape?: ViewNode["shape"];
+}
+
+const TABS: { id: ShapeTab; number: string; label: string }[] = [
+  { id: "intent", number: "1", label: "Intent" },
+  { id: "shape", number: "2", label: "Shape" },
+  { id: "code", number: "3", label: "Code" },
+];
+
+const DECIDED_LABEL = {
+  user: "You",
+  agent: "The agent, on its own",
+  agreed: "You, approving the agent's proposal",
+} as const;
+
+/** The record's Intent: the same fields the panel shows, in reading order. */
+function IntentLayer({ node }: { node: ShapeNode }) {
+  const empty =
+    !node.why &&
+    !node.alternatives?.length &&
+    !node.agentDecisions?.length &&
+    !node.work?.length &&
+    !node.decidedBy;
+  if (empty) return <p className="muted">No reason was recorded for this message.</p>;
+  return (
+    <div className="shape-intent">
+      {node.why ? (
+        <section>
+          <h4>Why</h4>
+          <p>{node.why}</p>
+        </section>
+      ) : null}
+      {node.alternatives?.length ? (
+        <section>
+          <h4>Considered and rejected</h4>
+          <ul>
+            {node.alternatives.map((alt) => (
+              <li key={alt.option}>
+                <strong>{alt.option}</strong>
+                {alt.why ? <> — {alt.why}</> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {node.agentDecisions?.length ? (
+        <section>
+          <h4>Decided by the agent on its own</h4>
+          <ul>
+            {node.agentDecisions.map((decision) => (
+              <li key={decision.title}>
+                <strong>{decision.title}</strong>
+                {decision.why ? <> — {decision.why}</> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {node.work?.length ? (
+        <section>
+          <h4>What the agent did</h4>
+          <ul>
+            {node.work.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {node.decidedBy ? (
+        <p className="decided-by">Decided by: {DECIDED_LABEL[node.decidedBy]}</p>
+      ) : null}
+    </div>
+  );
+}
+
+/** The Shape layer: the tools' output, Mermaid drawn in the page. */
+function ShapeLayer({
+  node,
+  enabled,
+  renderMermaid,
+}: {
+  node: ShapeNode;
+  enabled: boolean;
+  renderMermaid: (source: string) => ReactNode;
+}) {
+  const state = shapeState(node.shape, enabled);
+  if (state === "off") {
+    return <p className="muted">Shapes are off. Turn them on in Settings → Recording.</p>;
+  }
+  if (state === "queued") {
+    return <p className="muted">This Shape is being prepared, or the message landed no commits.</p>;
+  }
+  if (state === "empty") {
+    return <p className="muted">Nothing to show: the change was too small to draw.</p>;
+  }
+  return (
+    <div className="shape-tools">
+      {node.shape?.tools.map((tool, index) =>
+        tool.kind === "mermaid" && tool.valid !== false ? (
+          <figure key={`${tool.kind}-${index}`} className="shape-figure">
+            {renderMermaid(tool.text)}
+            <figcaption>Diagram</figcaption>
+          </figure>
+        ) : (
+          <figure key={`${tool.kind}-${index}`} className="shape-figure">
+            <pre className={`shape-source is-${tool.kind}`}>{tool.text}</pre>
+            <figcaption>
+              {tool.kind === "pseudo" ? "Steps" : "Diagram source (not drawn)"}
+            </figcaption>
+          </figure>
+        ),
+      )}
+      {node.shape?.by ? (
+        <p className="shape-by">
+          Written by {node.shape.by === "side" ? "the side model" : "the agent"}.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** The Code layer: the message's commits and their patches. */
+function CodeLayer({ node, root }: { node: ShapeNode; root: string }) {
+  const live = typeof document !== "undefined" && isLivePage();
+  const commits = node.commits ?? [];
+  if (commits.length === 0) return <p className="muted">No commit is linked to this message.</p>;
+  return (
+    <div className="shape-code">
+      {commits.map((commit) => (
+        <section key={commit}>
+          <h4>
+            <code>{commit.slice(0, 7)}</code>{" "}
+            {node.commitTags?.find((tag) => tag.hash === commit)?.subject ?? ""}
+          </h4>
+          {live ? <DiffView dir={root} commit={commit} /> : null}
+        </section>
+      ))}
+      {live ? null : <p className="muted">Open with `cogit open` to see the diffs.</p>}
+    </div>
+  );
+}
+
+/**
+ * The three layers with their tabs. Presentational (no state, no effects) so a
+ * render test can check the layers and the pending states without a browser;
+ * `renderMermaid` lets that test stand in for the real renderer.
+ */
+export function ShapeLayers({
+  node,
+  root,
+  tab,
+  enabled,
+  onTab,
+  renderMermaid = (source) => <MermaidDiagram source={source} />,
+}: {
+  node: ShapeNode;
+  root: string;
+  tab: ShapeTab;
+  enabled: boolean;
+  onTab: (tab: ShapeTab) => void;
+  renderMermaid?: (source: string) => ReactNode;
+}) {
+  return (
+    <div className="shape-layers">
+      <div className="shape-tabs" role="tablist" aria-label="Intent, Shape and Code">
+        {TABS.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === entry.id}
+            className={tab === entry.id ? "shape-tab is-active" : "shape-tab"}
+            onClick={() => onTab(entry.id)}
+          >
+            <span className="shape-tab-no">{entry.number}</span> {entry.label}
+          </button>
+        ))}
+      </div>
+      <div
+        className="shape-layer"
+        role="tabpanel"
+        aria-label={TABS.find((entry) => entry.id === tab)?.label}
+      >
+        {tab === "intent" ? <IntentLayer node={node} /> : null}
+        {tab === "shape" ? (
+          <ShapeLayer node={node} enabled={enabled} renderMermaid={renderMermaid} />
+        ) : null}
+        {tab === "code" ? <CodeLayer node={node} root={root} /> : null}
+      </div>
+    </div>
+  );
+}
+
+/** The large modal, opened from the panel's code section. */
+export function ShapeModal({
+  node,
+  root,
+  enabled,
+  onClose,
+}: {
+  node: ShapeNode;
+  root: string;
+  enabled: boolean;
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState<ShapeTab>("shape");
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    box.current?.focus();
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+      } else if (event.key === "1") setTab("intent");
+      else if (event.key === "2") setTab("shape");
+      else if (event.key === "3") setTab("code");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="shape-overlay" onClick={onClose}>
+      <div
+        ref={box}
+        className="shape-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${node.title} — Intent, Shape and Code`}
+        tabIndex={-1}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="shape-head">
+          <div>
+            <span className="kind">message</span>
+            <h2>{node.title}</h2>
+          </div>
+          <button type="button" className="drilldown-close" aria-label="Close" onClick={onClose}>
+            ×
+          </button>
+        </header>
+        <ShapeLayers node={node} root={root} tab={tab} enabled={enabled} onTab={setTab} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The panel's code section entry (Story 13.6): a short preview of the Shape and
+ * an Open button that shows the three layers. With no Shape yet it still opens,
+ * and the Shape tab explains why (queued or off).
+ */
+export function ShapeSection({
+  node,
+  root,
+  enabled,
+}: {
+  node: ShapeNode;
+  root: string;
+  enabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const state = shapeState(node.shape, enabled);
+  const preview = shapePreview(node.shape);
+  const diagram = node.shape?.tools.find((tool) => tool.kind === "mermaid" && tool.valid !== false);
+  return (
+    <section className="shape-section">
+      <h3>Intent, Shape and Code</h3>
+      {state === "ready" ? (
+        preview ? (
+          <pre className="shape-preview">{preview}</pre>
+        ) : diagram ? (
+          <MermaidDiagram source={diagram.text} className="shape-preview-diagram" />
+        ) : null
+      ) : state === "off" ? (
+        <p className="muted">Shapes are off.</p>
+      ) : state === "empty" ? (
+        <p className="muted">Nothing to show for this change.</p>
+      ) : (
+        <p className="muted">Shape is being prepared.</p>
+      )}
+      <button type="button" className="shape-open" onClick={() => setOpen(true)}>
+        Open
+      </button>
+      {open ? (
+        <ShapeModal node={node} root={root} enabled={enabled} onClose={() => setOpen(false)} />
+      ) : null}
+    </section>
+  );
+}

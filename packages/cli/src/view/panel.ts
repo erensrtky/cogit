@@ -69,6 +69,7 @@ export function panelSettings(config: Config): PanelSettings {
     startupContext: config.startupContext,
     recordHeadless: config.recordHeadless,
     tryBeforeNotes: config.tryBeforeNotes,
+    shapes: config.shapes,
     shareConversations: config.shareConversations,
     recordCommit: config.recordCommit,
     gitPolicy: config.gitPolicy,

@@ -24,6 +24,7 @@ import {
 import type { OutlineTarget } from "./Outline.js";
 import { peopleOf } from "./people.js";
 import { ResumeButton } from "./ResumeButton.js";
+import { ShapeSection } from "./ShapeModal.js";
 
 /**
  * What the drill-down shows: a message (with the branch it belongs to) or a
@@ -410,6 +411,13 @@ function NodeDetails({
           </ul>
         </section>
       ) : null}
+      {node.kind === "message" && node.commits?.length ? (
+        <ShapeSection
+          node={node}
+          root={model.project.path}
+          enabled={model.settings?.shapes ?? true}
+        />
+      ) : null}
       {node.kind === "message" && node.change ? (
         <section>
           <h3>Code landed</h3>
@@ -701,7 +709,11 @@ export function DrillDown({
   useEffect(() => {
     if (!selection) return;
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        // The three-layer modal sits on top; Escape closes it first.
+        if (document.querySelector(".shape-overlay") !== null) return;
+        onClose();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

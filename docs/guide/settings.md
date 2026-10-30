@@ -48,6 +48,14 @@ Some plugins and scripts run `claude -p` in the background, often once per promp
 
 Before the agent edits a file, it hears which options earlier thoughts tried and rejected for that file. These are notes from the record, never rules; they can make the agent ask before repeating a dead end.
 
+### Intent, Shape and Code
+
+`shapes` · default `true`
+
+**A small picture of what each change does, beside its reason and its diff.**
+
+For every message that landed commits, a small representation of what the change does: numbered plain-language steps or a Mermaid diagram. It sits between the record's intent (the decision, reason and rejected options) and the code (the diff), so a reviewer sees why, what and how in one place. The recorder writes it, not you; it costs one small model call per such message. Off, the map says so and nothing is written.
+
 ### Language
 
 `language` · default `auto`

@@ -19,7 +19,7 @@ const templateAsText: Plugin = {
 export default defineConfig({
   plugins: [templateAsText],
   test: {
-    include: ["packages/*/test/**/*.test.ts"],
+    include: ["packages/*/test/**/*.test.{ts,tsx}"],
     globalSetup: ["./packages/cli/test/global-setup.ts"],
     coverage: {
       provider: "v8",

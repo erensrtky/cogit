@@ -388,7 +388,7 @@ describe("ignore files and git hooks", () => {
     await hooksInstall(root, io);
     await hooksInstall(root, io);
     expect(io.lines).toEqual([
-      "Added the cogit block to: pre-commit, prepare-commit-msg",
+      "Added the cogit block to: pre-commit, prepare-commit-msg, post-commit",
       "The cogit hook blocks are already current.",
     ]);
     await hooksUninstall(root, io);

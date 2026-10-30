@@ -80,7 +80,22 @@ panel over the map.
   session with the same history and the original stays as it was. On the map the fork starts from
   the message it was forked at, like a session that continues another.
 
-## "Your turn"
+## Intent, Shape and Code
+
+A message that landed commits has three layers, in that order:
+
+- **Intent** — the record: the decision, the reason you gave, who decided, and the options
+  that were rejected. It is read as recorded, never rewritten here.
+- **Shape** — a small representation of what the change *does*: numbered plain-language
+  steps naming the functions and files, or a Mermaid diagram of the new path between them.
+  The recorder writes it, not you; the map draws the diagram in the page, offline included.
+- **Code** — the message's commits and their diffs, the same patches the panel opens.
+
+The message details show a short preview and an **Open** button. Open shows the three layers
+with 1/2/3 tabs (the number keys work too), starting on Shape. A message with nothing
+recorded yet says "being prepared"; with `shapes` off, it says so.
+
+
 
 Above the panel's project cards, and folded in a project map's head, the "Your turn" inbox
 lists the sessions waiting on you: the agent wrote last, or the record says it needs your

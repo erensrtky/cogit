@@ -107,6 +107,18 @@ const EDITABLE: FieldSpec[] = [
     kind: "boolean",
   },
   {
+    key: "shapes",
+    label: "Intent, Shape and Code",
+    help: "A small picture of what each change does, beside its reason and its diff.",
+    details:
+      "For every message that landed commits, a small representation of what the change does: " +
+      "numbered plain-language steps or a Mermaid diagram. It sits between the record's intent " +
+      "(the decision, reason and rejected options) and the code (the diff), so a reviewer sees " +
+      "why, what and how in one place. The recorder writes it, not you; it costs one small " +
+      "model call per such message. Off, the map says so and nothing is written.",
+    kind: "boolean",
+  },
+  {
     key: "language",
     label: "Language",
     help: "Language the agent writes records in; `auto` follows the chat.",
@@ -270,6 +282,7 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   startupContext: true,
   recordHeadless: false,
   tryBeforeNotes: true,
+  shapes: true,
   shareConversations: false,
   recordCommit: "ask",
   gitPolicy: "commit",
@@ -289,6 +302,7 @@ export function editableSettings(settings: PanelSettings): PanelEditableSettings
     startupContext: settings.startupContext,
     recordHeadless: settings.recordHeadless,
     tryBeforeNotes: settings.tryBeforeNotes,
+    shapes: settings.shapes,
     language: settings.language,
     shareConversations: settings.shareConversations,
     recordCommit: settings.recordCommit,

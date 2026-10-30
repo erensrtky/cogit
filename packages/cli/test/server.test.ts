@@ -571,6 +571,7 @@ describe("settings read", () => {
         startupContext: true,
         recordHeadless: false,
         tryBeforeNotes: true,
+        shapes: true,
         language: "auto",
         shareConversations: false,
         recordCommit: "ask",

@@ -31,6 +31,47 @@ export const AgentDecision = z.object({
 export const MESSAGE_ID = /^m[1-9][0-9]*$/;
 
 /**
+ * How a Shape shows what a change does (Story 13.6). Two tools today; the
+ * registry in `shape.ts` says when each fits and validates its output.
+ */
+export const ShapeKind = z.enum(["pseudo", "mermaid"]);
+export type ShapeKind = z.infer<typeof ShapeKind>;
+
+/**
+ * One tool's answer: plain-language pseudo-code, or Mermaid source. `valid` is
+ * set by the CLI, never by a writer: an output the registry refused keeps its
+ * text (so nothing is lost) and the map shows it as text instead of drawing it.
+ */
+export const ShapeTool = z.object({
+  kind: ShapeKind,
+  text: z.string().min(1).max(4000),
+  valid: z.boolean().optional(),
+});
+
+/**
+ * What a message's change does, between its Intent (the record) and its Code
+ * (the diff). One per message, covering every commit the message landed. An
+ * empty `tools` list is a real answer: the writer saw nothing worth showing.
+ */
+export const Shape = z.object({
+  tools: z.array(ShapeTool).max(3).default([]),
+  /** Who wrote it: the main agent or the side model (the CLI stamps it). */
+  by: z.enum(["agent", "side"]).optional(),
+  /** The message's commits this Shape was written from. */
+  commits: z
+    .array(z.string().regex(/^[0-9a-f]{7,40}$/, "a commit hash"))
+    .max(20)
+    .default([]),
+  /** When it was written (the CLI stamps it). */
+  at: IsoDate.optional(),
+});
+
+/** What a writer sends for a Shape: the tools' answers and the commits they cover. */
+export const ShapeInput = Shape.omit({ by: true, at: true }).extend({
+  tools: z.array(ShapeTool.omit({ valid: true })).max(3),
+});
+
+/**
  * The summary a branch carries on its first message: what the thread asked,
  * what came of it and what is still open.
  */
@@ -73,6 +114,11 @@ export const LineageNode = z.object({
   work: z.array(z.string().min(1).max(300)).max(20).optional(),
   /** For a message: choices the agent made on its own along the way. */
   agentDecisions: z.array(AgentDecision).max(10).optional(),
+  /**
+   * For a message that landed commits: a small representation of what the
+   * change does (Story 13.6). Missing means nobody wrote one yet.
+   */
+  shape: Shape.optional(),
   /**
    * Who wrote each optional field (Story 12.1): the main agent or the side
    * model. A missing entry means the agent (every record written before the
@@ -153,6 +199,9 @@ export const LineageNodeInput = LineageNode.omit({
   by: true,
 }).extend({
   parent: MessageRef.nullable().optional(),
+  // The CLI stamps `by`, `at` and each tool's `valid`; a writer sends only the
+  // answers and the commits they cover.
+  shape: ShapeInput.optional(),
 });
 
 /**
@@ -173,6 +222,9 @@ export type LineageNode = z.infer<typeof LineageNode>;
 export type LineageNodeInput = z.infer<typeof LineageNodeInput>;
 export type BranchSummary = z.infer<typeof BranchSummary>;
 export type AgentDecision = z.infer<typeof AgentDecision>;
+export type Shape = z.infer<typeof Shape>;
+export type ShapeTool = z.infer<typeof ShapeTool>;
+export type ShapeInput = z.infer<typeof ShapeInput>;
 export type Status = z.infer<typeof Status>;
 export type Session = z.infer<typeof Session>;
 export type SessionInput = z.infer<typeof SessionInput>;

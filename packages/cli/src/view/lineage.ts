@@ -122,6 +122,8 @@ export function buildMessages(
         ...(node.files?.length ? { files: node.files } : {}),
         ...(node.work?.length ? { work: node.work } : {}),
         ...(node.agentDecisions?.length ? { agentDecisions: node.agentDecisions } : {}),
+        // Story 13.6: the Shape travels with the record, as written and validated.
+        ...(node.shape === undefined ? {} : { shape: node.shape }),
         ...(node.addedAt === undefined ? {} : { addedAt: node.addedAt }),
         ...(node.touchedAt === undefined ? {} : { touchedAt: node.touchedAt }),
         ...(node.branch === undefined ? {} : { branch: node.branch }),

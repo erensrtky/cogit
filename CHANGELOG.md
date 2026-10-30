@@ -6,12 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Intent, Shape and Code: a message that landed commits gets a **Shape** — numbered plain-language steps or a Mermaid diagram of what the change does — between its recorded Intent and its diff. The side panel previews it and **Open** shows the three layers with 1/2/3 tabs. The side model writes it after a commit (detached, behind its own lock) in the mixed and side modes, the agent writes it in the record skill, and `shapes` (on by default) turns it off. Release bumps, lockfiles, CHANGELOG-only changes and changes under five lines are skipped; an invalid diagram is kept as text.
 - `cogit why <file>:<line>` (or `--line N`) shows only the thought behind that line: git blames the line to its commit, the commit's `Thought:` trailer names the message, and `why` prints that message's decision and rejected options. When the commit carries no thought it says so and lists the file's other thoughts; a line past the end of the file is an error.
 - `cogit doctor` explains why the map may stay empty: read-only checks for Node, the Claude Code plugin and its version, git identity, the project and its hooks, the skill permission, transcripts and their retention, recorded sessions and the unrecorded tail, the map server and the close-pass log. Each line says `ok`, `warn` or `fail` with the command that fixes it; `--json` prints the report, and a failed check exits 1.
 - `cogit init` warns when git has no `user.email`, since sessions are now told apart by it.
 - The map tells your sessions from your teammates': a teammate's session always shows their name and yours never needs to, the side panel marks yours "(you)", and a new Everyone / You / teammate choice in the toolbar fades the other people's sessions.
 
 ### Changed
+- `cogit init` and `cogit hooks install` also add a `post-commit` block now, which queues a Shape after a commit without blocking it; `cogit doctor` flags it when missing. Existing projects get it with `cogit hooks install`.
 - The README and the guide now describe what 0.20–0.25 ship: the map without epochs (row widths, open sessions remembered, the panel beside the map, one date shape, the person filter), Resume and Fork, forked sessions, `cogit doctor`, `why <file>:<line>` and the git-email identity. The map screenshots and the README demo are recorded again from the current map.
 - A session records its author's git email next to their name, and people are told apart by email, as in git.
 - A session only continues its author's own earlier sessions: after a pull, a teammate's sessions are no longer offered as the start of yours, and the map no longer draws a session as the continuation of someone else's.

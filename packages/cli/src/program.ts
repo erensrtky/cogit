@@ -21,6 +21,7 @@ import { openPanel, openProject } from "./commands/open.js";
 import { pr } from "./commands/pr.js";
 import { search } from "./commands/search.js";
 import { readStdin, sessionShow, sessionWrite } from "./commands/session.js";
+import { shapeMessage } from "./commands/shape.js";
 import { why } from "./commands/why.js";
 import { isGitHookEvent, runGitHook } from "./git-hooks.js";
 import { runHook } from "./hooks/run.js";
@@ -412,6 +413,19 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .action(
       run(async (opts: { dryRun?: boolean }) =>
         configPrune({ dryRun: opts.dryRun === true }, makeIo(false)),
+      ),
+    );
+
+  program
+    .command("shape")
+    .description("write the Shape of the newest message that landed commits (side model)")
+    .helpGroup("Agent:")
+    .argument("[session-id]", "session id; defaults to the session in .cogit/HEAD")
+    .option("-C, --dir <dir>", "project directory", ".")
+    .addHelpText("after", examples("cogit shape", "cogit shape 9c32ab18"))
+    .action(
+      run(async (sessionId: string | undefined, opts: { dir: string }) =>
+        shapeMessage(opts.dir, sessionId, makeIo(false)),
       ),
     );
 

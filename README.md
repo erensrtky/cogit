@@ -22,6 +22,8 @@ Claude Code today.
   continue it as a new one.
 - **Commits point back to their reason**: a `Thought:` trailer on each commit;
   `cogit show <sha>`, `cogit blame` and `cogit why` follow it back.
+- **Intent, Shape, Code**: a message that landed commits shows why it happened, a small
+  picture of what the change does (plain steps or a diagram), and the diff, in one place.
 - **Pull request descriptions with the decisions**: `cogit pr` writes the goal, the
   decisions and the rejected options, never the raw chat.
 - **Teams share the record through git**: after a pull, your teammates' sessions are on the

@@ -249,6 +249,48 @@
                 "title"
               ]
             }
+          },
+          "shape": {
+            "type": "object",
+            "properties": {
+              "tools": {
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "pseudo",
+                        "mermaid"
+                      ]
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4000
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "text"
+                  ]
+                }
+              },
+              "commits": {
+                "default": [],
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{7,40}$"
+                }
+              }
+            },
+            "required": [
+              "tools"
+            ]
           }
         },
         "required": [

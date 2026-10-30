@@ -22,6 +22,7 @@ import { parseMessageRef, Slug } from "../schema/common.js";
 import type { SessionEvent } from "../schema/events.js";
 import { mergeSession } from "../schema/merge.js";
 import { MESSAGE_ID, type Session, SessionInput } from "../schema/session.js";
+import { stampShape } from "../shape.js";
 import {
   appendEvents,
   applyEvents,
@@ -92,13 +93,18 @@ export async function sessionWrite(
   }
 
   const { value: redacted, count } = redactDeep(parsed.data);
+  // Story 13.6: shapes are written only while the setting is on; the CLI owns
+  // the stamp and each tool's validation, so every writer's answer is stored
+  // the same way.
+  const config = await loadConfig(io.env);
+  const stamped = stampShapes(redacted, opts.by ?? "agent", io.now(), config.shapes, io);
   // Both ids work: the agent may send the stable `h…` id, or the `m1` label it
   // reads in `session show`; the CLI maps the label to the stable id.
   const messages = await readSessionMessages(root, redacted.sessionId, io.env);
   // The side model runs on this same transcript, so a message id it does not
   // know is made up; its node is dropped instead of stored beside the real one.
   const input = withForkParent(
-    nameMessages(redacted, messages, io, opts.by === "side"),
+    nameMessages(stamped, messages, io, opts.by === "side"),
     messages,
     await forkParent(redacted.sessionId, io.env),
   );
@@ -161,6 +167,41 @@ export async function sessionWrite(
   } catch (err) {
     io.warn(`could not build map.html: ${(err as Error).message}`);
   }
+}
+
+/**
+ * Stamps every Shape a writer sent (Story 13.6): who wrote it, when, and what
+ * the registry thinks of each tool's output. A refused output keeps its text
+ * and only loses its `valid` mark, so nothing is dropped silently. With shapes
+ * off, no Shape is written at all.
+ */
+function stampShapes(
+  input: SessionInput,
+  by: "agent" | "side",
+  at: string,
+  enabled: boolean,
+  io: Io,
+): SessionInput {
+  if (!input.nodes?.some((node) => node.shape !== undefined)) return input;
+  let warnedOff = false;
+  const nodes = input.nodes.map((node) => {
+    if (node.shape === undefined) return node;
+    if (!enabled) {
+      if (!warnedOff) {
+        io.warn("shapes are off; the shape was not recorded");
+        warnedOff = true;
+      }
+      const { shape: _dropped, ...rest } = node;
+      return rest;
+    }
+    const shape = stampShape(node.shape, by, at);
+    for (const tool of shape.tools) {
+      if (tool.valid === false)
+        io.warn(`shape ${tool.kind}: the output does not match the tool's format; kept as text`);
+    }
+    return { ...node, shape };
+  });
+  return { ...input, nodes };
 }
 
 /**

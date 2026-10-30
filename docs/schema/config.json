@@ -52,6 +52,10 @@
       "default": false,
       "type": "boolean"
     },
+    "shapes": {
+      "default": true,
+      "type": "boolean"
+    },
     "startupContext": {
       "default": true,
       "type": "boolean"
@@ -137,6 +141,7 @@
     "sideModel",
     "sideEveryTurns",
     "messageSummaries",
+    "shapes",
     "startupContext",
     "recordHeadless",
     "serverPort",

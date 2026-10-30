@@ -447,7 +447,11 @@ describe("the thought behind a commit (Story 9.4)", () => {
       const preCommit = join(root, ".git", "hooks", "pre-commit");
       await writeFile(preCommit, userHook);
       await chmod(preCommit, 0o755);
-      expect(await installGitHooks(root)).toEqual(["pre-commit", "prepare-commit-msg"]);
+      expect(await installGitHooks(root)).toEqual([
+        "pre-commit",
+        "prepare-commit-msg",
+        "post-commit",
+      ]);
       expect(await readFile(preCommit, "utf8")).toBe(
         `${userHook}\n${hookBlock("pre-commit", root)}\n`,
       );
@@ -456,7 +460,11 @@ describe("the thought behind a commit (Story 9.4)", () => {
       );
       expect(await installGitHooks(root)).toEqual([]);
 
-      expect(await uninstallGitHooks(root)).toEqual(["pre-commit", "prepare-commit-msg"]);
+      expect(await uninstallGitHooks(root)).toEqual([
+        "pre-commit",
+        "prepare-commit-msg",
+        "post-commit",
+      ]);
       expect(await readFile(preCommit, "utf8")).toBe(userHook);
       // The file held nothing but cogit's shebang and block, so it is gone.
       expect(existsSync(join(root, ".git", "hooks", "prepare-commit-msg"))).toBe(false);
@@ -471,7 +479,11 @@ describe("the thought behind a commit (Story 9.4)", () => {
       expect(await readFile(join(root, ".husky", "prepare-commit-msg"), "utf8")).toContain(
         "cogit hook prepare-commit-msg",
       );
-      expect(await uninstallGitHooks(root)).toEqual(["pre-commit", "prepare-commit-msg"]);
+      expect(await uninstallGitHooks(root)).toEqual([
+        "pre-commit",
+        "prepare-commit-msg",
+        "post-commit",
+      ]);
       expect(await readFile(join(root, ".husky", "pre-commit"), "utf8")).toBe(userHook);
 
       // No repository and no block: nothing to do.
@@ -501,7 +513,9 @@ describe("the thought behind a commit (Story 9.4)", () => {
       const program = createProgram(() => io);
       program.exitOverride().configureOutput({ writeOut: () => {}, writeErr: () => {} });
       await program.parseAsync(["hooks", "uninstall", root], { from: "user" });
-      expect(io.lines.at(-1)).toBe("Removed the cogit block from: pre-commit, prepare-commit-msg");
+      expect(io.lines.at(-1)).toBe(
+        "Removed the cogit block from: pre-commit, prepare-commit-msg, post-commit",
+      );
 
       await program.parseAsync(["hooks", "uninstall", root], { from: "user" });
       expect(io.lines.at(-1)).toBe("No cogit hook blocks to remove.");

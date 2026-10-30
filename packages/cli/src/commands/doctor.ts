@@ -439,7 +439,7 @@ async function hookProblems(ctx: DoctorContext): Promise<string[]> {
   const dir = await gitHooksDir(gitRoot);
   if (dir === undefined) return ["the git hooks directory could not be found"];
   const problems: string[] = [];
-  for (const event of ["prepare-commit-msg", "pre-commit"] as const) {
+  for (const event of ["prepare-commit-msg", "pre-commit", "post-commit"] as const) {
     const text = await readFile(join(dir, event), "utf8").catch(() => undefined);
     if (text === undefined || !text.includes(BLOCK_START)) {
       problems.push(`the ${event} hook is missing`);
