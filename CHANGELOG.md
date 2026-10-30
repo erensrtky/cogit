@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.25.0] - 2026-10-30
+## [0.25.0] - 2026-10-31
 ### Added
 - Intent, Shape and Code: a message that landed commits gets a **Shape** — numbered plain-language steps or a Mermaid diagram of what the change does — between its recorded Intent and its diff. The side panel previews it and **Open** shows the three layers with 1/2/3 tabs. The side model writes it after a commit (detached, behind its own lock) in the mixed and side modes, on the message the commit's `Thought:` trailer names; a commit that lands before its message is recorded waits for the record, the agent writes it in the record skill, and `shapes` (on by default) turns it off. Release bumps, lockfiles, CHANGELOG-only changes and changes under five lines are skipped without holding back older messages; an invalid diagram is kept as text. Mermaid ships once beside the CLI and the local server hands it to the map, so `map.html` stays about 550 kB; a map opened from `file://` shows the diagram's source instead.
 - `cogit why <file>:<line>` (or `--line N`) shows only the thought behind that line: git blames the line to its commit, the commit's `Thought:` trailer names the message, and `why` prints that message's decision and rejected options. When the commit carries no thought it says so and lists the file's other thoughts; a line past the end of the file is an error.
