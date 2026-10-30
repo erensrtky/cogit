@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- A session the closing pass left untitled no longer shows as a bare id on the map and in the inbox: it takes its first message's title, and the side model is now told to write a title when the record has none.
+
 ### Changed
 - Map rows show the date only on a day's first row (the rest show the time), the `mN` label is quieter, and "↑ continues <session> · m37" is now "↑ m37" with the session in its tooltip.
 

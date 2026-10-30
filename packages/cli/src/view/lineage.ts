@@ -231,6 +231,16 @@ export function statusCard(sessions: Session[], now: string): StatusCard {
 }
 
 /**
+ * The title a session shows: its own, else its first message's, so a record the
+ * recorder left untitled reads as what it is about instead of a bare id.
+ */
+export function sessionTitle(session: Pick<Session, "title" | "nodes">): string {
+  const own = session.title.trim();
+  if (own) return own;
+  return session.nodes.find((node) => node.kind === "message")?.title.trim() ?? "";
+}
+
+/**
  * The messages the record does not hold yet join the end of the chain, so the
  * newest message is on the map before the agent summarizes it (8.2).
  */
@@ -246,7 +256,7 @@ function toViewSession(
   return {
     sessionId: session.sessionId,
     agent: session.agent,
-    title: session.title,
+    title: sessionTitle(session),
     ...(session.author === undefined ? {} : { author: session.author }),
     epoch: session.epoch,
     startedAt: session.startedAt,

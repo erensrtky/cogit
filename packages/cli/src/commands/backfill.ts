@@ -73,6 +73,7 @@ function rules(language: string, messageSummaries: boolean, recorder: RecordMode
   const lines = [
     "Rules (from the cogit lineage skill):",
     '- Send one "message" node for every message below, with the id exactly as given in its heading (m1, m2, …); skip none, even a short "ok". Never make up an id.',
+    "- The session title: when the record's title is empty, send one (a few words on what the session is about); a session without one shows only its id on the map.",
     `- kind is "message". title: a few words in the user's own wording.${
       messageSummaries ? " summary: one or two sentences on what came of it." : ""
     }`,
@@ -88,7 +89,7 @@ function rules(language: string, messageSummaries: boolean, recorder: RecordMode
   ];
   if (recorder === "mixed") {
     lines.push(
-      "- This is a periodic background run: send only message nodes with their titles, parents and user decisions. Do not send status, branch summaries or agentDecisions; the main agent owns those.",
+      "- This is a periodic background run: send only message nodes with their titles, parents and user decisions, and the session title when it is empty. Do not send status, branch summaries or agentDecisions; the main agent owns those.",
     );
   }
   return lines.join("\n");

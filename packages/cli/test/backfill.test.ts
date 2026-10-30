@@ -135,10 +135,13 @@ describe("catchUpPrompt", () => {
     expect(prompt).toContain("branch summary");
     expect(prompt).toContain("only for technical choices with a reason");
     expect(prompt).toContain("decidedBy");
+    // A closing pass once left a session untitled, so the map showed its bare id.
+    expect(prompt).toContain("when the record's title is empty, send one");
     // The periodic mixed run writes messages and user decisions only.
     const mixed = catchUpPrompt([turn], undefined, "s1", "auto", false, "mixed");
     expect(mixed).toContain("periodic background run");
     expect(mixed).toContain("Do not send status, branch summaries or agentDecisions");
+    expect(mixed).toContain("and the session title when it is empty");
     const side = catchUpPrompt([turn], undefined, "s1", "auto", false, "side");
     expect(side).not.toContain("periodic background run");
     const agent = catchUpPrompt([turn], undefined, "s1", "auto", false, "agent");

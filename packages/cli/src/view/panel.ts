@@ -19,7 +19,7 @@ import {
   type InboxCandidate,
   inboxRows,
 } from "./inbox.js";
-import { embedViewModel, lastActive, statusCard } from "./lineage.js";
+import { embedViewModel, lastActive, sessionTitle, statusCard } from "./lineage.js";
 import {
   type PanelSettings,
   type PanelViewModel,
@@ -211,7 +211,7 @@ export async function collectInboxForProject(
       projectPath: project.path,
       mapUrl: pathToFileURL(projectPaths(project.path).html).href,
       sessionId: session.sessionId,
-      sessionTitle: session.title || session.sessionId,
+      sessionTitle: sessionTitle(session) || session.sessionId,
       turn,
       lastActivity: activityIso(session),
       needsUser,
