@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-10-30
 ### Fixed
 - `cogit --version` said 0.22.0 in the 0.23.0 package: publishing now always builds first, so the bundled version matches the package.
 
