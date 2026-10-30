@@ -2160,10 +2160,6 @@ time {
   background: var(--hover);
 }
 
-.git-row.in-branch {
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
-}
-
 .git-row.is-selected {
   background: var(--active);
   outline: 1px solid var(--accent);

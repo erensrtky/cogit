@@ -30,7 +30,6 @@ function Row({
   row,
   sameDay,
   selected,
-  branchSelected,
   searchHit,
   searchActive,
   read,
@@ -42,7 +41,6 @@ function Row({
   /** The row above is on the same day, so this one shows only the time. */
   sameDay: boolean;
   selected: boolean;
-  branchSelected: boolean;
   /** The message matches the search (Story 8.14). */
   searchHit: boolean;
   /** The hit the ↑/↓ counter is on. */
@@ -57,7 +55,6 @@ function Row({
   const style = {
     top: row.y - row.height / 2,
     height: row.height,
-    borderColor: branchSelected ? color(row.colorIndex) : undefined,
   };
 
   if (row.kind === "more") {
@@ -85,7 +82,6 @@ function Row({
   const className = [
     "git-row",
     selected ? "is-selected" : "",
-    branchSelected ? "in-branch" : "",
     searchHit ? "is-search-hit" : "",
     searchActive ? "is-search-active" : "",
     unreadBig ? "is-unread-big" : "",
@@ -146,7 +142,6 @@ function Row({
 export function GitGraph({
   git,
   selectedId,
-  activeSegmentId,
   highlightIds,
   activeHitId,
   readIds,
@@ -158,7 +153,6 @@ export function GitGraph({
   /** Message id of the open drill-down, if it belongs to this session. */
   selectedId: string | null;
   /** Branch the drill-down belongs to. */
-  activeSegmentId: string | null;
   /** Messages that match the map search (Story 8.14); undefined when none. */
   highlightIds: ReadonlySet<string> | undefined;
   /** The search hit the counter is on, if it belongs to this session. */
@@ -256,7 +250,6 @@ export function GitGraph({
               row={row}
               sameDay={sameDay}
               selected={messageId !== null && selectedId !== null && messageId === selectedId}
-              branchSelected={activeSegmentId !== null && row.segmentId === activeSegmentId}
               searchHit={messageId !== null && highlightIds?.has(messageId) === true}
               searchActive={messageId !== null && activeHitId !== null && messageId === activeHitId}
               read={messageId !== null && readIds.has(messageId)}

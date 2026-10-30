@@ -70,4 +70,16 @@ describe("Story 9.3 on the map", () => {
     );
     expect(html).toContain("This conversation is not on this machine");
   });
+
+  it("shows the message's branch however the message was opened", () => {
+    // The selection carries no branch: the outline and a map click open it alike.
+    const html = renderToStaticMarkup(
+      createElement(DrillDown, {
+        model: modelOf(session),
+        selection: { type: "node", sessionId: "s1", nodeId: "h1" },
+        onClose: () => {},
+      }),
+    );
+    expect(html).toContain('class="branch-detail fold"');
+  });
 });

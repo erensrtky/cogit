@@ -58,7 +58,7 @@ const GraphActions = createContext<{
   /** Unread messages at or above this many lines get the quiet highlight. */
   bigChangeLines: number;
   openSession: (sessionId: string) => void;
-  openNode: (sessionId: string, messageId: string, branchId?: string) => void;
+  openNode: (sessionId: string, messageId: string) => void;
   openContinue: (sessionId: string, messageId: string) => void;
   unfold: (segmentId: string) => void;
   /** Sets the width of the open sessions' message rows (their right edge). */
@@ -115,12 +115,11 @@ function SessionMessages({
       <GitGraph
         git={git}
         selectedId={selection?.type === "node" && own ? selection.nodeId : null}
-        activeSegmentId={selection?.type === "node" && own ? (selection.branchId ?? null) : null}
         highlightIds={highlights}
         activeHitId={activeHitId}
         readIds={readIds}
         bigChangeLines={bigChangeLines}
-        onSelect={(row) => openNode(session.sessionId, row.message.id, row.segmentId)}
+        onSelect={(row) => openNode(session.sessionId, row.message.id)}
         onUnfold={unfold}
       />
       <RowEdge
@@ -574,15 +573,10 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     [openIds],
   );
   const openNode = useCallback(
-    (sessionId: string, messageId: string, branchId?: string) => {
+    (sessionId: string, messageId: string) => {
       ensureOpen(sessionId);
       setFocusedId(`node:session:${sessionId}:${messageId}`);
-      setSelection({
-        type: "node",
-        sessionId,
-        nodeId: messageId,
-        ...(branchId === undefined ? {} : { branchId }),
-      });
+      setSelection({ type: "node", sessionId, nodeId: messageId });
     },
     [ensureOpen],
   );

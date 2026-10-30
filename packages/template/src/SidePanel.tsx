@@ -31,7 +31,7 @@ import { ResumeButton } from "./ResumeButton.js";
  * showing stale text.
  */
 export type Selection =
-  | { type: "node"; sessionId: string; nodeId: string; branchId?: string | undefined }
+  | { type: "node"; sessionId: string; nodeId: string }
   | { type: "session"; sessionId: string };
 
 function findSession(model: LineageViewModel, sessionId: string): ViewSession | undefined {
@@ -256,7 +256,7 @@ function branchOf(session: ViewSession, messageId: string): string | undefined {
   )?.id;
 }
 
-/** The branch summary a clicked row opens the panel with (Story 8.2). */
+/** The branch summary of the selected message (Story 8.2), wherever it was opened from. */
 function BranchDetails({
   session,
   branchId,
@@ -325,7 +325,6 @@ function MessageNav({
               type: "node",
               sessionId: session.sessionId,
               nodeId: target.id,
-              ...(branchOf(session, target.id) ? { branchId: branchOf(session, target.id) } : {}),
             },
           })
       : undefined;
@@ -344,7 +343,6 @@ function MessageNav({
 function NodeDetails({
   model,
   node,
-  branchId,
   onNavigate,
   read,
   onToggleRead,
@@ -353,7 +351,6 @@ function NodeDetails({
 }: {
   model: LineageViewModel;
   node: NodeDetail;
-  branchId?: string | undefined;
   onNavigate: ((target: OutlineTarget) => void) | undefined;
   /** The user marked this message read (Story 10.3). */
   read: boolean;
@@ -516,7 +513,9 @@ function NodeDetails({
         <p className="muted">Open with `cogit open` to see diffs.</p>
       ) : null}
       {node.kind === "message" ? <Conversation session={session} id={node.nodeId} /> : null}
-      {session ? <BranchDetails session={session} branchId={branchId} /> : null}
+      {session ? (
+        <BranchDetails session={session} branchId={branchOf(session, node.nodeId)} />
+      ) : null}
       <dl className="drilldown-meta">
         <Field label={node.kind === "message" ? "Sent" : "Recorded"}>
           {formatTime(node.at ?? node.addedAt ?? null)}
@@ -771,7 +770,6 @@ export function DrillDown({
         <NodeDetails
           model={model}
           node={node}
-          branchId={selection.branchId}
           onNavigate={onNavigate}
           read={read}
           onToggleRead={onToggleRead}

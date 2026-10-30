@@ -76,7 +76,6 @@ function renderGraph(readIds: ReadonlySet<string>): string {
     createElement(GitGraph, {
       git: layoutGitGraph(session.messages),
       selectedId: null,
-      activeSegmentId: null,
       highlightIds: undefined,
       activeHitId: null,
       readIds,
@@ -110,7 +109,6 @@ describe("how much code landed on the map (10.3)", () => {
       createElement(GitGraph, {
         git: layoutGitGraph(session.messages),
         selectedId: null,
-        activeSegmentId: null,
         highlightIds: undefined,
         activeHitId: null,
         readIds: new Set(),
