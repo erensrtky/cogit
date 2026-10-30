@@ -1,9 +1,9 @@
 import { realpathSync } from "node:fs";
 import { chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { findGitRoot, gitHooksDir } from "./git.js";
+import { findGitRoot, gitHooksDir, resolveCommit } from "./git.js";
 import { spawnDetachedProcess } from "./hooks/run.js";
-import { readSessionHead, stageSessionFiles } from "./session-git.js";
+import { stageSessionFiles } from "./session-git.js";
 import { atomicWrite } from "./store/fs.js";
 import { captureDisabled, projectPaths } from "./store/paths.js";
 import { loadConfig } from "./store/stores.js";
@@ -176,25 +176,28 @@ export async function uninstallGitHooks(root: string): Promise<GitHookEvent[]> {
 }
 
 /**
- * Queues the Shape of the session that just committed (Story 13.6). Detached
- * and silent: a commit never waits for a side-model run, and a failure lands in
- * the detached log like the session-end pass. In `agent` mode the record skill
- * writes the Shape itself, so there is nothing to queue.
+ * Starts the Shape of the commit that just landed (Story 13.6). The commit's
+ * `Thought:` trailer, read by the shape run, names the message, so the Shape
+ * lands on the session that committed, not on whichever session wrote
+ * `.cogit/HEAD` last. Detached and silent: a commit never waits for a
+ * side-model run, and a failure lands in the detached log like the session-end
+ * pass. In `agent` mode the record skill writes the Shape itself.
  */
-async function queueShape(dir: string, env: NodeJS.ProcessEnv): Promise<void> {
+async function queueShape(
+  dir: string,
+  env: NodeJS.ProcessEnv,
+  spawn: typeof spawnDetachedProcess,
+): Promise<void> {
   if (captureDisabled(env)) return;
   const config = await loadConfig(env).catch(() => undefined);
   if (config === undefined || !config.shapes || config.recorder === "agent") return;
-  const head = await readSessionHead(dir);
-  if (head === undefined) return;
+  const gitRoot = await findGitRoot(dir);
+  if (gitRoot === undefined) return;
+  const commit = await resolveCommit(gitRoot, "HEAD");
+  if (commit === undefined) return;
   const cli = currentCliPath();
   if (cli === undefined) return;
-  spawnDetachedProcess(
-    cli,
-    ["shape", head.sessionId, "-C", dir],
-    env,
-    projectPaths(dir).detachedLog,
-  );
+  spawn(cli, ["shape", "--commit", commit, "-C", dir], env, projectPaths(dir).detachedLog);
 }
 
 /**
@@ -209,13 +212,14 @@ export async function runGitHook(
   env: NodeJS.ProcessEnv = process.env,
   args: readonly string[] = [],
   now: Date = new Date(),
+  spawn: typeof spawnDetachedProcess = spawnDetachedProcess,
 ): Promise<void> {
   if (event === "pre-commit") {
     await stageSessionFiles(dir, env);
     return;
   }
   if (event === "post-commit") {
-    await queueShape(dir, env);
+    await queueShape(dir, env, spawn);
     return;
   }
   const [messageFile, source] = args;

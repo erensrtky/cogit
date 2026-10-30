@@ -22,6 +22,24 @@ export async function findGitRoot(dir: string): Promise<string | undefined> {
   }
 }
 
+/** The full hash `ref` names (`HEAD`, a short hash), or undefined. */
+export async function resolveCommit(root: string, ref: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await exec("git", [
+      "-C",
+      root,
+      "rev-parse",
+      "--verify",
+      "--quiet",
+      `${ref}^{commit}`,
+    ]);
+    const hash = String(stdout).trim();
+    return hash === "" ? undefined : hash;
+  } catch {
+    return undefined;
+  }
+}
+
 const HEADER = "# cogit";
 
 /** The root line that keeps the whole `.cogit/` out under the ignore policy. */

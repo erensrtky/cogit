@@ -6,6 +6,7 @@ import { type Author, sameAuthor, sessionIdentity, stampedIdentity } from "../au
 export { sessionAuthor } from "../author.js";
 
 import { commitBetween, findGitRoot } from "../git.js";
+import { currentCliPath } from "../git-hooks.js";
 import { CliError, type Io } from "../io.js";
 import {
   hashesToLabels,
@@ -23,6 +24,7 @@ import type { SessionEvent } from "../schema/events.js";
 import { mergeSession } from "../schema/merge.js";
 import { MESSAGE_ID, type Session, SessionInput } from "../schema/session.js";
 import { stampShape } from "../shape.js";
+import { drainShapeQueue } from "../shape-queue.js";
 import {
   appendEvents,
   applyEvents,
@@ -167,6 +169,11 @@ export async function sessionWrite(
   } catch (err) {
     io.warn(`could not build map.html: ${(err as Error).message}`);
   }
+
+  // Story 13.6: commits that landed before this message was recorded wait for
+  // it; their Shape starts now, detached. Never a reason to fail the write.
+  if (config.shapes && config.recorder !== "agent")
+    await drainShapeQueue(root, saved, io.env, currentCliPath()).catch(() => 0);
 }
 
 /**

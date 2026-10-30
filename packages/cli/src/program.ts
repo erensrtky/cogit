@@ -421,11 +421,15 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .description("write the Shape of the newest message that landed commits (side model)")
     .helpGroup("Agent:")
     .argument("[session-id]", "session id; defaults to the session in .cogit/HEAD")
+    .option("--commit <sha>", "shape the message this commit's Thought trailer names")
     .option("-C, --dir <dir>", "project directory", ".")
-    .addHelpText("after", examples("cogit shape", "cogit shape 9c32ab18"))
+    .addHelpText(
+      "after",
+      examples("cogit shape", "cogit shape 9c32ab18", "cogit shape --commit HEAD"),
+    )
     .action(
-      run(async (sessionId: string | undefined, opts: { dir: string }) =>
-        shapeMessage(opts.dir, sessionId, makeIo(false)),
+      run(async (sessionId: string | undefined, opts: { dir: string; commit?: string }) =>
+        shapeMessage(opts.dir, sessionId, makeIo(false), { commit: opts.commit }),
       ),
     );
 

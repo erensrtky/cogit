@@ -44,6 +44,8 @@ export function projectPaths(root: string) {
     mapView: join(base, "state", "map.json"),
     /** What the detached hook children (build, side run) printed; local, capped. */
     detachedLog: join(base, "state", "detached.log"),
+    /** Commits waiting for their message's record before a Shape; local. */
+    shapeQueue: join(base, "state", "shape-queue"),
     locks: join(base, "locks"),
     /** Where the skill drops session JSON for `session write --file`. */
     inbox: (id: string) => join(base, "inbox", `${id}.json`),
