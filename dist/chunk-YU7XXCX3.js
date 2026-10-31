@@ -21210,7 +21210,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-DDPCNHQ6.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-DQ2SKMD3.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -21428,9 +21428,11 @@ var AgentDecision = external_exports.object({
   alternatives: external_exports.array(Alternative).max(10).optional()
 });
 var MESSAGE_ID = /^m[1-9][0-9]*$/;
-var ShapeKind = external_exports.enum(["pseudo", "mermaid"]);
+var ShapeKind = external_exports.enum(["pseudo", "mermaid", "table"]);
 var ShapeTool = external_exports.object({
-  kind: ShapeKind,
+  // Any kind is stored: a tool a newer CLI added must not make this record
+  // unreadable here. A kind this CLI does not know is shown as text.
+  kind: external_exports.string().min(1).max(40),
   text: external_exports.string().min(1).max(4e3),
   valid: external_exports.boolean().optional()
 });
@@ -21444,7 +21446,8 @@ var Shape = external_exports.object({
   at: IsoDate.optional()
 });
 var ShapeInput = Shape.omit({ by: true, at: true }).extend({
-  tools: external_exports.array(ShapeTool.omit({ valid: true })).max(3)
+  // A writer names a tool this CLI knows; the record keeps any kind it is given.
+  tools: external_exports.array(ShapeTool.omit({ valid: true }).extend({ kind: ShapeKind })).max(3)
 });
 var BranchSummary = external_exports.object({
   title: external_exports.string().min(1).max(80),
@@ -25709,7 +25712,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "0.25.0",
+  version: "0.25.1",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [
