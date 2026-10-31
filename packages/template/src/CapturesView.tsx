@@ -2,7 +2,6 @@ import { type ReactNode, useEffect, useState } from "react";
 import { timeSince } from "../../cli/src/view/inbox.js";
 import type { ViewCapture, ViewSession } from "../../cli/src/view/model.js";
 import { pageToken, saveCaptureState } from "./data.js";
-import type { FilesTarget } from "./FilesView.js";
 import { formatStamp } from "./format.js";
 
 /**
@@ -11,8 +10,8 @@ import { formatStamp } from "./format.js";
  * (Accept or Dismiss), "Open" the accepted ones (Done), and "Done" the last ten
  * that were closed. The list is the user's, not a plan cogit keeps: no
  * assignment, no priority, no tracker state. An item belongs to its session, so
- * clicking a row's source opens the session's first message — where the map
- * anchors its captured work.
+ * clicking a row opens that session's card in the side panel — where the map
+ * lists its captured work and anchors it on the session's first message.
  */
 
 type CaptureState = ViewCapture["state"];
@@ -42,13 +41,13 @@ function byNewest(a: ViewCapture, b: ViewCapture): number {
   return b.updatedAt.localeCompare(a.updatedAt);
 }
 
-/** Where clicking an item's source takes the map: the session's first message. */
+/** Where clicking an item takes the map: the session's card. */
 export interface CaptureSource {
   sessionTitle: string;
   /** The first message's `mN` label; absent when the session has no messages. */
   label?: string | undefined;
-  /** The message to open; absent when the session has no messages to anchor. */
-  target?: { sessionId: string; messageId: string } | undefined;
+  /** The session to open; absent when the project no longer holds it. */
+  sessionId?: string | undefined;
 }
 
 /**
@@ -65,11 +64,11 @@ export function captureSource(
   if (session === undefined) return { sessionTitle: source.sessionId };
   const first = session.messages[0];
   const sessionTitle = session.title || session.sessionId;
-  if (first === undefined) return { sessionTitle };
+  if (first === undefined) return { sessionTitle, sessionId: session.sessionId };
   return {
     sessionTitle,
     label: first.label ?? first.id,
-    target: { sessionId: session.sessionId, messageId: first.id },
+    sessionId: session.sessionId,
   };
 }
 
@@ -91,8 +90,8 @@ export function CapturesView({
   captures,
   sessions,
   dir,
-  active,
-  onSelect,
+  activeSessionId,
+  onSelectSession,
   onClose,
 }: {
   captures: readonly ViewCapture[] | undefined;
@@ -100,9 +99,10 @@ export function CapturesView({
   sessions: readonly ViewSession[];
   /** The project's path, for the state write. */
   dir: string;
-  /** The message the map has selected, if any. */
-  active: FilesTarget | null;
-  onSelect: (target: FilesTarget) => void;
+  /** The session the map's side panel is showing, if any. */
+  activeSessionId?: string | null;
+  /** Opens one session's card in the side panel (the row's source click). */
+  onSelectSession: (sessionId: string) => void;
   onClose: () => void;
 }) {
   // The page is a snapshot; a state change is shown at once and the live page
@@ -135,9 +135,7 @@ export function CapturesView({
     const source = captureSource(item.source, sessions);
     const age = timeSince(item.updatedAt, now);
     const selected =
-      source.target !== undefined &&
-      active?.sessionId === source.target.sessionId &&
-      active.messageId === source.target.messageId;
+      source.sessionId !== undefined && source.sessionId === activeSessionId;
     return (
       <li key={item.id}>
         <div className={`capture-row${selected ? " is-active" : ""}`}>
@@ -145,9 +143,9 @@ export function CapturesView({
             type="button"
             className="capture-open"
             title={formatStamp(item.updatedAt)}
-            disabled={source.target === undefined}
+            disabled={source.sessionId === undefined}
             onClick={() => {
-              if (source.target !== undefined) onSelect(source.target);
+              if (source.sessionId !== undefined) onSelectSession(source.sessionId);
             }}
           >
             <span className="capture-text">{item.text}</span>

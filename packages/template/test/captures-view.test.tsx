@@ -45,8 +45,8 @@ function render(captures: ViewCapture[] | undefined, sessionsFor = sessions): st
       captures,
       sessions: sessionsFor,
       dir: "/p",
-      active: null,
-      onSelect: () => {},
+      activeSessionId: null,
+      onSelectSession: () => {},
       onClose: () => {},
     }),
   );
@@ -76,12 +76,16 @@ describe("CapturesView", () => {
     expect(render([item({ id: "c00000009", state: "dismissed" })])).toContain("No captured work.");
   });
 
-  it("shows a session with no messages as a source with nothing to open", () => {
-    const html = render([item({ id: "c00000001", state: "suggested" })], [
+  it("opens the session's card, and only a missing session cannot be opened", () => {
+    const empty = render([item({ id: "c00000001", state: "suggested" })], [
       { sessionId: "s1", title: "Empty", messages: [] },
     ] as unknown as ViewSession[]);
-    expect(html).toContain("Empty");
-    expect(html).toContain("disabled");
+    expect(empty).toContain("Empty");
+    // A session with no messages still has a card to open.
+    expect(empty).not.toContain("disabled");
+
+    const gone = render([item({ id: "c00000002", state: "open", source: { sessionId: "gone" } })]);
+    expect(gone).toContain("disabled");
   });
 });
 
@@ -110,7 +114,7 @@ describe("an item's session anchor (Story 15.2)", () => {
     ).toEqual({
       sessionTitle: "s1",
       label: "a1",
-      target: { sessionId: "s1", messageId: "a1" },
+      sessionId: "s1",
     });
   });
 
@@ -127,14 +131,15 @@ describe("an item's session anchor (Story 15.2)", () => {
       {
         sessionTitle: "s2",
         label: "b1",
-        target: { sessionId: "s2", messageId: "b1" },
+        sessionId: "s2",
       },
     );
   });
 
-  it("anchors nowhere for a session with no messages or no record", () => {
+  it("keeps the session for a session with no messages, and drops one the record lost", () => {
     expect(captureSource({ sessionId: "s1" }, [session("s1", [])])).toEqual({
       sessionTitle: "s1",
+      sessionId: "s1",
     });
     expect(captureSource({ sessionId: "gone" }, [session("s1", [{ id: "a1" }])])).toEqual({
       sessionTitle: "gone",

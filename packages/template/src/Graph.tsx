@@ -831,12 +831,8 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
               captures={model.captures}
               sessions={model.sessions}
               dir={model.project.path}
-              active={
-                selection?.type === "node"
-                  ? { sessionId: selection.sessionId, messageId: selection.nodeId }
-                  : null
-              }
-              onSelect={selectFromFiles}
+              activeSessionId={selection?.type === "session" ? selection.sessionId : null}
+              onSelectSession={openSessionCard}
               onClose={() => setShowCaptures(false)}
             />
           ) : showFiles ? (
