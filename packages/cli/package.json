@@ -1,6 +1,6 @@
 {
   "name": "@cogit/cli",
-  "version": "0.25.3",
+  "version": "0.25.4",
   "description": "Git remembers what changed. cogit remembers why.",
   "license": "MIT",
   "keywords": [
