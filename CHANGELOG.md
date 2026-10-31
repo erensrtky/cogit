@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.27.0] - 2026-10-31
 ### Added
 - Diagrams take their colours from the map's palette: the light and dark themes each render a diagram in their own colours, including in the Shape's Open window and the panel preview, and switching the theme repaints an open diagram in place.
 - A diagram in the Shape's Open window opens fitted to the window and can be dragged, zoomed with the wheel or the **−** / **Fit** / **+** buttons, moved with the arrow keys and fitted again with a double-click, instead of being read through a horizontal scrollbar.
