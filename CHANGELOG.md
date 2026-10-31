@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.1] - 2026-11-01
+### Changed
+- `cogit init` asks only for the project name, the git policy and (below 90 days) the transcript retention. It lets the agent run the cogit skill, writes the project's `.claude/settings.json` and sets the summary language to the conversation's without asking; `--no-allow-skill`, `--no-project-settings` and `--language` still override them, and `--yes` leaves Claude Code's settings untouched.
+
 ## [0.28.0] - 2026-11-01
 ### Added
 - Captured work is a curated list now: when a session ends, the side model drafts at most three user-level items from what the record left undone, and you accept, dismiss or close each one on the map or with `cogit captures accept|dismiss|done <id>`. `cogit captures distill [--session <id> | --all] [--dry-run]` backfills older sessions; the list lives in `.cogit/state/captures.json`, local and never committed.
