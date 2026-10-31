@@ -135,13 +135,27 @@ describe("the session row's capture badge (Story 15.3)", () => {
     expect(render(new Map())).not.toContain("capture-mark");
   });
 
-  it("is a button inside the row, so its click cannot be the row's toggle", () => {
+  it("keeps the toggle and the badge as buttons inside the row", () => {
     const html = render(new Map([["s1", 1]]));
-    // The row is not a button (a button may not nest one): the badge is the button.
+    // The row is not a button (a button may not nest one): its two controls are.
     expect(html).toMatch(/<div[^>]*class="git-row session-row"[^>]*>/);
     expect(html).toContain('role="button"');
+    expect(html).toMatch(/<button[^>]*class="session-toggle"/);
     expect(html).toMatch(/<button[^>]*class="capture-mark session-capture"/);
-    expect(html.match(/<button/g)).toHaveLength(1);
+    expect(html.match(/<button/g)).toHaveLength(2);
+  });
+
+  it("draws the messages toggle on every session, badge or not", () => {
+    // The row opens the card; the toggle beside it is the only way to the messages.
+    const html = render(undefined);
+    expect(html).toMatch(
+      /<button[^>]*class="session-toggle"[^>]*aria-expanded="false"[^>]*aria-label="Open this session/,
+    );
+    expect(html).not.toContain("capture-mark");
+    const folded = render(undefined, new Set(["s1"]));
+    expect(folded).toMatch(
+      /<button[^>]*class="session-toggle"[^>]*aria-expanded="true"[^>]*aria-label="Fold this session/,
+    );
   });
 });
 

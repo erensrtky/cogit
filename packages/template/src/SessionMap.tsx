@@ -45,8 +45,9 @@ function SessionRow({
   searchHit: boolean;
   /** Suggested + open captured items the session stands for (Story 15.3). */
   captured?: number | undefined;
+  /** Opens or folds the session's messages (the arrow on the left). */
   onOpen: (sessionId: string) => void;
-  /** Opens the session's card, with its Captured work in view (the capture badge). */
+  /** Opens the session's card (a click anywhere on the row, and the capture badge). */
   onOpenCard: (sessionId: string) => void;
   onContinue: (continues: NonNullable<ViewSession["messages"][number]["continues"]>) => void;
 }) {
@@ -66,30 +67,41 @@ function SessionRow({
     .filter(Boolean)
     .join(" ");
   return (
-    // A div, not a button: the row holds the capture badge button (Story 15.3),
-    // and a button may not nest one.
+    // A div, not a button: the row holds the toggle and the capture badge
+    // (Story 15.3), and a button may not nest one. The box opens the session's
+    // card; the arrow beside it opens the messages.
     <div
       role="button"
       tabIndex={0}
       className={className}
       style={style}
-      aria-expanded={open}
       onClick={(event: MouseEvent) => {
         event.stopPropagation();
-        onOpen(session.sessionId);
+        onOpenCard(session.sessionId);
       }}
       onKeyDown={(event) => {
-        // The badge handles its own keys; only the row's focus reaches here.
+        // The toggle and the badge handle their own keys; only the row's own
+        // focus reaches here.
         if (event.target !== event.currentTarget) return;
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
-        onOpen(session.sessionId);
+        onOpenCard(session.sessionId);
       }}
       title={session.status.goal || session.title}
     >
-      <span className="session-toggle" aria-hidden="true">
+      <button
+        type="button"
+        className="session-toggle"
+        aria-expanded={open}
+        aria-label={open ? "Fold this session's messages" : "Open this session's messages"}
+        title={open ? "Fold the messages" : "Open the messages"}
+        onClick={(event: MouseEvent) => {
+          event.stopPropagation();
+          onOpen(session.sessionId);
+        }}
+      >
         {open ? "▾" : "▸"}
-      </span>
+      </button>
       <span className="git-time">{session.startedAt ? formatStamp(session.startedAt) : ""}</span>
       <span className="git-title">{session.title || session.sessionId}</span>
       {badge === undefined ? null : (
@@ -158,8 +170,9 @@ export function SessionMap({
   person?: PersonFilter;
   /** Suggested + open captured items, by session id (Story 15.3). */
   captured?: ReadonlyMap<string, number> | undefined;
+  /** Opens or folds a session's messages (its arrow). */
   onOpen: (sessionId: string) => void;
-  /** Opens the session's card, with its Captured work in view. */
+  /** Opens a session's card (its row, or its capture badge). */
   onOpenCard: (sessionId: string) => void;
   onContinue: (sessionId: string, messageId: string) => void;
 }) {

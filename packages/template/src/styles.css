@@ -2612,9 +2612,20 @@ time {
 
 .session-toggle {
   flex: none;
-  width: 10px;
+  width: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--muted);
+  font: inherit;
   font-size: 10px;
+  line-height: inherit;
+  cursor: pointer;
+}
+
+.session-toggle:hover,
+.session-toggle:focus-visible {
+  color: var(--text);
 }
 
 .session-row.is-open {
