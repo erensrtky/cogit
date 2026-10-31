@@ -215,6 +215,35 @@ describe("backfill --tail", () => {
     expect(prompt).toContain("the conversation's language");
   });
 
+  it("keeps the record when the answer's status is null and its summary is an object", async () => {
+    const answer = JSON.stringify({
+      status: { goal: "g", done: [], pending: [], next: null },
+      nodes: [
+        {
+          id: "m2",
+          kind: "message",
+          parent: null,
+          title: "Second",
+          summary: { text: "Recorded it" },
+        },
+      ],
+    });
+    const env = await fakeClaude(printing(answer), dir);
+    await initialized(env);
+    await transcript([typed("first", 1), typed("second", 2)]);
+    await sessionWrite({ dir: root }, fakeIo(env), async () =>
+      JSON.stringify({ sessionId: "s1", nodes: [{ id: "m1", kind: "message", title: "First" }] }),
+    );
+    const io = fakeIo(env);
+    await backfillTail(root, "s1", io);
+    const saved = await record();
+    const second = messageHash("s1", { at: "2026-10-23T10:02:00.000Z", text: "second" });
+    // The node keeps its text and the null's absence takes the schema default.
+    expect(saved?.nodes.find((n) => n.id === second)).toMatchObject({ summary: "Recorded it" });
+    expect(saved?.status).toMatchObject({ goal: "g", next: "" });
+    expect(io.warnings.some((w) => w.includes("malformed"))).toBe(false);
+  });
+
   it("does nothing when there is no transcript or nothing missing", async () => {
     const env = envFor(dir);
     await initialized(env);

@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { type ChatTurn, defaultAgent } from "../agents/index.js";
 import { CliError, type Io } from "../io.js";
 import { hashTurns, isRecorded, type SessionMessage, upgradeSessionIds } from "../messages.js";
-import type { Session } from "../schema/session.js";
+import { LineageNodeInput, type Session, Status } from "../schema/session.js";
 import { maybeAutoCommit } from "../session-git.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { LockBusyError, withLock } from "../store/lock.js";
@@ -265,6 +265,70 @@ async function missingTurns(
  * its answer through `session write` (validation, redaction, stamping, build).
  * A busy session lock means another catch-up already runs, which is not an error.
  */
+/**
+ * The answer, trimmed to what the record accepts. A malformed status or summary
+ * must not cost the session its whole write, and in mixed mode the side model
+ * does not own the status, the branch summaries or the agent's decisions, so
+ * they are dropped even when it sends them.
+ */
+export function writableAnswer(
+  answer: Record<string, unknown>,
+  recorder: string,
+): { payload: Record<string, unknown>; dropped: number } {
+  const out: Record<string, unknown> = { ...answer };
+  const soleOwner = recorder !== "mixed";
+  if (!soleOwner) delete out.status;
+  let dropped = 0;
+  // A null inside the status is a missing field (`next: null` means nothing to do next).
+  if (out.status !== undefined) out.status = stripNulls(out.status);
+  if (out.status !== undefined && !Status.safeParse(out.status).success) {
+    delete out.status;
+    dropped += 1;
+  }
+  if (Array.isArray(out.nodes)) {
+    const kept: unknown[] = [];
+    for (const node of out.nodes) {
+      const fixed = summaryAsText(node);
+      if (ownsNode(fixed, soleOwner) && LineageNodeInput.safeParse(fixed).success) kept.push(fixed);
+      else dropped += 1;
+    }
+    out.nodes = kept;
+  }
+  return { payload: out, dropped };
+}
+
+/** Drops every null, so the schema's defaults fill the gaps. */
+function stripNulls(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripNulls);
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, v]) => v !== null)
+        .map(([key, v]) => [key, stripNulls(v)]),
+    );
+  }
+  return value;
+}
+
+/** A summary the model wrote as an object keeps its text; anything else is left for validation. */
+function summaryAsText(node: unknown): unknown {
+  if (typeof node !== "object" || node === null) return node;
+  const { summary, ...rest } = node as Record<string, unknown>;
+  if (summary === undefined || typeof summary === "string") return node;
+  const text =
+    typeof summary === "object" && summary !== null
+      ? (summary as Record<string, unknown>).text
+      : undefined;
+  return typeof text === "string" ? { ...rest, summary: text } : rest;
+}
+
+/** In mixed mode the side model may not write a branch summary or the agent's decisions. */
+function ownsNode(node: unknown, soleOwner: boolean): boolean {
+  if (soleOwner || typeof node !== "object" || node === null) return true;
+  const n = node as Record<string, unknown>;
+  return n.branch === undefined && n.agentDecisions === undefined;
+}
+
 export async function backfillTail(
   dir: string,
   sessionId: string,
@@ -308,10 +372,16 @@ export async function backfillTail(
     config.recorder,
   );
   const stdout = await runClaude(prompt, config.sideModel, io.env);
-  const payload = { ...withoutNulls(agentRecord(resultText(stdout))), sessionId };
+  const { payload, dropped } = writableAnswer(
+    withoutNulls(agentRecord(resultText(stdout))),
+    config.recorder,
+  );
+  if (dropped > 0) io.warn(`dropped ${dropped} malformed field(s) from the catch-up answer`);
   // Story 12.1: a side run fills empty fields and new nodes; it never rewrites
   // what the main agent wrote.
-  await sessionWrite({ dir: root, by: "side" }, io, async () => JSON.stringify(payload));
+  await sessionWrite({ dir: root, by: "side" }, io, async () =>
+    JSON.stringify({ ...payload, sessionId }),
+  );
   // At the session end the closing pass reads the whole session once it is all recorded.
   if (opts.close === true) await closeSession(root, sessionId, io);
   // The session end wrote the last messages after the last code commit; auto
