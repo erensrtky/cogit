@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-31
+### Removed
+- The read/unread tracking: the **Mark as read** button in the message details, the **Unread** view and its toolbar button, the panel's "Unread big changes" count, the `POST /api/read` route with its state file, and `cogit log --unread`. The map still marks messages whose commits crossed `bigChangeLines`.
+
+### Changed
+- A tool's **?** only explains how to read it; the kinds it listed are already named in the legend above the Shape.
+
 ## [0.25.7] - 2026-10-31
 ### Added
 - The Shape modal has a **Regenerate** button under the Shape: it asks the side model to write that message's Shape again — for an answer a small model missed, or one you want differently — and it replaces a Shape the agent wrote too. It works on the map `cogit open` serves.
