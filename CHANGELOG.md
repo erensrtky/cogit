@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.25.2] - 2026-10-31
 ### Added
 - Three more Shape tools: **Sequence** (a Mermaid sequence diagram for work handed between a hook, a queue, a server or a background job), **Interface** (one row per command, flag, exported function, config key or schema field that changed) and **Example** (one concrete run with real values). A new or changed command always gets an example.
 - `cogit shape --commit <sha> --dry-run` prints the Shape a commit would get without saving or queueing anything.
