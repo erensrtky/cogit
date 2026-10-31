@@ -78,8 +78,8 @@ const EDITABLE: FieldSpec[] = [
   },
   {
     key: "startupContext",
-    label: "Lineage at session start",
-    help: "Hand the agent the previous session's lineage when a chat starts.",
+    label: "Record at session start",
+    help: "Hand the agent the previous session's record when a chat starts.",
     details:
       "When a chat starts, the agent gets a short summary of where the previous session left " +
       "off and how to read the record. It costs a few tokens; turn it off if your projects " +

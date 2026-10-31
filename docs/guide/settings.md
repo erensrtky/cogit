@@ -24,11 +24,11 @@ Economical (recommended): a small model records in the background every few turn
 
 A one-sentence summary under each message title, so a skim reads better. Off keeps the record shorter and cheaper. Branch summaries and the line on where a session left off are written either way.
 
-### Lineage at session start
+### Record at session start
 
 `startupContext` · default `true`
 
-**Hand the agent the previous session's lineage when a chat starts.**
+**Hand the agent the previous session's record when a chat starts.**
 
 When a chat starts, the agent gets a short summary of where the previous session left off and how to read the record. It costs a few tokens; turn it off if your projects are unrelated.
 

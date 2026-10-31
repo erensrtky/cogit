@@ -128,7 +128,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
 
   program
     .command("log")
-    .description("print the recorded lineage, newest first")
+    .description("print the recorded sessions, newest first")
     .helpGroup("Read:")
     .argument("[dir]", "project directory", ".")
     .option("-C, --dir <dir>", "project directory (same as the positional)")
