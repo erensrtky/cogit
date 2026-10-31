@@ -19,6 +19,7 @@ import {
 } from "react";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
+import { CapturesView } from "./CapturesView.js";
 import { loadMapView, pageToken, saveOpenSessions, saveRowWidth } from "./data.js";
 import { type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
@@ -328,6 +329,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   const [showOutline, setShowOutline] = useState(true);
   // The files and outline views share the left column; only one shows.
   const [showFiles, setShowFiles] = useState(false);
+  const [showCaptures, setShowCaptures] = useState(false);
   const [person, setPerson] = useState<PersonFilter>(null);
   const people = useMemo(() => peopleOf(model), [model]);
   const personOptions = useMemo(() => people.options(), [people]);
@@ -757,6 +759,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
             onClick={() => {
               setShowOutline((value) => !value);
               setShowFiles(false);
+              setShowCaptures(false);
             }}
           >
             {showOutline ? "Hide outline" : "Show outline"}
@@ -769,13 +772,38 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
             onClick={() => {
               setShowFiles((value) => !value);
               setShowOutline(false);
+              setShowCaptures(false);
             }}
           >
             {showFiles ? "Hide files" : "Files"}
           </button>
+          <button
+            type="button"
+            className="outline-button capture-button"
+            aria-pressed={showCaptures}
+            title="What the sessions left open, read from the record"
+            onClick={() => {
+              setShowCaptures((value) => !value);
+              setShowFiles(false);
+              setShowOutline(false);
+            }}
+          >
+            {showCaptures ? "Hide captured" : "Captured"}
+          </button>
         </div>
         <div className="graph-wrap">
-          {showFiles ? (
+          {showCaptures ? (
+            <CapturesView
+              captures={model.captures}
+              active={
+                selection?.type === "node"
+                  ? { sessionId: selection.sessionId, messageId: selection.nodeId }
+                  : null
+              }
+              onSelect={selectFromFiles}
+              onClose={() => setShowCaptures(false)}
+            />
+          ) : showFiles ? (
             <FilesView
               files={model.files}
               active={

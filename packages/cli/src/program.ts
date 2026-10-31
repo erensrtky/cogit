@@ -3,6 +3,7 @@ import pkg from "../package.json" with { type: "json" };
 import { backfillTail } from "./commands/backfill.js";
 import { blame } from "./commands/blame.js";
 import { buildProject } from "./commands/build.js";
+import { captures } from "./commands/captures.js";
 import {
   configGet,
   configGit,
@@ -195,6 +196,26 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
           else for (const line of formatShow(model)) io.out(line);
         },
       ),
+    );
+
+  program
+    .command("captures")
+    .description("list what the sessions left open, gathered from the record (not a plan)")
+    .helpGroup("Read:")
+    .argument("[dir]", "project directory", ".")
+    .option("-C, --dir <dir>", "project directory (same as the positional)")
+    .option("--session <id>", "only this session (id or prefix)")
+    .option("--json", "print JSON instead of text")
+    .addHelpText("after", examples("cogit captures", "cogit captures --session 9c32ab18"))
+    .action(
+      run(async (dir: string, opts: { dir?: string; session?: string; json?: boolean }) => {
+        await captures({
+          dir: opts.dir ?? dir,
+          io: makeIo(false),
+          session: opts.session,
+          json: opts.json === true,
+        });
+      }),
     );
 
   program

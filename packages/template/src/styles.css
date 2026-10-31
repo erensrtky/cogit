@@ -7,6 +7,8 @@
   --muted: #9aa3b7;
   --accent: #7aa2f7;
   --warn: #e0af68;
+  /* Captured work (Story 14.1): its own colour, never the big-change warning. */
+  --capture: #73daca;
   /* Branch lanes in the git graph (Story 8.2). */
   --l0: #7aa2f7;
   --l1: #9ece6a;
@@ -55,6 +57,7 @@
     --muted: #545e72;
     --accent: #2957c8;
     --warn: #8a5300;
+    --capture: #0f766e;
     --l0: #2957c8;
     --l1: #2f7d32;
     --l2: #8a5300;
@@ -99,6 +102,7 @@
   --muted: #545e72;
   --accent: #2957c8;
   --warn: #8a5300;
+  --capture: #0f766e;
   --l0: #2957c8;
   --l1: #2f7d32;
   --l2: #8a5300;
@@ -1158,6 +1162,112 @@ body:has(.map-shell.is-expanded) {
 
 .file-hit-branch,
 .file-hit-commit {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+/* Captured work (Story 14.1): a read-only list, visibly not a message row. */
+.capture-view {
+  width: 340px;
+}
+
+.outline-button.capture-button[aria-pressed="true"] {
+  border-color: var(--capture);
+  color: var(--capture);
+}
+
+.capture-head {
+  border-bottom-color: var(--capture);
+}
+
+.capture-title {
+  color: var(--capture);
+}
+
+.capture-badge {
+  color: var(--capture);
+  border-color: var(--capture);
+}
+
+.capture-note {
+  margin: 0;
+  padding: 4px 10px 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.capture-list {
+  margin: 0;
+  padding: 0 4px;
+  list-style: none;
+}
+
+.capture-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  margin: 2px 0;
+  padding: 6px 8px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-left: 2px solid var(--capture);
+  border-radius: 0 5px 5px 0;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+button.capture-row {
+  cursor: pointer;
+}
+
+button.capture-row:hover {
+  background: var(--hover);
+}
+
+.capture-row.is-active {
+  background: var(--active);
+  outline: 1px solid var(--capture);
+}
+
+.capture-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.capture-chip,
+.capture-needs {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid var(--capture);
+  border-radius: 8px;
+  color: var(--capture);
+  font-size: 10px;
+  line-height: 15px;
+}
+
+.capture-needs {
+  background: var(--capture);
+  color: var(--bg);
+}
+
+.capture-text {
+  overflow-wrap: anywhere;
+}
+
+.capture-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.capture-label,
+.capture-branch {
   font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
 }
 

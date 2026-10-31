@@ -347,6 +347,38 @@ export interface LineageViewModel {
    * built before it; a project's map never carries another project's rows.
    */
   inbox?: ViewInboxRow[];
+  /**
+   * Captured work (Story 14.1): what the sessions left open, derived from the
+   * records at build time. Absent on pages built before it.
+   */
+  captures?: ViewCapture[];
+}
+
+/**
+ * One line of captured work (Story 14.1): something a session left open, read
+ * from its record — a `status.pending` item or a branch summary's `open` line.
+ * Derived on every build, never stored, never edited; it is not a plan.
+ */
+export interface ViewCapture {
+  /** `<sessionId>#p<n>` for a pending item, `<sessionId>#<messageId>` for a branch. */
+  key: string;
+  text: string;
+  /** Where the record holds it: the session's pending list or a branch summary. */
+  source: "pending" | "branch";
+  sessionId: string;
+  /** The session's title, or its id when the record has none yet. */
+  sessionTitle: string;
+  /** The message that named it: the newest one for pending, the branch's first for an open line. */
+  messageId?: string;
+  /** That message's `mN` label. */
+  label?: string;
+  /** The branch summary's title, for an open line. */
+  branch?: string;
+  /** Who recorded the session (name, else email); absent on older records. */
+  author?: string;
+  /** The session's last update: how old the line is. */
+  updatedAt: string;
+  needsUser: boolean;
 }
 
 /**

@@ -124,6 +124,23 @@ The Files view lists every file a recorded message touched, most recently first,
 count. Opening a file lists the messages that changed it; opening one of those jumps to it on
 the map. In the terminal: `cogit log --file <path>` and `cogit why <path>`.
 
+## Captured work
+
+Working with an agent is improvised: things that would have been a plan's items get done,
+half-done or dropped along the way. The **Captured** button lists what the sessions left open,
+gathered from the record: each session's pending items and each branch summary's open line,
+with the session, the message that named it, who recorded it and when. Items waiting for you
+come first and are marked "your call"; clicking a row opens its message on the map. In the
+terminal: `cogit captures` (`--session <id>`, `--json`).
+
+It is not a task board. The list is derived from the record on every build and cannot be
+edited: no checkboxes, no status, no assignee. cogit keeps no planning state; what becomes a
+real piece of work, and who owns it, is decided in your team's own tracker. The same text in two
+sessions stays two rows, because where it came from is the point.
+
+Known limit: when the agent removes a pending item from its record, it leaves the list too; the
+record keeps no history of pending items.
+
 ## Search
 
 The search box in the top bar (Ctrl+F or Cmd+F) finds text in message titles, decisions,

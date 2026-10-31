@@ -14,10 +14,11 @@ cogit why src/auth.ts         # what earlier messages decided about this file, a
 cogit why src/auth.ts:42      # only the thought behind line 42
 cogit why src/auth.ts --line 42  # the same lookup
 cogit search "refresh token"  # titles, decisions, summaries and the stored conversation
+cogit captures                # what the sessions left open (pending items, open branch lines)
 ```
 
-`log` and `search` take `-n <count>` and `--session <id>`; `log`, `show` and `search` take
-`--json`; `show --no-chat` leaves out the conversation turn.
+`log` and `search` take `-n <count>` and `--session <id>`; `captures` takes `--session <id>`
+too; `log`, `show`, `search` and `captures` take `--json`; `show --no-chat` leaves out the conversation turn.
 
 ## Addressing a message
 
