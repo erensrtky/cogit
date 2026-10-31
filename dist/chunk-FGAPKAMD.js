@@ -21206,7 +21206,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-HPVTUAMQ.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-5KGTRKFV.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -25559,7 +25559,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "0.28.0",
+  version: "0.28.1",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [
