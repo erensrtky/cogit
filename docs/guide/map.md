@@ -110,7 +110,8 @@ The message details show a short preview and an **Open** button. Open shows the 
 with 1/2/3 tabs (the number keys work too), starting on Shape. A message with nothing
 recorded yet says "being prepared"; with `shapes` off, it says so. In the Open window a wide
 diagram opens fitted to the window: drag it to move it, use the wheel or **−** / **Fit** / **+**
-to zoom, the arrow keys to move it, and double-click to fit it again.
+to zoom, the arrow keys to move it, and double-click to fit it again. Diagrams follow the
+map's light and dark theme.
 
 
 

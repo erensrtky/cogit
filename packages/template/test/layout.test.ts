@@ -140,6 +140,9 @@ describe("small text contrast (Story 9.2)", () => {
     // Diff lines in the message details (Story 10.5).
     ["diff-add-text", "diff-add-bg"],
     ["diff-remove-text", "diff-remove-bg"],
+    // Diagrams use the chip surface as their background (Story 14.3).
+    ["text", "chip-bg"],
+    ["muted", "chip-bg"],
   ];
 
   it("declares a light theme besides the dark default", () => {

@@ -6,7 +6,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { type DiagramTheme, effectiveTheme, mermaidThemeVariables } from "./diagramTheme.js";
 import { clampPan, fitView, type PanView, type Size, zoomAt } from "./panZoom.js";
+import { getTheme, subscribeTheme, type ThemeMode } from "./theme.js";
 
 /**
  * Draws a Mermaid flowchart (Story 13.6). Mermaid is ~3.5 MB, so it is not
@@ -44,15 +46,7 @@ function loadMermaid(): Promise<Mermaid> {
     script.onload = () => {
       const mermaid = window.mermaid;
       if (mermaid === undefined) reject(new Error("mermaid did not load"));
-      else {
-        mermaid.initialize({
-          startOnLoad: false,
-          securityLevel: "strict",
-          theme: "neutral",
-          fontFamily: "inherit",
-        });
-        resolve(mermaid);
-      }
+      else resolve(mermaid);
     };
     script.onerror = () => {
       loading = undefined;
@@ -61,6 +55,25 @@ function loadMermaid(): Promise<Mermaid> {
     document.head.append(script);
   });
   return loading;
+}
+
+/** One of the page's colour tokens, or `undefined` when it is missing. */
+function readToken(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value === "" ? undefined : value;
+}
+
+/** The palette the page is showing right now (Story 14.3). */
+function pageTheme(): DiagramTheme {
+  if (typeof document === "undefined") return "dark";
+  const marked = document.documentElement.dataset.theme;
+  const mode: ThemeMode = marked === "light" || marked === "dark" ? marked : getTheme();
+  const prefersDark =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return effectiveTheme(mode, prefersDark);
 }
 
 let seq = 0;
@@ -103,6 +116,7 @@ export function MermaidDiagram({
   const host = useRef<HTMLDivElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
+  const [theme, setTheme] = useState<DiagramTheme>(pageTheme);
   const [view, setView] = useState<PanView>({ x: 0, y: 0, scale: 1 });
   const [dragging, setDragging] = useState(false);
   const drag = useRef<{ id: number; x: number; y: number } | null>(null);
@@ -132,13 +146,40 @@ export function MermaidDiagram({
     [sizes],
   );
 
+  // The theme switch (and the system preference while on System) repaints the
+  // diagrams in place; the Mermaid already loaded is reused, never fetched again.
+  useEffect(() => {
+    const update = () => setTheme(pageTheme());
+    update();
+    const unsubscribe = subscribeTheme(update);
+    const media =
+      typeof window !== "undefined" && typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-color-scheme: dark)")
+        : undefined;
+    media?.addEventListener("change", update);
+    return () => {
+      unsubscribe();
+      media?.removeEventListener("change", update);
+    };
+  }, []);
+
   useEffect(() => {
     if (!available) return;
     let cancelled = false;
     setFailed(false);
     const id = `cogit-shape-${(seq += 1)}`;
     loadMermaid()
-      .then((mermaid) => mermaid.render(id, source))
+      .then((mermaid) => {
+        // Mermaid keeps its config globally, so it is set again for every
+        // render: the colours come from the page's tokens, never from here.
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: "strict",
+          theme: "base",
+          themeVariables: mermaidThemeVariables(readToken),
+        });
+        return mermaid.render(id, source);
+      })
       .then(({ svg }) => {
         if (cancelled || host.current === null) return;
         host.current.innerHTML = svg;
@@ -152,7 +193,7 @@ export function MermaidDiagram({
     return () => {
       cancelled = true;
     };
-  }, [source, available, fit, interactive, refit]);
+  }, [source, available, fit, interactive, refit, theme]);
 
   // A plain wheel over the diagram zooms around the pointer and never scrolls
   // the window behind it; React's wheel listener is passive, so this one is not.
