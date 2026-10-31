@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.25.3] - 2026-10-31
 ### Added
 - Every Shape tool's caption has a **?** that says how to read it: which way the arrows go, what a row means. Diagrams, examples and steps also list how names are written: a role in plain words, a file with its extension, a function with `()`, a field with its owner, a command after `$`, printed text in quotes.
 
