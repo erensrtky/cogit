@@ -45,7 +45,6 @@ function render(captures: ViewCapture[] | undefined, sessionsFor = sessions): st
       captures,
       sessions: sessionsFor,
       dir: "/p",
-      activeSessionId: null,
       onSelectSession: () => {},
       onClose: () => {},
     }),

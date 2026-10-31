@@ -507,7 +507,12 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       const row = sessionGraph.git.rows.find(
         (candidate) => candidate.kind === "message" && candidate.message.id === hit.sessionId,
       );
-      return row === undefined ? null : { x: sessionGraph.git.graphWidth / 2, y: row.y };
+      if (row === undefined) return null;
+      // Centre the row's text, not only its lanes: the same span a message row
+      // reports, so a session hit and a captured row land where the reader looks.
+      const left = sessionGraph.git.graphWidth + 8;
+      const width = sessionGraph.git.rowWidth;
+      return { x: left + width / 2, y: row.y, left, right: left + width };
     },
     [pointOf, sessionGraph],
   );
@@ -585,6 +590,9 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       setFocusedId(`session:${sessionId}`);
       setSelection({ type: "session", sessionId });
       setRevealCaptures((value) => value + 1);
+      // Bring the session's row into view, the way a search hit does.
+      setSessionTarget(sessionId);
+      setSessionJumps((value) => value + 1);
     },
     [keep],
   );
@@ -656,6 +664,21 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   const fileJump = useMemo(
     () => (fileJumps === 0 || filePoint === null ? null : { key: fileJumps, point: filePoint }),
     [fileJumps, filePoint],
+  );
+  // A captured row's click (Story 15.3): centre the project graph on that
+  // session's row, so the card that opened on the side has a place on the map.
+  const [sessionJumps, setSessionJumps] = useState(0);
+  const [sessionTarget, setSessionTarget] = useState<string | null>(null);
+  const sessionPoint = useMemo(
+    () => (sessionTarget === null ? null : pointOfHit({ sessionId: sessionTarget, messageId: null })),
+    [sessionTarget, pointOfHit],
+  );
+  const sessionJump = useMemo(
+    () =>
+      sessionJumps === 0 || sessionPoint === null
+        ? null
+        : { key: sessionJumps, point: sessionPoint },
+    [sessionJumps, sessionPoint],
   );
 
   const actions = useMemo(
@@ -831,7 +854,6 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
               captures={model.captures}
               sessions={model.sessions}
               dir={model.project.path}
-              activeSessionId={selection?.type === "session" ? selection.sessionId : null}
               onSelectSession={openSessionCard}
               onClose={() => setShowCaptures(false)}
             />
@@ -864,6 +886,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
                 jump={jump}
                 searchJump={searchJump}
                 fileJump={fileJump}
+                sessionJump={sessionJump}
                 fit={fits}
                 refocus={refocus}
               />
@@ -899,6 +922,7 @@ function MapCanvas({
   jump,
   searchJump,
   fileJump,
+  sessionJump,
   fit,
   refocus,
 }: {
@@ -911,6 +935,8 @@ function MapCanvas({
   searchJump: { key: number; point: { x: number; y: number } } | null;
   /** A files-view click: the message it opened (Story 8.15). */
   fileJump: { key: number; point: { x: number; y: number } } | null;
+  /** A captured row's click: the session's row on the project graph. */
+  sessionJump: { key: number; point: { x: number; y: number } } | null;
   /** A new value frames the whole map again (after "Fold all"). */
   fit: number;
   /** A new value centres on `focusRow` again: the stored view opened more sessions. */
@@ -959,6 +985,13 @@ function MapCanvas({
     if (fileKey === 0 || filePoint === null) return;
     centre(filePoint);
   }, [fileKey, filePoint]);
+
+  const sessionKey = sessionJump?.key ?? 0;
+  const sessionPt = sessionJump?.point ?? null;
+  useEffect(() => {
+    if (sessionKey === 0 || sessionPt === null) return;
+    centre(sessionPt);
+  }, [sessionKey, sessionPt]);
 
   useEffect(() => {
     if (refocus === 0 || focusRow === null) return;

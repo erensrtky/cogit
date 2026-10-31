@@ -90,7 +90,6 @@ export function CapturesView({
   captures,
   sessions,
   dir,
-  activeSessionId,
   onSelectSession,
   onClose,
 }: {
@@ -99,8 +98,6 @@ export function CapturesView({
   sessions: readonly ViewSession[];
   /** The project's path, for the state write. */
   dir: string;
-  /** The session the map's side panel is showing, if any. */
-  activeSessionId?: string | null;
   /** Opens one session's card in the side panel (the row's source click). */
   onSelectSession: (sessionId: string) => void;
   onClose: () => void;
@@ -108,6 +105,9 @@ export function CapturesView({
   // The page is a snapshot; a state change is shown at once and the live page
   // swaps in the rebuilt model a moment later.
   const [items, setItems] = useState<readonly ViewCapture[]>(captures ?? []);
+  // The row the user last clicked: each item is its own thing, even when three of
+  // them come from the same session and open the same card.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => setItems(captures ?? []), [captures]);
   const now = new Date().toISOString();
@@ -134,8 +134,7 @@ export function CapturesView({
   function row(item: ViewCapture, actions: ReactNode) {
     const source = captureSource(item.source, sessions);
     const age = timeSince(item.updatedAt, now);
-    const selected =
-      source.sessionId !== undefined && source.sessionId === activeSessionId;
+    const selected = item.id === selectedId;
     return (
       <li key={item.id}>
         <div className={`capture-row${selected ? " is-active" : ""}`}>
@@ -145,7 +144,9 @@ export function CapturesView({
             title={formatStamp(item.updatedAt)}
             disabled={source.sessionId === undefined}
             onClick={() => {
-              if (source.sessionId !== undefined) onSelectSession(source.sessionId);
+              if (source.sessionId === undefined) return;
+              setSelectedId(item.id);
+              onSelectSession(source.sessionId);
             }}
           >
             <span className="capture-text">{item.text}</span>
