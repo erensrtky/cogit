@@ -103,10 +103,16 @@ Tools (at most three, the ones that say the most; never two that tell the same t
   or changed command or flag always gets one that runs it.
 - `pseudo`: numbered plain-language steps of the new logic, naming the functions and files.
 
-Tables have no header row. Order them diagram, tables, example, steps. `{ "tools": [] }`
-means nothing worth showing. Skip messages whose commits are only release/version bumps,
-lockfiles or CHANGELOG, or change fewer than 5 lines in total. Write it in the conversation's language; the CLI validates each output and keeps an
-invalid diagram as text.
+Write names the same way in every tool: a role in plain words (`Git`, `cogit`, `Record`), a
+file with its extension (`session.ts`), a function with `()`, a field with its owner
+(`node.commits`), a command after `$`, printed text in quotes. In a diagram, name actors and
+boxes by role with the code name in parentheses (`Queue (shape-queue.ts)`) and label arrows
+with plain verbs. Tables have no header row. Order the tools diagram, tables, example, steps.
+
+`{ "tools": [] }` means nothing worth showing: give it for a change nobody would notice from
+outside (a refactor, a rename). Skip messages whose commits are only release/version bumps,
+lockfiles or CHANGELOG, or change fewer than 5 lines in total. Write it in the conversation's
+language; the CLI validates each output and keeps an invalid diagram as text.
 
 ## Branch summary
 
