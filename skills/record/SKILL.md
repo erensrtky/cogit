@@ -85,15 +85,20 @@ between its Intent (the decision and reason above) and its Code (the diff). Add 
 message's node, with the node's commit hashes:
 
 ```json
-"shape": { "tools": [{ "kind": "pseudo", "text": "1. ...\n2. ..." }], "commits": ["abc1234"] }
+"shape": { "tools": [{ "kind": "pseudo", "text": "1. ⚡ ...\n2. ƒ ..." }], "commits": ["abc1234"] }
 ```
 
 Tools (at most three, the ones that say the most; never two that tell the same thing):
 
-- `mermaid`: a Mermaid `flowchart TD` (or `LR`) of a path through code, at most 10 nodes.
-  Quote labels that hold spaces or punctuation.
-- `sequence`: a Mermaid `sequenceDiagram` when work is handed between actors over time (a hook
-  starting a job, a client and a server, a queue drained later), at most 6 participants.
+- `flow`: a path through code as JSON. Every node has a `kind` from the table below and a
+  `label` in the project's own words; at most 12 nodes and 16 edges; ids are short lowercase
+  words (`a`, `hook`), unique, and every edge names two of them. Set `ordered: true` when the
+  edges are steps over time and work is handed between parts (the map numbers them 1, 2, 3…).
+
+  ```json
+  {"kind": "flow", "text": "{\"nodes\":[{\"id\":\"a\",\"kind\":\"event\",\"label\":\"after a commit\"}],\"edges\":[{\"from\":\"a\",\"to\":\"b\",\"label\":\"no\"}],\"ordered\":false}"}
+  ```
+
 - `table`: Before / After, one `case | before | after` line per case (at most 8), for a
   change someone can see: a fix, a new default, a rule that now says yes or no.
 - `interface`: one `item | before | after` line per command, flag, exported function, config
@@ -101,18 +106,35 @@ Tools (at most three, the ones that say the most; never two that tell the same t
   `—` for nothing.
 - `example`: one concrete case with real values, each result on its own line after `→`. A new
   or changed command or flag always gets one that runs it.
-- `pseudo`: numbered plain-language steps of the new logic, naming the functions and files.
+- `pseudo`: numbered plain-language steps of the new logic, each starting with the symbol of
+  its kind after its number (`1. ⚡ After a commit, …`), naming the functions and files.
 
-Write names the same way in every tool: a role in plain words (`Git`, `cogit`, `Record`), a
-file with its extension (`session.ts`), a function with `()`, a field with its owner
-(`node.commits`), a command after `$`, printed text in quotes. In a diagram, name actors and
-boxes by role with the code name in parentheses (`Queue (shape-queue.ts)`) and label arrows
-with plain verbs. Tables have no header row. Order the tools diagram, tables, example, steps.
+Kinds (one per Flow node, and the symbol a step starts with; the map draws the symbol, you
+never draw it):
+
+| id | symbol | name | means |
+|---|---|---|---|
+| fn | ƒ | Function | a function or method |
+| var | x | Variable | a variable, field or setting |
+| cond | ◇ | Condition | a question the code asks; its arrows are the answers |
+| loop | ↻ | Loop | repeats for each item |
+| event | ⚡ | Event | something that starts the work: a hook, a click, a timer |
+| store | ▤ | Data store | a file, database, queue or cache that keeps data |
+| type | ▭ | Type | a type, class or schema |
+| ext | ◎ | External system | another program or service: git, a browser, an API, an AI model |
+| person | ☺ | Person | someone using it |
+| async | ⇢ | Background job | work started without waiting for it |
+| out | ↩ | Output | what is returned or shown |
+| error | ✕ | Error | an error or a refusal |
+
+A Flow node's label names the thing in the project's own words (`shape-queue.ts`,
+`enqueueShape()`), never a role word — the symbol already says what kind it is. Tables have
+no header row. Order the tools diagram, tables, example, steps.
 
 `{ "tools": [] }` means nothing worth showing: give it for a change nobody would notice from
 outside (a refactor, a rename). Skip messages whose commits are only release/version bumps,
 lockfiles or CHANGELOG, or change fewer than 5 lines in total. Write it in the conversation's
-language; the CLI validates each output and keeps an invalid diagram as text.
+language; the CLI validates each output and keeps an invalid output as text.
 
 ## Branch summary
 
