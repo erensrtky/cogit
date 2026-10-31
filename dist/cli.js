@@ -8,6 +8,7 @@ import {
   Config,
   IsoDate,
   LIVE_META_NAME,
+  LineageNodeInput,
   LockBusyError,
   MESSAGE_HASH,
   MESSAGE_ID,
@@ -120,7 +121,7 @@ import {
   versionNotice,
   why,
   withLock
-} from "./chunk-FGAPKAMD.js";
+} from "./chunk-X36QZV7V.js";
 
 // node_modules/commander/lib/error.js
 var CommanderError = class extends Error {
@@ -5957,6 +5958,48 @@ async function missingTurns(root, sessionId, env) {
   }
   return turns.filter((turn) => !isRecorded(recorded, turn));
 }
+function writableAnswer(answer, recorder) {
+  const out = { ...answer };
+  const soleOwner = recorder !== "mixed";
+  if (!soleOwner) delete out.status;
+  let dropped = 0;
+  if (out.status !== void 0) out.status = stripNulls(out.status);
+  if (out.status !== void 0 && !Status.safeParse(out.status).success) {
+    delete out.status;
+    dropped += 1;
+  }
+  if (Array.isArray(out.nodes)) {
+    const kept = [];
+    for (const node of out.nodes) {
+      const fixed = summaryAsText(node);
+      if (ownsNode(fixed, soleOwner) && LineageNodeInput.safeParse(fixed).success) kept.push(fixed);
+      else dropped += 1;
+    }
+    out.nodes = kept;
+  }
+  return { payload: out, dropped };
+}
+function stripNulls(value) {
+  if (Array.isArray(value)) return value.map(stripNulls);
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).filter(([, v]) => v !== null).map(([key, v]) => [key, stripNulls(v)])
+    );
+  }
+  return value;
+}
+function summaryAsText(node) {
+  if (typeof node !== "object" || node === null) return node;
+  const { summary, ...rest } = node;
+  if (summary === void 0 || typeof summary === "string") return node;
+  const text = typeof summary === "object" && summary !== null ? summary.text : void 0;
+  return typeof text === "string" ? { ...rest, summary: text } : rest;
+}
+function ownsNode(node, soleOwner) {
+  if (soleOwner || typeof node !== "object" || node === null) return true;
+  const n = node;
+  return n.branch === void 0 && n.agentDecisions === void 0;
+}
 async function backfillTail(dir, sessionId, io, opts = {}) {
   const { root } = await resolveProjectRoot(dir);
   const project = await loadProject(root);
@@ -5992,8 +6035,16 @@ async function backfillTail(dir, sessionId, io, opts = {}) {
     config.recorder
   );
   const stdout = await runClaude(prompt, config.sideModel, io.env);
-  const payload = { ...withoutNulls(agentRecord(resultText(stdout))), sessionId };
-  await sessionWrite({ dir: root, by: "side" }, io, async () => JSON.stringify(payload));
+  const { payload, dropped } = writableAnswer(
+    withoutNulls(agentRecord(resultText(stdout))),
+    config.recorder
+  );
+  if (dropped > 0) io.warn(`dropped ${dropped} malformed field(s) from the catch-up answer`);
+  await sessionWrite(
+    { dir: root, by: "side" },
+    io,
+    async () => JSON.stringify({ ...payload, sessionId })
+  );
   if (opts.close === true) await closeSession(root, sessionId, io);
   await maybeAutoCommit(root, sessionId, io.env);
 }

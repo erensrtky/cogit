@@ -21206,7 +21206,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-5KGTRKFV.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-XKHTMQKI.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -25559,7 +25559,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "0.28.1",
+  version: "0.28.2",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [
@@ -26152,6 +26152,15 @@ export {
   labelsToHashes,
   hashesToLabels,
   upgradeSessionIds,
+  Slug,
+  IsoDate,
+  parseMessageRef,
+  SESSION_SCHEMA,
+  MESSAGE_ID,
+  BranchSummary,
+  Status,
+  LineageNodeInput,
+  SessionInput,
   findGitRoot,
   resolveCommit,
   ensureGitignore,
@@ -26167,15 +26176,7 @@ export {
   gitUserEmail,
   commitBetween,
   gitHooksDir,
-  Slug,
-  IsoDate,
-  parseMessageRef,
   Config,
-  SESSION_SCHEMA,
-  MESSAGE_ID,
-  BranchSummary,
-  Status,
-  SessionInput,
   LockBusyError,
   withLock,
   loadProject,
