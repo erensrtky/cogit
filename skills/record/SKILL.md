@@ -92,8 +92,9 @@ Tools (at most three, the ones that say the most; never two that tell the same t
 
 - `flow`: a path through code as JSON. Every node has a `kind` from the table below and a
   `label` in the project's own words; at most 12 nodes and 16 edges; ids are short lowercase
-  words (`a`, `hook`), unique, and every edge names two of them. Set `ordered: true` when the
-  edges are steps over time and work is handed between parts (the map numbers them 1, 2, 3…).
+  words (`a`, `hook`), unique, and every edge names two of them. Set `ordered: true` when
+  work is handed between parts over time (a hook → a job → a store, a client → a server): the
+  map draws it as a sequence diagram, so keep the edges in time order.
 
   ```json
   {"kind": "flow", "text": "{\"nodes\":[{\"id\":\"a\",\"kind\":\"event\",\"label\":\"after a commit\"}],\"edges\":[{\"from\":\"a\",\"to\":\"b\",\"label\":\"no\"}],\"ordered\":false}"}
