@@ -11,6 +11,7 @@ import {
   type Thread,
   threadMembers,
 } from "../src/commands/close.js";
+import { configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
 import { messageHash } from "../src/messages.js";
@@ -125,9 +126,17 @@ describe("closePrompt", () => {
     expect(prompt).toContain("· Release → s0:h10");
     expect(prompt).toContain('"continues": null');
     expect(prompt).not.toContain('"status"');
-    expect(
-      closePrompt(turns, session([]), { language: "Turkish", status: true, candidates: [] }),
-    ).toContain('"status": {"goal"');
+    const withStatus = closePrompt(turns, session([]), {
+      language: "Turkish",
+      status: true,
+      candidates: [],
+    });
+    expect(withStatus).toContain('"status": {"goal"');
+    // Pending is leftover work in the user's words, never a command list.
+    expect(withStatus).toContain("never a checklist of commands");
+    expect(withStatus).toContain("one piece of open work, in the user's words");
+    // The status guidance stays out when the pass does not write a status.
+    expect(prompt).not.toContain("never a checklist of commands");
   });
 });
 
@@ -296,5 +305,90 @@ process.stdin.on("end", async () => {
     expect(await readFile(join(dir, "prompt.txt"), "utf8")).toContain(
       "Split the session into threads",
     );
+  });
+
+  it("fills a status the agent never wrote, and keeps the one it did", async () => {
+    const bin = join(dir, "bin");
+    await mkdir(bin, { recursive: true });
+    // Only the close pass answers; the tail backfill before it writes no status.
+    const fake = async (answer: unknown): Promise<void> => {
+      await writeFile(
+        join(bin, "claude"),
+        `#!/usr/bin/env node
+let input = "";
+process.stdin.on("data", (c) => { input += c; });
+process.stdin.on("end", () => {
+  const answer = input.includes("You close a cogit lineage record")
+    ? ${JSON.stringify(JSON.stringify(answer))}
+    : "{}";
+  process.stdout.write(JSON.stringify({ result: answer }));
+});
+`,
+      );
+      await chmod(join(bin, "claude"), 0o755);
+    };
+    const closedStatus = {
+      goal: "Ship it",
+      done: ["built it"],
+      pending: [{ text: "publish", needsUser: true }],
+      next: "push",
+    };
+    const threads = [
+      { name: "Work", messages: "m1-m2", from: null, asked: "a", outcome: "o", open: "" },
+    ];
+    await fake({ threads, leftOff: "Built", status: closedStatus });
+    const env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+    await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
+    // The agent owns the status in mixed mode; the close pass fills it only when empty.
+    await configSet("recorder", "mixed", fakeIo(env));
+    const folder = join(envFor(dir).CLAUDE_CONFIG_DIR ?? "", "projects", "proj");
+    await mkdir(folder, { recursive: true });
+    const at = (m: number) => `2026-10-23T10:0${m}:00.000Z`;
+    const typed = (m: number) => ({
+      type: "user",
+      timestamp: at(m),
+      message: { role: "user", content: `message ${m}` },
+    });
+    await writeFile(
+      join(folder, "s1.jsonl"),
+      `${[1, 2].map((m) => JSON.stringify(typed(m))).join("\n")}\n`,
+    );
+    await sessionWrite({ dir: root, by: "side" }, fakeIo(env), async () =>
+      JSON.stringify({
+        sessionId: "s1",
+        nodes: [1, 2].map((m) => ({
+          id: `m${m}`,
+          kind: "message",
+          title: `T${m}`,
+          parent: m === 1 ? null : `m${m - 1}`,
+        })),
+      }),
+    );
+
+    // A short session closed before the agent's first record pass: filled here.
+    await backfillTail(root, "s1", fakeIo(env), { close: true });
+    const first = await loadSession(root, "s1");
+    expect(first.found && first.ok ? first.data.status : undefined).toEqual(closedStatus);
+
+    // Once the agent has written a status, a later close leaves it alone.
+    const agentStatus = {
+      goal: "The agent's goal",
+      done: [],
+      pending: [],
+      next: "keep going",
+    };
+    await sessionWrite({ dir: root, by: "agent" }, fakeIo(env), async () =>
+      JSON.stringify({ sessionId: "s1", status: agentStatus }),
+    );
+    const agent = await loadSession(root, "s1");
+    expect(agent.found && agent.ok ? agent.data.status : undefined).toEqual(agentStatus);
+    await fake({
+      threads,
+      leftOff: "Built",
+      status: { ...closedStatus, goal: "A different goal" },
+    });
+    await backfillTail(root, "s1", fakeIo(env), { close: true });
+    const second = await loadSession(root, "s1");
+    expect(second.found && second.ok ? second.data.status : undefined).toEqual(agentStatus);
   });
 });

@@ -83,7 +83,7 @@ function rules(language: string, messageSummaries: boolean, recorder: RecordMode
     '- The agent\'s work belongs inside the message node that caused it, never in nodes of its own: work (short items), agentDecisions ([{"title": "...", "why": "...", "alternatives": [...]}]) only for technical choices with a reason — never for proposals or work items — commits (short hashes) and files (a few paths).',
     "- Write a branch summary ({title, asked, outcome, open}) on the first message of a branch when the branch ends.",
     '- Never send "at"; the CLI takes each message\'s time from the transcript.',
-    "- Replace the whole status (goal, done, pending [{text, needsUser}], next) when it changed; otherwise leave it out.",
+    "- Replace the whole status (goal, done, pending [{text, needsUser}], next) when it changed; otherwise leave it out. Pending is the work still open, one item per ask in the user's words, never a checklist of commands: a release and the restart it needs are one item, and a step that serves nothing is dropped.",
     "- Record decisions and reasons, never secrets, credentials, personal data, file contents or command output.",
     `- Write titles and text in ${writing}; JSON keys stay in English.`,
   ];

@@ -15,7 +15,7 @@ The current record (`cogit session show`):
 - `initialized: false`: reply exactly "cogit is not set up in this project yet; run
   `npx @cogit/cli init` here first." and stop.
 - `sessionError`: quote it and stop; never write over the record.
-- Nothing new or changed (`newMessages` empty): reply "Lineage is up to date." and stop.
+- Nothing new or changed (`newMessages` empty): reply "cogit is up to date." and stop.
 
 ## Look something up
 
@@ -36,8 +36,11 @@ One JSON object:
 
 - `sessionId`: always `"${CLAUDE_SESSION_ID}"`.
 - `title`: a few words; on the first write or when the focus changed.
-- `status`: replaces all four fields, so send each: `goal` (one sentence), `done`, `pending`
-  (`{ "text", "needsUser": true }` when it waits on the user), `next` (concrete step).
+- `status`: replaces all four fields, so send each: `goal` (one sentence), `done` (what
+  finished, as outcomes), `pending` (the work still open, one item per ask in the user's
+  words — never a checklist of commands; a release and the restart it needs are one item, and
+  a step that serves nothing is dropped; `{ "text", "needsUser": true }` when it waits on the
+  user), `next` (concrete step).
 - `nodes`: only new nodes or changed fields; the rest is kept.
 
 ## One node per user message
@@ -154,4 +157,4 @@ personal data, file contents or command output.
 2. `node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" session write -C "<dir from the record>" --file "<inbox path>" --consume`
 
 If it fails, fix the JSON according to the error and run it again. Then reply with one short
-line, e.g. "Lineage updated (3 nodes)"; never repeat the JSON.
+line, e.g. "cogit updated (3 nodes)"; never repeat the JSON.

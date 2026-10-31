@@ -158,7 +158,7 @@ export function closePrompt(
     ].join("\n");
   });
   const status = opts.status
-    ? ', "status": {"goal": "one sentence", "done": ["..."], "pending": [{"text": "...", "needsUser": true}], "next": "a concrete step"}'
+    ? ', "status": {"goal": "one sentence", "done": ["an outcome"], "pending": [{"text": "one piece of open work, in the user\'s words", "needsUser": false}], "next": "a concrete step"}'
     : "";
   return [
     "You close a cogit lineage record at the end of a coding session. Each user message below is listed with what the agent did.",
@@ -173,6 +173,11 @@ export function closePrompt(
     "",
     "Then write a branch summary for every thread (asked: what the user wanted; outcome: what it meant and what came of it; open: what is still open, or empty), and leftOff: one line saying where the session left off, so a later session can decide whether to continue it.",
     "Outcome, open and leftOff describe the state at the end: read each thread to its last message, and the whole session to its last messages. A problem or task a later message fixed, finished or dropped is done, not open; never report a mid-session state as where things stand.",
+    ...(opts.status
+      ? [
+          "Write the status the way the user would say it. `goal`: one sentence. `done`: what the session finished, as outcomes. `pending`: the work it still leaves open, one item per ask in the user's words — never a checklist of commands; a release and the restart it needs are one item, and a step that serves nothing is dropped. Mark `needsUser` when only the user can decide or act (a choice, an approval, a credential). A session usually leaves none or a few.",
+        ]
+      : []),
     `Write text in ${writing}; JSON keys stay English. Never invent what is not in the record. Never write secrets, credentials or personal data.`,
     "",
     ...candidatePart(opts.candidates),
@@ -261,6 +266,12 @@ export function closePayload(
  * recorded session and writes its answer as the side model. Nothing recorded
  * yet means nothing to close.
  */
+/** Whether the record's status says nothing yet (a short session the agent never recorded). */
+export function statusIsEmpty(record: Session): boolean {
+  const { goal, done, pending, next } = record.status;
+  return goal === "" && done.length === 0 && pending.length === 0 && next === "";
+}
+
 export async function closeSession(root: string, sessionId: string, io: Io): Promise<void> {
   const agent = defaultAgent();
   const file = await agent.findTranscript(sessionId, io.env);
@@ -287,7 +298,10 @@ export async function closeSession(root: string, sessionId: string, io: Io): Pro
   const candidates =
     firstNode && firstNode.parent === null ? await candidateSessions(root, sessionId, io.env) : [];
   // The status belongs to the main agent unless only the side model records.
-  const status = config.recorder === "side";
+  // A session that ended before the agent's first record pass (a short chat)
+  // leaves it empty, so this pass fills it: without a status there are no
+  // pending items for the captured-work pass to read.
+  const status = config.recorder === "side" || statusIsEmpty(record);
   const prompt = closePrompt(closing, record, {
     language: config.language,
     candidates,
