@@ -2591,6 +2591,14 @@ time {
   font-weight: 600;
 }
 
+/* Passes the modal's height down, so the open layer scrolls inside it. */
+.shape-layers {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .shape-tabs {
   display: flex;
   gap: 4px;
