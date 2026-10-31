@@ -54,6 +54,7 @@ describe("the distiller's input", () => {
         sessionId: "s1",
         title: "Ship it",
         status: {
+          done: ["ship the parser", "  ", "ship the parser "],
           pending: [
             { text: "write the docs", needsUser: false },
             { text: "   ", needsUser: true },
@@ -68,6 +69,7 @@ describe("the distiller's input", () => {
         ],
       }),
     );
+    expect(input.done).toEqual(["ship the parser"]);
     expect(input.pending).toEqual([
       { text: "write the docs", needsUser: false, messageId: "m3", label: "m3" },
     ]);
@@ -89,9 +91,12 @@ describe("the distiller's prompt and answer", () => {
     source({
       sessionId: "s9",
       title: "Parser work",
-      status: { pending: [{ text: "decide the error format", needsUser: true }] },
+      status: {
+        done: ["ship the parser"],
+        pending: [{ text: "decide the error format", needsUser: true }],
+      },
       messages: [
-        { id: "m1", label: "m1", title: "Build the parser" },
+        { id: "m1", label: "m1", title: "Build the parser", branch: branch("handle input") },
         { id: "m2", label: "m2", title: "Handle input" },
       ],
     }),
@@ -99,6 +104,11 @@ describe("the distiller's prompt and answer", () => {
 
   it("names the leftover lines, the messages and the current list", () => {
     const prompt = distillPrompt(input, [{ id: "c1a2b3c4", text: "old item" }], "auto");
+    expect(prompt).toContain("Done in this session (never draft these):\n- ship the parser");
+    expect(prompt).toContain(
+      "Pending items — the session's own list of what is still open:\n- (needs the user) decide the error format",
+    );
+    expect(prompt).toContain("Open branch lines (supporting context; may be stale):");
     expect(prompt).toContain("decide the error format");
     expect(prompt).toContain("Handle input");
     expect(prompt).toContain("c1a2b3c4: old item");
@@ -106,6 +116,8 @@ describe("the distiller's prompt and answer", () => {
     expect(prompt).toContain("at most 140 characters");
     expect(prompt).toContain("the conversation's language");
     expect(prompt).toContain("Items belong to the session");
+    expect(prompt).toContain("Work the done list names is finished");
+    expect(prompt).toContain("Fold the lines that are steps of one goal into one item");
     expect(prompt).toContain('{"items": [{"text": "..."}], "duplicateOf": []}');
     expect(prompt).not.toContain("messageId");
   });

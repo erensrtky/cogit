@@ -45,9 +45,9 @@ export interface ExistingCapture {
 }
 
 /**
- * The prompt of the captured-work pass: the session's leftover lines and last
- * message titles, plus the project's current open and suggested items so
- * nothing is drafted twice.
+ * The prompt of the captured-work pass: what the session finished (a veto), its
+ * pending lines, its branch summaries' open lines and last message titles, plus
+ * the project's current open and suggested items so nothing is drafted twice.
  */
 export function distillPrompt(
   input: CaptureInput,
@@ -55,6 +55,7 @@ export function distillPrompt(
   language: string,
 ): string {
   const writing = language === "auto" ? "the conversation's language" : language;
+  const done = input.done.map((text) => `- ${clip(text, 300)}`);
   const pending = input.pending.map(
     (item) => `- ${item.needsUser ? "(needs the user) " : ""}${clip(item.text, 300)}`,
   );
@@ -75,19 +76,25 @@ export function distillPrompt(
         ];
   return [
     "You distil the work a coding session left undone into a few items its user would recognize.",
-    "The session below lists what its record says is still open: pending items, the open line of each branch summary, and the titles of its last messages.",
+    "The session's pending items are the record's own word on what is still open: draft from them first. The open line of each branch summary and the titles of the last messages are supporting context only — a branch line can be out of date, so never draft an item from one while a pending item covers the same work.",
     "",
     "Rules:",
     `- At most ${DISTILL_LIMIT} items. Each one is work a person would ask for, phrased as a short imperative (one line, at most 140 characters) in ${writing}.`,
-    "- Name only work the user asked for and that is still not done, or that the session left undone. A problem a later message fixed, finished or dropped is done, not open.",
-    '- Never draft a commit step, a test run, a release chore, a status fact ("0.24 is unreleased") or a question a later message answered.',
+    "- Work the done list names is finished: never draft it, even when an older branch line still calls it open. A problem a later message fixed, finished or dropped is done, not open.",
+    "- When the session has pending items, every item must come from one of them; the branch lines only help you understand or reword an item, they never add one. Only when there is no pending item at all may an open branch line become an item. Never invent a commit step, a test run, a status fact or a question a later message answered; a pending item is work, not a status report.",
+    "- Fold the lines that are steps of one goal into one item: a release, its push and the restart that follows are one piece of work, phrased as the goal, not three items. A line that only orders an operation (run a command, restart a service, try something once, check a result) is a step of the item it serves; when it serves nothing, drop it.",
     "- Items belong to the session, not to one message: do not name a message.",
     "- Existing captured items are the user's list: never rephrase, merge or close them. Only put an id in `duplicateOf`.",
     "",
     ...current,
     `Session ${input.sessionId} "${clip(input.title, 200)}"`,
-    ...(pending.length === 0 ? [] : ["Pending items:", ...pending]),
-    ...(branches.length === 0 ? [] : ["Open branch lines:", ...branches]),
+    ...(done.length === 0 ? [] : ["Done in this session (never draft these):", ...done]),
+    ...(pending.length === 0
+      ? []
+      : ["Pending items — the session's own list of what is still open:", ...pending]),
+    ...(branches.length === 0
+      ? []
+      : ["Open branch lines (supporting context; may be stale):", ...branches]),
     ...(messages.length === 0 ? [] : ["Last messages:", ...messages]),
     "",
     `Return only one JSON object, no code fences: {"items": [{"text": "..."}], "duplicateOf": []}`,

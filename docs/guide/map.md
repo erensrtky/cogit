@@ -131,11 +131,13 @@ the map. In the terminal: `cogit log --file <path>` and `cogit why <path>`.
 
 Working with an agent is improvised: things that would have been a plan's items get done,
 half-done or dropped along the way. The **Captured** list is a short, curated one. When a
-session ends, the side model reads what its record left open — pending items, open branch
-lines, the last messages — and drafts at most three **user-level** items: something you asked
-for or the session left undone, as a short imperative in the conversation's language. It never
-drafts a commit step, a test run, a release chore or a status fact, and a session with nothing
-open costs no model call.
+session ends, the side model reads what its record left open — the record's own pending items
+first, with the open line of each branch summary and the last messages as supporting context —
+and drafts at most three **user-level** items: something you asked for or the session left
+undone, as a short imperative in the conversation's language. Anything the record lists as done
+is never drafted, even when an older branch line still calls it open, and the model never
+invents a commit step, a test run, a status fact or a question a later message answered. A
+session with nothing open costs no model call.
 
 Each drafted item waits in **To review** until you choose: **Accept** keeps it in **Open**,
 **Dismiss** closes it without doing it. An open item is closed with **Done**. The last ten

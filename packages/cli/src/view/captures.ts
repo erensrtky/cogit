@@ -2,9 +2,9 @@ import type { ViewNode, ViewPendingItem } from "./model.js";
 
 /**
  * The input the captured-work distiller reads (Story 15.1). The record is the
- * only source: a session's pending items and its branch summaries' open lines,
- * next to the titles of its last messages so the model can tell what the session
- * was really about. The map and the CLI show the curated store, never these rows.
+ * only source: what the session finished (a veto), its pending items and its
+ * branch summaries' open lines, next to the titles of its last messages so the
+ * model can tell what the session was really about. The map and the CLI show the curated store, never these rows.
  *
  * Kept free of Node imports, like the rest of `view/`.
  */
@@ -14,7 +14,7 @@ export interface CaptureSourceSession {
   sessionId: string;
   title: string;
   updatedAt: string;
-  status: { pending: readonly ViewPendingItem[] };
+  status: { pending: readonly ViewPendingItem[]; done?: readonly string[] | undefined };
   messages: readonly Pick<ViewNode, "id" | "label" | "title" | "branch" | "unsummarized">[];
 }
 
@@ -40,6 +40,8 @@ export interface CaptureMessageTitle {
 export interface CaptureInput {
   sessionId: string;
   title: string;
+  /** What the session finished: the pass never drafts these again. */
+  done: string[];
   pending: CapturePendingLine[];
   /** A branch summary's `open` line, on the branch's first message. */
   branches: CaptureLine[];
@@ -64,6 +66,16 @@ export function captureInput(
   lastMessageLimit = LAST_MESSAGE_LIMIT,
 ): CaptureInput {
   const recorded = session.messages.filter((message) => message.unsummarized !== true);
+  // What the session finished is a veto on its own: an older branch line still
+  // naming the work as open must not bring it back.
+  const done: string[] = [];
+  const doneSeen = new Set<string>();
+  for (const raw of session.status.done ?? []) {
+    const text = raw.replace(/\s+/g, " ").trim();
+    if (text === "" || doneSeen.has(text)) continue;
+    doneSeen.add(text);
+    done.push(text);
+  }
   // A pending item belongs to the session as a whole; it points at the newest
   // recorded message, where the session left off.
   const newest = recorded[recorded.length - 1];
@@ -95,6 +107,7 @@ export function captureInput(
   return {
     sessionId: session.sessionId,
     title: session.title === "" ? session.sessionId : session.title,
+    done,
     pending,
     branches,
     lastMessages,
