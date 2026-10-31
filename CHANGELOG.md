@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.2] - 2026-11-01
+### Fixed
+- The session-end catch-up no longer loses the whole record when the model's answer is only slightly off: nulls inside the status take the schema's defaults, a message summary written as an object keeps its text, and in mixed mode the side model's status, branch summaries and agent decisions are dropped instead of failing the write.
+
 ## [0.28.1] - 2026-11-01
 ### Changed
 - `cogit init` asks where the session records should live — with a note on what committing `.cogit/` shares — and, below 90 days, whether to keep transcripts longer. The project takes its directory's name. It lets the agent run the cogit skill, writes the project's `.claude/settings.json` and sets the summary language to the conversation's without asking; `--git`, `--name`, `--retention`, `--no-allow-skill`, `--no-project-settings` and `--language` still override them, and `--yes` leaves Claude Code's settings untouched.
