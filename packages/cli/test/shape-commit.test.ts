@@ -206,4 +206,27 @@ process.stdin.on("end", () => {
     await withLock(projectPaths(root).lock("shape-s1"), () => shapeMessage(root, "s1", io));
     expect(io.lines).toEqual(["a shape for s1 is already being written"]);
   });
+
+  it("prints a dry run without saving or queueing, for a recorded message or a bare commit", async () => {
+    const sha = await commit("a.txt", 12, THOUGHT);
+    const claudeEnv = await fakeClaude();
+    const bare = fakeIo(claudeEnv);
+    await shapeMessage(root, undefined, bare, { commit: sha, dryRun: true });
+    expect(JSON.parse(bare.lines.join("\n")).tools[0]).toMatchObject({
+      kind: "pseudo",
+      valid: true,
+    });
+    expect(await queuedShapes(root)).toEqual([]);
+
+    await writeRecord([{ id: THOUGHT, kind: "message", title: "Work", parent: null }]);
+    await shapeMessage(root, undefined, fakeIo(claudeEnv), { commit: "HEAD", dryRun: true });
+    expect(await shapeOf(THOUGHT)).toBeUndefined();
+
+    await expect(shapeMessage(root, undefined, fakeIo(env), { dryRun: true })).rejects.toThrow(
+      "--dry-run needs --commit",
+    );
+    await expect(
+      shapeMessage(root, undefined, fakeIo(env), { commit: "nope", dryRun: true }),
+    ).rejects.toThrow("no commit nope");
+  });
 });

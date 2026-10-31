@@ -264,7 +264,10 @@
                       "enum": [
                         "pseudo",
                         "mermaid",
-                        "table"
+                        "table",
+                        "sequence",
+                        "interface",
+                        "example"
                       ]
                     },
                     "text": {

@@ -26,7 +26,7 @@ export interface ShapeToolSpec {
 }
 
 /** Number of nodes a Mermaid flowchart may carry. */
-export const MERMAID_MAX_NODES = 15;
+export const MERMAID_MAX_NODES = 10;
 
 const MERMAID_KEYWORDS = new Set([
   "flowchart",
@@ -67,6 +67,9 @@ export function mermaidNodeCount(text: string): number {
   return ids.size;
 }
 
+/** Participants a sequence diagram may carry. */
+export const SEQUENCE_MAX_ACTORS = 6;
+
 export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
   {
     kind: "pseudo",
@@ -100,7 +103,7 @@ export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
   },
   {
     kind: "mermaid",
-    name: "Diagram",
+    name: "Flowchart",
     when:
       `The change is a flow between files or functions (a request path, a queue, a state ` +
       `machine). A Mermaid flowchart of at most ${MERMAID_MAX_NODES} nodes.`,
@@ -114,7 +117,68 @@ export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
       return mermaidNodeCount(source) <= MERMAID_MAX_NODES;
     },
   },
+  {
+    kind: "sequence",
+    name: "Sequence",
+    when:
+      "The change is a flow over time between actors that hand work to each other: a hook " +
+      "starting a background job, a client and a server, a queue drained later. Prefer it to a " +
+      `flowchart when the order of the calls is the point. A Mermaid sequenceDiagram of at most ${SEQUENCE_MAX_ACTORS} participants.`,
+    output:
+      '{"kind": "sequence", "text": "sequenceDiagram\\n  participant Git\\n  Git->>CLI: post-commit"}',
+    validate(text) {
+      const source = text.trim();
+      if (!/^sequenceDiagram\b/.test(source)) return false;
+      if (/<script/i.test(source)) return false;
+      if (!/-{1,2}>>?|-[x)]/.test(source)) return false;
+      if (source.split("\n").length > 40) return false;
+      return sequenceActors(source) <= SEQUENCE_MAX_ACTORS;
+    },
+  },
+  {
+    kind: "interface",
+    name: "Interface",
+    when:
+      "The change adds, removes or changes something other code or people call: a CLI command " +
+      "or flag, an exported function's signature, a config key, a schema field, an HTTP route. " +
+      'One row per item: the item, what it was, what it is now; "—" for nothing.',
+    output:
+      '{"kind": "interface", "text": "cogit shape --commit <sha> | — | shapes the message the commit\'s trailer names"}',
+    validate(text) {
+      const rows = tableRows(text);
+      return rows !== undefined && rows.length >= 1 && rows.length <= TABLE_MAX_ROWS;
+    },
+  },
+  {
+    kind: "example",
+    name: "Example",
+    when:
+      "The behaviour is easiest to grasp from one concrete case: a command and what it prints, " +
+      "an input and the output, a situation and what now happens. Real values from the diff, " +
+      'each step on its own line, "→" before each result.',
+    output:
+      '{"kind": "example", "text": "git commit (message not recorded yet)\\n→ queued ba654e8 until h72a65f6220b4 is recorded"}',
+    validate(text) {
+      const lines = text.split("\n").filter((line) => line.trim() !== "");
+      return lines.length >= 2 && lines.length <= 12 && text.includes("→") && text.length <= 1500;
+    },
+  },
 ];
+
+/** The participants of a sequence diagram: declared ones plus every message end. */
+export function sequenceActors(text: string): number {
+  const actors = new Set<string>();
+  for (const line of text.split("\n")) {
+    const declared = /^\s*(?:participant|actor)\s+([^\s:]+)/.exec(line);
+    if (declared?.[1]) actors.add(declared[1]);
+    const message = /^\s*([^\s:-][^:]*?)\s*-{1,2}(?:>>|>|x|\))[+-]?\s*([^:]+?)\s*:/.exec(line);
+    if (message?.[1] && message[2]) {
+      actors.add(message[1]);
+      actors.add(message[2]);
+    }
+  }
+  return actors.size;
+}
 
 /** Rows a Before / After table may carry. */
 export const TABLE_MAX_ROWS = 8;
@@ -253,12 +317,16 @@ export function shapePrompt(opts: {
     toolCatalogue(),
     "",
     "Rules:",
-    "- When the change touches two or more files, give a diagram of the path and the steps; a single-file change takes the one tool that fits.",
-    "- When the change alters behaviour someone can see (a fix, a new default, a rule), add a Before / After table; a pure refactor takes none.",
-    "- A table has no header row (the map adds Case / Before / After); every line is one case.",
-    "- Order the tools diagram, table, steps; at most three. Return none when the change is a small fix not worth a picture.",
+    "- Give at most three tools, the ones that say the most about this change; never two that tell the same thing.",
+    "- A diagram for a change across two or more files: a sequence diagram when work is handed between actors over time, a flowchart for a path through code.",
+    "- A Before / After table when behaviour someone can see changes (a fix, a new default, a rule). A pure refactor takes none.",
+    "- An Interface table only for what is reached from outside the changed module: a CLI command or flag, an exported function or type other packages use, a config key, a stored schema field, an HTTP route. Never an internal helper, a component prop or a view-model field.",
+    "- A new or changed command or flag always gets an example that runs it and shows what it prints, with real values from the diff. Otherwise an example only when one concrete case shows the change faster than steps.",
+    "- Steps only when the logic itself is the point and no other tool says it.",
+    "- Tables have no header row (the map adds one); every line is one row of three cells split by |.",
+    "- Order the tools: diagram, tables, example, steps. Return none when the change is a small fix not worth a picture.",
     `- Name real functions, files and modules from the diff. Never invent a path.`,
-    `- The Mermaid source must start with "flowchart TD" (or LR) and stay under ${MERMAID_MAX_NODES} nodes; quote labels that hold spaces or punctuation.`,
+    `- A flowchart starts with "flowchart TD" (or LR) and stays under ${MERMAID_MAX_NODES} nodes; quote labels that hold spaces or punctuation. A sequence diagram starts with "sequenceDiagram", names at most ${SEQUENCE_MAX_ACTORS} participants with short ids, and puts no semicolons or # in message text.`,
     "- Describe what the code does now, not the steps of the conversation.",
     `- Write the text in ${writing}; JSON keys stay English. Never write secrets, credentials or personal data.`,
     "",

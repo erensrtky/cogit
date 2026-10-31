@@ -34,7 +34,7 @@ export const MESSAGE_ID = /^m[1-9][0-9]*$/;
  * How a Shape shows what a change does (Story 13.6). The registry in `shape.ts`
  * says when each tool fits and validates its output.
  */
-export const ShapeKind = z.enum(["pseudo", "mermaid", "table"]);
+export const ShapeKind = z.enum(["pseudo", "mermaid", "table", "sequence", "interface", "example"]);
 export type ShapeKind = z.infer<typeof ShapeKind>;
 
 /**

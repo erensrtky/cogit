@@ -102,19 +102,39 @@ function IntentLayer({ node }: { node: ShapeNode }) {
 /** How a tool's output is named when it is shown as plain text. */
 const TEXT_CAPTION: Record<string, string> = {
   pseudo: "Steps",
-  mermaid: "Diagram source (not drawn)",
+  example: "Example",
+  mermaid: "Flowchart source (not drawn)",
+  sequence: "Sequence source (not drawn)",
   table: "Before / After (as written)",
+  interface: "Interface (as written)",
 };
 
-/** A Before / After table: one row per case. */
-function BeforeAfter({ rows }: { rows: readonly (readonly [string, string, string])[] }) {
+/** Tools Mermaid draws. */
+const DIAGRAM_KINDS = new Set(["mermaid", "sequence"]);
+
+/** The header of each table tool; the writer sends only the rows. */
+const TABLE_COLUMNS: Record<string, readonly [string, string, string]> = {
+  table: ["Case", "Before", "After"],
+  interface: ["Item", "Before", "After"],
+};
+
+/** A three-column table: Before / After or Interface, one row per case or item. */
+function ShapeTable({
+  columns,
+  rows,
+}: {
+  columns: readonly [string, string, string];
+  rows: readonly (readonly [string, string, string])[];
+}) {
   return (
     <table className="shape-table">
       <thead>
         <tr>
-          <th scope="col">Case</th>
-          <th scope="col">Before</th>
-          <th scope="col">After</th>
+          {columns.map((column) => (
+            <th key={column} scope="col">
+              {column}
+            </th>
+          ))}
         </tr>
       </thead>
       <tbody>
@@ -154,20 +174,20 @@ function ShapeLayer({
     <div className="shape-tools">
       {node.shape?.tools.map((tool, index) => {
         const key = `${tool.kind}-${index}`;
-        if (tool.kind === "mermaid" && tool.valid !== false)
+        if (DIAGRAM_KINDS.has(tool.kind) && tool.valid !== false)
           return (
             <figure key={key} className="shape-figure">
               {renderMermaid(tool.text)}
-              <figcaption>Diagram</figcaption>
+              <figcaption>{tool.kind === "sequence" ? "Sequence" : "Flowchart"}</figcaption>
             </figure>
           );
-        const rows =
-          tool.kind === "table" && tool.valid !== false ? tableRows(tool.text) : undefined;
-        if (rows !== undefined)
+        const columns = TABLE_COLUMNS[tool.kind];
+        const rows = columns && tool.valid !== false ? tableRows(tool.text) : undefined;
+        if (columns && rows !== undefined)
           return (
             <figure key={key} className="shape-figure">
-              <BeforeAfter rows={rows} />
-              <figcaption>Before / After</figcaption>
+              <ShapeTable columns={columns} rows={rows} />
+              <figcaption>{tool.kind === "interface" ? "Interface" : "Before / After"}</figcaption>
             </figure>
           );
         return (
@@ -330,7 +350,9 @@ export function ShapeSection({
   const [open, setOpen] = useState(false);
   const state = shapeState(node.shape, enabled);
   const preview = shapePreview(node.shape);
-  const diagram = node.shape?.tools.find((tool) => tool.kind === "mermaid" && tool.valid !== false);
+  const diagram = node.shape?.tools.find(
+    (tool) => DIAGRAM_KINDS.has(tool.kind) && tool.valid !== false,
+  );
   return (
     <section className="shape-section">
       <h3>Intent, Shape and Code</h3>

@@ -88,19 +88,24 @@ message's node, with the node's commit hashes:
 "shape": { "tools": [{ "kind": "pseudo", "text": "1. ...\n2. ..." }], "commits": ["abc1234"] }
 ```
 
-Three tools:
+Tools (at most three, the ones that say the most; never two that tell the same thing):
 
-- `mermaid`: a Mermaid `flowchart TD` (or `LR`) of the new path between files or functions,
-  at most 15 nodes. Quote labels that hold spaces or punctuation.
+- `mermaid`: a Mermaid `flowchart TD` (or `LR`) of a path through code, at most 10 nodes.
+  Quote labels that hold spaces or punctuation.
+- `sequence`: a Mermaid `sequenceDiagram` when work is handed between actors over time (a hook
+  starting a job, a client and a server, a queue drained later), at most 6 participants.
 - `table`: Before / After, one `case | before | after` line per case (at most 8), for a
   change someone can see: a fix, a new default, a rule that now says yes or no.
+- `interface`: one `item | before | after` line per command, flag, exported function, config
+  key or stored schema field that changed, only what is reached from outside the module;
+  `—` for nothing.
+- `example`: one concrete case with real values, each result on its own line after `→`. A new
+  or changed command or flag always gets one that runs it.
 - `pseudo`: numbered plain-language steps of the new logic, naming the functions and files.
 
-A change across two or more files gets the diagram and the steps; a visible behaviour change
-also gets the table; order them diagram, table, steps. `{ "tools": [] }` means nothing worth
-showing. Skip messages whose
-commits are only release/version bumps, lockfiles or CHANGELOG, or change fewer than 5 lines
-in total. Write it in the conversation's language; the CLI validates each output and keeps an
+Tables have no header row. Order them diagram, tables, example, steps. `{ "tools": [] }`
+means nothing worth showing. Skip messages whose commits are only release/version bumps,
+lockfiles or CHANGELOG, or change fewer than 5 lines in total. Write it in the conversation's language; the CLI validates each output and keeps an
 invalid diagram as text.
 
 ## Branch summary

@@ -422,14 +422,22 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .helpGroup("Agent:")
     .argument("[session-id]", "session id; defaults to the session in .cogit/HEAD")
     .option("--commit <sha>", "shape the message this commit's Thought trailer names")
+    .option("--dry-run", "with --commit: print the Shape instead of saving it")
     .option("-C, --dir <dir>", "project directory", ".")
     .addHelpText(
       "after",
       examples("cogit shape", "cogit shape 9c32ab18", "cogit shape --commit HEAD"),
     )
     .action(
-      run(async (sessionId: string | undefined, opts: { dir: string; commit?: string }) =>
-        shapeMessage(opts.dir, sessionId, makeIo(false), { commit: opts.commit }),
+      run(
+        async (
+          sessionId: string | undefined,
+          opts: { dir: string; commit?: string; dryRun?: boolean },
+        ) =>
+          shapeMessage(opts.dir, sessionId, makeIo(false), {
+            commit: opts.commit,
+            dryRun: opts.dryRun,
+          }),
       ),
     );
 

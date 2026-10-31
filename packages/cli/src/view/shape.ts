@@ -21,16 +21,16 @@ export function shapeState(shape: ViewShape | undefined, enabled: boolean): Shap
 }
 
 /**
- * The panel preview: the first lines of the steps, or else of the Before /
- * After table as `case: before → after`. A diagram alone has no text preview.
+ * The panel preview: the first lines of the steps, else of the example, else
+ * of a table as `case: before → after`. A diagram alone has no text preview.
  */
 export function shapePreview(shape: ViewShape | undefined, lines = 3): string | undefined {
   const text = (kind: string) => shape?.tools.find((tool) => tool.kind === kind)?.text;
-  const pseudo = text("pseudo");
-  const table = text("table");
+  const plain = text("pseudo") ?? text("example");
+  const table = text("table") ?? text("interface");
   const kept =
-    pseudo !== undefined
-      ? pseudo.split("\n").map((line) => line.trim())
+    plain !== undefined
+      ? plain.split("\n").map((line) => line.trim())
       : (table?.split("\n") ?? []).map((line) => {
           const cells = line.split("|").map((cell) => cell.trim());
           return cells.length === 3 ? `${cells[0]}: ${cells[1]} → ${cells[2]}` : line.trim();

@@ -81,7 +81,7 @@ describe("Intent, Shape and Code", () => {
         commits: [],
       },
     });
-    expect(invalid).toContain("Diagram source (not drawn)");
+    expect(invalid).toContain("Flowchart source (not drawn)");
   });
 
   it("lays out a Before / After table and shows an unknown tool as text", () => {
@@ -103,6 +103,24 @@ describe("Intent, Shape and Code", () => {
     expect(html).toContain("Before / After");
     expect(html).toContain("a newer tool");
     expect(html).toContain("<figcaption>timeline</figcaption>");
+  });
+
+  it("draws a sequence, lays out an Interface table and shows an example", () => {
+    const html = render("shape", {
+      shape: {
+        tools: [
+          { kind: "sequence", text: "sequenceDiagram\n  A->>B: go", valid: true },
+          { kind: "interface", text: "--commit <sha> | — | new flag", valid: true },
+          { kind: "example", text: "git commit\n→ queued", valid: true },
+        ],
+        commits: [],
+      },
+    });
+    expect(html).toContain("<figcaption>Sequence</figcaption>");
+    expect(html).toContain('<th scope="col">Item</th>');
+    expect(html).toContain("<figcaption>Interface</figcaption>");
+    expect(html).toContain("<figcaption>Example</figcaption>");
+    expect(html).toContain("→ queued");
   });
 
   it("shows a table the registry refused as written", () => {

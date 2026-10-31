@@ -10,6 +10,7 @@ import {
   mermaidNodeCount,
   parseShapeAnswer,
   SHAPE_DIFF_LIMIT,
+  sequenceActors,
   shapePrompt,
   shapeWanted,
   stampShape,
@@ -70,6 +71,43 @@ describe("the Shape tool catalogue", () => {
     expect(validateShapeTools([{ kind: "mermaid", text: labelled }])[0]?.valid).toBe(true);
   });
 
+  it("accepts a small sequence diagram and rejects a crowded or empty one", () => {
+    const ok = [
+      "sequenceDiagram",
+      "  participant G as Git",
+      "  G->>CLI: post-commit",
+      "  CLI-->>Queue: enqueue",
+      "  Queue->>Model: shape when recorded",
+    ].join("\n");
+    expect(sequenceActors(ok)).toBe(4);
+    expect(validateShapeTools([{ kind: "sequence", text: ok }])[0]?.valid).toBe(true);
+    const crowded = [
+      "sequenceDiagram",
+      ...Array.from({ length: 7 }, (_, i) => `  A${i}->>A${i + 1}: go`),
+    ];
+    for (const bad of [
+      "flowchart TD\n  A --> B",
+      "sequenceDiagram\n  participant A",
+      crowded.join("\n"),
+      "sequenceDiagram\n  A->>B: hi\n<script>x</script>",
+    ]) {
+      expect(validateShapeTools([{ kind: "sequence", text: bad }])[0]?.valid).toBe(false);
+    }
+  });
+
+  it("accepts an Interface table and a concrete example", () => {
+    const iface =
+      "cogit shape --commit <sha> | — | shapes the commit's message\nShape.tools.kind | enum | any string";
+    expect(validateShapeTools([{ kind: "interface", text: iface }])[0]?.valid).toBe(true);
+    expect(validateShapeTools([{ kind: "interface", text: "a | b" }])[0]?.valid).toBe(false);
+    const example =
+      "git commit (message not recorded)\n→ queued ba654e8 until h72a65f6220b4 is recorded";
+    expect(validateShapeTools([{ kind: "example", text: example }])[0]?.valid).toBe(true);
+    for (const bad of ["one line → only", "two lines\nwith no arrow", `${"x\n".repeat(13)}→`]) {
+      expect(validateShapeTools([{ kind: "example", text: bad }])[0]?.valid).toBe(false);
+    }
+  });
+
   it("accepts a Before / After table and rejects rows without three cells", () => {
     const ok =
       "Commit before record | no Shape | queued, then shaped\nSkipped message | blocks the rest | passed over";
@@ -101,6 +139,12 @@ describe("the Shape tool catalogue", () => {
     expect(
       shapePreview(tools([{ kind: "mermaid", text: "flowchart TD\nA --> B" }])),
     ).toBeUndefined();
+    expect(shapePreview(tools([{ kind: "example", text: "run it\n→ done" }]))).toBe(
+      "run it\n→ done",
+    );
+    expect(shapePreview(tools([{ kind: "interface", text: "--commit | — | new flag" }]))).toBe(
+      "--commit: — → new flag",
+    );
     expect(tableRows("a | b | c\n\nd | e | f")).toEqual([
       ["a", "b", "c"],
       ["d", "e", "f"],
@@ -115,16 +159,22 @@ describe("the Shape tool catalogue", () => {
       diffTruncated: false,
       language: "auto",
     });
-    expect(prompt).toContain("two or more files, give a diagram of the path and the steps");
-    expect(prompt).toContain("add a Before / After table");
+    expect(prompt).toContain("A diagram for a change across two or more files");
+    expect(prompt).toContain("A Before / After table when behaviour someone can see changes");
+    expect(prompt).toContain("A new or changed command or flag always gets an example");
+    expect(prompt).toContain("Never an internal helper");
     expect(prompt).toContain('"table" (Before / After)');
+    expect(prompt).toContain('"sequence" (Sequence)');
+    expect(prompt).toContain('"interface" (Interface)');
+    expect(prompt).toContain('"example" (Example)');
+    expect(prompt).toContain("a sequence diagram when work is handed between actors");
   });
 
   it("names both tools and says when to use each", () => {
     const catalogue = toolCatalogue();
     expect(catalogue).toContain('"pseudo"');
     expect(catalogue).toContain('"mermaid"');
-    expect(catalogue).toContain("15 nodes");
+    expect(catalogue).toContain("10 nodes");
     expect(catalogue).toContain('{"kind": "pseudo"');
     expect(catalogue).toContain('{"kind": "mermaid"');
   });

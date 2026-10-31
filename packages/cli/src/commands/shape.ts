@@ -15,6 +15,7 @@ import {
   type ShapeCommitInfo,
   shapePrompt,
   shapeWanted,
+  validateShapeTools,
 } from "../shape.js";
 import { dequeueShape, enqueueShape } from "../shape-queue.js";
 import { LockBusyError, withLock } from "../store/lock.js";
@@ -65,6 +66,8 @@ export function nextShapeNode(nodes: readonly LineageNode[]): LineageNode | unde
 export interface ShapeOptions {
   /** Shape the message this commit's `Thought:` trailer names (the post-commit path). */
   commit?: string | undefined;
+  /** With `commit`: print the Shape the side model writes, without saving it. */
+  dryRun?: boolean | undefined;
 }
 
 export async function shapeMessage(
@@ -79,6 +82,11 @@ export async function shapeMessage(
   if (!project.ok) throw new CliError(project.error);
 
   const config = await loadConfig(io.env);
+  if (opts.dryRun === true) {
+    if (opts.commit === undefined) throw new CliError("--dry-run needs --commit <sha>");
+    await previewCommit(root, opts.commit, config, io);
+    return;
+  }
   if (!config.shapes) {
     io.out("shapes are off");
     return;
@@ -158,6 +166,33 @@ async function shapeCommit(root: string, ref: string, config: Config, io: Io): P
 }
 
 /**
+ * `--dry-run`: the Shape one commit would get, printed and not saved. The
+ * message the trailer names lends its Intent when it is recorded; otherwise
+ * the commit's subject stands in for it. Nothing is queued or written.
+ */
+async function previewCommit(root: string, ref: string, config: Config, io: Io): Promise<void> {
+  const gitRoot = await findGitRoot(root);
+  const commit = gitRoot === undefined ? undefined : await resolveCommit(gitRoot, ref);
+  if (gitRoot === undefined || commit === undefined) throw new CliError(`no commit ${ref}`);
+  const thought = await readCommitThought(root, commit, io.env);
+  const sessions = await loadAllSessions(root, () => {});
+  const recorded = sessions
+    .flatMap((session) => session.nodes)
+    .find((node) => node.kind === "message" && node.id === thought);
+  const subject = (await readCommitSubjects(gitRoot, [commit])).get(commit) ?? commit.slice(0, 7);
+  const node: LineageNode = {
+    ...(recorded ?? {
+      id: thought ?? "h000000000000",
+      kind: "message",
+      title: subject,
+      parent: null,
+    }),
+    commits: [commit],
+  };
+  await shapeNode(root, gitRoot, undefined, node, config, io);
+}
+
+/**
  * The manual path: the newest message that wants a Shape. A message the skip
  * rules turn down (a release commit, a two-line fix) is passed over, so it
  * never holds back the older ones behind it.
@@ -177,11 +212,14 @@ async function runShape(root: string, sessionId: string, config: Config, io: Io)
   }
 }
 
-/** Writes one message's Shape; false when the skip rules turned it down. */
+/**
+ * Writes one message's Shape; false when the skip rules turned it down. With
+ * no session it prints the validated tools as JSON instead (`--dry-run`).
+ */
 async function shapeNode(
   root: string,
   gitRoot: string,
-  sessionId: string,
+  sessionId: string | undefined,
   node: LineageNode,
   config: Config,
   io: Io,
@@ -220,6 +258,10 @@ async function shapeNode(
   });
   const stdout = await runClaude(prompt, config.sideModel, io.env);
   const answer = parseShapeAnswer(resultText(stdout)) ?? { tools: [], commits: [] };
+  if (sessionId === undefined) {
+    io.out(JSON.stringify({ tools: validateShapeTools(answer.tools) }, null, 2));
+    return true;
+  }
   const payload = {
     sessionId,
     nodes: [

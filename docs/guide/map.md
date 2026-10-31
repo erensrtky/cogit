@@ -86,9 +86,18 @@ A message that landed commits has three layers, in that order:
 
 - **Intent** — the record: the decision, the reason you gave, who decided, and the options
   that were rejected. It is read as recorded, never rewritten here.
-- **Shape** — a small representation of what the change *does*: numbered plain-language
-  steps naming the functions and files, or a Mermaid diagram of the new path between them.
-  The recorder writes it, not you; the map draws the diagram in the page, offline included.
+- **Shape** — a small representation of what the change *does*, in up to three of these:
+  - a **Flowchart** of a path through the code, or a **Sequence** diagram when work is handed
+    between a hook, a queue, a server or a background job;
+  - a **Before / After** table for a fix or any change you can see, and an **Interface**
+    table for a command, flag, exported function, config key or schema field that changed;
+  - an **Example**, one concrete run with real values (every new command gets one);
+  - **Steps**, numbered plain-language steps naming the functions and files.
+
+  The recorder writes it, not you, and a tiny change or a pure refactor gets none. The
+  diagrams are drawn when the map is opened with `cogit open`; a map opened from the file
+  shows their source. `cogit shape --commit <sha> --dry-run` prints the Shape a commit would
+  get without saving it.
 - **Code** — the message's commits and their diffs, the same patches the panel opens.
 
 The message details show a short preview and an **Open** button. Open shows the three layers
