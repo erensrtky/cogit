@@ -3,7 +3,7 @@ import pkg from "../package.json" with { type: "json" };
 import { backfillTail } from "./commands/backfill.js";
 import { blame } from "./commands/blame.js";
 import { buildProject } from "./commands/build.js";
-import { captures } from "./commands/captures.js";
+import { captures, distill, setCapture } from "./commands/captures.js";
 import {
   configGet,
   configGit,
@@ -198,24 +198,76 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       ),
     );
 
-  program
+  const capturesCommand = program
     .command("captures")
-    .description("list what the sessions left open, gathered from the record (not a plan)")
+    .description("the curated list of work the sessions left open (not a plan)")
     .helpGroup("Read:")
     .argument("[dir]", "project directory", ".")
     .option("-C, --dir <dir>", "project directory (same as the positional)")
-    .option("--session <id>", "only this session (id or prefix)")
-    .option("--json", "print JSON instead of text")
-    .addHelpText("after", examples("cogit captures", "cogit captures --session 9c32ab18"))
+    .option("--json", "print the store as JSON")
+    .addHelpText(
+      "after",
+      examples(
+        "cogit captures",
+        "cogit captures accept c1a2b3c4",
+        "cogit captures distill --dry-run",
+        "cogit captures distill --all",
+      ),
+    )
     .action(
-      run(async (dir: string, opts: { dir?: string; session?: string; json?: boolean }) => {
-        await captures({
-          dir: opts.dir ?? dir,
-          io: makeIo(false),
-          session: opts.session,
-          json: opts.json === true,
-        });
+      run(async (dir: string, opts: { dir?: string; json?: boolean }) => {
+        await captures({ dir: opts.dir ?? dir, io: makeIo(false), json: opts.json === true });
       }),
+    );
+
+  for (const verb of ["accept", "dismiss", "done"] as const) {
+    capturesCommand
+      .command(verb)
+      .description(
+        verb === "accept"
+          ? "accept a suggested item and keep it open"
+          : verb === "dismiss"
+            ? "dismiss a suggested item; it leaves the list"
+            : "close an open item",
+      )
+      .argument("<id>", "the item's id (c…, as `cogit captures` prints it)")
+      .option("-C, --dir <dir>", "project directory")
+      .action(
+        run(async (id: string, opts: { dir?: string }, command: Command) => {
+          // Commander hands a `--dir` that the parent also defines to the
+          // parent's opts, so both are read.
+          await setCapture(
+            opts.dir ?? command.parent?.opts<{ dir?: string }>().dir ?? ".",
+            verb,
+            id,
+            makeIo(false),
+          );
+        }),
+      );
+  }
+
+  capturesCommand
+    .command("distill")
+    .description("draft items from a session's leftover work, by hand")
+    .option("-C, --dir <dir>", "project directory")
+    .option("--session <id>", "only this session (id or prefix)")
+    .option("--all", "every session with something left open")
+    .option("--dry-run", "print the proposals and write nothing")
+    .action(
+      run(
+        async (
+          opts: { dir?: string; session?: string; all?: boolean; dryRun?: boolean },
+          command: Command,
+        ) => {
+          await distill({
+            dir: opts.dir ?? command.parent?.opts<{ dir?: string }>().dir ?? ".",
+            io: makeIo(false),
+            session: opts.session,
+            all: opts.all === true,
+            dryRun: opts.dryRun === true,
+          });
+        },
+      ),
     );
 
   program

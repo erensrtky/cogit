@@ -39,6 +39,7 @@ export const PANEL_EDITABLE_KEYS = [
   "recordHeadless",
   "tryBeforeNotes",
   "shapes",
+  "captures",
   "language",
   "shareConversations",
   "recordCommit",
@@ -348,37 +349,31 @@ export interface LineageViewModel {
    */
   inbox?: ViewInboxRow[];
   /**
-   * Captured work (Story 14.1): what the sessions left open, derived from the
-   * records at build time. Absent on pages built before it.
+   * The curated captured-work list (Story 15.1), read from the local store at
+   * build time. Absent on pages built before it.
    */
   captures?: ViewCapture[];
 }
 
 /**
- * One line of captured work (Story 14.1): something a session left open, read
- * from its record — a `status.pending` item or a branch summary's `open` line.
- * Derived on every build, never stored, never edited; it is not a plan.
+ * One item of the curated captured-work list (Story 15.1), read from
+ * `.cogit/state/captures.json` at build time. A side model drafts it from a
+ * session's leftover work; the user accepts, dismisses or closes it. The store
+ * is local and never committed, and it is not a plan: no assignment, no
+ * priority, no tracker state.
  */
 export interface ViewCapture {
-  /** `<sessionId>#p<n>` for a pending item, `<sessionId>#<messageId>` for a branch. */
-  key: string;
+  /** `c` + eight hex characters, minted once; never derived from the text. */
+  id: string;
   text: string;
-  /** Where the record holds it: the session's pending list or a branch summary. */
-  source: "pending" | "branch";
-  sessionId: string;
-  /** The session's title, or its id when the record has none yet. */
-  sessionTitle: string;
-  /** The message that named it: the newest one for pending, the branch's first for an open line. */
-  messageId?: string;
-  /** That message's `mN` label. */
-  label?: string;
-  /** The branch summary's title, for an open line. */
-  branch?: string;
-  /** Who recorded the session (name, else email); absent on older records. */
-  author?: string;
-  /** The session's last update: how old the line is. */
+  /** `suggested` waits for the user; `open` is accepted; `dismissed` and `done` are closed. */
+  state: "suggested" | "open" | "dismissed" | "done";
+  /** The recorded message the item came from. */
+  source: { sessionId: string; messageId: string };
+  createdAt: string;
   updatedAt: string;
-  needsUser: boolean;
+  /** Set when the item became `done`. */
+  closedAt?: string | undefined;
 }
 
 /**
@@ -454,6 +449,11 @@ export interface PanelSettings {
    * plain-language or diagram view of what the change does.
    */
   shapes: boolean;
+  /**
+   * Whether the side model distils each session's leftover work into a short
+   * curated list (Story 15.1).
+   */
+  captures: boolean;
   shareConversations: boolean;
   recordCommit: "ask" | "auto" | "off";
   gitPolicy: "ignore" | "commit";

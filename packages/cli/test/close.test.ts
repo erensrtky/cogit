@@ -251,7 +251,7 @@ describe("backfill --tail --close", () => {
 let input = "";
 process.stdin.on("data", (c) => { input += c; });
 process.stdin.on("end", async () => {
-  (await import("node:fs")).writeFileSync(${JSON.stringify(join(dir, "prompt.txt"))}, input);
+  (await import("node:fs")).appendFileSync(${JSON.stringify(join(dir, "prompt.txt"))}, input + "\\n");
   process.stdout.write(JSON.stringify({ result: ${JSON.stringify(answer)} }));
 });
 `,

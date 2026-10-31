@@ -42,6 +42,12 @@ export const Config = z.object({
    */
   shapes: z.boolean().default(true),
   /**
+   * Whether the side model distils each session's leftover work into a short
+   * curated list (Story 15.1). Off writes nothing; items already in the store
+   * are kept and come back when it is turned on again.
+   */
+  captures: z.boolean().default(true),
+  /**
    * Whether SessionStart hands the agent the lineage of the previous session and
    * how to read the record (`log` / `show`). On by default; costs only tokens.
    */

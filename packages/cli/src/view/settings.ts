@@ -119,6 +119,18 @@ const EDITABLE: FieldSpec[] = [
     kind: "boolean",
   },
   {
+    key: "captures",
+    label: "Captured work",
+    help: "A short list of what each session left undone, drafted by the side model.",
+    details:
+      "When a session ends, the side model reads what its record left open and drafts at " +
+      "most three things a person would ask for, in the conversation's language. The list " +
+      "is yours: accept, dismiss or close each item. Sessions with nothing open cost no " +
+      "model call; the map's Captured button appears only while something waits or is open. " +
+      "Off, nothing is drafted and the list already in the store is kept, not deleted.",
+    kind: "boolean",
+  },
+  {
     key: "language",
     label: "Language",
     help: "Language the agent writes records in; `auto` follows the chat.",
@@ -283,6 +295,7 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   recordHeadless: false,
   tryBeforeNotes: true,
   shapes: true,
+  captures: true,
   shareConversations: false,
   recordCommit: "ask",
   gitPolicy: "commit",
@@ -303,6 +316,7 @@ export function editableSettings(settings: PanelSettings): PanelEditableSettings
     recordHeadless: settings.recordHeadless,
     tryBeforeNotes: settings.tryBeforeNotes,
     shapes: settings.shapes,
+    captures: settings.captures,
     language: settings.language,
     shareConversations: settings.shareConversations,
     recordCommit: settings.recordCommit,

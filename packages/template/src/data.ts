@@ -159,6 +159,28 @@ export async function saveDismiss(
 }
 
 /**
+ * Moves one captured item to a state the user chose (Story 15.1). The list is
+ * local to the project, so this needs the local server; over `file://` the row
+ * only says so. The server allows only the user's transitions.
+ */
+export async function saveCaptureState(
+  dir: string,
+  id: string,
+  state: "open" | "dismissed" | "done",
+  token: string,
+): Promise<void> {
+  const response = await fetch("/api/captures/state", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-cogit-token": token },
+    body: JSON.stringify({ dir, id, state }),
+  });
+  if (!response.ok) {
+    const text = (await response.text()).trim();
+    throw new Error(text || `could not save the item (HTTP ${response.status})`);
+  }
+}
+
+/**
  * One commit's patch for the message details (Story 10.5). Only the local
  * server answers this; over `file://` the diff rows do not expand.
  */

@@ -29,6 +29,7 @@ import {
   startMapServer,
   stopStaleServer,
 } from "../src/server.js";
+import { addCaptureSuggestions, readCaptures } from "../src/store/captures.js";
 import { atomicWrite } from "../src/store/fs.js";
 import { readInboxDismissed } from "../src/store/inbox-state.js";
 import { readMapView } from "../src/store/map-view.js";
@@ -587,6 +588,7 @@ describe("settings read", () => {
         recordHeadless: false,
         tryBeforeNotes: true,
         shapes: true,
+        captures: true,
         language: "auto",
         shareConversations: false,
         recordCommit: "ask",
@@ -974,6 +976,108 @@ describe("inbox dismiss endpoint (Story 11.1)", () => {
     await mkdir(projectPaths(root).inboxState, { recursive: true });
     const reply = await dismissWrite(server, token, { dir: root, sessionId: SESSION, at: AT });
     expect(reply.status).toBe(500);
+  });
+});
+
+describe("captures state endpoint (Story 15.1)", () => {
+  function stateWrite(
+    server: MapServer,
+    token: string,
+    payload: unknown,
+    overrides: Record<string, string> = {},
+  ): Promise<Reply> {
+    return postConfig(`${server.url}/api/captures/state`, JSON.stringify(payload), {
+      origin: `http://127.0.0.1:${server.port}`,
+      [CONFIG_TOKEN_HEADER]: token,
+      ...overrides,
+    });
+  }
+
+  async function suggested(): Promise<string> {
+    const [item] = await addCaptureSuggestions(
+      root,
+      "s1",
+      [{ text: "write the docs", messageId: "m1" }],
+      { now: T0 },
+    );
+    return item?.id as string;
+  }
+
+  it("accepts a suggestion and closes an open item", async () => {
+    const id = await suggested();
+    const server = await start();
+    const token = await panelToken(server);
+    const accept = await stateWrite(server, token, { dir: root, id, state: "open" });
+    expect(accept.status).toBe(200);
+    expect(JSON.parse(accept.body)).toEqual({ ok: true, id, state: "open" });
+    expect((await readCaptures(root)).items[0]?.state).toBe("open");
+    const done = await stateWrite(server, token, { dir: root, id, state: "done" });
+    expect(done.status).toBe(200);
+    expect((await readCaptures(root)).items[0]?.closedAt).toBeTruthy();
+  });
+
+  it("refuses an unknown id, an impossible jump, a foreign project, a bad token and a bad body", async () => {
+    const id = await suggested();
+    const server = await start();
+    const token = await panelToken(server);
+    expect(
+      (await stateWrite(server, token, { dir: root, id: "c00000000", state: "open" })).status,
+    ).toBe(404);
+    expect((await stateWrite(server, token, { dir: root, id, state: "done" })).status).toBe(409);
+    expect((await stateWrite(server, token, { dir: root, id, state: "suggested" })).status).toBe(
+      400,
+    );
+    expect(
+      (await stateWrite(server, token, { dir: join(dir, "elsewhere"), id, state: "open" })).status,
+    ).toBe(403);
+    expect((await stateWrite(server, "nope", { dir: root, id, state: "open" })).status).toBe(403);
+    expect((await stateWrite(server, token, { dir: root, id: "nope", state: "open" })).status).toBe(
+      400,
+    );
+    expect((await stateWrite(server, token, { dir: root, state: "open" })).status).toBe(400);
+    expect(
+      (
+        await stateWrite(
+          server,
+          token,
+          { dir: root, id, state: "open" },
+          { "content-type": "text/plain" },
+        )
+      ).status,
+    ).toBe(415);
+    expect(
+      (
+        await stateWrite(
+          server,
+          token,
+          { dir: root, id, state: "open" },
+          { origin: "http://evil.example" },
+        )
+      ).status,
+    ).toBe(403);
+  });
+
+  it("refuses an oversized or malformed body, and answers 500 when the write fails", async () => {
+    const id = await suggested();
+    const server = await start();
+    const token = await panelToken(server);
+    expect(
+      (await stateWrite(server, token, { dir: root, id, state: "open", pad: "x".repeat(5000) }))
+        .status,
+    ).toBe(413);
+    expect(
+      (
+        await postConfig(`${server.url}/api/captures/state`, "{oops", {
+          origin: `http://127.0.0.1:${server.port}`,
+          [CONFIG_TOKEN_HEADER]: token,
+        })
+      ).status,
+    ).toBe(400);
+    expect((await stateWrite(server, token, [])).status).toBe(400);
+    // A directory where the store should be: the read fails, the route must not crash.
+    await rm(projectPaths(root).captures, { force: true });
+    await mkdir(projectPaths(root).captures, { recursive: true });
+    expect((await stateWrite(server, token, { dir: root, id, state: "open" })).status).toBe(500);
   });
 });
 

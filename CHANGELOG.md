@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Captured work is a curated list now: when a session ends, the side model drafts at most three user-level items from what the record left undone, and you accept, dismiss or close each one on the map or with `cogit captures accept|dismiss|done <id>`. `cogit captures distill [--session <id> | --all] [--dry-run]` backfills older sessions; the list lives in `.cogit/state/captures.json`, local and never committed.
+- A `captures` setting (on by default, with a **?** in the settings panel) turns the drafting off; items already in the list are kept, not deleted.
+
+### Changed
+- The map's **Captured** button and `cogit captures` show the curated store instead of rows derived from the record, and the button appears only while the setting is on and something waits or is open.
 
 ## [0.27.0] - 2026-10-31
 ### Added

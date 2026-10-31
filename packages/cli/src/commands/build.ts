@@ -22,6 +22,7 @@ import {
 import { redactDeep } from "../redact.js";
 import { Slug } from "../schema/common.js";
 import { SESSION_SCHEMA, type Session } from "../schema/session.js";
+import { readCaptures } from "../store/captures.js";
 import { readProjectChanges } from "../store/changes.js";
 import {
   appendConversationHashes,
@@ -36,7 +37,6 @@ import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
 import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
-import { buildCaptures } from "../view/captures.js";
 import { attachChanges } from "../view/change.js";
 import { buildFileHistory, modelSessions } from "../view/files.js";
 import { buildViewModel, embedViewModel, markBuiltBy } from "../view/lineage.js";
@@ -378,8 +378,9 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       // The files view (8.15) unions each message's own files with the files of
       // its commits, so a message the agent listed no paths for still lands.
       built.files = buildFileHistory(modelSessions(built), commits.files);
-      // Story 14.1: what the sessions left open, read from the same records.
-      built.captures = buildCaptures(built.sessions);
+      // Story 15.1: the curated captured-work list, from the local store the
+      // distiller and the CLI write. A corrupt or missing file is an empty list.
+      built.captures = (await readCaptures(root, io.warn)).items;
       // The skill already avoids secrets; this is the safety net before rendering.
       const redacted = redactDeep(built);
       if (redacted.count > 0)

@@ -25,8 +25,8 @@ Claude Code today.
 - **Intent, Shape, Code**: a message that landed commits shows why it happened, a small
   picture of what the change does (a diagram, a before/after or interface table, an example
   or plain steps), and the diff, in one place.
-- **Captured work**: what the sessions left open — pending items and open branch lines —
-  gathered from the record into one read-only list (`cogit captures`, and on the map).
+- **Captured work**: when a session ends, a small model drafts a few user-level items from
+  what it left undone; you accept, dismiss or close them (`cogit captures`, and on the map).
 - **Pull request descriptions with the decisions**: `cogit pr` writes the goal, the
   decisions and the rejected options, never the raw chat.
 - **Teams share the record through git**: after a pull, your teammates' sessions are on the

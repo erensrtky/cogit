@@ -36,6 +36,8 @@ export function projectPaths(root: string) {
     inboxState: join(base, "state", "inbox.json"),
     /** How the user left the map: open sessions and dragged row widths; also local. */
     mapView: join(base, "state", "map.json"),
+    /** The curated captured-work list (Story 15.1); local, never committed. */
+    captures: join(base, "state", "captures.json"),
     /** What the detached hook children (build, side run) printed; local, capped. */
     detachedLog: join(base, "state", "detached.log"),
     /** Commits waiting for their message's record before a Shape; local. */

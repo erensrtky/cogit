@@ -1,62 +1,81 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { ViewCapture } from "../../cli/src/view/model.js";
-import { CapturesView } from "../src/CapturesView.js";
+import type { ViewCapture, ViewSession } from "../../cli/src/view/model.js";
+import { CapturesView, capturesButtonVisible } from "../src/CapturesView.js";
 
 const T0 = "2026-10-26T10:00:00.000Z";
 
-const rows: ViewCapture[] = [
+const sessions = [
   {
-    key: "s1#p0",
-    text: "decide the error format",
-    source: "pending",
     sessionId: "s1",
-    sessionTitle: "Parser work",
-    messageId: "h3",
-    label: "m3",
-    author: "Ada",
-    updatedAt: T0,
-    needsUser: true,
+    title: "Parser work",
+    messages: [{ id: "m3", label: "m3", title: "Build it" }],
   },
-  {
-    key: "s1#h1",
-    text: "unicode input untested",
-    source: "branch",
-    sessionId: "s1",
-    sessionTitle: "Parser work",
-    messageId: "h1",
-    label: "m1",
-    branch: "Parser",
-    updatedAt: T0,
-    needsUser: false,
-  },
+] as unknown as ViewSession[];
+
+const item = (
+  over: Partial<ViewCapture> & { id: string; state: ViewCapture["state"] },
+): ViewCapture => ({
+  text: "some work",
+  source: { sessionId: "s1", messageId: "m3" },
+  createdAt: T0,
+  updatedAt: T0,
+  ...over,
+});
+
+const items: ViewCapture[] = [
+  item({ id: "c00000001", state: "suggested", text: "decide the error format" }),
+  item({ id: "c00000002", state: "open", text: "write the docs" }),
+  item({ id: "c00000003", state: "done", text: "close the release" }),
+  item({ id: "c00000004", state: "dismissed", text: "gone" }),
 ];
 
 function render(captures: ViewCapture[] | undefined): string {
   return renderToStaticMarkup(
-    createElement(CapturesView, { captures, active: null, onSelect: () => {}, onClose: () => {} }),
+    createElement(CapturesView, {
+      captures,
+      sessions,
+      dir: "/p",
+      active: null,
+      onSelect: () => {},
+      onClose: () => {},
+    }),
   );
 }
 
 describe("CapturesView", () => {
-  it("lists each row with its source and the muted not-a-plan note", () => {
-    const html = render(rows);
-    expect(html).toContain("Captured work — what the sessions left open");
-    expect(html).toContain('class="capture-note"');
-    expect(html).toContain("Not a plan");
+  it("shows the three sections with their buttons", () => {
+    const html = render(items);
+    expect(html).toContain("Captured work");
+    expect(html).toContain("A list you curate, not a plan cogit keeps.");
+    expect(html).toContain("To review");
+    expect(html).toContain("Open");
+    expect(html).toContain("Done (last 10)");
     expect(html).toContain("decide the error format");
-    expect(html).toContain("unicode input untested");
+    expect(html).toContain("write the docs");
+    expect(html).toContain(">Accept<");
+    expect(html).toContain(">Dismiss<");
+    expect(html).toContain(">Done<");
     expect(html).toContain("Parser work");
     expect(html).toContain("m3");
-    expect(html).toContain("╭ Parser");
-    expect(html).toContain("your call");
-    // Read-only: nothing to tick.
-    expect(html).not.toContain('type="checkbox"');
+    // A dismissed item is closed and stays out of the list.
+    expect(html).not.toContain("gone");
   });
 
-  it("shows a plain empty state", () => {
-    expect(render(undefined)).toContain("No captured work in this project.");
-    expect(render([])).toContain("No captured work in this project.");
+  it("is empty when nothing was drafted", () => {
+    expect(render(undefined)).toContain("No captured work.");
+    expect(render([item({ id: "c00000009", state: "dismissed" })])).toContain("No captured work.");
+  });
+});
+
+describe("the Captured button", () => {
+  it("shows only while the setting is on and something waits or is open", () => {
+    expect(capturesButtonVisible(items, true)).toBe(true);
+    expect(capturesButtonVisible(items, undefined)).toBe(true);
+    expect(capturesButtonVisible(items, false)).toBe(false);
+    expect(capturesButtonVisible([item({ id: "c00000009", state: "done" })], true)).toBe(false);
+    expect(capturesButtonVisible([], true)).toBe(false);
+    expect(capturesButtonVisible(undefined, true)).toBe(false);
   });
 });

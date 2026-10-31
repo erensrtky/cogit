@@ -19,7 +19,7 @@ import {
 } from "react";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
-import { CapturesView } from "./CapturesView.js";
+import { CapturesView, capturesButtonVisible } from "./CapturesView.js";
 import { loadMapView, pageToken, saveOpenSessions, saveRowWidth } from "./data.js";
 import { type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
@@ -335,6 +335,9 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   const personOptions = useMemo(() => people.options(), [people]);
   const { expanded: fullscreen, toggle: toggleFullscreen } = useFullscreen();
   const bigChangeLines = model.settings?.bigChangeLines ?? 300;
+  // The Captured button is only there while the setting is on and something
+  // waits or is open; a store of only done items has no button and no empty list.
+  const capturesVisible = capturesButtonVisible(model.captures, model.settings?.captures);
   const [focusedId, setFocusedId] = useState<string | null>(() => {
     if (initial === null) return null;
     if (initial.messageId === undefined) return `session:${initial.sessionId}`;
@@ -777,24 +780,28 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
           >
             {showFiles ? "Hide files" : "Files"}
           </button>
-          <button
-            type="button"
-            className="outline-button capture-button"
-            aria-pressed={showCaptures}
-            title="What the sessions left open, read from the record"
-            onClick={() => {
-              setShowCaptures((value) => !value);
-              setShowFiles(false);
-              setShowOutline(false);
-            }}
-          >
-            {showCaptures ? "Hide captured" : "Captured"}
-          </button>
+          {capturesVisible ? (
+            <button
+              type="button"
+              className="outline-button capture-button"
+              aria-pressed={showCaptures}
+              title="A list you curate: what the sessions left undone"
+              onClick={() => {
+                setShowCaptures((value) => !value);
+                setShowFiles(false);
+                setShowOutline(false);
+              }}
+            >
+              {showCaptures ? "Hide captured" : "Captured"}
+            </button>
+          ) : null}
         </div>
         <div className="graph-wrap">
           {showCaptures ? (
             <CapturesView
               captures={model.captures}
+              sessions={model.sessions}
+              dir={model.project.path}
               active={
                 selection?.type === "node"
                   ? { sessionId: selection.sessionId, messageId: selection.nodeId }

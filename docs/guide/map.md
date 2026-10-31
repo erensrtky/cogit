@@ -130,19 +130,26 @@ the map. In the terminal: `cogit log --file <path>` and `cogit why <path>`.
 ## Captured work
 
 Working with an agent is improvised: things that would have been a plan's items get done,
-half-done or dropped along the way. The **Captured** button lists what the sessions left open,
-gathered from the record: each session's pending items and each branch summary's open line,
-with the session, the message that named it, who recorded it and when. Items waiting for you
-come first and are marked "your call"; clicking a row opens its message on the map. In the
-terminal: `cogit captures` (`--session <id>`, `--json`).
+half-done or dropped along the way. The **Captured** list is a short, curated one. When a
+session ends, the side model reads what its record left open — pending items, open branch
+lines, the last messages — and drafts at most three **user-level** items: something you asked
+for or the session left undone, as a short imperative in the conversation's language. It never
+drafts a commit step, a test run, a release chore or a status fact, and a session with nothing
+open costs no model call.
 
-It is not a task board. The list is derived from the record on every build and cannot be
-edited: no checkboxes, no status, no assignee. cogit keeps no planning state; what becomes a
-real piece of work, and who owns it, is decided in your team's own tracker. The same text in two
-sessions stays two rows, because where it came from is the point.
+Each drafted item waits in **To review** until you choose: **Accept** keeps it in **Open**,
+**Dismiss** closes it without doing it. An open item is closed with **Done**. The last ten
+closed items stay under **Done (last 10)**. Clicking a row opens the message that named it on
+the map. The model never reopens or rewrites an item you already saw; closing is your act. In
+the terminal: `cogit captures`, `cogit captures accept|dismiss|done <id>`, and
+`cogit captures distill [--session <id> | --all] [--dry-run]` to backfill sessions by hand
+(`--dry-run` prints the proposals and writes nothing).
 
-Known limit: when the agent removes a pending item from its record, it leaves the list too; the
-record keeps no history of pending items.
+It is not a task board: no assignment, no priority, no tracker state. The list lives in
+`.cogit/state/captures.json` on this machine and is never committed. The **Captured** button
+appears only while the setting is on and something waits or is open; with the setting off
+(`cogit config set captures false`) nothing is drafted, the button hides, and items already in
+the store are kept, not deleted.
 
 ## Search
 

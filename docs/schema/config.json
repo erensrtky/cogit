@@ -56,6 +56,10 @@
       "default": true,
       "type": "boolean"
     },
+    "captures": {
+      "default": true,
+      "type": "boolean"
+    },
     "startupContext": {
       "default": true,
       "type": "boolean"
@@ -142,6 +146,7 @@
     "sideEveryTurns",
     "messageSummaries",
     "shapes",
+    "captures",
     "startupContext",
     "recordHeadless",
     "serverPort",

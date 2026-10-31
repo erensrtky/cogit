@@ -14,11 +14,15 @@ cogit why src/auth.ts         # what earlier messages decided about this file, a
 cogit why src/auth.ts:42      # only the thought behind line 42
 cogit why src/auth.ts --line 42  # the same lookup
 cogit search "refresh token"  # titles, decisions, summaries and the stored conversation
-cogit captures                # what the sessions left open (pending items, open branch lines)
+cogit captures                # the curated list: to review, open and done
+cogit captures accept <id>    # accept a suggestion (also: dismiss, done)
+cogit captures distill        # draft items from a session's leftover work by hand
 ```
 
-`log` and `search` take `-n <count>` and `--session <id>`; `captures` takes `--session <id>`
-too; `log`, `show`, `search` and `captures` take `--json`; `show --no-chat` leaves out the conversation turn.
+`log` and `search` take `-n <count>` and `--session <id>`; `log`, `show`, `search` and
+`captures` take `--json` (the store's `{ schema, items }`); `show --no-chat` leaves out the
+conversation turn. `captures distill` takes `--session <id>`, `--all` or `--dry-run`; with no
+flag it distils the newest session. Ids are the `c…` shown at the start of each line.
 
 ## Addressing a message
 

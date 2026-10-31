@@ -56,6 +56,14 @@ Before the agent edits a file, it hears which options earlier thoughts tried and
 
 For every message that landed commits, a small representation of what the change does: numbered plain-language steps or a Mermaid diagram. It sits between the record's intent (the decision, reason and rejected options) and the code (the diff), so a reviewer sees why, what and how in one place. The recorder writes it, not you; it costs one small model call per such message. Off, the map says so and nothing is written.
 
+### Captured work
+
+`captures` · default `true`
+
+**A short list of what each session left undone, drafted by the side model.**
+
+When a session ends, the side model reads what its record left open and drafts at most three things a person would ask for, in the conversation's language. The list is yours: accept, dismiss or close each item. Sessions with nothing open cost no model call; the map's Captured button appears only while something waits or is open. Off, nothing is drafted and the list already in the store is kept, not deleted.
+
 ### Language
 
 `language` · default `auto`

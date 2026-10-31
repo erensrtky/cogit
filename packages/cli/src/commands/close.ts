@@ -1,4 +1,5 @@
 import { type ChatTurn, defaultAgent } from "../agents/index.js";
+import { distillAtClose } from "../captures.js";
 import type { Io } from "../io.js";
 import { hashTurns, upgradeSessionIds } from "../messages.js";
 import { parseMessageRef } from "../schema/common.js";
@@ -295,4 +296,8 @@ export async function closeSession(root: string, sessionId: string, io: Io): Pro
   const answer = agentRecord(resultText(await runClaude(prompt, config.sideModel, io.env)));
   const payload = closePayload(answer, closing, record, { status });
   await sessionWrite({ dir: root, by: "side" }, io, async () => JSON.stringify(payload));
+  // Story 15.1: one more side call distils what the session left open. It reads
+  // the record as just written, so it needs the close pass to have landed.
+  const closed = await loadSession(root, sessionId);
+  if (closed.found && closed.ok) await distillAtClose(root, closed.data, io);
 }

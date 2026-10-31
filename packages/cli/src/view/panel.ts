@@ -66,6 +66,7 @@ export function panelSettings(config: Config): PanelSettings {
     recordHeadless: config.recordHeadless,
     tryBeforeNotes: config.tryBeforeNotes,
     shapes: config.shapes,
+    captures: config.captures,
     shareConversations: config.shareConversations,
     recordCommit: config.recordCommit,
     gitPolicy: config.gitPolicy,

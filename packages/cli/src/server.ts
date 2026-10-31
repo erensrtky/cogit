@@ -19,6 +19,12 @@ import { diffTooLarge, isDiffSha, readCommitDiff } from "./diff.js";
 import { defaultsPrompter, type Io } from "./io.js";
 import { Config } from "./schema/config.js";
 import { refreshShareConversations } from "./share.js";
+import {
+  CAPTURE_ID,
+  CaptureTransitionError,
+  setCaptureState,
+  UnknownCaptureError,
+} from "./store/captures.js";
 import { dismissInboxSession } from "./store/inbox-state.js";
 import { LockBusyError } from "./store/lock.js";
 import { MAX_OPEN, readMapView, setOpenSessions, setRowWidth } from "./store/map-view.js";
@@ -749,6 +755,90 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
   }
 
   /**
+   * `POST /api/captures/state` { dir, id, state } (Story 15.1): the map's
+   * Accept, Dismiss and Done buttons. Only the user's own transitions are
+   * allowed (`suggested` → `open`|`dismissed`, `open` → `done`); an unknown id
+   * is a 404 and an impossible transition a 409. Same Host, Origin,
+   * content-type and token checks as an inbox dismissal, and `dir` must be a
+   * registered project. The open maps are rebuilt so the list follows.
+   */
+  async function writeCaptureState(
+    req: IncomingMessage,
+    res: ServerResponse,
+    port: number,
+  ): Promise<void> {
+    if (
+      !originAllowed(req.headers.origin, port) ||
+      !tokenMatches(req.headers[CONFIG_TOKEN_HEADER])
+    ) {
+      respond(res, 403, "forbidden");
+      return;
+    }
+    const type = req.headers["content-type"];
+    if (
+      typeof type !== "string" ||
+      type.split(";")[0]?.trim().toLowerCase() !== "application/json"
+    ) {
+      respond(res, 415, "content-type must be application/json");
+      return;
+    }
+    const body = await readLimitedBody(req);
+    if (body === null) {
+      respond(res, 413, "request body too large");
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      respond(res, 400, "invalid JSON");
+      return;
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      respond(res, 400, "expected a JSON object");
+      return;
+    }
+    const { dir, id, state } = parsed as Record<string, unknown>;
+    if (typeof dir !== "string" || typeof id !== "string" || typeof state !== "string") {
+      respond(res, 400, "expected { dir, id, state }");
+      return;
+    }
+    if (!CAPTURE_ID.test(id)) {
+      respond(res, 400, "id is not a captured item id");
+      return;
+    }
+    if (state !== "open" && state !== "dismissed" && state !== "done") {
+      respond(res, 400, "state must be open, dismissed or done");
+      return;
+    }
+    const root = await registeredRoot(env, dir);
+    if (root === null) {
+      respond(res, 403, "not a registered project");
+      return;
+    }
+    try {
+      await setCaptureState(root, id, state, new Date().toISOString());
+    } catch (err) {
+      if (err instanceof UnknownCaptureError) {
+        respond(res, 404, err.message);
+        return;
+      }
+      if (err instanceof CaptureTransitionError) {
+        respond(res, 409, err.message);
+        return;
+      }
+      respond(res, 500, "could not write the captured list");
+      return;
+    }
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify({ ok: true, id, state }));
+    void queueRebuild();
+  }
+
+  /**
    * The checks every map-view write shares: Origin and token, a JSON object body
    * within the size cap, and a registered `dir`. Answers the request itself and
    * returns null when one fails.
@@ -892,6 +982,10 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       }
       if (url.pathname === "/api/inbox/dismiss") {
         await writeInboxDismiss(req, res, port);
+        return;
+      }
+      if (url.pathname === "/api/captures/state") {
+        await writeCaptureState(req, res, port);
         return;
       }
       if (url.pathname === "/api/row-width") {

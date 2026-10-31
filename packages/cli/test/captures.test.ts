@@ -1,20 +1,40 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
+import {
+  distillAtClose,
+  distillPrompt,
+  distillSessionInput,
+  parseDistillAnswer,
+  resolveMessageId,
+  sessionInput,
+} from "../src/captures.js";
 import { buildProject } from "../src/commands/build.js";
-import { captures, formatCaptures } from "../src/commands/captures.js";
+import { captures, distill, formatCaptures, setCapture } from "../src/commands/captures.js";
+import { closeSession } from "../src/commands/close.js";
+import { configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
+import { sessionWrite } from "../src/commands/session.js";
 import { createProgram } from "../src/program.js";
 import type { Session } from "../src/schema/session.js";
+import {
+  addCaptureSuggestions,
+  CAPTURES_SCHEMA,
+  type CaptureItem,
+  canTransition,
+  readCaptures,
+  setCaptureState,
+} from "../src/store/captures.js";
+import { withLock } from "../src/store/lock.js";
 import { projectPaths } from "../src/store/paths.js";
-import { buildCaptures, type CaptureSourceSession } from "../src/view/captures.js";
+import { type CaptureSourceSession, captureInput, hasOpenWork } from "../src/view/captures.js";
 import { DATA_ELEMENT_ID } from "../src/view/model.js";
 import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
 
 const TEMPLATE = `<!doctype html><html><body><div id="root"></div>
     <script id="${DATA_ELEMENT_ID}" type="application/json"></script></body></html>`;
 
-const branch = (open: string) => ({ title: "Parser", asked: "build it", outcome: "built", open });
+const NOW = "2026-10-21T10:00:00.000Z";
 
 function source(over: Partial<CaptureSourceSession> & { sessionId: string }): CaptureSourceSession {
   return {
@@ -26,19 +46,14 @@ function source(over: Partial<CaptureSourceSession> & { sessionId: string }): Ca
   };
 }
 
-describe("buildCaptures", () => {
-  it("is empty for a project with no sessions or nothing open", () => {
-    expect(buildCaptures([])).toEqual([]);
-    expect(buildCaptures([source({ sessionId: "s1" })])).toEqual([]);
-  });
+const branch = (open: string) => ({ title: "Parser", asked: "build it", outcome: "built", open });
 
-  it("takes pending items and branch open lines, dropping blanks and in-source repeats", () => {
-    const rows = buildCaptures([
+describe("the distiller's input", () => {
+  it("takes pending items and branch open lines, dropping blanks and repeats", () => {
+    const input = captureInput(
       source({
         sessionId: "s1",
         title: "Ship it",
-        author: "Ada",
-        authorEmail: "ada@example.com",
         status: {
           pending: [
             { text: "write the docs", needsUser: false },
@@ -47,71 +62,213 @@ describe("buildCaptures", () => {
           ],
         },
         messages: [
-          { id: "h1", label: "m1", branch: branch("handle empty input") },
-          { id: "h2", label: "m2", branch: branch("  ") },
-          { id: "h3", label: "m3" },
-          { id: "h4", label: "m4", unsummarized: true },
+          { id: "m1", label: "m1", title: "Build", branch: branch("handle empty input") },
+          { id: "m2", label: "m2", title: "More", branch: branch("  ") },
+          { id: "m3", label: "m3", title: "Done" },
+          { id: "h4", label: "m4", title: "Tail", unsummarized: true },
         ],
       }),
+    );
+    expect(input.pending).toEqual([
+      { text: "write the docs", needsUser: false, messageId: "m3", label: "m3" },
     ]);
-    expect(rows).toEqual([
-      {
-        key: "s1#p0",
-        text: "write the docs",
-        source: "pending",
-        sessionId: "s1",
-        sessionTitle: "Ship it",
-        author: "Ada",
-        updatedAt: T0,
-        // The newest recorded message, not the unsummarized tail.
-        messageId: "h3",
-        label: "m3",
-        needsUser: false,
-      },
-      {
-        key: "s1#h1",
-        text: "handle empty input",
-        source: "branch",
-        sessionId: "s1",
-        sessionTitle: "Ship it",
-        author: "Ada",
-        updatedAt: T0,
-        messageId: "h1",
-        label: "m1",
-        branch: "Parser",
-        needsUser: false,
-      },
-    ]);
+    expect(input.branches).toEqual([{ text: "handle empty input", messageId: "m1", label: "m1" }]);
+    expect(input.lastMessages.map((message) => message.id)).toEqual(["m1", "m2", "m3"]);
+    expect(hasOpenWork(input)).toBe(true);
   });
 
-  it("puts needsUser first, then the newest session, and keeps one row per source", () => {
-    const rows = buildCaptures([
+  it("has nothing to do for a session with nothing open", () => {
+    const input = captureInput(source({ sessionId: "s1", messages: [] }));
+    expect(hasOpenWork(input)).toBe(false);
+    expect(input.pending).toEqual([]);
+    expect(input.branches).toEqual([]);
+  });
+});
+
+describe("the distiller's prompt and answer", () => {
+  const input = captureInput(
+    source({
+      sessionId: "s9",
+      title: "Parser work",
+      status: { pending: [{ text: "decide the error format", needsUser: true }] },
+      messages: [
+        { id: "m1", label: "m1", title: "Build the parser" },
+        { id: "m2", label: "m2", title: "Handle input" },
+      ],
+    }),
+  );
+
+  it("names the leftover lines, the messages and the current list", () => {
+    const prompt = distillPrompt(input, [{ id: "c1a2b3c4", text: "old item" }], "auto");
+    expect(prompt).toContain("decide the error format");
+    expect(prompt).toContain("Handle input");
+    expect(prompt).toContain("c1a2b3c4: old item");
+    expect(prompt).toContain('"duplicateOf"');
+    expect(prompt).toContain("at most 140 characters");
+    expect(prompt).toContain("the conversation's language");
+    expect(prompt).toContain('{"items": [{"text": "...", "messageId": "m3"}]');
+  });
+
+  it("reads the answer, flattening the text and dropping malformed rows", () => {
+    const answer = JSON.stringify({
+      items: [
+        { text: "  write  the docs ", messageId: "m1" },
+        { text: "", messageId: "m2" },
+        { text: "no message" },
+        { text: "fix the parser", messageId: "m2" },
+      ],
+      duplicateOf: ["c11111111", 7],
+    });
+    expect(parseDistillAnswer(`\`\`\`json\n${answer}\n\`\`\``)).toEqual({
+      items: [
+        { text: "write the docs", messageId: "m1" },
+        { text: "fix the parser", messageId: "m2" },
+      ],
+      duplicateOf: ["c11111111"],
+    });
+  });
+
+  it("keeps a named message, a numeric one, or falls back to the newest", () => {
+    const withMessage = captureInput(
       source({
-        sessionId: "old",
-        updatedAt: "2026-10-01T00:00:00.000Z",
-        status: { pending: [{ text: "pick a name", needsUser: true }] },
+        sessionId: "s1",
+        status: { pending: [{ text: "p", needsUser: false }] },
+        messages: [{ id: "m2", label: "m2", title: "T" }],
       }),
-      source({
-        sessionId: "a",
-        updatedAt: "2026-10-10T00:00:00.000Z",
-        status: { pending: [{ text: "same text", needsUser: false }] },
-      }),
-      source({
-        sessionId: "b",
-        updatedAt: "2026-10-20T00:00:00.000Z",
-        status: { pending: [{ text: "same text", needsUser: false }] },
-      }),
-    ]);
-    expect(rows.map((row) => row.key)).toEqual(["old#p0", "b#p0", "a#p0"]);
-    // A session without a title falls back to its id; no message means no link.
-    expect(rows[0]?.sessionTitle).toBe("old");
-    expect(rows[0]?.messageId).toBeUndefined();
+    );
+    expect(resolveMessageId(withMessage, "m2")).toBe("m2");
+    expect(resolveMessageId(withMessage, "m7")).toBe("m7");
+    expect(resolveMessageId(withMessage, "h123")).toBe("m2");
+    // A pending line can carry the message it points at even with no titles.
+    expect(
+      resolveMessageId(
+        {
+          sessionId: "s1",
+          title: "t",
+          pending: [{ text: "p", needsUser: false, messageId: "m4" }],
+          branches: [],
+          lastMessages: [],
+        },
+        "",
+      ),
+    ).toBe("m4");
+    expect(resolveMessageId(withMessage, "")).toBe("m2");
+    const nothing = captureInput(
+      source({ sessionId: "s1", status: { pending: [{ text: "p", needsUser: false }] } }),
+    );
+    expect(resolveMessageId(nothing, "h9")).toBe("");
+  });
+});
+
+describe("the captured store", () => {
+  let dir: string;
+  let root: string;
+
+  beforeEach(async () => {
+    dir = await tempDir();
+    root = join(dir, "proj");
+    await mkdir(root);
+    await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+  });
+
+  it("round-trips suggestions and moves only updatedAt for duplicates", async () => {
+    const first = await addCaptureSuggestions(
+      root,
+      "s1",
+      [{ text: "write the docs", messageId: "m1" }],
+      { now: T0 },
+    );
+    expect(first).toHaveLength(1);
+    expect(first[0]?.id).toMatch(/^c[0-9a-f]{8}$/);
+    const open = await setCaptureState(root, first[0]?.id as string, "open", T0);
+    expect(open.state).toBe("open");
+    const later = "2026-10-22T00:00:00.000Z";
+    const added = await addCaptureSuggestions(
+      root,
+      "s2",
+      [{ text: "write the docs", messageId: "m1" }],
+      {
+        now: later,
+        duplicateOf: [open.id],
+      },
+    );
+    expect(added).toEqual([]);
+    const store = await readCaptures(root);
+    expect(store.items).toHaveLength(1);
+    expect(store.items[0]).toMatchObject({ id: open.id, state: "open", updatedAt: later });
+  });
+
+  it("records closedAt on done and refuses an impossible transition", async () => {
+    const [item] = await addCaptureSuggestions(root, "s1", [{ text: "x", messageId: "m1" }], {
+      now: T0,
+    });
+    await expect(setCaptureState(root, item?.id as string, "done", T0)).rejects.toThrow(
+      "cannot become done",
+    );
+    await setCaptureState(root, item?.id as string, "open", T0);
+    const done = await setCaptureState(root, item?.id as string, "done", NOW);
+    expect(done.closedAt).toBe(NOW);
+    await expect(setCaptureState(root, "c00000000", "open", T0)).rejects.toThrow(
+      "no captured item",
+    );
+    expect(canTransition("suggested", "dismissed")).toBe(true);
+    expect(canTransition("done", "open")).toBe(false);
+  });
+
+  it("replaces a corrupt file with an empty one and warns", async () => {
+    await mkdir(join(root, ".cogit", "state"), { recursive: true });
+    await writeFile(projectPaths(root).captures, "{not json");
+    const warnings: string[] = [];
+    const store = await readCaptures(root, (line) => warnings.push(line));
+    expect(store).toEqual({ schema: CAPTURES_SCHEMA, items: [] });
+    expect(warnings[0]).toContain("corrupt");
+    expect(JSON.parse(await readFile(projectPaths(root).captures, "utf8"))).toEqual({
+      schema: CAPTURES_SCHEMA,
+      items: [],
+    });
   });
 });
 
 describe("formatCaptures", () => {
-  it("says so plainly when there is nothing", () => {
-    expect(formatCaptures([], T0)).toEqual(["No captured work in this project."]);
+  const item = (
+    over: Partial<CaptureItem> & { id: string; state: CaptureItem["state"] },
+  ): CaptureItem => ({
+    text: "text",
+    source: { sessionId: "s1", messageId: "m3" },
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...over,
+  });
+
+  it("groups the list into the three sections and leaves dismissed items out", () => {
+    const lines = formatCaptures(
+      {
+        schema: CAPTURES_SCHEMA,
+        items: [
+          // Same time: the id keeps the order stable.
+          item({ id: "c00000005", state: "suggested", text: "review me" }),
+          item({ id: "c00000001", state: "suggested", text: "same time", updatedAt: NOW }),
+          item({ id: "c00000002", state: "open", text: "accepted" }),
+          item({ id: "c00000003", state: "done", text: "closed" }),
+          item({ id: "c00000004", state: "dismissed", text: "gone" }),
+        ],
+      },
+      new Map([["s1:m3", "m3"]]),
+      NOW,
+    );
+    expect(lines).toEqual([
+      "To review",
+      "  c00000001  same time  (s1 m3 · under a minute ago)",
+      "  c00000005  review me  (s1 m3 · under a minute ago)",
+      "Open",
+      "  c00000002  accepted  (s1 m3 · under a minute ago)",
+      "Done",
+      "  c00000003  closed  (s1 m3 · under a minute ago)",
+    ]);
+  });
+
+  it("says so plainly when nothing was ever drafted", () => {
+    expect(formatCaptures({ schema: CAPTURES_SCHEMA, items: [] })).toEqual(["No captured work."]);
   });
 });
 
@@ -142,7 +299,6 @@ describe("cogit captures", () => {
     const s1 = session({
       sessionId: "s1",
       title: "Parser",
-      author: "Ada",
       updatedAt: "2026-10-21T08:00:00.000Z",
       status: {
         goal: "",
@@ -150,49 +306,240 @@ describe("cogit captures", () => {
         pending: [{ text: "decide the error format", needsUser: true }],
         next: "",
       },
-      nodes: [
-        {
-          id: "h111111111111",
-          parent: null,
-          kind: "message",
-          title: "Build the parser",
-          at: "2026-10-21T07:00:00.000Z",
-          branch: branch("unicode input untested"),
-        },
-      ],
-    });
-    const s2 = session({
-      sessionId: "s2",
-      title: "Docs",
-      updatedAt: "2026-10-21T09:00:00.000Z",
-      status: {
-        goal: "",
-        done: [],
-        pending: [{ text: "decide the error format", needsUser: false }],
-        next: "",
-      },
+      nodes: [{ id: "m1", parent: null, kind: "message", title: "Build the parser", at: T0 }],
     });
     await writeFile(projectPaths(root).session("s1"), JSON.stringify(s1));
+  });
+
+  it("prints the sections, with the source label and the age", async () => {
+    await addCaptureSuggestions(
+      root,
+      "s1",
+      [{ text: "decide the error format", messageId: "m1" }],
+      {
+        now: "2026-10-21T08:00:00.000Z",
+      },
+    );
+    const store = await captures({ dir: root, io, now: NOW });
+    expect(store.items).toHaveLength(1);
+    const [header, line] = io.lines;
+    expect(header).toBe("To review");
+    expect(line).toContain("decide the error format");
+    expect(line).toContain("s1 m1");
+    expect(line).toContain("2 h ago");
+  });
+
+  it("prints the store as JSON", async () => {
+    await addCaptureSuggestions(root, "s1", [{ text: "one", messageId: "m1" }], { now: NOW });
+    await captures({ dir: root, io, json: true });
+    const store = JSON.parse(io.lines.join("\n"));
+    expect(store.items[0]).toMatchObject({ text: "one", state: "suggested" });
+  });
+
+  it("accepts, dismisses and closes an item", async () => {
+    const [item] = await addCaptureSuggestions(root, "s1", [{ text: "one", messageId: "m1" }], {
+      now: NOW,
+    });
+    await setCapture(root, "accept", item?.id as string, io);
+    expect((await readCaptures(root)).items[0]?.state).toBe("open");
+    await setCapture(root, "done", item?.id as string, io);
+    expect((await readCaptures(root)).items[0]?.state).toBe("done");
+    await expect(setCapture(root, "dismiss", "c00000000", fakeIo(envFor(dir)))).rejects.toThrow(
+      "no captured item",
+    );
+    const [fresh] = await addCaptureSuggestions(root, "s1", [{ text: "two", messageId: "m1" }], {
+      now: NOW,
+    });
+    await expect(setCapture(root, "done", fresh?.id as string, io)).rejects.toThrow(
+      "cannot become done",
+    );
+  });
+
+  it("lets an unreadable store's own error through", async () => {
+    await addCaptureSuggestions(root, "s1", [{ text: "one", messageId: "m1" }], { now: NOW });
+    await rm(projectPaths(root).captures, { force: true });
+    await mkdir(projectPaths(root).captures, { recursive: true });
+    await expect(setCapture(root, "accept", "c00000000", io)).rejects.toThrow(/EISDIR/);
+  });
+
+  it("is carried in the map's page model", async () => {
+    await addCaptureSuggestions(root, "s1", [{ text: "one", messageId: "m1" }], { now: NOW });
+    const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(model.captures?.map((row) => row.text)).toEqual(["one"]);
+    expect(model.settings?.captures).toBe(true);
+  });
+});
+
+describe("distilling with the side model", () => {
+  let dir: string;
+  let root: string;
+  let bin: string;
+  let io: FakeIo;
+  let env: NodeJS.ProcessEnv;
+
+  /** A fake `claude` that answers with one fixed result. */
+  async function fakeClaude(answer: unknown): Promise<void> {
+    bin = join(dir, "bin");
+    await mkdir(bin, { recursive: true });
+    const file = join(bin, "claude");
+    await writeFile(
+      file,
+      `#!/usr/bin/env node
+let input = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (c) => { input += c; });
+process.stdin.on("end", async () => {
+  const fs = await import("node:fs");
+  fs.writeFileSync(${JSON.stringify(join(dir, "prompt.txt"))}, input);
+  process.stdout.write(JSON.stringify({ result: ${JSON.stringify(JSON.stringify(answer))} }));
+});
+`,
+    );
+    await chmod(file, 0o755);
+    env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+    io = fakeIo(env);
+  }
+
+  const s1 = (): Session => ({
+    schema: 1,
+    sessionId: "s1",
+    agent: "claude-code",
+    title: "Parser",
+    startedAt: T0,
+    updatedAt: T0,
+    status: {
+      goal: "",
+      done: [],
+      pending: [{ text: "write the docs", needsUser: false }],
+      next: "",
+    },
+    nodes: [
+      { id: "m1", parent: null, kind: "message", title: "Build the parser", at: T0 },
+      { id: "m2", parent: "m1", kind: "message", title: "More", at: T0 },
+    ],
+  });
+
+  beforeEach(async () => {
+    dir = await tempDir();
+    root = join(dir, "proj");
+    await mkdir(root);
+    await fakeClaude({ items: [{ text: "write the docs", messageId: "m2" }], duplicateOf: [] });
+    await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
+    await writeFile(projectPaths(root).session("s1"), JSON.stringify(s1()));
+    // A session with nothing left open costs no call; --all passes over it.
+    const s2 = {
+      ...s1(),
+      sessionId: "s2",
+      title: "Quiet",
+      status: { goal: "", done: [], pending: [], next: "" },
+    };
     await writeFile(projectPaths(root).session("s2"), JSON.stringify(s2));
   });
 
-  it("prints one line per row with source, author and age", async () => {
-    const rows = await captures({ dir: root, io, now: T0 });
-    // The same text in two sessions stays two rows.
-    expect(rows.map((row) => row.key)).toEqual(["s1#p0", "s2#p0", "s1#h111111111111"]);
-    expect(io.lines).toEqual([
-      "! decide the error format  (s1 m1 · Ada · 2 h ago)",
-      "  decide the error format  (s2 · 1 h ago)",
-      "  unicode input untested  (s1 m1 · Ada · 2 h ago)",
-      "! = waiting for you",
-    ]);
+  it("writes the answer as a suggested item with its source message", async () => {
+    const result = await distillSessionInput(root, sessionInput(s1()), { io });
+    expect(result?.proposal.items).toEqual([{ text: "write the docs", messageId: "m2" }]);
+    const store = await readCaptures(root);
+    expect(store.items).toHaveLength(1);
+    expect(store.items[0]).toMatchObject({
+      state: "suggested",
+      text: "write the docs",
+      source: { sessionId: "s1", messageId: "m2" },
+    });
   });
 
-  it("prints JSON and limits to one session", async () => {
-    await captures({ dir: root, io, json: true, session: "s2" });
-    const rows = JSON.parse(io.lines.join("\n"));
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ sessionId: "s2", text: "decide the error format" });
+  it("returns nothing for a session with nothing open and calls no model", async () => {
+    const quiet = { ...s1(), status: { goal: "", done: [], pending: [], next: "" } };
+    const result = await distillSessionInput(root, sessionInput(quiet), { io });
+    expect(result).toBeUndefined();
+    expect((await readCaptures(root)).items).toEqual([]);
+  });
+
+  it("does nothing with captures turned off", async () => {
+    await configSet("captures", "false", fakeIo(env));
+    const result = await distillSessionInput(root, sessionInput(s1()), { io });
+    expect(result).toBeUndefined();
+  });
+
+  it("writes nothing in a dry run", async () => {
+    const result = await distillSessionInput(root, sessionInput(s1()), { io, dryRun: true });
+    expect(result?.proposal.items).toHaveLength(1);
+    expect((await readCaptures(root)).items).toEqual([]);
+  });
+
+  it("runs by hand and respects --dry-run", async () => {
+    await distill({ dir: root, io, dryRun: true });
+    expect(io.lines[0]).toContain('Session s1 "Parser"');
+    expect((await readCaptures(root)).items).toEqual([]);
+    await distill({ dir: root, io });
+    expect((await readCaptures(root)).items[0]?.state).toBe("suggested");
+  });
+
+  it("reads the existing list and keeps an item the session is still about", async () => {
+    const [existing] = await addCaptureSuggestions(
+      root,
+      "s1",
+      [{ text: "write the docs", messageId: "m2" }],
+      { now: T0 },
+    );
+    await setCaptureState(root, existing?.id as string, "open", T0);
+    await fakeClaude({
+      items: [{ text: "write the docs", messageId: "m2" }],
+      duplicateOf: [existing?.id, "c00000000"],
+    });
+    const later = "2026-10-22T00:00:00.000Z";
+    const result = await distillSessionInput(root, sessionInput(s1()), { io, now: later });
+    // An unknown id in duplicateOf is dropped; the known one is kept as is.
+    expect(result?.proposal.duplicateOf).toEqual([existing?.id]);
+    expect(result?.proposal.added).toEqual([]);
+    const store = await readCaptures(root);
+    expect(store.items).toHaveLength(1);
+    expect(store.items[0]).toMatchObject({ id: existing?.id, state: "open", updatedAt: later });
+  });
+
+  it("drops an item with no message to point at", async () => {
+    await fakeClaude({ items: [{ text: "orphan", messageId: "h9" }], duplicateOf: [] });
+    const record = { ...s1(), nodes: [] };
+    const result = await distillSessionInput(root, sessionInput(record), { io });
+    expect(result?.proposal.items).toEqual([]);
+    expect((await readCaptures(root)).items).toEqual([]);
+  });
+
+  it("refuses a hand-run pass with captures off", async () => {
+    await configSet("captures", "false", fakeIo(env));
+    await expect(distill({ dir: root, io })).rejects.toThrow("captured work is off");
+  });
+
+  it("skips a session whose lock is busy and warns when the pass fails", async () => {
+    await withLock(
+      projectPaths(root).lock("captures-s1"),
+      async () => {
+        expect(await distillAtClose(root, s1(), io)).toBeUndefined();
+      },
+      { timeoutMs: 0 },
+    );
+    // No `claude` on PATH: the failure lands in the warning, never in the close pass.
+    const broken = fakeIo({ ...env, PATH: join(dir, "missing") });
+    expect(await distillAtClose(root, s1(), broken)).toBeUndefined();
+    expect(broken.warnings[0]).toContain("could not distil captured work");
+  });
+
+  it("takes --session and --all, and says when nothing is new or left open", async () => {
+    await distill({ dir: root, io, session: "s1" });
+    expect((await readCaptures(root)).items).toHaveLength(1);
+    io.lines.length = 0;
+    // The same answer again is not drafted twice; the quiet session costs nothing.
+    await distill({ dir: root, io, all: true });
+    expect(io.lines.join("\n")).toContain("nothing new for session s1");
+    expect(io.lines.join("\n")).toContain("session s2 has nothing left open to distil");
+  });
+
+  it("says when a project has no session at all", async () => {
+    const empty = join(dir, "empty");
+    await mkdir(empty);
+    await init(empty, { name: "empty", retention: "keep", language: "auto" }, fakeIo(env));
+    await distill({ dir: empty, io });
+    expect(io.lines).toContain("this project has no recorded session to distil");
   });
 
   it("runs through the command line", async () => {
@@ -201,12 +548,83 @@ describe("cogit captures", () => {
       server: async () => null,
       stdin: async () => "",
     });
-    await program.parseAsync(["captures", root, "--session", "s2", "--json"], { from: "user" });
-    expect(JSON.parse(io.lines.join("\n"))).toHaveLength(1);
+    await program.parseAsync(["captures", root, "--json"], { from: "user" });
+    expect(JSON.parse(io.lines.join("\n")).items).toEqual([]);
+    io.lines.length = 0;
+    await program.parseAsync(["captures", "distill", "--dry-run", "--dir", root], {
+      from: "user",
+    });
+    expect(io.lines.join("\n")).toContain('Session s1 "Parser"');
+    const [item] = await addCaptureSuggestions(
+      root,
+      "s1",
+      [{ text: "cli item", messageId: "m1" }],
+      {
+        now: T0,
+      },
+    );
+    await program.parseAsync(["captures", "accept", item?.id as string, "--dir", root], {
+      from: "user",
+    });
+    expect((await readCaptures(root)).items.find((row) => row.id === item?.id)?.state).toBe("open");
   });
+});
 
-  it("is carried in the map's page model", async () => {
-    const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(model.captures?.map((row) => row.key)).toEqual(["s1#p0", "s2#p0", "s1#h111111111111"]);
+describe("the session-end pass", () => {
+  it("leaves a suggested item after a session closes", async () => {
+    const dir = await tempDir();
+    const root = join(dir, "proj");
+    await mkdir(root);
+    const bin = join(dir, "bin");
+    await mkdir(bin, { recursive: true });
+    await writeFile(
+      join(bin, "claude"),
+      `#!/usr/bin/env node
+let input = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (c) => { input += c; });
+process.stdin.on("end", () => {
+  const answer = input.includes("You distil")
+    ? JSON.stringify({ items: [{ text: "write the docs", messageId: "m1" }], duplicateOf: [] })
+    : JSON.stringify({
+        threads: [{ name: "Work", messages: "m1-m2", from: null, asked: "a", outcome: "o", open: "docs unwritten" }],
+        leftOff: "The docs are unwritten",
+      });
+  process.stdout.write(JSON.stringify({ result: answer }));
+});
+`,
+    );
+    await chmod(join(bin, "claude"), 0o755);
+    const env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+    await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
+    const folder = join(envFor(dir).CLAUDE_CONFIG_DIR ?? "", "projects", "proj");
+    await mkdir(folder, { recursive: true });
+    const at = (m: number) => `2026-10-23T10:0${m}:00.000Z`;
+    const typed = (m: number) => ({
+      type: "user",
+      timestamp: at(m),
+      message: { role: "user", content: `message ${m}` },
+    });
+    await writeFile(
+      join(folder, "s1.jsonl"),
+      `${[1, 2].map((m) => JSON.stringify(typed(m))).join("\n")}\n`,
+    );
+    await sessionWrite({ dir: root, by: "side" }, fakeIo(env), async () =>
+      JSON.stringify({
+        sessionId: "s1",
+        nodes: [1, 2].map((m) => ({
+          id: `m${m}`,
+          kind: "message",
+          title: `T${m}`,
+          parent: m === 1 ? null : `m${m - 1}`,
+        })),
+      }),
+    );
+
+    await closeSession(root, "s1", fakeIo(env));
+    const store = await readCaptures(root);
+    expect(store.items).toHaveLength(1);
+    expect(store.items[0]).toMatchObject({ text: "write the docs", state: "suggested" });
+    expect(store.items[0]?.source.sessionId).toBe("s1");
   });
 });
