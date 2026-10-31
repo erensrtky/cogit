@@ -2,7 +2,13 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { ViewCapture, ViewSession } from "../../cli/src/view/model.js";
-import { CapturesView, capturesButtonVisible } from "../src/CapturesView.js";
+import {
+  CapturesView,
+  captureCounts,
+  capturePlacements,
+  captureSource,
+  capturesButtonVisible,
+} from "../src/CapturesView.js";
 
 const T0 = "2026-10-26T10:00:00.000Z";
 
@@ -10,7 +16,10 @@ const sessions = [
   {
     sessionId: "s1",
     title: "Parser work",
-    messages: [{ id: "m3", label: "m3", title: "Build it" }],
+    messages: [
+      { id: "m3", label: "m3", title: "Build it" },
+      { id: "h4", label: "m4", title: "Then this" },
+    ],
   },
 ] as unknown as ViewSession[];
 
@@ -18,7 +27,7 @@ const item = (
   over: Partial<ViewCapture> & { id: string; state: ViewCapture["state"] },
 ): ViewCapture => ({
   text: "some work",
-  source: { sessionId: "s1", messageId: "m3" },
+  source: { sessionId: "s1" },
   createdAt: T0,
   updatedAt: T0,
   ...over,
@@ -31,11 +40,11 @@ const items: ViewCapture[] = [
   item({ id: "c00000004", state: "dismissed", text: "gone" }),
 ];
 
-function render(captures: ViewCapture[] | undefined): string {
+function render(captures: ViewCapture[] | undefined, sessionsFor = sessions): string {
   return renderToStaticMarkup(
     createElement(CapturesView, {
       captures,
-      sessions,
+      sessions: sessionsFor,
       dir: "/p",
       active: null,
       onSelect: () => {},
@@ -67,6 +76,14 @@ describe("CapturesView", () => {
     expect(render(undefined)).toContain("No captured work.");
     expect(render([item({ id: "c00000009", state: "dismissed" })])).toContain("No captured work.");
   });
+
+  it("shows a session with no messages as a source with nothing to open", () => {
+    const html = render([item({ id: "c00000001", state: "suggested" })], [
+      { sessionId: "s1", title: "Empty", messages: [] },
+    ] as unknown as ViewSession[]);
+    expect(html).toContain("Empty");
+    expect(html).toContain("disabled");
+  });
 });
 
 describe("the Captured button", () => {
@@ -77,5 +94,98 @@ describe("the Captured button", () => {
     expect(capturesButtonVisible([item({ id: "c00000009", state: "done" })], true)).toBe(false);
     expect(capturesButtonVisible([], true)).toBe(false);
     expect(capturesButtonVisible(undefined, true)).toBe(false);
+  });
+});
+
+describe("an item's session anchor (Story 15.2)", () => {
+  const session = (id: string, messages: { id: string; label?: string }[]): ViewSession =>
+    ({
+      sessionId: id,
+      title: "",
+      messages,
+    }) as unknown as ViewSession;
+
+  it("anchors on the session's first message in send order", () => {
+    expect(
+      captureSource({ sessionId: "s1" }, [session("s1", [{ id: "a1" }, { id: "a2" }])]),
+    ).toEqual({
+      sessionTitle: "s1",
+      label: "a1",
+      target: { sessionId: "s1", messageId: "a1" },
+    });
+  });
+
+  it("anchors a session on its own first message even when it continues another", () => {
+    const continuing = {
+      sessionId: "s2",
+      title: "",
+      messages: [
+        { id: "b1", continues: { sessionId: "s1", id: "a1", sessionTitle: "One" } },
+        { id: "b2" },
+      ],
+    } as unknown as ViewSession;
+    expect(captureSource({ sessionId: "s2" }, [session("s1", [{ id: "a1" }]), continuing])).toEqual(
+      {
+        sessionTitle: "s2",
+        label: "b1",
+        target: { sessionId: "s2", messageId: "b1" },
+      },
+    );
+  });
+
+  it("anchors nowhere for a session with no messages or no record", () => {
+    expect(captureSource({ sessionId: "s1" }, [session("s1", [])])).toEqual({
+      sessionTitle: "s1",
+    });
+    expect(captureSource({ sessionId: "gone" }, [session("s1", [{ id: "a1" }])])).toEqual({
+      sessionTitle: "gone",
+    });
+  });
+});
+
+describe("the map's capture mark count", () => {
+  it("counts suggested and open items per session, and nothing when only done ones exist", () => {
+    const counts = captureCounts([
+      item({ id: "c00000001", state: "suggested" }),
+      item({ id: "c00000002", state: "open" }),
+      item({ id: "c00000003", state: "done" }),
+      item({ id: "c00000004", state: "dismissed" }),
+      item({ id: "c00000005", state: "open", source: { sessionId: "s2" } }),
+    ]);
+    expect(counts.get("s1")).toBe(2);
+    expect(counts.get("s2")).toBe(1);
+    expect(captureCounts([item({ id: "c00000009", state: "done" })]).size).toBe(0);
+    expect(captureCounts(undefined).size).toBe(0);
+  });
+
+  it("puts the mark on the anchor message when its row is drawn, else on the session row", () => {
+    const captures = [
+      item({ id: "c00000001", state: "suggested" }),
+      item({ id: "c00000002", state: "open" }),
+    ];
+    const open = capturePlacements(captures, sessions, () => true);
+    expect([...open.messages]).toEqual([["m3", 2]]);
+    expect(open.sessions.size).toBe(0);
+
+    const folded = capturePlacements(captures, sessions, () => false);
+    expect([...folded.sessions]).toEqual([["s1", { count: 2, messageId: "m3" }]]);
+    expect(folded.messages.size).toBe(0);
+
+    const none = capturePlacements(
+      [item({ id: "c00000009", state: "done" })],
+      sessions,
+      () => true,
+    );
+    expect(none.messages.size).toBe(0);
+    expect(none.sessions.size).toBe(0);
+
+    // A session with no messages has no row to anchor on.
+    const empty = capturePlacements(
+      captures,
+      [{ ...sessions[0], messages: [] } as ViewSession],
+      () => true,
+    );
+    expect(empty.messages.size).toBe(0);
+    expect(empty.sessions.size).toBe(0);
   });
 });

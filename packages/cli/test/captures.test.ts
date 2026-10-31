@@ -6,7 +6,6 @@ import {
   distillPrompt,
   distillSessionInput,
   parseDistillAnswer,
-  resolveMessageId,
   sessionInput,
 } from "../src/captures.js";
 import { buildProject } from "../src/commands/build.js";
@@ -106,57 +105,25 @@ describe("the distiller's prompt and answer", () => {
     expect(prompt).toContain('"duplicateOf"');
     expect(prompt).toContain("at most 140 characters");
     expect(prompt).toContain("the conversation's language");
-    expect(prompt).toContain('{"items": [{"text": "...", "messageId": "m3"}]');
+    expect(prompt).toContain("Items belong to the session");
+    expect(prompt).toContain('{"items": [{"text": "..."}], "duplicateOf": []}');
+    expect(prompt).not.toContain("messageId");
   });
 
   it("reads the answer, flattening the text and dropping malformed rows", () => {
     const answer = JSON.stringify({
       items: [
         { text: "  write  the docs ", messageId: "m1" },
-        { text: "", messageId: "m2" },
-        { text: "no message" },
-        { text: "fix the parser", messageId: "m2" },
+        { text: "" },
+        7,
+        { text: "fix the parser" },
       ],
       duplicateOf: ["c11111111", 7],
     });
     expect(parseDistillAnswer(`\`\`\`json\n${answer}\n\`\`\``)).toEqual({
-      items: [
-        { text: "write the docs", messageId: "m1" },
-        { text: "fix the parser", messageId: "m2" },
-      ],
+      items: [{ text: "write the docs" }, { text: "fix the parser" }],
       duplicateOf: ["c11111111"],
     });
-  });
-
-  it("keeps a named message, a numeric one, or falls back to the newest", () => {
-    const withMessage = captureInput(
-      source({
-        sessionId: "s1",
-        status: { pending: [{ text: "p", needsUser: false }] },
-        messages: [{ id: "m2", label: "m2", title: "T" }],
-      }),
-    );
-    expect(resolveMessageId(withMessage, "m2")).toBe("m2");
-    expect(resolveMessageId(withMessage, "m7")).toBe("m7");
-    expect(resolveMessageId(withMessage, "h123")).toBe("m2");
-    // A pending line can carry the message it points at even with no titles.
-    expect(
-      resolveMessageId(
-        {
-          sessionId: "s1",
-          title: "t",
-          pending: [{ text: "p", needsUser: false, messageId: "m4" }],
-          branches: [],
-          lastMessages: [],
-        },
-        "",
-      ),
-    ).toBe("m4");
-    expect(resolveMessageId(withMessage, "")).toBe("m2");
-    const nothing = captureInput(
-      source({ sessionId: "s1", status: { pending: [{ text: "p", needsUser: false }] } }),
-    );
-    expect(resolveMessageId(nothing, "h9")).toBe("");
   });
 });
 
@@ -172,26 +139,18 @@ describe("the captured store", () => {
   });
 
   it("round-trips suggestions and moves only updatedAt for duplicates", async () => {
-    const first = await addCaptureSuggestions(
-      root,
-      "s1",
-      [{ text: "write the docs", messageId: "m1" }],
-      { now: T0 },
-    );
+    const first = await addCaptureSuggestions(root, "s1", [{ text: "write the docs" }], {
+      now: T0,
+    });
     expect(first).toHaveLength(1);
     expect(first[0]?.id).toMatch(/^c[0-9a-f]{8}$/);
     const open = await setCaptureState(root, first[0]?.id as string, "open", T0);
     expect(open.state).toBe("open");
     const later = "2026-10-22T00:00:00.000Z";
-    const added = await addCaptureSuggestions(
-      root,
-      "s2",
-      [{ text: "write the docs", messageId: "m1" }],
-      {
-        now: later,
-        duplicateOf: [open.id],
-      },
-    );
+    const added = await addCaptureSuggestions(root, "s2", [{ text: "write the docs" }], {
+      now: later,
+      duplicateOf: [open.id],
+    });
     expect(added).toEqual([]);
     const store = await readCaptures(root);
     expect(store.items).toHaveLength(1);
@@ -199,7 +158,7 @@ describe("the captured store", () => {
   });
 
   it("records closedAt on done and refuses an impossible transition", async () => {
-    const [item] = await addCaptureSuggestions(root, "s1", [{ text: "x", messageId: "m1" }], {
+    const [item] = await addCaptureSuggestions(root, "s1", [{ text: "x" }], {
       now: T0,
     });
     await expect(setCaptureState(root, item?.id as string, "done", T0)).rejects.toThrow(
@@ -227,6 +186,62 @@ describe("the captured store", () => {
       items: [],
     });
   });
+
+  it("reads a schema-1 file by dropping each item's message and keeping the rest", async () => {
+    await mkdir(join(root, ".cogit", "state"), { recursive: true });
+    await writeFile(
+      projectPaths(root).captures,
+      JSON.stringify({
+        schema: 1,
+        items: [
+          {
+            id: "c00000001",
+            text: "one",
+            state: "open",
+            source: { sessionId: "s1", messageId: "m3" },
+            createdAt: NOW,
+            updatedAt: NOW,
+          },
+          {
+            id: "c00000002",
+            text: "two",
+            state: "done",
+            source: { sessionId: "s2", messageId: "m9" },
+            createdAt: NOW,
+            updatedAt: NOW,
+            closedAt: NOW,
+          },
+        ],
+      }),
+    );
+    expect(await readCaptures(root)).toEqual({
+      schema: CAPTURES_SCHEMA,
+      items: [
+        {
+          id: "c00000001",
+          text: "one",
+          state: "open",
+          source: { sessionId: "s1" },
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+        {
+          id: "c00000002",
+          text: "two",
+          state: "done",
+          source: { sessionId: "s2" },
+          createdAt: NOW,
+          updatedAt: NOW,
+          closedAt: NOW,
+        },
+      ],
+    });
+    // The next change writes the migrated shape; the message stays dropped.
+    await setCaptureState(root, "c00000001", "done", NOW);
+    const file = JSON.parse(await readFile(projectPaths(root).captures, "utf8"));
+    expect(file.schema).toBe(CAPTURES_SCHEMA);
+    expect(file.items[0].source).toEqual({ sessionId: "s1" });
+  });
 });
 
 describe("formatCaptures", () => {
@@ -234,7 +249,7 @@ describe("formatCaptures", () => {
     over: Partial<CaptureItem> & { id: string; state: CaptureItem["state"] },
   ): CaptureItem => ({
     text: "text",
-    source: { sessionId: "s1", messageId: "m3" },
+    source: { sessionId: "s1" },
     createdAt: NOW,
     updatedAt: NOW,
     ...over,
@@ -253,17 +268,17 @@ describe("formatCaptures", () => {
           item({ id: "c00000004", state: "dismissed", text: "gone" }),
         ],
       },
-      new Map([["s1:m3", "m3"]]),
+      new Map([["s1", "Parser"]]),
       NOW,
     );
     expect(lines).toEqual([
       "To review",
-      "  c00000001  same time  (s1 m3 · under a minute ago)",
-      "  c00000005  review me  (s1 m3 · under a minute ago)",
+      "  c00000001  same time  (Parser · under a minute ago)",
+      "  c00000005  review me  (Parser · under a minute ago)",
       "Open",
-      "  c00000002  accepted  (s1 m3 · under a minute ago)",
+      "  c00000002  accepted  (Parser · under a minute ago)",
       "Done",
-      "  c00000003  closed  (s1 m3 · under a minute ago)",
+      "  c00000003  closed  (Parser · under a minute ago)",
     ]);
   });
 
@@ -311,33 +326,29 @@ describe("cogit captures", () => {
     await writeFile(projectPaths(root).session("s1"), JSON.stringify(s1));
   });
 
-  it("prints the sections, with the source label and the age", async () => {
-    await addCaptureSuggestions(
-      root,
-      "s1",
-      [{ text: "decide the error format", messageId: "m1" }],
-      {
-        now: "2026-10-21T08:00:00.000Z",
-      },
-    );
+  it("prints the sections, with the session title as the source and the age", async () => {
+    await addCaptureSuggestions(root, "s1", [{ text: "decide the error format" }], {
+      now: "2026-10-21T08:00:00.000Z",
+    });
     const store = await captures({ dir: root, io, now: NOW });
     expect(store.items).toHaveLength(1);
     const [header, line] = io.lines;
     expect(header).toBe("To review");
     expect(line).toContain("decide the error format");
-    expect(line).toContain("s1 m1");
+    expect(line).toContain("Parser");
+    expect(line).not.toContain(" m1");
     expect(line).toContain("2 h ago");
   });
 
   it("prints the store as JSON", async () => {
-    await addCaptureSuggestions(root, "s1", [{ text: "one", messageId: "m1" }], { now: NOW });
+    await addCaptureSuggestions(root, "s1", [{ text: "one" }], { now: NOW });
     await captures({ dir: root, io, json: true });
     const store = JSON.parse(io.lines.join("\n"));
     expect(store.items[0]).toMatchObject({ text: "one", state: "suggested" });
   });
 
   it("accepts, dismisses and closes an item", async () => {
-    const [item] = await addCaptureSuggestions(root, "s1", [{ text: "one", messageId: "m1" }], {
+    const [item] = await addCaptureSuggestions(root, "s1", [{ text: "one" }], {
       now: NOW,
     });
     await setCapture(root, "accept", item?.id as string, io);
@@ -347,7 +358,7 @@ describe("cogit captures", () => {
     await expect(setCapture(root, "dismiss", "c00000000", fakeIo(envFor(dir)))).rejects.toThrow(
       "no captured item",
     );
-    const [fresh] = await addCaptureSuggestions(root, "s1", [{ text: "two", messageId: "m1" }], {
+    const [fresh] = await addCaptureSuggestions(root, "s1", [{ text: "two" }], {
       now: NOW,
     });
     await expect(setCapture(root, "done", fresh?.id as string, io)).rejects.toThrow(
@@ -356,14 +367,14 @@ describe("cogit captures", () => {
   });
 
   it("lets an unreadable store's own error through", async () => {
-    await addCaptureSuggestions(root, "s1", [{ text: "one", messageId: "m1" }], { now: NOW });
+    await addCaptureSuggestions(root, "s1", [{ text: "one" }], { now: NOW });
     await rm(projectPaths(root).captures, { force: true });
     await mkdir(projectPaths(root).captures, { recursive: true });
     await expect(setCapture(root, "accept", "c00000000", io)).rejects.toThrow(/EISDIR/);
   });
 
   it("is carried in the map's page model", async () => {
-    await addCaptureSuggestions(root, "s1", [{ text: "one", messageId: "m1" }], { now: NOW });
+    await addCaptureSuggestions(root, "s1", [{ text: "one" }], { now: NOW });
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
     expect(model.captures?.map((row) => row.text)).toEqual(["one"]);
     expect(model.settings?.captures).toBe(true);
@@ -423,7 +434,7 @@ process.stdin.on("end", async () => {
     dir = await tempDir();
     root = join(dir, "proj");
     await mkdir(root);
-    await fakeClaude({ items: [{ text: "write the docs", messageId: "m2" }], duplicateOf: [] });
+    await fakeClaude({ items: [{ text: "write the docs" }], duplicateOf: [] });
     await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
     await writeFile(projectPaths(root).session("s1"), JSON.stringify(s1()));
     // A session with nothing left open costs no call; --all passes over it.
@@ -436,15 +447,15 @@ process.stdin.on("end", async () => {
     await writeFile(projectPaths(root).session("s2"), JSON.stringify(s2));
   });
 
-  it("writes the answer as a suggested item with its source message", async () => {
+  it("writes the answer as a suggested item that belongs to its session", async () => {
     const result = await distillSessionInput(root, sessionInput(s1()), { io });
-    expect(result?.proposal.items).toEqual([{ text: "write the docs", messageId: "m2" }]);
+    expect(result?.proposal.items).toEqual([{ text: "write the docs" }]);
     const store = await readCaptures(root);
     expect(store.items).toHaveLength(1);
     expect(store.items[0]).toMatchObject({
       state: "suggested",
       text: "write the docs",
-      source: { sessionId: "s1", messageId: "m2" },
+      source: { sessionId: "s1" },
     });
   });
 
@@ -476,15 +487,12 @@ process.stdin.on("end", async () => {
   });
 
   it("reads the existing list and keeps an item the session is still about", async () => {
-    const [existing] = await addCaptureSuggestions(
-      root,
-      "s1",
-      [{ text: "write the docs", messageId: "m2" }],
-      { now: T0 },
-    );
+    const [existing] = await addCaptureSuggestions(root, "s1", [{ text: "write the docs" }], {
+      now: T0,
+    });
     await setCaptureState(root, existing?.id as string, "open", T0);
     await fakeClaude({
-      items: [{ text: "write the docs", messageId: "m2" }],
+      items: [{ text: "write the docs" }],
       duplicateOf: [existing?.id, "c00000000"],
     });
     const later = "2026-10-22T00:00:00.000Z";
@@ -497,12 +505,12 @@ process.stdin.on("end", async () => {
     expect(store.items[0]).toMatchObject({ id: existing?.id, state: "open", updatedAt: later });
   });
 
-  it("drops an item with no message to point at", async () => {
-    await fakeClaude({ items: [{ text: "orphan", messageId: "h9" }], duplicateOf: [] });
+  it("stores an item for a session with no messages to anchor", async () => {
+    await fakeClaude({ items: [{ text: "orphan" }], duplicateOf: [] });
     const record = { ...s1(), nodes: [] };
     const result = await distillSessionInput(root, sessionInput(record), { io });
-    expect(result?.proposal.items).toEqual([]);
-    expect((await readCaptures(root)).items).toEqual([]);
+    expect(result?.proposal.items).toEqual([{ text: "orphan" }]);
+    expect((await readCaptures(root)).items[0]?.source).toEqual({ sessionId: "s1" });
   });
 
   it("refuses a hand-run pass with captures off", async () => {
@@ -555,14 +563,9 @@ process.stdin.on("end", async () => {
       from: "user",
     });
     expect(io.lines.join("\n")).toContain('Session s1 "Parser"');
-    const [item] = await addCaptureSuggestions(
-      root,
-      "s1",
-      [{ text: "cli item", messageId: "m1" }],
-      {
-        now: T0,
-      },
-    );
+    const [item] = await addCaptureSuggestions(root, "s1", [{ text: "cli item" }], {
+      now: T0,
+    });
     await program.parseAsync(["captures", "accept", item?.id as string, "--dir", root], {
       from: "user",
     });
@@ -585,7 +588,7 @@ process.stdin.setEncoding("utf8");
 process.stdin.on("data", (c) => { input += c; });
 process.stdin.on("end", () => {
   const answer = input.includes("You distil")
-    ? JSON.stringify({ items: [{ text: "write the docs", messageId: "m1" }], duplicateOf: [] })
+    ? JSON.stringify({ items: [{ text: "write the docs" }], duplicateOf: [] })
     : JSON.stringify({
         threads: [{ name: "Work", messages: "m1-m2", from: null, asked: "a", outcome: "o", open: "docs unwritten" }],
         leftOff: "The docs are unwritten",

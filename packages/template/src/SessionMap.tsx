@@ -27,7 +27,9 @@ function SessionRow({
   selected,
   open,
   searchHit,
+  captured,
   onOpen,
+  onOpenMessage,
   onContinue,
 }: {
   row: GitMessageRow;
@@ -41,7 +43,11 @@ function SessionRow({
   open: boolean;
   /** The session's title or status matches the search (Story 8.14). */
   searchHit: boolean;
+  /** Suggested + open captured items whose anchor is not shown on a message row. */
+  captured?: { count: number; messageId: string } | undefined;
   onOpen: (sessionId: string) => void;
+  /** Selects one message and opens its details (the capture mark, Story 15.2). */
+  onOpenMessage: (sessionId: string, messageId: string) => void;
   onContinue: (continues: NonNullable<ViewSession["messages"][number]["continues"]>) => void;
 }) {
   const continues = session.messages[0]?.continues;
@@ -73,6 +79,18 @@ function SessionRow({
       </span>
       <span className="git-time">{session.startedAt ? formatStamp(session.startedAt) : ""}</span>
       <span className="git-title">{session.title || session.sessionId}</span>
+      {captured === undefined ? null : (
+        <span
+          className="capture-mark session-capture"
+          title={`${captured.count} captured item${captured.count === 1 ? "" : "s"} from this session`}
+          onClick={(event: MouseEvent) => {
+            event.stopPropagation();
+            onOpenMessage(session.sessionId, captured.messageId);
+          }}
+        >
+          {captured.count}
+        </span>
+      )}
       {showAuthor && session.author ? (
         <span className="muted session-author" title={`Recorded by ${session.author}`}>
           {session.author}
@@ -110,7 +128,9 @@ export function SessionMap({
   openIds,
   highlightSessionIds,
   person = null,
+  captured,
   onOpen,
+  onOpenMessage,
   onContinue,
 }: {
   model: LineageViewModel;
@@ -122,7 +142,10 @@ export function SessionMap({
   highlightSessionIds: ReadonlySet<string>;
   /** The person filter: everyone when left out. */
   person?: PersonFilter;
+  /** Captured-work marks, by session id (Story 15.2). */
+  captured?: ReadonlyMap<string, { count: number; messageId: string }> | undefined;
   onOpen: (sessionId: string) => void;
+  onOpenMessage: (sessionId: string, messageId: string) => void;
   onContinue: (sessionId: string, messageId: string) => void;
 }) {
   const { git } = graph;
@@ -221,7 +244,9 @@ export function SessionMap({
               selected={selectedSessionId === session.sessionId}
               open={openIds.has(session.sessionId)}
               searchHit={highlightSessionIds.has(session.sessionId)}
+              captured={captured?.get(session.sessionId)}
               onOpen={onOpen}
+              onOpenMessage={onOpenMessage}
               onContinue={(continues) => onContinue(continues.sessionId, continues.id)}
             />
           );

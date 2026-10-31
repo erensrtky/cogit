@@ -42,6 +42,7 @@ describe("Story 9.3 on the map", () => {
           openIds: new Set<string>(),
           highlightSessionIds: new Set<string>(),
           onOpen: () => {},
+          onOpenMessage: () => {},
           onContinue: () => {},
         }),
       );
@@ -100,5 +101,97 @@ describe("Story 9.3 on the map", () => {
     const gone = render(session);
     expect(gone).toContain("session no longer available");
     expect(gone.match(/class="resume-button" disabled/g)).toHaveLength(2);
+  });
+});
+
+describe("captured work on the map (Story 15.2)", () => {
+  it("marks the session row with its count while the first message is not drawn", () => {
+    const model = modelOf(session);
+    const render = (captured: Map<string, { count: number; messageId: string }> | undefined) =>
+      renderToStaticMarkup(
+        createElement(SessionMap, {
+          model,
+          graph: layoutSessionGraph(model),
+          selectedSessionId: null,
+          openIds: new Set<string>(),
+          highlightSessionIds: new Set<string>(),
+          captured,
+          onOpen: () => {},
+          onOpenMessage: () => {},
+          onContinue: () => {},
+        }),
+      );
+    const html = render(new Map([["s1", { count: 2, messageId: "h1" }]]));
+    expect(html).toContain("session-capture");
+    expect(html).toContain(">2<");
+    expect(render(undefined)).not.toContain("session-capture");
+  });
+
+  it("lists the session's items in the first message's details, read-only", () => {
+    const model: LineageViewModel = {
+      ...modelOf(session),
+      captures: [
+        {
+          id: "c00000001",
+          text: "write the docs",
+          state: "suggested",
+          source: { sessionId: "s1" },
+          createdAt: T0,
+          updatedAt: T0,
+        },
+        {
+          id: "c00000002",
+          text: "ship it",
+          state: "open",
+          source: { sessionId: "s1" },
+          createdAt: T0,
+          updatedAt: T0,
+        },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      createElement(DrillDown, {
+        model,
+        selection: { type: "node", sessionId: "s1", nodeId: "h1" },
+        onClose: () => {},
+      }),
+    );
+    expect(html).toContain("Captured here");
+    expect(html).toContain("write the docs");
+    expect(html).toContain("To review");
+    expect(html).toContain("Open");
+    // Actions stay in the Captured list.
+    expect(html).not.toContain(">Accept<");
+  });
+
+  it("shows the section only on the anchor, not on another message", () => {
+    const two = {
+      ...session,
+      messages: [
+        ...session.messages,
+        { id: "h2", label: "m2", kind: "message", title: "Later", at: T0, parent: "h1" },
+      ],
+    } as ViewSession;
+    const model: LineageViewModel = {
+      ...modelOf(two),
+      captures: [
+        {
+          id: "c00000001",
+          text: "write the docs",
+          state: "suggested",
+          source: { sessionId: "s1" },
+          createdAt: T0,
+          updatedAt: T0,
+        },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      createElement(DrillDown, {
+        model,
+        selection: { type: "node", sessionId: "s1", nodeId: "h2" },
+        onClose: () => {},
+      }),
+    );
+    expect(html).not.toContain("Captured here");
   });
 });

@@ -20,10 +20,9 @@ import { buildMessages } from "./view/lineage.js";
  * and can be run by hand (`cogit captures distill`) for existing sessions.
  */
 
-/** One item the model proposes, with the recorded message it came from. */
+/** One item the model proposes: a user-level leftover of the session. */
 export interface CaptureDraftItem {
   text: string;
-  messageId: string;
 }
 
 export interface DistillAnswer {
@@ -82,7 +81,7 @@ export function distillPrompt(
     `- At most ${DISTILL_LIMIT} items. Each one is work a person would ask for, phrased as a short imperative (one line, at most 140 characters) in ${writing}.`,
     "- Name only work the user asked for and that is still not done, or that the session left undone. A problem a later message fixed, finished or dropped is done, not open.",
     '- Never draft a commit step, a test run, a release chore, a status fact ("0.24 is unreleased") or a question a later message answered.',
-    "- Each item carries `messageId`: the reference shown for the message it came from (m1, m2, …).",
+    "- Items belong to the session, not to one message: do not name a message.",
     "- Existing captured items are the user's list: never rephrase, merge or close them. Only put an id in `duplicateOf`.",
     "",
     ...current,
@@ -91,14 +90,14 @@ export function distillPrompt(
     ...(branches.length === 0 ? [] : ["Open branch lines:", ...branches]),
     ...(messages.length === 0 ? [] : ["Last messages:", ...messages]),
     "",
-    `Return only one JSON object, no code fences: {"items": [{"text": "...", "messageId": "m3"}], "duplicateOf": []}`,
+    `Return only one JSON object, no code fences: {"items": [{"text": "..."}], "duplicateOf": []}`,
   ].join("\n");
 }
 
 /**
  * The model's answer, tolerated as an object (a code fence is stripped) with a
- * missing or malformed list read as "nothing". Text and message refs are
- * flattened and trimmed here; the store validates the rest.
+ * missing or malformed list read as "nothing". Text is flattened and trimmed
+ * here; the store validates the rest.
  */
 export function parseDistillAnswer(text: string): DistillAnswer {
   const answer = agentRecord(text);
@@ -106,11 +105,11 @@ export function parseDistillAnswer(text: string): DistillAnswer {
   const items: CaptureDraftItem[] = [];
   for (const raw of rawItems) {
     if (typeof raw !== "object" || raw === null) continue;
-    const { text: itemText, messageId } = raw as Record<string, unknown>;
-    if (typeof itemText !== "string" || typeof messageId !== "string") continue;
+    const { text: itemText } = raw as Record<string, unknown>;
+    if (typeof itemText !== "string") continue;
     const flat = itemText.replace(/\s+/g, " ").trim();
     if (flat === "") continue;
-    items.push({ text: flat, messageId: messageId.trim() });
+    items.push({ text: flat });
     if (items.length >= DISTILL_LIMIT) break;
   }
   const rawDuplicates = Array.isArray(answer.duplicateOf) ? answer.duplicateOf : [];
@@ -118,22 +117,6 @@ export function parseDistillAnswer(text: string): DistillAnswer {
     (id): id is string => typeof id === "string" && id.trim() !== "",
   );
   return { items, duplicateOf: duplicateOf.map((id) => id.trim()) };
-}
-
-/** The newest recorded message id, the fallback when the model names none. */
-function newestMessageId(input: CaptureInput): string {
-  return input.lastMessages.at(-1)?.id ?? input.pending[0]?.messageId ?? "";
-}
-
-/** The message id the model named, when it is a reference the session could show. */
-export function resolveMessageId(input: CaptureInput, raw: string): string {
-  const ref = raw.trim();
-  if (ref !== "") {
-    if (input.lastMessages.some((message) => message.id === ref || message.label === ref))
-      return ref;
-    if (/^m[1-9][0-9]*$/.test(ref)) return ref;
-  }
-  return newestMessageId(input);
 }
 
 /** What one distill pass produced: the model's answer and the rows it added. */
@@ -191,11 +174,7 @@ export async function distillSessionInput(
   const answer = parseDistillAnswer(
     resultText(await runClaude(prompt, config.sideModel, opts.io.env)),
   );
-  // An item with no recorded message to point at could never be opened from
-  // the map, so it is dropped rather than stored without a source.
-  const items = answer.items
-    .map((item) => ({ text: item.text, messageId: resolveMessageId(input, item.messageId) }))
-    .filter((item) => item.messageId !== "");
+  const items = answer.items;
   const known = new Set(existing.map((item) => item.id));
   const duplicateOf = answer.duplicateOf.filter((id) => known.has(id));
   const now = opts.now ?? opts.io.now();
@@ -261,7 +240,7 @@ export function formatProposal(proposal: CaptureProposal): string[] {
   if (proposal.items.length === 0) return [`${head} nothing to draft`];
   return [
     head,
-    ...proposal.items.map((item) => `  + ${item.text}  (${item.messageId})`),
+    ...proposal.items.map((item) => `  + ${item.text}`),
     ...(proposal.duplicateOf.length === 0
       ? []
       : [`  still about: ${proposal.duplicateOf.join(", ")}`]),

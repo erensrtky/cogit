@@ -13,9 +13,13 @@ import { projectPaths } from "./paths.js";
  *
  * An item's id is minted once and never derived from its text, because the model
  * may rephrase a suggestion without it becoming a second row.
+ *
+ * Story 15.2 made an item belong to a session, not a single message: a leftover
+ * is usually the outcome of the whole session, and the model's chosen message
+ * was arbitrary. The map anchors each item on the session's first message.
  */
 
-export const CAPTURES_SCHEMA = 1;
+export const CAPTURES_SCHEMA = 2;
 
 const SESSION_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 /** A random `c` followed by eight hex characters. */
@@ -30,10 +34,9 @@ export const CaptureItem = z.object({
   id: z.string().regex(CAPTURE_ID),
   text: z.string().trim().min(1).max(CAPTURE_TEXT_MAX),
   state: CaptureState,
-  /** The recorded message the item came from. */
+  /** The recorded session the item came from. */
   source: z.object({
     sessionId: z.string().regex(SESSION_ID),
-    messageId: z.string().min(1).max(128),
   }),
   createdAt: IsoDate,
   updatedAt: IsoDate,
@@ -47,6 +50,38 @@ export const Captures = z.object({
   items: z.array(CaptureItem).default([]),
 });
 export type Captures = z.infer<typeof Captures>;
+
+/**
+ * A schema-1 item pointed at the message the model named (Story 15.1). It is
+ * read only to migrate the file: the message is dropped, the rest is kept.
+ */
+const CaptureItemV1 = CaptureItem.extend({
+  source: z.object({
+    sessionId: z.string().regex(SESSION_ID),
+    messageId: z.string().min(1).max(128),
+  }),
+});
+
+const CapturesV1 = z.object({
+  schema: z.literal(1),
+  items: z.array(CaptureItemV1).default([]),
+});
+
+/** A schema-1 file becomes the current shape; the next write stores it as 2. */
+function migrateV1(store: z.infer<typeof CapturesV1>): Captures {
+  return {
+    schema: CAPTURES_SCHEMA,
+    items: store.items.map((item) => ({
+      id: item.id,
+      text: item.text,
+      state: item.state,
+      source: { sessionId: item.source.sessionId },
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      ...(item.closedAt === undefined ? {} : { closedAt: item.closedAt }),
+    })),
+  };
+}
 
 /** A missing file is an empty list, not an error. */
 export function emptyCaptures(): Captures {
@@ -114,19 +149,19 @@ export async function readCaptures(
   const read = await readJson(file);
   if (!read.found) return emptyCaptures();
   const parsed = "error" in read ? undefined : Captures.safeParse(read.value);
-  if (parsed === undefined || !parsed.success) {
-    warn?.(`ignored a corrupt ${file}; starting with an empty captured list`);
-    // Replace it so the next read is clean; a failed repair is not fatal either.
-    await atomicWriteJson(file, emptyCaptures()).catch(() => undefined);
-    return emptyCaptures();
-  }
-  return parsed.data;
+  if (parsed !== undefined && parsed.success) return parsed.data;
+  // A file from before Story 15.2 keeps its items; only the message is dropped.
+  const legacy = "error" in read ? undefined : CapturesV1.safeParse(read.value);
+  if (legacy !== undefined && legacy.success) return migrateV1(legacy.data);
+  warn?.(`ignored a corrupt ${file}; starting with an empty captured list`);
+  // Replace it so the next read is clean; a failed repair is not fatal either.
+  await atomicWriteJson(file, emptyCaptures()).catch(() => undefined);
+  return emptyCaptures();
 }
 
-/** A rephrase from the model for one recorded message. */
+/** A rephrase from the model for one session. */
 export interface CaptureDraft {
   text: string;
-  messageId: string;
 }
 
 export interface AddCapturesOptions {
@@ -177,7 +212,7 @@ export async function addCaptureSuggestions(
           id,
           text,
           state: "suggested",
-          source: { sessionId, messageId: draft.messageId },
+          source: { sessionId },
           createdAt: opts.now,
           updatedAt: opts.now,
         };

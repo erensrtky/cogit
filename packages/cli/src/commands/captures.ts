@@ -12,7 +12,6 @@ import {
 import { loadAllSessions, loadConfig } from "../store/stores.js";
 import { captureInput, hasOpenWork } from "../view/captures.js";
 import { timeSince } from "../view/inbox.js";
-import { buildMessages } from "../view/lineage.js";
 import {
   type EffectiveSession,
   loadEffectiveSessions,
@@ -40,28 +39,26 @@ function oneLine(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
-/** `sessionId:messageId` → the message's `mN` label, from the records. */
-async function messageLabels(
+/** `sessionId` → the session's title, or its id when the record has none yet. */
+async function sessionTitles(
   root: string,
   warn: (message: string) => void,
 ): Promise<Map<string, string>> {
-  const labels = new Map<string, string>();
+  const titles = new Map<string, string>();
   for (const session of await loadAllSessions(root, warn)) {
-    for (const message of buildMessages(session.nodes)) {
-      if (message.label !== undefined)
-        labels.set(`${session.sessionId}:${message.id}`, message.label);
-    }
+    titles.set(session.sessionId, session.title || session.sessionId);
   }
-  return labels;
+  return titles;
 }
 
 function newestFirst(a: CaptureItem, b: CaptureItem): number {
   return b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id);
 }
 
-function itemLine(item: CaptureItem, labels: ReadonlyMap<string, string>, now: string): string {
-  const label = labels.get(`${item.source.sessionId}:${item.source.messageId}`);
-  const source = [item.source.sessionId, label ?? item.source.messageId].join(" ");
+function itemLine(item: CaptureItem, titles: ReadonlyMap<string, string>, now: string): string {
+  // An item belongs to its session (Story 15.2): the title is the source, with
+  // no message label to point at.
+  const source = titles.get(item.source.sessionId) ?? item.source.sessionId;
   const age = timeSince(item.updatedAt, now);
   const meta = age === "" ? source : `${source} · ${age} ago`;
   return `${item.id}  ${oneLine(item.text)}  (${meta})`;
@@ -74,13 +71,13 @@ function itemLine(item: CaptureItem, labels: ReadonlyMap<string, string>, now: s
  */
 export function formatCaptures(
   store: Captures,
-  labels: ReadonlyMap<string, string> = new Map(),
+  titles: ReadonlyMap<string, string> = new Map(),
   now = new Date().toISOString(),
 ): string[] {
   const of = (state: CaptureState): CaptureItem[] =>
     store.items.filter((item) => item.state === state).sort(newestFirst);
   const section = (title: string, items: CaptureItem[]): string[] =>
-    items.length === 0 ? [] : [title, ...items.map((item) => `  ${itemLine(item, labels, now)}`)];
+    items.length === 0 ? [] : [title, ...items.map((item) => `  ${itemLine(item, titles, now)}`)];
   const lines = [
     ...section("To review", of("suggested")),
     ...section("Open", of("open")),
@@ -97,8 +94,8 @@ export async function captures(opts: CapturesOptions): Promise<Captures> {
     opts.io.out(JSON.stringify(store, null, 2));
     return store;
   }
-  const labels = await messageLabels(root, opts.io.warn);
-  for (const line of formatCaptures(store, labels, opts.now ?? opts.io.now())) opts.io.out(line);
+  const titles = await sessionTitles(root, opts.io.warn);
+  for (const line of formatCaptures(store, titles, opts.now ?? opts.io.now())) opts.io.out(line);
   return store;
 }
 

@@ -1,7 +1,9 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { formatChange, isBigChange } from "../../cli/src/view/change.js";
+import { timeSince } from "../../cli/src/view/inbox.js";
 import type {
   LineageViewModel,
+  ViewCapture,
   ViewChatTurn,
   ViewNode,
   ViewSession,
@@ -104,6 +106,48 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <dt>{label}</dt>
       <dd>{children}</dd>
     </div>
+  );
+}
+
+const CAPTURE_STATE_LABEL = {
+  suggested: "To review",
+  open: "Open",
+  done: "Done",
+  dismissed: "Dismissed",
+} as const;
+
+/**
+ * The captured work a whole session stands for (Story 15.2), shown on its first
+ * message — the anchor the map marks. Read-only: accepting, dismissing or
+ * closing stays in the Captured list, so a stray click here cannot close work.
+ */
+function CapturedHere({ items }: { items: readonly ViewCapture[] }) {
+  // A dismissed item is closed away from the reading view, like in the list.
+  const shown = items
+    .filter((item) => item.state !== "dismissed")
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  if (shown.length === 0) return null;
+  const now = new Date().toISOString();
+  return (
+    <section className="captured-here">
+      <h3>
+        Captured here <span className="count">{shown.length}</span>
+      </h3>
+      <ul className="drilldown-list capture-here-list">
+        {shown.map((item) => {
+          const age = timeSince(item.updatedAt, now);
+          return (
+            <li key={item.id}>
+              <span className={`capture-state is-${item.state}`}>
+                {CAPTURE_STATE_LABEL[item.state]}
+              </span>{" "}
+              {item.text}
+              {age === "" ? null : <span className="muted"> · {age} ago</span>}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -370,6 +414,13 @@ function NodeDetails({
       ) : null}
       {node.decidedBy ? (
         <p className="decided-by">Decided by: {DECIDED_LABEL[node.decidedBy]}</p>
+      ) : null}
+      {node.kind === "message" && session?.messages[0]?.id === node.nodeId ? (
+        <CapturedHere
+          items={(model.captures ?? []).filter(
+            (item) => item.source.sessionId === session.sessionId,
+          )}
+        />
       ) : null}
       {node.agentDecisions?.length ? (
         <section>

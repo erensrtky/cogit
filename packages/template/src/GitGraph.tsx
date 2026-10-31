@@ -33,6 +33,7 @@ function Row({
   searchHit,
   searchActive,
   bigChangeLines,
+  captured,
   onSelect,
   onUnfold,
 }: {
@@ -46,6 +47,8 @@ function Row({
   searchActive: boolean;
   /** A change at or above this many lines gets the quiet highlight. */
   bigChangeLines: number;
+  /** Suggested + open captured items this message anchors (Story 15.2). */
+  captured?: number | undefined;
   onSelect: (row: GitMessageRow) => void;
   onUnfold: (segmentId: string) => void;
 }) {
@@ -99,6 +102,20 @@ function Row({
       <span className="git-time">{rowRange(row, sameDay)}</span>
       <span className="git-id">{message.label ?? message.id}</span>
       <span className="git-title">{message.title}</span>
+      {captured === undefined ? null : (
+        // A span, not a button: the whole row is already a button. The mark is
+        // the session's captured work, anchored on its first message.
+        <span
+          className="capture-mark git-capture"
+          title={`${captured} captured item${captured === 1 ? "" : "s"} from this session`}
+          onClick={(event: MouseEvent) => {
+            event.stopPropagation();
+            onSelect(row);
+          }}
+        >
+          {captured}
+        </span>
+      )}
       {row.tags.length > 0 ? (
         <span className="git-tags">
           {row.tags.map((tag) => (
@@ -141,6 +158,7 @@ export function GitGraph({
   highlightIds,
   activeHitId,
   bigChangeLines,
+  captured,
   onSelect,
   onUnfold,
 }: {
@@ -154,6 +172,8 @@ export function GitGraph({
   activeHitId: string | null;
   /** A change at or above this many lines gets the quiet highlight. */
   bigChangeLines: number;
+  /** Suggested + open captured items, by the message id that anchors them. */
+  captured?: ReadonlyMap<string, number> | undefined;
   onSelect: (row: GitMessageRow) => void;
   onUnfold: (segmentId: string) => void;
 }) {
@@ -246,6 +266,7 @@ export function GitGraph({
               searchHit={messageId !== null && highlightIds?.has(messageId) === true}
               searchActive={messageId !== null && activeHitId !== null && messageId === activeHitId}
               bigChangeLines={bigChangeLines}
+              captured={messageId === null ? undefined : captured?.get(messageId)}
               onSelect={onSelect}
               onUnfold={onUnfold}
             />

@@ -368,8 +368,11 @@ export interface ViewCapture {
   text: string;
   /** `suggested` waits for the user; `open` is accepted; `dismissed` and `done` are closed. */
   state: "suggested" | "open" | "dismissed" | "done";
-  /** The recorded message the item came from. */
-  source: { sessionId: string; messageId: string };
+  /**
+   * The recorded session the item came from. An item belongs to a whole session
+   * (Story 15.2); the map anchors it on the session's first message.
+   */
+  source: { sessionId: string };
   createdAt: string;
   updatedAt: string;
   /** Set when the item became `done`. */

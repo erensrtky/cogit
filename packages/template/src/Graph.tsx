@@ -19,7 +19,7 @@ import {
 } from "react";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
-import { CapturesView, capturesButtonVisible } from "./CapturesView.js";
+import { CapturesView, capturePlacements, capturesButtonVisible } from "./CapturesView.js";
 import { loadMapView, pageToken, saveOpenSessions, saveRowWidth } from "./data.js";
 import { type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
@@ -102,11 +102,14 @@ function SessionMessages({
   git,
   highlights,
   activeHitId,
+  captured,
 }: {
   session: ViewSession;
   git: GitLayout;
   highlights: ReadonlySet<string> | undefined;
   activeHitId: string | null;
+  /** Capture marks for message rows, by the anchor message id (Story 15.2). */
+  captured?: ReadonlyMap<string, number> | undefined;
 }) {
   const { selection, bigChangeLines, openNode, unfold, resizeRows, storeRowWidth, person, people } =
     useContext(GraphActions);
@@ -122,6 +125,7 @@ function SessionMessages({
         highlightIds={highlights}
         activeHitId={activeHitId}
         bigChangeLines={bigChangeLines}
+        captured={captured}
         onSelect={(row) => openNode(session.sessionId, row.message.id)}
         onUnfold={unfold}
       />
@@ -135,7 +139,18 @@ function SessionMessages({
 }
 
 function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
-  const { openSession, openContinue, selection, openIds, person } = useContext(GraphActions);
+  const { openSession, openNode, openContinue, selection, openIds, person } =
+    useContext(GraphActions);
+  // A captured-work mark goes on the anchored message row when it is drawn; a
+  // session whose first message is not showing (folded away by branch folding,
+  // or the session is closed) carries the mark on its own row instead.
+  const capture = capturePlacements(data.model.captures, data.model.sessions, (sessionId, id) =>
+    data.openings.some(
+      (opening) =>
+        opening.session.sessionId === sessionId &&
+        opening.git.rows.some((row) => row.kind === "message" && row.message.id === id),
+    ),
+  );
   return (
     <div className="map-node">
       <SessionMap
@@ -146,7 +161,9 @@ function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
         openIds={openIds}
         highlightSessionIds={data.sessionHits}
         person={person}
+        captured={capture.sessions}
         onOpen={openSession}
+        onOpenMessage={openNode}
         onContinue={openContinue}
       />
       {data.openings.map((opening) => {
@@ -164,6 +181,7 @@ function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
               activeHitId={
                 active?.sessionId === opening.session.sessionId ? active.messageId : null
               }
+              captured={capture.messages}
             />
           </div>
         );

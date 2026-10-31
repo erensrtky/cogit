@@ -1291,6 +1291,44 @@ body:has(.map-shell.is-expanded) {
   overflow-wrap: anywhere;
 }
 
+/* Story 15.2: the mark on the message or session row a session's items anchor on. */
+.capture-mark {
+  flex: none;
+  padding: 0 5px;
+  color: var(--capture);
+  border: 1px solid var(--capture);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.capture-mark:hover {
+  color: var(--bg);
+  background: var(--capture);
+}
+
+.capture-state {
+  display: inline-block;
+  padding: 0 5px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.capture-state.is-open {
+  color: var(--capture);
+  border-color: var(--capture);
+}
+
+.capture-here-list li {
+  margin: 3px 0;
+}
+
 .capture-meta {
   display: flex;
   flex-wrap: wrap;

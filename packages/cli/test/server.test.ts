@@ -994,12 +994,9 @@ describe("captures state endpoint (Story 15.1)", () => {
   }
 
   async function suggested(): Promise<string> {
-    const [item] = await addCaptureSuggestions(
-      root,
-      "s1",
-      [{ text: "write the docs", messageId: "m1" }],
-      { now: T0 },
-    );
+    const [item] = await addCaptureSuggestions(root, "s1", [{ text: "write the docs" }], {
+      now: T0,
+    });
     return item?.id as string;
   }
 

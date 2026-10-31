@@ -10,8 +10,9 @@ import { formatStamp } from "./format.js";
  * sessions left open, and the user curates. "To review" holds the suggestions
  * (Accept or Dismiss), "Open" the accepted ones (Done), and "Done" the last ten
  * that were closed. The list is the user's, not a plan cogit keeps: no
- * assignment, no priority, no tracker state. Clicking a row's source opens the
- * message that named it, the same drill-down the files view gives.
+ * assignment, no priority, no tracker state. An item belongs to its session, so
+ * clicking a row's source opens the session's first message — where the map
+ * anchors its captured work.
  */
 
 type CaptureState = ViewCapture["state"];
@@ -41,6 +42,82 @@ function byNewest(a: ViewCapture, b: ViewCapture): number {
   return b.updatedAt.localeCompare(a.updatedAt);
 }
 
+/** Where clicking an item's source takes the map: the session's first message. */
+export interface CaptureSource {
+  sessionTitle: string;
+  /** The first message's `mN` label; absent when the session has no messages. */
+  label?: string | undefined;
+  /** The message to open; absent when the session has no messages to anchor. */
+  target?: { sessionId: string; messageId: string } | undefined;
+}
+
+/**
+ * An item belongs to its session (Story 15.2). The session's **first message in
+ * send order** is the honest anchor — a session has no node of its own in the
+ * record — and the map draws it as the session's root, even when the session
+ * continues another one. A session with no messages anchors nowhere.
+ */
+export function captureSource(
+  source: { sessionId: string },
+  sessions: readonly ViewSession[],
+): CaptureSource {
+  const session = sessions.find((candidate) => candidate.sessionId === source.sessionId);
+  if (session === undefined) return { sessionTitle: source.sessionId };
+  const first = session.messages[0];
+  const sessionTitle = session.title || session.sessionId;
+  if (first === undefined) return { sessionTitle };
+  return {
+    sessionTitle,
+    label: first.label ?? first.id,
+    target: { sessionId: session.sessionId, messageId: first.id },
+  };
+}
+
+/**
+ * How many `suggested` + `open` items each session stands for, for the map's
+ * capture mark. `done` and `dismissed` items are closed and count nothing, so a
+ * store of only done items marks no row, like the Captured button.
+ */
+export function captureCounts(captures: readonly ViewCapture[] | undefined): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of captures ?? []) {
+    if (item.state !== "suggested" && item.state !== "open") continue;
+    counts.set(item.source.sessionId, (counts.get(item.source.sessionId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** Where each session's capture mark is drawn. */
+export interface CapturePlacements {
+  /** The session row, for a session whose anchor message is not drawn. */
+  sessions: Map<string, { count: number; messageId: string }>;
+  /** The anchor's message row, by message id. */
+  messages: Map<string, number>;
+}
+
+/**
+ * Places each session's mark on the row the map actually draws: the anchored
+ * first message when its row is visible, otherwise the session's own row (a
+ * closed session, or a first message folded away). `visible` answers whether a
+ * message row is on the map right now.
+ */
+export function capturePlacements(
+  captures: readonly ViewCapture[] | undefined,
+  sessions: readonly ViewSession[],
+  visible: (sessionId: string, messageId: string) => boolean,
+): CapturePlacements {
+  const counts = captureCounts(captures);
+  const placements: CapturePlacements = { sessions: new Map(), messages: new Map() };
+  for (const session of sessions) {
+    const count = counts.get(session.sessionId);
+    const messageId = session.messages[0]?.id;
+    if (count === undefined || messageId === undefined) continue;
+    if (visible(session.sessionId, messageId)) placements.messages.set(messageId, count);
+    else placements.sessions.set(session.sessionId, { count, messageId });
+  }
+  return placements;
+}
+
 export function CapturesView({
   captures,
   sessions,
@@ -50,7 +127,7 @@ export function CapturesView({
   onClose,
 }: {
   captures: readonly ViewCapture[] | undefined;
-  /** The project's sessions, for the title of each item's source message. */
+  /** The project's sessions, for each item's source title and anchored message. */
   sessions: readonly ViewSession[];
   /** The project's path, for the state write. */
   dir: string;
@@ -65,15 +142,6 @@ export function CapturesView({
   const [error, setError] = useState<string | null>(null);
   useEffect(() => setItems(captures ?? []), [captures]);
   const now = new Date().toISOString();
-
-  const titles = new Map(
-    sessions.map((session) => [session.sessionId, session.title || session.sessionId]),
-  );
-  const labels = new Map<string, string>();
-  for (const session of sessions)
-    for (const message of session.messages)
-      if (message.label !== undefined)
-        labels.set(`${session.sessionId}:${message.id}`, message.label);
 
   function change(item: ViewCapture, state: CaptureTarget): void {
     const token = pageToken();
@@ -95,11 +163,12 @@ export function CapturesView({
   const done = stateTarget(items, "done").sort(byNewest).slice(0, 10);
 
   function row(item: ViewCapture, actions: ReactNode) {
-    const sessionTitle = titles.get(item.source.sessionId) ?? item.source.sessionId;
-    const label = labels.get(`${item.source.sessionId}:${item.source.messageId}`);
+    const source = captureSource(item.source, sessions);
     const age = timeSince(item.updatedAt, now);
     const selected =
-      active?.sessionId === item.source.sessionId && active.messageId === item.source.messageId;
+      source.target !== undefined &&
+      active?.sessionId === source.target.sessionId &&
+      active.messageId === source.target.messageId;
     return (
       <li key={item.id}>
         <div className={`capture-row${selected ? " is-active" : ""}`}>
@@ -107,14 +176,17 @@ export function CapturesView({
             type="button"
             className="capture-open"
             title={formatStamp(item.updatedAt)}
-            onClick={() =>
-              onSelect({ sessionId: item.source.sessionId, messageId: item.source.messageId })
-            }
+            disabled={source.target === undefined}
+            onClick={() => {
+              if (source.target !== undefined) onSelect(source.target);
+            }}
           >
             <span className="capture-text">{item.text}</span>
             <span className="capture-meta">
-              <span className="capture-session">{sessionTitle}</span>
-              <span className="capture-label">{label ?? item.source.messageId}</span>
+              <span className="capture-session">{source.sessionTitle}</span>
+              {source.label === undefined ? null : (
+                <span className="capture-label">{source.label}</span>
+              )}
               {age === "" ? null : <span className="capture-time">{age} ago</span>}
             </span>
           </button>
