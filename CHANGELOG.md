@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.7] - 2026-10-31
+### Added
+- The Shape modal has a **Regenerate** button under the Shape: it asks the side model to write that message's Shape again — for an answer a small model missed, or one you want differently — and it replaces a Shape the agent wrote too. It works on the map `cogit open` serves.
+
+### Changed
+- The writer's last instruction says again that a change across two or more files always includes a Flow, so a small model stops dropping it.
+
 ## [0.25.6] - 2026-10-31
 ### Changed
 - An ordered **Flow** is drawn as a sequence diagram with the kind symbols.
