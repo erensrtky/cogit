@@ -44,20 +44,23 @@ cd your-project
 cogit init
 ```
 
-`init` asks a few questions. Every one has a flag, so `cogit init --yes` with flags runs
-without asking.
+`init` asks two questions; the rest have sensible defaults, and every one has a flag so
+`cogit init --yes` runs without asking.
 
 | Question | Default | Flag |
 |---|---|---|
 | Project name | the directory name | `--name` |
 | Commit the session records to git? | yes | `--git commit\|ignore` |
 | Keep Claude Code transcripts longer? Claude Code deletes them after 30 days by default. | keep as is | `--retention <days\|keep>` |
-| Let the agent update the record without asking each time? | yes | `--allow-skill` / `--no-allow-skill` |
-| Turn the plugin on for everyone who opens this repository? | yes | `--project-settings` / `--no-project-settings` |
-| Summary language | the conversation's | `--language <lang\|auto>` |
 
-`init` changes your Claude Code settings only for the questions you agreed to. It backs up
-`~/.claude/settings.json` before the first change and prints what it changed.
+Without asking, `init` lets the agent run the cogit skill without a permission prompt (so it
+updates the record as it works), turns the plugin on for the project (writes
+`.claude/settings.json`, which a teammate's session reads to load the plugin and stops one
+that started without it), and sets the summary language to the conversation's.
+`--no-allow-skill`, `--no-project-settings` and `--language <lang|auto>` override them, and
+`--yes` leaves Claude Code's settings unchanged.
+
+`init` backs up `~/.claude/settings.json` before the first change and prints what it changed.
 
 Running `init` again in a set-up project changes nothing except what you pass as flags, and
 refreshes the git hooks.

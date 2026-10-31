@@ -89,17 +89,9 @@ async function askSkillPermission(io: Io, opts: InitOptions): Promise<void> {
     return;
   }
   if (allowed) return;
-  const allow =
-    opts.allowSkill ??
-    (await io.prompt.confirm(
-      "Let the agent update the lineage record without asking each time? " +
-        `(adds ${agent.skillRule} to your Claude Code permissions)`,
-      true,
-    ));
-  if (!allow) {
-    io.out(
-      `Claude Code will ask before each lineage update; allow ${agent.skillRule} to stop that.`,
-    );
+  // Recording is what the plugin is for: allow the skill unless asked not to.
+  if (opts.allowSkill === false) {
+    io.out(`Claude Code will ask before each cogit update; allow ${agent.skillRule} to stop that.`);
     return;
   }
   const { file, backup } = await agent.allowSkill(io.env, io.now());
@@ -113,14 +105,9 @@ async function askProjectSettings(io: Io, root: string, opts: InitOptions): Prom
     return;
   }
   if (done) return;
-  const add =
-    opts.projectSettings ??
-    (await io.prompt.confirm(
-      "Turn the plugin on for everyone who opens this project, and stop a session that " +
-        "started without it? (writes .claude/settings.json; commit it to share)",
-      true,
-    ));
-  if (!add) return;
+  // On by default: the project's settings are what tells a teammate's session
+  // to load the plugin at all.
+  if (opts.projectSettings === false) return;
   await bestEffort(io, "could not update the project's Claude Code settings", async () => {
     const { file } = await agent.writeProjectSetup(root);
     io.out(`Enabled the plugin and the missing-plugin guard in ${file}.`);
@@ -130,21 +117,9 @@ async function askProjectSettings(io: Io, root: string, opts: InitOptions): Prom
 async function askLanguage(io: Io, opts: InitOptions): Promise<void> {
   const firstRun = !(await readJson(globalPaths(io.env).config)).found;
   if (!firstRun && opts.language === undefined) return;
-  let language = opts.language;
-  if (language === undefined) {
-    const mode = await io.prompt.select(
-      "Language for session summaries?",
-      [
-        { value: "auto", name: "Same as the conversation (auto)" },
-        { value: "fixed", name: "Always one language" },
-      ],
-      "auto",
-    );
-    language = mode === "auto" ? "auto" : await io.prompt.input("Which language?", "English");
-  }
-  const lang = language;
+  // The conversation's own language is the default; `--language` overrides it.
   await bestEffort(io, "could not save global config", () =>
-    updateConfig((c) => ({ ...c, language: lang }), io.env),
+    updateConfig((c) => ({ ...c, language: opts.language ?? "auto" }), io.env),
   );
 }
 

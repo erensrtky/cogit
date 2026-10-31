@@ -77,8 +77,8 @@ describe("init", () => {
       data: { projects: [{ path: root, name: "proj" }] },
     });
     expect((await loadConfig(env)).language).toBe("auto");
-    // name, git policy, retention, skill permission, project settings and language
-    expect(io.asked).toHaveLength(6);
+    // name, git policy and retention; the rest take their defaults
+    expect(io.asked).toHaveLength(3);
     expect(await readProjectSetup(root)).toBe(true);
     expect(await readSkillAllowed(env)).toBe(true);
     expect(io.lines.at(-2)).toMatch(/^Initialized proj/);
@@ -182,7 +182,7 @@ describe("init", () => {
     const io = fakeIo(env);
     await init(root, {}, io);
     expect(io.lines).toContain("Claude Code keeps transcripts for 365 days.");
-    expect(io.asked).toHaveLength(5);
+    expect(io.asked).toHaveLength(2);
   });
 
   it("applies a retention option without asking, and skips an unchanged one", async () => {
@@ -233,14 +233,15 @@ describe("init", () => {
     expect(await readText(settingsFile())).toBe("{oops");
   });
 
-  it("asks which fixed language on the first run only", async () => {
-    await init(root, {}, fakeIo(env, ["proj", "commit", "keep", "yes", "yes", "fixed", "Turkish"]));
-    expect((await loadConfig(env)).language).toBe("Turkish");
+  it("takes the conversation's language without asking, and the option when given", async () => {
+    const io = fakeIo(env, ["proj", "commit", "keep"]);
+    await init(root, {}, io);
+    expect((await loadConfig(env)).language).toBe("auto");
+    expect(io.asked.some((q) => q.startsWith("Language"))).toBe(false);
     const second = join(dir, "second");
     await mkdir(second);
-    const io = fakeIo(env);
-    await init(second, {}, io);
-    expect(io.asked.some((q) => q.startsWith("Language"))).toBe(false);
+    await init(second, { language: "Turkish" }, fakeIo(env));
+    expect((await loadConfig(env)).language).toBe("Turkish");
   });
 
   it("adds the skill rule to existing permissions, and only once", async () => {
@@ -263,12 +264,12 @@ describe("init", () => {
     expect(again.asked.some((q) => q.startsWith("Let the agent"))).toBe(false);
   });
 
-  it("leaves permissions alone when declined", async () => {
-    const io = fakeIo(env, ["proj", "commit", "keep", "no"]);
-    await init(root, {}, io);
+  it("leaves permissions alone when declined with the flag", async () => {
+    const io = fakeIo(env, ["proj", "commit", "keep"]);
+    await init(root, { allowSkill: false }, io);
     expect(await readSkillAllowed(env)).toBe(false);
     expect(io.lines).toContain(
-      `Claude Code will ask before each lineage update; allow ${SKILL_RULE} to stop that.`,
+      `Claude Code will ask before each cogit update; allow ${SKILL_RULE} to stop that.`,
     );
   });
 
