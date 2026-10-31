@@ -127,6 +127,9 @@ describe("Intent, Shape and Code", () => {
     expect(html).toContain("⚡");
     expect(html).toContain("Data store");
     expect(html).not.toContain("Function");
+    // The "?" bubble explains how to read the tool; the legend above already
+    // names the kinds, so it must not list them a second time.
+    expect(html).not.toContain('class="shape-kinds"');
   });
 
   it("captions an ordered Flow as a Sequence and an unordered one as a Flow", () => {

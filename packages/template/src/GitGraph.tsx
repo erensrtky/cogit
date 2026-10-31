@@ -32,7 +32,6 @@ function Row({
   selected,
   searchHit,
   searchActive,
-  read,
   bigChangeLines,
   onSelect,
   onUnfold,
@@ -45,9 +44,7 @@ function Row({
   searchHit: boolean;
   /** The hit the ↑/↓ counter is on. */
   searchActive: boolean;
-  /** The user marked this message read (Story 10.3). */
-  read: boolean;
-  /** Unread messages at or above this many lines get the quiet highlight. */
+  /** A change at or above this many lines gets the quiet highlight. */
   bigChangeLines: number;
   onSelect: (row: GitMessageRow) => void;
   onUnfold: (segmentId: string) => void;
@@ -75,16 +72,15 @@ function Row({
   }
 
   const message = row.message;
-  // A fact, not a verdict: the row is only quiet-highlighted when the user has
-  // not read it and its commits changed at least `bigChangeLines` lines.
-  const unreadBig =
-    message.change !== undefined && !read && isBigChange(message.change, bigChangeLines);
+  // A fact, not a verdict: the row is quiet-highlighted when its commits changed
+  // at least `bigChangeLines` lines.
+  const big = message.change !== undefined && isBigChange(message.change, bigChangeLines);
   const className = [
     "git-row",
     selected ? "is-selected" : "",
     searchHit ? "is-search-hit" : "",
     searchActive ? "is-search-active" : "",
-    unreadBig ? "is-unread-big" : "",
+    big ? "is-big-change" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -128,7 +124,7 @@ function Row({
       {message.change ? (
         <span
           className="git-change"
-          title={`The commits linked to this message changed ${message.change.added} lines added, ${message.change.removed} removed${read ? " (read)" : ""}`}
+          title={`The commits linked to this message changed ${message.change.added} lines added, ${message.change.removed} removed`}
         >
           {formatChange(message.change)}
         </span>
@@ -144,7 +140,6 @@ export function GitGraph({
   selectedId,
   highlightIds,
   activeHitId,
-  readIds,
   bigChangeLines,
   onSelect,
   onUnfold,
@@ -157,9 +152,7 @@ export function GitGraph({
   highlightIds: ReadonlySet<string> | undefined;
   /** The search hit the counter is on, if it belongs to this session. */
   activeHitId: string | null;
-  /** Messages the user marked read (Story 10.3). */
-  readIds: ReadonlySet<string>;
-  /** Unread messages at or above this many lines get the quiet highlight. */
+  /** A change at or above this many lines gets the quiet highlight. */
   bigChangeLines: number;
   onSelect: (row: GitMessageRow) => void;
   onUnfold: (segmentId: string) => void;
@@ -252,7 +245,6 @@ export function GitGraph({
               selected={messageId !== null && selectedId !== null && messageId === selectedId}
               searchHit={messageId !== null && highlightIds?.has(messageId) === true}
               searchActive={messageId !== null && activeHitId !== null && messageId === activeHitId}
-              read={messageId !== null && readIds.has(messageId)}
               bigChangeLines={bigChangeLines}
               onSelect={onSelect}
               onUnfold={onUnfold}

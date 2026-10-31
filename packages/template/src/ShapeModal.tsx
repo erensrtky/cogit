@@ -8,7 +8,6 @@ import {
   shapePreview,
   shapeState,
   tableRows,
-  UNIVERSAL_KINDS,
 } from "../../cli/src/view/shape.js";
 import { DiffView } from "./DiffView.js";
 import { isLivePage, pageToken } from "./data.js";
@@ -123,44 +122,26 @@ const TEXT_CAPTION: Record<string, string> = {
   interface: "Interface (as written)",
 };
 
-/** Tools whose "?" lists every kind, so the reader can decode the symbols. */
-const KINDS_CAPTIONS = new Set(["flow", "pseudo"]);
-
 /**
- * A tool's caption with a "?" that says how to read it; a Flow or Steps also
- * lists every kind, so the symbols name themselves. `reading` swaps in another
- * tool's explanation (an ordered Flow reads like a Sequence).
+ * A tool's caption with a "?" that says how to read it. The kinds a Shape uses
+ * are already named in the legend above, so the bubble only explains the tool.
+ * `reading` swaps in another tool's explanation (an ordered Flow reads like a
+ * Sequence).
  */
-function ToolCaption({
-  id,
-  kind,
-  label,
-  reading = kind,
-}: {
-  id: string;
-  kind: string;
-  label: string;
-  reading?: string;
-}) {
+function ToolCaption({ id, label, reading }: { id: string; label: string; reading: string }) {
   const help = SHAPE_READING[reading];
-  const listsKinds = KINDS_CAPTIONS.has(kind);
+  if (!help)
+    return (
+      <figcaption className="shape-caption">
+        <span>{label}</span>
+      </figcaption>
+    );
   return (
     <figcaption className="shape-caption">
       <span>{label}</span>
-      {help ? (
-        <HelpTip id={`shape-${id}`} label={`How to read the ${label}`}>
-          <span className="shape-reading">{help}</span>
-          {listsKinds ? (
-            <span className="shape-kinds">
-              {UNIVERSAL_KINDS.map((kind) => (
-                <span key={kind.id} className="shape-kind-row">
-                  <code>{kind.symbol}</code> {kind.name} — {kind.means}
-                </span>
-              ))}
-            </span>
-          ) : null}
-        </HelpTip>
-      ) : null}
+      <HelpTip id={`shape-${id}`} label={`How to read the ${label}`}>
+        <span className="shape-reading">{help}</span>
+      </HelpTip>
     </figcaption>
   );
 }
@@ -257,7 +238,6 @@ function ShapeLayer({
               {renderMermaid(source)}
               <ToolCaption
                 id={key}
-                kind={tool.kind}
                 label={orderedFlow ? "Sequence" : diagramLabel(tool.kind)}
                 reading={orderedFlow ? "sequence" : tool.kind}
               />
@@ -271,15 +251,19 @@ function ShapeLayer({
               <ShapeTable columns={columns} rows={rows} />
               <ToolCaption
                 id={key}
-                kind={tool.kind}
                 label={tool.kind === "interface" ? "Interface" : "Before / After"}
+                reading={tool.kind}
               />
             </figure>
           );
         return (
           <figure key={key} className="shape-figure">
             <pre className={`shape-source is-${tool.kind}`}>{tool.text}</pre>
-            <ToolCaption id={key} kind={tool.kind} label={TEXT_CAPTION[tool.kind] ?? tool.kind} />
+            <ToolCaption
+              id={key}
+              label={TEXT_CAPTION[tool.kind] ?? tool.kind}
+              reading={tool.kind}
+            />
           </figure>
         );
       })}

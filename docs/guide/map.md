@@ -118,13 +118,6 @@ answer. Each row shows the project, the session and the agent's last words, with
 straight to that message. The × hides a row until the agent writes in that session again.
 Sessions older than a day (`inboxMaxAgeDays`) leave the inbox; the map still has them.
 
-## Unread
-
-"Unread, most code first" lists the messages with commits you have not opened yet, the ones
-that changed the most code first. It is the quickest way to catch up on what a teammate's
-sessions did. Messages past `bigChangeLines` get a quiet highlight. Read state stays on your
-machine. In the terminal: `cogit log --unread`.
-
 ## Files
 
 The Files view lists every file a recorded message touched, most recently first, with a

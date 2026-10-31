@@ -324,20 +324,13 @@ function NodeDetails({
   model,
   node,
   onNavigate,
-  read,
-  onToggleRead,
   bigChangeLines,
-  readError,
 }: {
   model: LineageViewModel;
   node: NodeDetail;
   onNavigate: ((target: OutlineTarget) => void) | undefined;
-  /** The user marked this message read (Story 10.3). */
-  read: boolean;
-  onToggleRead: ((id: string, read: boolean) => void) | undefined;
+  /** A change at or above this many lines is marked as big. */
   bigChangeLines: number;
-  /** A failed write of the read mark, shown and not swallowed. */
-  readError: string | null;
 }) {
   const session = findSession(model, node.sessionId);
   // Diffs are read from the local server (Story 10.5); a `file://` map has no
@@ -423,29 +416,12 @@ function NodeDetails({
           <h3>Code landed</h3>
           <p>
             <span
-              className={`git-change${
-                !read && isBigChange(node.change, bigChangeLines) ? " is-big" : ""
-              }`}
+              className={`git-change${isBigChange(node.change, bigChangeLines) ? " is-big" : ""}`}
             >
               {formatChange(node.change)}
             </span>{" "}
             after this message.
           </p>
-          <button
-            type="button"
-            className="read-toggle"
-            aria-pressed={read}
-            disabled={onToggleRead === undefined}
-            onClick={() => onToggleRead?.(node.nodeId, !read)}
-          >
-            {read ? "Mark as unread" : "Mark as read"}
-          </button>
-          {typeof document !== "undefined" && isLivePage() ? null : (
-            <p className="muted">
-              Saved under .cogit/state by `cogit open`; this page keeps it only while open.
-            </p>
-          )}
-          {readError === null ? null : <p className="error">{readError}</p>}
         </section>
       ) : null}
       {node.commits?.length ? (
@@ -690,21 +666,14 @@ export function DrillDown({
   selection,
   onClose,
   onNavigate,
-  read = false,
-  onToggleRead,
   bigChangeLines = 300,
-  readError = null,
 }: {
   model: LineageViewModel;
   selection: Selection | null;
   onClose: () => void;
   /** Moves the selection to another node and reveals it on the map. */
   onNavigate?: (target: OutlineTarget) => void;
-  /** Whether the selected message is marked read (Story 10.3). */
-  read?: boolean;
-  onToggleRead?: ((id: string, read: boolean) => void) | undefined;
   bigChangeLines?: number;
-  readError?: string | null;
 }) {
   useEffect(() => {
     if (!selection) return;
@@ -762,10 +731,7 @@ export function DrillDown({
           model={model}
           node={node}
           onNavigate={onNavigate}
-          read={read}
-          onToggleRead={onToggleRead}
           bigChangeLines={bigChangeLines}
-          readError={readError}
         />
       </div>
     </aside>

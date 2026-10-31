@@ -638,7 +638,6 @@ describe("cogit build", () => {
     await writeFile(paths().state("s3"), "{}");
     // No transcript: nothing to show. Not a session: the read state.
     await writeFile(paths().state("gone"), "{}");
-    await writeFile(paths().readState, "[]");
 
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
     expect(model.sessions.map((s) => s.sessionId)).toEqual(["s3"]);

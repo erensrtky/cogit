@@ -10,7 +10,7 @@ cogit keeps its record in `.cogit/` next to your code and ties it to your commit
 |---|---|---|
 | `.cogit/sessions/`, `.cogit/project.json` (the record) | committed | ignored |
 | `.cogit/conversations/` (raw chat) | ignored, unless `shareConversations` is on | ignored |
-| Local state: map, inbox, locks, `HEAD`, read marks | ignored | ignored |
+| Local state: map, inbox, locks, `HEAD` | ignored | ignored |
 
 Under the commit policy, `.cogit/.gitignore` decides what stays local. Under the ignore policy,
 one `/.cogit/` line in the root `.gitignore` hides all of it.
@@ -50,7 +50,7 @@ cogit hooks uninstall    # remove only the cogit block
 2. Everyone installs the CLI and runs `cogit init` once in their clone. It sees the project is
    set up, registers it on their machine and installs the git hooks.
 3. Each person's sessions are committed with their code. After a pull, teammates' sessions
-   appear on the map with their author, and "Unread" lists what changed most.
+   appear on the map with their author, most recent first.
 
 A session belongs to the person who recorded it: cogit stamps it with their git `user.name`
 and `user.email`, and like git it tells people apart by email. Your sessions only ever

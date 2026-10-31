@@ -146,7 +146,7 @@ A session that waits on you longer than this leaves the inbox. It is hidden, not
 
 **Lines of code after which a message counts as a big change on the map.**
 
-Messages whose commits changed at least this many lines get a quiet highlight in the unread list. It never hides or ranks anything by itself.
+Messages whose commits changed at least this many lines get a quiet mark on the map and in the message details. It never hides or ranks anything by itself.
 
 ### Trailer age
 

@@ -17,7 +17,7 @@ and a redaction pass for key and token patterns runs over everything the map wri
   `shareConversations` on. Turn it on only if everyone who can read the repository may read
   your chats, and never in a public repository.
 - **The map** (`.cogit/map.html`) shows the conversation, so it is never committed.
-- **Local state:** read marks, the inbox, locks.
+- **Local state:** the inbox, the map view, locks.
 
 ## What git carries
 

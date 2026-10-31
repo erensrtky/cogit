@@ -4,14 +4,10 @@ import type { Io } from "../io.js";
 import { redactDeep } from "../redact.js";
 import type { Config, RegistryEntry } from "../schema/config.js";
 import type { Session } from "../schema/session.js";
-import { readProjectChanges } from "../store/changes.js";
 import { atomicWrite, isDirectory } from "../store/fs.js";
 import { readInboxDismissed } from "../store/inbox-state.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
-import { readReadState } from "../store/read-state.js";
 import { loadAllSessions, loadConfig, loadRegistry } from "../store/stores.js";
-import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
-import { countBigUnread } from "./change.js";
 import {
   compareInboxRows,
   dismissKey,
@@ -76,42 +72,6 @@ export function panelSettings(config: Config): PanelSettings {
     agents: config.agents,
     bigChangeLines: config.bigChangeLines,
   };
-}
-
-/**
- * How many unread messages in this project crossed the threshold (Story 10.3).
- * The card count never fails a panel build: a missing git, a broken record or
- * an unreadable state file simply counts zero.
- */
-async function unreadBigCount(
-  root: string,
-  sessions: Session[],
-  threshold: number,
-): Promise<number> {
-  try {
-    const trailers = await readThoughtTrailers(root, {
-      since: earliestSessionStart(sessions),
-    });
-    const withThoughts = attachThoughtTrailers(sessions, trailers);
-    const hashes = new Set(
-      withThoughts.flatMap((session) => session.nodes.flatMap((node) => node.commits ?? [])),
-    );
-    if (hashes.size === 0) return 0;
-    const changes = await readProjectChanges(root, hashes);
-    const read = await readReadState(root);
-    return countBigUnread(
-      withThoughts.map((session) => ({
-        sessionId: session.sessionId,
-        title: session.title,
-        startedAt: session.startedAt,
-        nodes: session.nodes,
-      })),
-      read,
-      threshold,
-    );
-  } catch {
-    return 0;
-  }
 }
 
 /** The title of the newest message in a session, in send order. */
@@ -264,7 +224,6 @@ export async function collectPanelData(
         needsUserCount: 0,
         lineageUrl: null,
         leftOff: "",
-        unreadBigCount: 0,
       });
       continue;
     }
@@ -289,7 +248,6 @@ export async function collectPanelData(
         needsUserCount: card.pending.filter((item) => item.needsUser).length,
         lineageUrl: pathToFileURL(projectPaths(entry.path).html).href,
         leftOff: leftOffLine(sessions),
-        unreadBigCount: await unreadBigCount(entry.path, sessions, config.bigChangeLines),
       });
       inbox.push(...rows);
     } catch (err) {
@@ -302,7 +260,6 @@ export async function collectPanelData(
         needsUserCount: 0,
         lineageUrl: pathToFileURL(projectPaths(entry.path).html).href,
         leftOff: "",
-        unreadBigCount: 0,
       });
     }
   }

@@ -7,7 +7,6 @@ directory as `[dir]` or `-C <dir>`.
 cogit log                     # like git log: messages and branches, newest first
 cogit log --branches          # only the branch summaries
 cogit log --file src/auth.ts  # the messages that touched this file
-cogit log --unread            # messages with commits you have not opened, most code first
 cogit show h3f9c2a1b4d6e      # one message: what came of it, its decisions, its commits
 cogit show a1b2c3d            # the message behind a commit (through its Thought: trailer)
 cogit blame src/auth.ts:42    # which recorded message produced this line

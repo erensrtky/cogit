@@ -15,7 +15,7 @@ import {
 import { doctor } from "./commands/doctor.js";
 import { hooksInstall, hooksUninstall } from "./commands/hooks.js";
 import { type InitOptions, init } from "./commands/init.js";
-import { formatShow, log, logFile, logUnread, show } from "./commands/log.js";
+import { formatShow, log, logFile, show } from "./commands/log.js";
 import { migrateIds } from "./commands/migrate.js";
 import { openPanel, openProject } from "./commands/open.js";
 import { pr } from "./commands/pr.js";
@@ -135,12 +135,8 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .option("-n, --number <count>", "at most this many messages", positiveCount)
     .option("--branches", "only the branch summaries (the compressed view)")
     .option("--file <path>", "only messages that touched this file (its history)")
-    .option("--unread", "unread messages with commits, most code first")
     .option("--json", "print JSON instead of text")
-    .addHelpText(
-      "after",
-      examples("cogit log -n 10", "cogit log --file src/auth.ts", "cogit log --unread"),
-    )
+    .addHelpText("after", examples("cogit log -n 10", "cogit log --file src/auth.ts"))
     .action(
       run(
         async (
@@ -151,15 +147,10 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
             number?: number;
             branches?: boolean;
             file?: string;
-            unread?: boolean;
             json?: boolean;
           },
         ) => {
           const target = opts.dir ?? dir;
-          if (opts.unread === true) {
-            await logUnread({ dir: target, io: makeIo(false), json: opts.json === true });
-            return;
-          }
           if (opts.file !== undefined) {
             await logFile({
               dir: target,

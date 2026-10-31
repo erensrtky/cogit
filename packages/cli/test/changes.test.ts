@@ -4,20 +4,11 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildProject } from "../src/commands/build.js";
-import { formatUnread, logUnread } from "../src/commands/log.js";
-import { createProgram } from "../src/program.js";
 import type { Session } from "../src/schema/session.js";
 import { readProjectChanges } from "../src/store/changes.js";
 import { projectPaths } from "../src/store/paths.js";
-import { readReadState, setMessageRead } from "../src/store/read-state.js";
 import { projectJson } from "../src/store/stores.js";
-import {
-  attachChanges,
-  countBigUnread,
-  messageChange,
-  unreadMessages,
-  unreadViewMessages,
-} from "../src/view/change.js";
+import { attachChanges, messageChange } from "../src/view/change.js";
 import { DATA_ELEMENT_ID } from "../src/view/model.js";
 import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
 
@@ -63,7 +54,6 @@ interface Embedded {
       commits?: string[];
     }[];
   }[];
-  read?: string[];
 }
 
 function embedded(html: string): Embedded {
@@ -165,79 +155,6 @@ describe("how much code landed per message (10.3)", () => {
     expect(messageChange(undefined, changes)).toBeUndefined();
   });
 
-  it("round-trips the read mark and embeds it in the map", async () => {
-    await createCommits();
-    expect([...(await readReadState(root))]).toEqual([]);
-    await setMessageRead(root, A, true);
-    expect([...(await readReadState(root))]).toEqual([A]);
-
-    await buildProject({ dir: root, io, templateHtml: TEMPLATE });
-    const html = await readFile(projectPaths(root).html, "utf8");
-    expect(embedded(html).read).toEqual([A]);
-
-    await setMessageRead(root, A, false);
-    expect([...(await readReadState(root))]).toEqual([]);
-  });
-
-  it("replaces an unreadable state file instead of blocking the toggle", async () => {
-    await mkdir(join(projectPaths(root).base, "state"), { recursive: true });
-    await writeFile(projectPaths(root).readState, "{not json");
-    await setMessageRead(root, B, true);
-    expect([...(await readReadState(root))]).toEqual([B]);
-    await expect(setMessageRead(root, "not-a-message", true)).rejects.toThrow("not a message id");
-  });
-
-  it("lists unread messages most code first, and the threshold counts only big ones", () => {
-    const sessions = [
-      {
-        sessionId: "s1",
-        title: "Ship the parser",
-        startedAt: T0,
-        nodes: [
-          {
-            id: A,
-            kind: "message",
-            title: "Write the parser",
-            change: { added: 900, removed: 100, files: 3 },
-          },
-          {
-            id: B,
-            kind: "message",
-            title: "Add the second file",
-            change: { added: 10, removed: 0, files: 1 },
-          },
-          { id: C, kind: "message", title: "No commits" },
-        ],
-      },
-    ];
-    const ordered = unreadMessages(sessions, new Set());
-    expect(ordered.map((entry) => entry.messageId)).toEqual([A, B]);
-    expect(countBigUnread(sessions, new Set(), 300)).toBe(1);
-    expect(countBigUnread(sessions, new Set([A]), 300)).toBe(0);
-    expect(unreadMessages(sessions, new Set([A, B])).map((entry) => entry.messageId)).toEqual([]);
-  });
-
-  it("prints `log --unread` most code first and drops a message once read", async () => {
-    await createCommits();
-    const unread = await logUnread({ dir: root, io });
-    expect(unread.map((entry) => entry.messageId)).toEqual([A, B]);
-    const lines = formatUnread(unread);
-    expect(lines[0]).toContain("+5 −1 · 1 file");
-    expect(lines[0]).toContain("Write the parser");
-    expect(lines[1]).toContain("+5 −0 · 1 file");
-    expect(io.lines).toEqual(lines);
-
-    await setMessageRead(root, A, true);
-    const after = await logUnread({ dir: root, io, json: true });
-    expect(after.map((entry) => entry.messageId)).toEqual([B]);
-    expect(JSON.parse(io.lines.at(-1) ?? "[]")).toHaveLength(1);
-
-    // Nothing unread: one plain line, no invented numbers.
-    await setMessageRead(root, B, true);
-    const none = await logUnread({ dir: root, io });
-    expect(none).toEqual([]);
-    expect(io.lines.at(-1)).toBe("No unread messages with linked commits.");
-  });
   it("drops a stale number when its commit no longer resolves", () => {
     const sessions = [
       {
@@ -260,32 +177,6 @@ describe("how much code landed per message (10.3)", () => {
       new Map([["deadbee", { full: "f".repeat(40), added: 1, removed: 1, files: ["x"] }]]),
     );
     expect(stale[0]?.nodes[0]?.change).toBeUndefined();
-    expect(
-      unreadViewMessages(
-        [{ sessionId: "s1", title: "t", startedAt: T0, messages: stale[0]?.nodes ?? [] }],
-        new Set(),
-      ),
-    ).toHaveLength(0);
-    expect(
-      unreadViewMessages(
-        [
-          {
-            sessionId: "s1",
-            title: "t",
-            startedAt: T0,
-            messages: [
-              {
-                id: A,
-                kind: "message",
-                title: "Changed",
-                change: { added: 4, removed: 0, files: 1 },
-              },
-            ],
-          },
-        ],
-        new Set(),
-      ).map((entry) => entry.messageId),
-    ).toEqual([A]);
   });
 
   it("projects numstat paths onto a project inside a larger repository", async () => {
@@ -308,15 +199,5 @@ describe("how much code landed per message (10.3)", () => {
     // Empty input and a directory outside git resolve to nothing, never an error.
     expect(await readProjectChanges(sub, [])).toEqual(new Map());
     expect(await readProjectChanges(dir, [full])).toEqual(new Map());
-  });
-
-  it("is reachable as `cogit log --unread`", async () => {
-    await createCommits();
-    const program = createProgram(() => io);
-    program.exitOverride();
-    for (const command of program.commands) command.exitOverride();
-    await program.parseAsync(["log", "--unread", "-C", root], { from: "user" });
-    expect(io.lines.join("\n")).toContain("+5 −1 · 1 file");
-    expect(io.lines.join("\n")).toContain("Write the parser");
   });
 });

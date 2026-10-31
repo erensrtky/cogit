@@ -33,7 +33,6 @@ import { atomicWrite } from "../src/store/fs.js";
 import { readInboxDismissed } from "../src/store/inbox-state.js";
 import { readMapView } from "../src/store/map-view.js";
 import { globalPaths, projectPaths } from "../src/store/paths.js";
-import { readReadState } from "../src/store/read-state.js";
 import { loadConfig, loadSession, updateConfig } from "../src/store/stores.js";
 import { builtBy } from "../src/view/lineage.js";
 import { DATA_ELEMENT_ID, LIVE_META_NAME, TOKEN_META_NAME } from "../src/view/model.js";
@@ -768,90 +767,6 @@ describe("ensureServer", () => {
   });
 });
 
-describe("read marks (10.3)", () => {
-  const ID = "h111111111111";
-
-  function readWrite(
-    server: MapServer,
-    token: string,
-    payload: unknown,
-    overrides: Record<string, string> = {},
-  ): Promise<Reply> {
-    return postConfig(`${server.url}/api/read`, JSON.stringify(payload), {
-      origin: `http://127.0.0.1:${server.port}`,
-      [CONFIG_TOKEN_HEADER]: token,
-      ...overrides,
-    });
-  }
-
-  it("writes a read mark for a registered project and clears it", async () => {
-    const server = await start();
-    const token = await panelToken(server);
-    const marked = await readWrite(server, token, { dir: root, id: ID, read: true });
-    expect(marked.status).toBe(200);
-    expect(JSON.parse(marked.body)).toEqual({ ok: true, id: ID, read: true });
-    expect([...(await readReadState(root))]).toEqual([ID]);
-
-    const cleared = await readWrite(server, token, { dir: root, id: ID, read: false });
-    expect(cleared.status).toBe(200);
-    expect([...(await readReadState(root))]).toEqual([]);
-  });
-
-  it("refuses a foreign project, a bad id, a bad body and a bad token", async () => {
-    const server = await start();
-    const token = await panelToken(server);
-    expect(
-      (await readWrite(server, token, { dir: join(dir, "elsewhere"), id: ID, read: true })).status,
-    ).toBe(403);
-    expect((await readWrite(server, token, { dir: root, id: "m1", read: true })).status).toBe(400);
-    expect((await readWrite(server, token, { dir: root, id: ID })).status).toBe(400);
-    expect((await readWrite(server, token, { id: ID, read: true })).status).toBe(400);
-    expect((await readWrite(server, "nope", { dir: root, id: ID, read: true })).status).toBe(403);
-    expect(
-      (
-        await readWrite(
-          server,
-          token,
-          { dir: root, id: ID, read: true },
-          {
-            "content-type": "text/plain",
-          },
-        )
-      ).status,
-    ).toBe(415);
-    expect((await readWrite(server, token, { dir: root, id: ID, read: true }, {})).status).toBe(
-      200,
-    );
-    const raw = await postConfig(`${server.url}/api/read`, "{oops", {
-      origin: `http://127.0.0.1:${server.port}`,
-      [CONFIG_TOKEN_HEADER]: token,
-    });
-    expect(raw.status).toBe(400);
-    const huge = await readWrite(server, token, {
-      dir: root,
-      id: ID,
-      read: true,
-      pad: "x".repeat(5000),
-    });
-    expect(huge.status).toBe(413);
-
-    const array = await postConfig(`${server.url}/api/read`, "[]", {
-      origin: `http://127.0.0.1:${server.port}`,
-      [CONFIG_TOKEN_HEADER]: token,
-    });
-    expect(array.status).toBe(400);
-  });
-
-  it("answers 500 instead of crashing when the state cannot be written", async () => {
-    const server = await start();
-    const token = await panelToken(server);
-    // A directory where the state file belongs makes the write fail.
-    await mkdir(projectPaths(root).readState, { recursive: true });
-    const reply = await readWrite(server, token, { dir: root, id: ID, read: true });
-    expect(reply.status).toBe(500);
-  });
-});
-
 describe("shape regenerate endpoint", () => {
   const NODE = "h111111111111";
 
@@ -974,7 +889,11 @@ process.stdin.on("end", () => {
     env = { ...env, PATH: `${bin}:${process.env.PATH ?? ""}` };
     const server = await start();
     const token = await panelToken(server);
-    const reply = await regenerateWrite(server, token, { dir: root, sessionId: "s1", nodeId: NODE });
+    const reply = await regenerateWrite(server, token, {
+      dir: root,
+      sessionId: "s1",
+      nodeId: NODE,
+    });
     expect(reply.status).toBe(200);
     const loaded = await loadSession(root, "s1");
     if (!loaded.found || !loaded.ok) throw new Error("no record");

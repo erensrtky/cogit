@@ -2,9 +2,7 @@ import { findGitRoot, projectFiles, readCommitFiles, readCommitSubjects } from "
 import { CliError, type Io } from "../io.js";
 import { readSessionMessages, type SessionMessage, upgradeSessionIds } from "../messages.js";
 import type { LineageNode, Session } from "../schema/session.js";
-import { readProjectChanges } from "../store/changes.js";
 import { applyEvents, readEvents } from "../store/events.js";
-import { readReadState } from "../store/read-state.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadProject } from "../store/stores.js";
 import {
@@ -13,7 +11,6 @@ import {
   readCommitThought,
   readThoughtTrailers,
 } from "../thought.js";
-import { formatChange, messageChange, type UnreadMessage, unreadMessages } from "../view/change.js";
 import { buildFileHistory, type FileSourceSession } from "../view/files.js";
 import { buildMessages } from "../view/lineage.js";
 import type { ViewFile, ViewNode } from "../view/model.js";
@@ -715,59 +712,6 @@ export async function log(opts: LogCommandOptions): Promise<LogModel> {
   }
   for (const line of formatLog(model, opts.branchesOnly === true)) opts.io.out(line);
   return model;
-}
-
-export interface UnreadLogOptions {
-  dir: string;
-  io: Io;
-  json?: boolean;
-}
-
-/**
- * `cogit log --unread` (Story 10.3): every unread message whose commits resolve
- * in git, most code first, with the same numstat numbers the map shows. The
- * mark is the user's own (`cogit open` toggles it); nothing here reads message
- * text to guess whether a message was "really" understood.
- */
-export async function logUnread(opts: UnreadLogOptions): Promise<UnreadMessage[]> {
-  const root = await openProject(opts.dir);
-  const sessions = await loadEffectiveSessions(root, opts.io);
-  const hashes = new Set(
-    sessions.flatMap((entry) => entry.messages.flatMap((message) => message.commits ?? [])),
-  );
-  const changes = hashes.size === 0 ? new Map() : await readProjectChanges(root, hashes);
-  const read = await readReadState(root);
-  const unread = unreadMessages(
-    sessions.map(({ session, messages }) => ({
-      sessionId: session.sessionId,
-      title: session.title,
-      startedAt: session.startedAt,
-      nodes: messages.map((message) => ({
-        ...message,
-        change: messageChange(message.commits, changes),
-      })),
-    })),
-    read,
-  );
-  if (opts.json === true) {
-    opts.io.out(JSON.stringify(unread, null, 2));
-    return unread;
-  }
-  for (const line of formatUnread(unread)) opts.io.out(line);
-  return unread;
-}
-
-/** The plain-text `--unread` list, one line per message, most code first. */
-export function formatUnread(messages: readonly UnreadMessage[]): string[] {
-  if (messages.length === 0) return ["No unread messages with linked commits."];
-  return messages.map((message) => {
-    const parts = [
-      `  ${shortHash(message.messageId)}  ${message.label}  ${clock(message.at)}  ` +
-        `${formatChange(message.change)}  ${oneLine(message.title)}`,
-    ];
-    parts.push(`  · ${oneLine(message.sessionTitle)}`);
-    return parts.join("");
-  });
 }
 
 /**

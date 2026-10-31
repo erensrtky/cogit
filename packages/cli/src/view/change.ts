@@ -20,13 +20,6 @@ export interface ChangeNode {
   change?: ViewChange | undefined;
 }
 
-export interface ChangeSession {
-  sessionId: string;
-  title: string;
-  startedAt: string;
-  nodes: readonly ChangeNode[];
-}
-
 /**
  * One message's totals: the union of its linked commits, each commit counted
  * once (its full hash decides), files deduped across commits. Undefined when no
@@ -77,86 +70,14 @@ export function attachChanges<N extends ChangeNode, S extends { nodes: readonly 
   });
 }
 
-/** One unread message with code behind it, as the map view and `log --unread` list it. */
-export interface UnreadMessage {
-  sessionId: string;
-  sessionTitle: string;
-  sessionStartedAt: string;
-  messageId: string;
-  label: string;
-  title: string;
-  at?: string | undefined;
-  change: ViewChange;
-}
-
 /** Total lines a change touched; the sort key ("most code first"). */
 export function changeLines(change: ViewChange): number {
   return change.added + change.removed;
 }
 
-/** True for a message the user has not read whose code crossed the threshold. */
+/** True for a change whose linked commits crossed the threshold. */
 export function isBigChange(change: ViewChange, threshold: number): boolean {
   return changeLines(change) >= threshold;
-}
-
-/** Messages with commits that are not marked read, most code first. */
-export function unreadMessages(
-  sessions: readonly ChangeSession[],
-  read: ReadonlySet<string>,
-): UnreadMessage[] {
-  const out: UnreadMessage[] = [];
-  for (const session of sessions) {
-    for (const node of session.nodes) {
-      if (node.kind !== "message" || node.change === undefined) continue;
-      if (read.has(node.id)) continue;
-      out.push({
-        sessionId: session.sessionId,
-        sessionTitle: session.title,
-        sessionStartedAt: session.startedAt,
-        messageId: node.id,
-        label: node.label ?? node.id,
-        title: node.title,
-        ...(node.at === undefined ? {} : { at: node.at }),
-        change: node.change,
-      });
-    }
-  }
-  return out.sort(
-    (a, b) =>
-      changeLines(b.change) - changeLines(a.change) ||
-      b.change.files - a.change.files ||
-      a.title.localeCompare(b.title) ||
-      a.messageId.localeCompare(b.messageId),
-  );
-}
-
-/** The page's shape: `ViewSession` carries `messages` rather than `nodes`. */
-export interface ViewChangeSession {
-  sessionId: string;
-  title: string;
-  startedAt: string;
-  messages: readonly ChangeNode[];
-}
-
-/** `unreadMessages` over the page model, which names its nodes `messages`. */
-export function unreadViewMessages(
-  sessions: readonly ViewChangeSession[],
-  read: ReadonlySet<string>,
-): UnreadMessage[] {
-  return unreadMessages(
-    sessions.map((session) => ({ ...session, nodes: session.messages })),
-    read,
-  );
-}
-
-/** How many unread messages crossed the threshold (the panel card's number). */
-export function countBigUnread(
-  sessions: readonly ChangeSession[],
-  read: ReadonlySet<string>,
-  threshold: number,
-): number {
-  return unreadMessages(sessions, read).filter((message) => isBigChange(message.change, threshold))
-    .length;
 }
 
 /** `1240` → `1 240`: thousands separated by a thin space, no locale dependency. */

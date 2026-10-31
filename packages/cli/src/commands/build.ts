@@ -33,7 +33,6 @@ import { atomicWrite } from "../store/fs.js";
 import { withLock } from "../store/lock.js";
 import { readMapView } from "../store/map-view.js";
 import { projectPaths } from "../store/paths.js";
-import { readReadState } from "../store/read-state.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
 import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
@@ -338,7 +337,6 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       // Story 10.3: each message carries the numstat totals of its linked
       // commits. A project outside git simply has no numbers to show.
       const withChanges = attachChanges(withThoughts, commits.changes);
-      const read = await readReadState(root);
       const built = buildViewModel({
         project: project.data,
         sessions: withChanges,
@@ -358,7 +356,6 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         unrecorded: config.sessionEndCatchUp ? undefined : views.unrecorded,
       });
       built.switcher = switcher;
-      built.read = [...read].sort();
       const view = await readMapView(root);
       built.rowWidths = view.rowWidths;
       built.openSessions = view.open;

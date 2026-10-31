@@ -332,12 +332,6 @@ export interface LineageViewModel {
    */
   settings?: PanelSettings;
   /**
-   * Message ids the user marked read (Story 10.3), from `.cogit/state/read.json`
-   * at build time. Local state: the page toggles it through the local server and
-   * a rebuild embeds the new list.
-   */
-  read?: string[];
-  /**
    * How wide the user dragged each session's message rows, by session id, from
    * `.cogit/state/map.json` at build time. Local state like `read`. Absent on
    * pages built before it.
@@ -397,11 +391,6 @@ export interface PanelProject {
   needsUserCount: number;
   /** `file://` URL of the project's map; null when the directory is gone. */
   lineageUrl: string | null;
-  /**
-   * Unread messages whose commits crossed `bigChangeLines` (Story 10.3), the
-   * same number the map's unread view lists. Absent on pages built before 10.3.
-   */
-  unreadBigCount?: number;
 }
 
 /**

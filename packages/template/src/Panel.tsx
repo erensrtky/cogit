@@ -72,14 +72,6 @@ export function Panel({ model }: { model: PanelViewModel }) {
                     <dt>Waiting on you</dt>
                     <dd>{project.needsUserCount}</dd>
                   </div>
-                  {project.unreadBigCount === undefined ? null : (
-                    <div>
-                      <dt title="Unread messages whose commits changed at least the big-change threshold of lines">
-                        Unread big changes
-                      </dt>
-                      <dd>{project.unreadBigCount}</dd>
-                    </div>
-                  )}
                 </dl>
                 {href ? (
                   <a className="card-open" href={href}>
