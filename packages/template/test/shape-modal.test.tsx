@@ -63,6 +63,22 @@ describe("Intent, Shape and Code", () => {
     expect(html).toContain("Shapes are off");
   });
 
+  it("offers Regenerate only on a served page that names the message", () => {
+    expect(render("shape")).not.toContain("Regenerate");
+    const html = renderToStaticMarkup(
+      createElement(ShapeLayers, {
+        node,
+        root: "/tmp/project",
+        tab: "shape",
+        enabled: true,
+        onTab: () => {},
+        regenerate: { dir: "/tmp/project", sessionId: "s1", nodeId: node.id },
+        renderMermaid: () => createElement("div", null, "diagram"),
+      }),
+    );
+    expect(html).toContain(">Regenerate</button>");
+  });
+
   it("says nothing is worth showing for an empty answer", () => {
     const html = render("shape", { shape: { tools: [], commits: ["abc1234"] } });
     expect(html).toContain("Nothing to show");

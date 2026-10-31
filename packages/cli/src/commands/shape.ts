@@ -213,6 +213,57 @@ async function runShape(root: string, sessionId: string, config: Config, io: Io)
 }
 
 /**
+ * The map's Regenerate button: the same side-model pass the hook runs, asked
+ * for by name, for a message that already has a Shape or was passed over. The
+ * session's shape lock is taken as usual, so a hook run and the button never
+ * write the same record at once. It answers with the reason when nothing was
+ * written, and the write replaces a Shape the agent wrote too.
+ */
+export async function regenerateShape(
+  root: string,
+  sessionId: string,
+  nodeId: string,
+  io: Io,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const loaded = await loadSession(root, sessionId);
+  if (!loaded.found || !loaded.ok) return { ok: false, reason: "no such session" };
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === undefined) return { ok: false, reason: "not a git repository" };
+  // The trailers link commits the record has not listed yet, as in the hook path.
+  const [session] = attachThoughtTrailers(
+    [loaded.data],
+    await readThoughtTrailers(root, { env: io.env }),
+  );
+  const node = session?.nodes.find(
+    (candidate) => candidate.kind === "message" && candidate.id === nodeId,
+  );
+  if (node === undefined) return { ok: false, reason: "no such message" };
+  const config = await loadConfig(io.env);
+  const said: string[] = [];
+  const quiet: Io = {
+    ...io,
+    out: (line) => said.push(line),
+    warn: (line) => said.push(line),
+  };
+  let wrote = false;
+  try {
+    await withLock(
+      projectPaths(root).lock(`shape-${sessionId}`),
+      async () => {
+        wrote = await shapeNode(root, gitRoot, sessionId, node, config, quiet, true);
+      },
+      // A hook run may be holding the lock just now; give it a moment, then say so.
+      { timeoutMs: 2000 },
+    );
+  } catch (err) {
+    if (!(err instanceof LockBusyError)) throw err;
+    return { ok: false, reason: "a shape is already being written" };
+  }
+  if (!wrote) return { ok: false, reason: said.at(-1) ?? "no shape was written" };
+  return { ok: true };
+}
+
+/**
  * Writes one message's Shape; false when the skip rules turned it down. With
  * no session it prints the validated tools as JSON instead (`--dry-run`).
  */
@@ -223,6 +274,8 @@ async function shapeNode(
   node: LineageNode,
   config: Config,
   io: Io,
+  /** Replace a Shape the agent wrote too: the user asked for this one. */
+  force = false,
 ): Promise<boolean> {
   const hashes = node.commits ?? [];
   const [changes, subjects] = await Promise.all([
@@ -275,6 +328,10 @@ async function shapeNode(
       },
     ],
   };
-  await sessionWrite({ dir: root, by: "side" }, io, async () => JSON.stringify(payload));
+  await sessionWrite(
+    { dir: root, by: "side", ...(force ? { forceShape: true } : {}) },
+    io,
+    async () => JSON.stringify(payload),
+  );
   return true;
 }

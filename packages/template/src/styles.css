@@ -2788,6 +2788,37 @@ time {
   font-size: 11px;
 }
 
+/* The Regenerate ask: a small button and where its answer goes. */
+.shape-regenerate {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.shape-regenerate-button {
+  padding: 4px 12px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.shape-regenerate-button:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.shape-regenerate-error {
+  color: var(--danger, #d9483b);
+}
+
 .shape-code section {
   margin-bottom: 14px;
 }

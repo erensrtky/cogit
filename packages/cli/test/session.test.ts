@@ -132,6 +132,45 @@ describe("session write", () => {
       expect((await stored()).lastRecordedBy).toBe("side");
     });
 
+    it("keeps the agent's Shape until the user asks for a new one by hand", async () => {
+      const shape = (kind: string, text: string) => ({ tools: [{ kind, text }], commits: [] });
+      await write({
+        sessionId: "s1",
+        nodes: [
+          {
+            id: "m1",
+            kind: "message",
+            parent: null,
+            title: "Ship it",
+            shape: shape("table", "a | b | c"),
+          },
+        ],
+      });
+      // The usual side rule: the agent's Shape stays.
+      await side({
+        sessionId: "s1",
+        nodes: [
+          { id: "m1", kind: "message", title: "Ship it", shape: shape("pseudo", "1. one\n2. two") },
+        ],
+      });
+      expect((await node("m1"))?.shape?.tools[0]?.kind).toBe("table");
+      // The map's Regenerate button asks for this one, so it replaces it.
+      await sessionWrite({ dir: root, by: "side", forceShape: true }, io, async () =>
+        JSON.stringify({
+          sessionId: "s1",
+          nodes: [
+            {
+              id: "m1",
+              kind: "message",
+              title: "Ship it",
+              shape: shape("pseudo", "1. one\n2. two"),
+            },
+          ],
+        }),
+      );
+      expect((await node("m1"))?.shape?.tools[0]).toMatchObject({ kind: "pseudo", valid: true });
+    });
+
     it("lets the side model fill a field the agent left empty", async () => {
       await write({
         sessionId: "s1",

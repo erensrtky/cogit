@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import { init } from "../src/commands/init.js";
-import { shapeMessage } from "../src/commands/shape.js";
+import { regenerateShape, shapeMessage } from "../src/commands/shape.js";
 import { runGitHook } from "../src/git-hooks.js";
 import { createProgram } from "../src/program.js";
 import type { Session } from "../src/schema/session.js";
@@ -205,6 +205,59 @@ process.stdin.on("end", () => {
     const io = fakeIo(env);
     await withLock(projectPaths(root).lock("shape-s1"), () => shapeMessage(root, "s1", io));
     expect(io.lines).toEqual(["a shape for s1 is already being written"]);
+  });
+
+  it("writes a Shape again when the map asks, even for one the message already has", async () => {
+    const a = await commit("a.txt", 12, THOUGHT);
+    const b = await commit("b.txt", 12, THOUGHT);
+    await writeRecord([
+      {
+        id: THOUGHT,
+        kind: "message",
+        title: "Work",
+        parent: null,
+        commits: [a, b],
+        // The hook would leave this alone: it already covers both commits, and
+        // the agent wrote it — the user's ask still replaces it.
+        shape: {
+          tools: [{ kind: "table", text: "a | b | c" }],
+          commits: [a, b],
+          by: "agent",
+          at: T0,
+        },
+      },
+    ]);
+    const io = fakeIo(await fakeClaude());
+    expect(await regenerateShape(root, "s1", THOUGHT, io)).toEqual({ ok: true });
+    const shape = await shapeOf(THOUGHT);
+    expect(shape?.by).toBe("side");
+    expect(shape?.commits).toEqual([a, b]);
+    expect(shape?.tools[0]).toMatchObject({ kind: "pseudo", valid: true });
+  });
+
+  it("says why a regenerate wrote nothing, and refuses an unknown message", async () => {
+    const tiny = await commit("a.txt", 1, THOUGHT);
+    await writeRecord([
+      {
+        id: THOUGHT,
+        kind: "message",
+        title: "Tiny",
+        parent: null,
+        commits: [tiny],
+      },
+    ]);
+    expect(await regenerateShape(root, "s1", THOUGHT, fakeIo(env))).toEqual({
+      ok: false,
+      reason: `no shape for ${THOUGHT}: only 1 changed line`,
+    });
+    expect(await regenerateShape(root, "s1", OLDER, fakeIo(env))).toEqual({
+      ok: false,
+      reason: "no such message",
+    });
+    expect(await regenerateShape(root, "nope", THOUGHT, fakeIo(env))).toEqual({
+      ok: false,
+      reason: "no such session",
+    });
   });
 
   it("prints a dry run without saving or queueing, for a recorded message or a bare commit", async () => {

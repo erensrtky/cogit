@@ -35,6 +35,12 @@ export interface MergeOptions {
    * correction is never undone by a later side run.
    */
   sideOwnsParent?: ReadonlySet<string>;
+  /**
+   * The user asked for this Shape (the map's Regenerate button), so a side
+   * write replaces `shape` even when the agent wrote it. Every other field
+   * keeps the usual rule.
+   */
+  forceShape?: boolean;
 }
 
 /**
@@ -71,14 +77,14 @@ function isEmptyValue(value: unknown): boolean {
  * Merges one side-model node into the stored one: a field is written only when
  * empty or already the side model's, so the agent's notes are never overwritten.
  */
-function mergeSide(prev: LineageNode, input: LineageNodeInput): LineageNode {
+function mergeSide(prev: LineageNode, input: LineageNodeInput, forceShape = false): LineageNode {
   const next: LineageNode = { ...prev };
   const marks: Record<string, "side"> = {};
   for (const field of SIDE_FIELDS) {
     const value = input[field];
-    if (value === undefined || (!isEmptyValue(prev[field]) && prev.by?.[field] !== "side")) {
-      continue;
-    }
+    if (value === undefined) continue;
+    const forced = forceShape && field === "shape";
+    if (!forced && !isEmptyValue(prev[field]) && prev.by?.[field] !== "side") continue;
     (next as unknown as Record<SideField, unknown>)[field] = value;
     marks[field] = "side";
   }
@@ -146,7 +152,7 @@ export function mergeSession(
     if (side && prev) {
       // The side model fills notes but never rewrites the agent's: it may only
       // correct a parent it wrote itself (Story 12.1).
-      const merged = mergeSide(prev, n);
+      const merged = mergeSide(prev, n, opts.forceShape === true);
       const nextParent =
         parent !== undefined && own !== null && (opts.sideOwnsParent?.has(n.id) ?? false)
           ? checkParent(n.id, parent, own, recorded, messageWarnings, label, opts.crossTargets)

@@ -373,7 +373,7 @@ export function shapePrompt(opts: {
     `Diff${opts.diffTruncated ? " (cut to fit; the commits above are complete)" : ""}:`,
     opts.diff,
     "",
-    'Return only one JSON object, no code fences: {"tools": [{"kind": "pseudo", "text": "1. ...\\n2. ..."}]}. Return {"tools": []} when nothing here is worth showing.',
+    'Return only one JSON object, no code fences: {"tools": [{"kind": "pseudo", "text": "1. ...\\n2. ..."}]}. A change across two or more files always includes a Flow; return {"tools": []} only for a change that is not worth showing.',
   ].join("\n");
 }
 

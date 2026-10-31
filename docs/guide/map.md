@@ -101,7 +101,9 @@ A message that landed commits has three layers, in that order:
   writes it, not you, and a tiny change or a pure refactor gets none. The diagrams are drawn
   when the map is opened with `cogit open`; a map opened from the file shows their source.
   `cogit shape --commit <sha> --dry-run` prints the Shape a commit would get without saving
-  it.
+  it. Under the Shape, **Regenerate** asks the side model to write it again — for the answer
+  a small model missed, or one you want differently; it replaces a Shape the agent wrote
+  too.
 - **Code** — the message's commits and their diffs, the same patches the panel opens.
 
 The message details show a short preview and an **Open** button. Open shows the three layers

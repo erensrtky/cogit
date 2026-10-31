@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import {
   type ClientRequest,
   createServer as createHttpServer,
@@ -34,10 +34,10 @@ import { readInboxDismissed } from "../src/store/inbox-state.js";
 import { readMapView } from "../src/store/map-view.js";
 import { globalPaths, projectPaths } from "../src/store/paths.js";
 import { readReadState } from "../src/store/read-state.js";
-import { loadConfig, updateConfig } from "../src/store/stores.js";
+import { loadConfig, loadSession, updateConfig } from "../src/store/stores.js";
 import { builtBy } from "../src/view/lineage.js";
 import { DATA_ELEMENT_ID, LIVE_META_NAME, TOKEN_META_NAME } from "../src/view/model.js";
-import { envFor, fakeIo, noGitProject, tempDir } from "./helpers.js";
+import { envFor, fakeIo, noGitProject, T0, tempDir } from "./helpers.js";
 
 const TEMPLATE = `<!doctype html><html><head><title>cogit</title></head><body><div id="root"></div>
 <script id="${DATA_ELEMENT_ID}" type="application/json"></script></body></html>`;
@@ -849,6 +849,138 @@ describe("read marks (10.3)", () => {
     await mkdir(projectPaths(root).readState, { recursive: true });
     const reply = await readWrite(server, token, { dir: root, id: ID, read: true });
     expect(reply.status).toBe(500);
+  });
+});
+
+describe("shape regenerate endpoint", () => {
+  const NODE = "h111111111111";
+
+  function regenerateWrite(
+    server: MapServer,
+    token: string,
+    payload: unknown,
+    overrides: Record<string, string> = {},
+  ): Promise<Reply> {
+    return postConfig(`${server.url}/api/shape/regenerate`, JSON.stringify(payload), {
+      origin: `http://127.0.0.1:${server.port}`,
+      [CONFIG_TOKEN_HEADER]: token,
+      ...overrides,
+    });
+  }
+
+  it("refuses a foreign project, a bad body, a bad token and an unknown session", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    expect(
+      (
+        await regenerateWrite(server, token, {
+          dir: join(dir, "elsewhere"),
+          sessionId: "s1",
+          nodeId: NODE,
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (await regenerateWrite(server, token, { dir: root, sessionId: "s1", nodeId: "m1" })).status,
+    ).toBe(400);
+    expect((await regenerateWrite(server, token, { dir: root, nodeId: NODE })).status).toBe(400);
+    expect(
+      (await regenerateWrite(server, "nope", { dir: root, sessionId: "s1", nodeId: NODE })).status,
+    ).toBe(403);
+    const missing = await regenerateWrite(server, token, {
+      dir: root,
+      sessionId: "s1",
+      nodeId: NODE,
+    });
+    expect(missing.status).toBe(404);
+    expect(missing.body).toContain("no such session");
+  });
+
+  it("writes the message's Shape again with the side model", async () => {
+    const run = promisify(execFile);
+    const git = (...args: string[]): Promise<string> =>
+      run("git", ["-C", root, ...args], {
+        env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", HOME: dir },
+      }).then((result) => result.stdout.trim());
+    await git("init", "-q");
+    await writeFile(join(root, "a.ts"), `${"a\n".repeat(12)}a.ts`);
+    await writeFile(join(root, "b.ts"), `${"b\n".repeat(12)}b.ts`);
+    await git("add", "a.ts", "b.ts");
+    await git(
+      "-c",
+      "user.email=t@example.com",
+      "-c",
+      "user.name=Tester",
+      "commit",
+      "-q",
+      "--no-verify",
+      "-m",
+      "feat: work",
+    );
+    const sha = await git("rev-parse", "HEAD");
+    // A record the agent shaped already: the hook would leave it alone.
+    await mkdir(projectPaths(root).sessions, { recursive: true });
+    await writeFile(
+      projectPaths(root).session("s1"),
+      JSON.stringify({
+        schema: 1,
+        sessionId: "s1",
+        agent: "claude-code",
+        title: "Ship it",
+        startedAt: T0,
+        updatedAt: T0,
+        status: { goal: "", done: [], pending: [], next: "" },
+        nodes: [
+          {
+            id: NODE,
+            kind: "message",
+            parent: null,
+            title: "Work",
+            at: T0,
+            commits: [sha],
+            shape: {
+              tools: [{ kind: "table", text: "a | b | c", valid: true }],
+              commits: [sha],
+              by: "agent",
+              at: T0,
+            },
+          },
+        ],
+      }),
+      "utf8",
+    );
+    // A fake side model that answers with a Flow.
+    const bin = join(dir, "bin");
+    await mkdir(bin, { recursive: true });
+    const flow = JSON.stringify({
+      nodes: [
+        { id: "a", kind: "event", label: "after a commit" },
+        { id: "b", kind: "fn", label: "write the shape" },
+      ],
+      edges: [{ from: "a", to: "b", label: "once the message is recorded" }],
+      ordered: false,
+    });
+    const answer = JSON.stringify({ tools: [{ kind: "flow", text: flow }] });
+    await writeFile(
+      join(bin, "claude"),
+      `#!/usr/bin/env node
+process.stdin.resume();
+process.stdin.on("end", () => {
+  process.stdout.write(JSON.stringify({ type: "result", subtype: "success", result: ${JSON.stringify(answer)} }));
+});
+`,
+    );
+    await chmod(join(bin, "claude"), 0o755);
+    env = { ...env, PATH: `${bin}:${process.env.PATH ?? ""}` };
+    const server = await start();
+    const token = await panelToken(server);
+    const reply = await regenerateWrite(server, token, { dir: root, sessionId: "s1", nodeId: NODE });
+    expect(reply.status).toBe(200);
+    const loaded = await loadSession(root, "s1");
+    if (!loaded.found || !loaded.ok) throw new Error("no record");
+    const shape = loaded.data.nodes.find((node) => node.id === NODE)?.shape;
+    expect(shape?.by).toBe("side");
+    expect(shape?.tools[0]).toMatchObject({ kind: "flow", valid: true });
   });
 });
 

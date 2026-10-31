@@ -25,6 +25,9 @@ export const LIVE_META_NAME = "cogit-live";
  */
 export const TOKEN_META_NAME = "cogit-token";
 
+/** Request header that echoes {@link TOKEN_META_NAME} back on a write (a page cannot read it off another site). */
+export const TOKEN_HEADER_NAME = "x-cogit-token";
+
 /**
  * Settings the panel may change over the local server (Story 8.9). The rest are
  * setup-time or security-adjacent and stay on `cogit config set`.

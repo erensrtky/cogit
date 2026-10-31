@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import type { ViewNode } from "../../cli/src/view/model.js";
+import { TOKEN_HEADER_NAME, type ViewNode } from "../../cli/src/view/model.js";
 import {
   flowToMermaid,
   parseFlow,
@@ -11,7 +11,7 @@ import {
   UNIVERSAL_KINDS,
 } from "../../cli/src/view/shape.js";
 import { DiffView } from "./DiffView.js";
-import { isLivePage } from "./data.js";
+import { isLivePage, pageToken } from "./data.js";
 import { HelpTip } from "./HelpTip.js";
 import { MermaidDiagram } from "./MermaidDiagram.js";
 
@@ -35,6 +35,9 @@ export interface ShapeNode {
   commits?: string[] | undefined;
   commitTags?: ViewNode["commitTags"];
   shape?: ViewNode["shape"];
+  /** The owning session and the message's id: what the Regenerate button posts. */
+  sessionId?: string | undefined;
+  nodeId?: string | undefined;
 }
 
 const TABS: { id: ShapeTab; number: string; label: string }[] = [
@@ -289,6 +292,64 @@ function ShapeLayer({
   );
 }
 
+/** What the Regenerate button posts: the message and the project it belongs to. */
+export interface RegenerateRequest {
+  dir: string;
+  sessionId: string;
+  nodeId: string;
+}
+
+/** The POST the button makes; the token is the one the served page carries. */
+async function requestShape(request: RegenerateRequest): Promise<void> {
+  const token = pageToken();
+  if (token === null) throw new Error("Open the map with `cogit open` to regenerate a Shape.");
+  const response = await fetch("/api/shape/regenerate", {
+    method: "POST",
+    headers: { "content-type": "application/json", [TOKEN_HEADER_NAME]: token },
+    body: JSON.stringify(request),
+  });
+  if (response.ok) return;
+  const text = (await response.text()).trim();
+  throw new Error(text === "" ? `the Shape was not written (${response.status})` : text);
+}
+
+/**
+ * Asks the side model to write this message's Shape again, for the answer a
+ * small model missed or one the reader wants differently. The server holds the
+ * request until the model answers and then rebuilds the open maps, so the layer
+ * swaps in the new Shape by itself; this only shows whether the ask is running.
+ */
+function RegenerateButton({ request }: { request: RegenerateRequest }) {
+  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [error, setError] = useState("");
+  const run = async (): Promise<void> => {
+    setState("running");
+    setError("");
+    try {
+      await requestShape(request);
+      setState("done");
+    } catch (err) {
+      setState("error");
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+  return (
+    <div className="shape-regenerate">
+      <button
+        type="button"
+        className="shape-regenerate-button"
+        title="Ask the side model to write this Shape again"
+        onClick={() => void run()}
+        disabled={state === "running"}
+      >
+        {state === "running" ? "Regenerating…" : "Regenerate"}
+      </button>
+      {state === "done" ? <span className="muted">Written again.</span> : null}
+      {state === "error" ? <span className="shape-regenerate-error">{error}</span> : null}
+    </div>
+  );
+}
+
 /** The Code layer: the message's commits and their patches. */
 function CodeLayer({ node, root }: { node: ShapeNode; root: string }) {
   const live = typeof document !== "undefined" && isLivePage();
@@ -321,6 +382,7 @@ export function ShapeLayers({
   tab,
   enabled,
   onTab,
+  regenerate,
   renderMermaid = (source) => <MermaidDiagram source={source} />,
 }: {
   node: ShapeNode;
@@ -328,6 +390,8 @@ export function ShapeLayers({
   tab: ShapeTab;
   enabled: boolean;
   onTab: (tab: ShapeTab) => void;
+  /** Set on a served page for a message that can be shaped again. */
+  regenerate?: RegenerateRequest | undefined;
   renderMermaid?: (source: string) => ReactNode;
 }) {
   return (
@@ -353,7 +417,10 @@ export function ShapeLayers({
       >
         {tab === "intent" ? <IntentLayer node={node} /> : null}
         {tab === "shape" ? (
-          <ShapeLayer node={node} enabled={enabled} renderMermaid={renderMermaid} />
+          <>
+            <ShapeLayer node={node} enabled={enabled} renderMermaid={renderMermaid} />
+            {regenerate === undefined ? null : <RegenerateButton request={regenerate} />}
+          </>
         ) : null}
         {tab === "code" ? <CodeLayer node={node} root={root} /> : null}
       </div>
@@ -366,11 +433,13 @@ export function ShapeModal({
   node,
   root,
   enabled,
+  regenerate,
   onClose,
 }: {
   node: ShapeNode;
   root: string;
   enabled: boolean;
+  regenerate?: RegenerateRequest | undefined;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<ShapeTab>("shape");
@@ -410,7 +479,14 @@ export function ShapeModal({
             ×
           </button>
         </header>
-        <ShapeLayers node={node} root={root} tab={tab} enabled={enabled} onTab={setTab} />
+        <ShapeLayers
+          node={node}
+          root={root}
+          tab={tab}
+          enabled={enabled}
+          onTab={setTab}
+          regenerate={regenerate}
+        />
       </div>
     </div>
   );
@@ -433,6 +509,13 @@ export function ShapeSection({
   const [open, setOpen] = useState(false);
   const state = shapeState(node.shape, enabled);
   const preview = shapePreview(node.shape);
+  // Only a page the local server served can ask for a new Shape: over
+  // `file://` nothing would answer, and the button stays out.
+  const live = typeof document !== "undefined" && isLivePage();
+  const regenerate =
+    enabled && live && node.sessionId !== undefined && node.nodeId !== undefined
+      ? { dir: root, sessionId: node.sessionId, nodeId: node.nodeId }
+      : undefined;
   const diagram = node.shape?.tools.find(
     (tool) => DIAGRAM_KINDS.has(tool.kind) && tool.valid !== false,
   );
@@ -462,7 +545,13 @@ export function ShapeSection({
         Open
       </button>
       {open ? (
-        <ShapeModal node={node} root={root} enabled={enabled} onClose={() => setOpen(false)} />
+        <ShapeModal
+          node={node}
+          root={root}
+          enabled={enabled}
+          regenerate={regenerate}
+          onClose={() => setOpen(false)}
+        />
       ) : null}
     </section>
   );

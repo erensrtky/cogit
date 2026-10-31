@@ -160,6 +160,8 @@ describe("the Shape tool catalogue", () => {
       language: "auto",
     });
     expect(prompt).toContain("A Flow for a change across two or more files");
+    // The last line the writer reads says it again, since a small model forgets.
+    expect(prompt).toContain("A change across two or more files always includes a Flow");
     expect(prompt).toContain("A Before / After table when behaviour someone can see changes");
     expect(prompt).toContain("A new or changed command or flag always gets an example");
     expect(prompt).toContain("Never an internal helper");

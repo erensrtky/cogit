@@ -63,6 +63,11 @@ export interface SessionWriteOptions {
    * The side model may only fill empty fields and correct its own parents.
    */
   by?: "agent" | "side";
+  /**
+   * The user asked for this Shape by hand (the map's Regenerate button), so it
+   * replaces one the agent wrote too. Only `shape` is forced.
+   */
+  forceShape?: boolean;
 }
 
 /**
@@ -142,6 +147,7 @@ export async function sessionWrite(
       crossTargets,
       by,
       sideOwnsParent: sideOwnedParents(events, base?.nodes),
+      forceShape: opts.forceShape === true,
     });
     warnings = merged.warnings;
     const changes = structureChanges(merged.session, base, io.now(), by);

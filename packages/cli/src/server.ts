@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import pkg from "../package.json" with { type: "json" };
 import { defaultAgent } from "./agents/index.js";
 import { buildProject } from "./commands/build.js";
+import { regenerateShape } from "./commands/shape.js";
 import { diffTooLarge, isDiffSha, readCommitDiff } from "./diff.js";
 import { defaultsPrompter, type Io } from "./io.js";
 import { Config } from "./schema/config.js";
@@ -25,7 +26,12 @@ import { globalPaths, projectPaths } from "./store/paths.js";
 import { setMessageRead } from "./store/read-state.js";
 import { loadConfig, loadRegistry, updateConfig } from "./store/stores.js";
 import { builtBy } from "./view/lineage.js";
-import { isPanelEditableKey, LIVE_META_NAME, TOKEN_META_NAME } from "./view/model.js";
+import {
+  isPanelEditableKey,
+  LIVE_META_NAME,
+  TOKEN_HEADER_NAME,
+  TOKEN_META_NAME,
+} from "./view/model.js";
 import { buildPanel, panelSettings } from "./view/panel.js";
 import { editableSettings } from "./view/settings.js";
 
@@ -42,7 +48,7 @@ const HOST = "127.0.0.1";
 const LIVE_META = `<meta name="${LIVE_META_NAME}" content="1">`;
 
 /** Header a settings write must carry, with the token from the panel page. */
-export const CONFIG_TOKEN_HEADER = "x-cogit-token";
+export const CONFIG_TOKEN_HEADER = TOKEN_HEADER_NAME;
 
 /** A settings write is a tiny JSON object; anything larger is not ours. */
 export const CONFIG_BODY_LIMIT = 4096;
@@ -662,6 +668,84 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
   }
 
   /**
+   * `POST /api/shape/regenerate` { dir, sessionId, nodeId }: the Shape modal's
+   * Regenerate button. Runs the side model for that message the way the
+   * post-commit hook does — behind the session's shape lock — and then rebuilds
+   * the open maps, so the page shows the Shape it wrote. Every check a write
+   * carries holds here too; the model call can take a minute.
+   */
+  async function writeShapeRegenerate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    port: number,
+  ): Promise<void> {
+    if (
+      !originAllowed(req.headers.origin, port) ||
+      !tokenMatches(req.headers[CONFIG_TOKEN_HEADER])
+    ) {
+      respond(res, 403, "forbidden");
+      return;
+    }
+    const type = req.headers["content-type"];
+    if (
+      typeof type !== "string" ||
+      type.split(";")[0]?.trim().toLowerCase() !== "application/json"
+    ) {
+      respond(res, 415, "content-type must be application/json");
+      return;
+    }
+    const body = await readLimitedBody(req);
+    if (body === null) {
+      respond(res, 413, "request body too large");
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      respond(res, 400, "invalid JSON");
+      return;
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      respond(res, 400, "expected a JSON object");
+      return;
+    }
+    const { dir, sessionId, nodeId } = parsed as Record<string, unknown>;
+    if (
+      typeof dir !== "string" ||
+      typeof sessionId !== "string" ||
+      typeof nodeId !== "string" ||
+      !/^[A-Za-z0-9._:-]{1,128}$/.test(sessionId) ||
+      !/^h[0-9a-f]{12}$/.test(nodeId)
+    ) {
+      respond(res, 400, "expected { dir, sessionId, nodeId }");
+      return;
+    }
+    const root = await registeredRoot(env, dir);
+    if (root === null) {
+      respond(res, 403, "not a registered project");
+      return;
+    }
+    let result: Awaited<ReturnType<typeof regenerateShape>>;
+    try {
+      result = await regenerateShape(root, sessionId, nodeId, buildIo);
+    } catch (err) {
+      respond(res, 500, err instanceof Error ? err.message : "could not regenerate the shape");
+      return;
+    }
+    if (!result.ok) {
+      respond(res, result.reason.startsWith("no such") ? 404 : 409, result.reason);
+      return;
+    }
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify({ ok: true, sessionId, nodeId }));
+    void queueRebuild();
+  }
+
+  /**
    * `POST /api/inbox/dismiss` { dir, sessionId, at } (Story 11.1): the inbox's
    * dismiss button. It writes the project's local state file, and the turn time
    * is stored so a newer agent turn brings the row back. Same Host, Origin,
@@ -886,6 +970,10 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       }
       if (url.pathname === "/api/open-sessions") {
         await writeOpenSessions(req, res, port);
+        return;
+      }
+      if (url.pathname === "/api/shape/regenerate") {
+        await writeShapeRegenerate(req, res, port);
         return;
       }
       if (url.pathname !== "/api/config") {
