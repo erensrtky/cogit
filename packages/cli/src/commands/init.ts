@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { basename, resolve } from "node:path";
+import { styleText } from "node:util";
 import { defaultAgent } from "../agents/index.js";
 import { sessionIdentity } from "../author.js";
 import {
@@ -48,6 +49,29 @@ async function bestEffort(io: Io, what: string, fn: () => Promise<unknown>): Pro
     io.warn(`${what}: ${(err as Error).message}`);
     return false;
   }
+}
+
+/**
+ * Where the record lives. This one changes what a clone contains — the record
+ * holds titles, summaries, decisions and open items — so it is asked with a
+ * note, in a colour that stands apart from the routine questions.
+ */
+async function askGitPolicy(io: Io, fallback: GitPolicy): Promise<GitPolicy> {
+  const paint = (text: string): string =>
+    process.stdout.isTTY === true ? styleText("yellow", text) : text;
+  io.out(
+    paint("⚠  Session records carry your messages' titles, summaries, decisions and open items."),
+  );
+  io.out(paint("   Committing .cogit/ shares all of that with anyone who clones this repository."));
+  io.out(paint("   Keep it local if the repository is public or the sessions are private."));
+  return io.prompt.select<GitPolicy>(
+    "Where should the session records live?",
+    [
+      { value: "commit", name: "In the repository — shared with whoever clones it" },
+      { value: "ignore", name: "Only on this machine — private" },
+    ],
+    fallback,
+  );
 }
 
 async function askRetention(io: Io, opts: InitOptions): Promise<void> {
@@ -215,16 +239,7 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
   const config = await loadConfig(io.env);
 
   // Story 9.3: the record travels with the repository by default.
-  const policy: GitPolicy =
-    opts.git ??
-    (await io.prompt.select<GitPolicy>(
-      "Commit the session records?",
-      [
-        { value: "commit", name: "Yes, commit session records (local state stays ignored)" },
-        { value: "ignore", name: "No, keep .cogit/ out of git (private)" },
-      ],
-      config.gitPolicy,
-    ));
+  const policy: GitPolicy = opts.git ?? (await askGitPolicy(io, config.gitPolicy));
 
   await askRetention(io, opts);
   await askSkillPermission(io, opts);

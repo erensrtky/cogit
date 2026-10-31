@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.28.1] - 2026-11-01
 ### Changed
-- `cogit init` asks only for the project name, the git policy and (below 90 days) the transcript retention. It lets the agent run the cogit skill, writes the project's `.claude/settings.json` and sets the summary language to the conversation's without asking; `--no-allow-skill`, `--no-project-settings` and `--language` still override them, and `--yes` leaves Claude Code's settings untouched.
+- `cogit init` asks where the session records should live — with a note on what committing `.cogit/` shares — and, below 90 days, whether to keep transcripts longer. The project takes its directory's name. It lets the agent run the cogit skill, writes the project's `.claude/settings.json` and sets the summary language to the conversation's without asking; `--git`, `--name`, `--retention`, `--no-allow-skill`, `--no-project-settings` and `--language` still override them, and `--yes` leaves Claude Code's settings untouched.
 - The user-facing "lineage" labels say cogit now: the settings label is **Record at session start**, `cogit log` describes what it prints as recorded sessions, and the record skill replies `cogit updated`.
 
 ## [0.28.0] - 2026-11-01
