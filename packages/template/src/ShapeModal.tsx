@@ -1,12 +1,13 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ViewNode } from "../../cli/src/view/model.js";
 import {
-  NOTATION_KINDS,
-  SHAPE_NOTATION,
+  flowToMermaid,
   SHAPE_READING,
+  shapeKindsUsed,
   shapePreview,
   shapeState,
   tableRows,
+  UNIVERSAL_KINDS,
 } from "../../cli/src/view/shape.js";
 import { DiffView } from "./DiffView.js";
 import { isLivePage } from "./data.js";
@@ -111,29 +112,34 @@ function IntentLayer({ node }: { node: ShapeNode }) {
 const TEXT_CAPTION: Record<string, string> = {
   pseudo: "Steps",
   example: "Example",
+  flow: "Flow source (not drawn)",
   mermaid: "Flowchart source (not drawn)",
   sequence: "Sequence source (not drawn)",
   table: "Before / After (as written)",
   interface: "Interface (as written)",
 };
 
+/** Tools whose "?" lists every kind, so the reader can decode the symbols. */
+const KINDS_CAPTIONS = new Set(["flow", "pseudo"]);
+
 /**
- * A tool's caption with a "?" that says how to read it; tools that name roles,
- * files and functions also list how those names are written.
+ * A tool's caption with a "?" that says how to read it; a Flow or Steps also
+ * lists every kind, so the symbols name themselves.
  */
 function ToolCaption({ id, kind, label }: { id: string; kind: string; label: string }) {
   const reading = SHAPE_READING[kind];
+  const listsKinds = KINDS_CAPTIONS.has(kind);
   return (
     <figcaption className="shape-caption">
       <span>{label}</span>
       {reading ? (
         <HelpTip id={`shape-${id}`} label={`How to read the ${label}`}>
           <span className="shape-reading">{reading}</span>
-          {NOTATION_KINDS.has(kind) ? (
-            <span className="shape-notation">
-              {SHAPE_NOTATION.map((entry) => (
-                <span key={entry.sample} className="shape-notation-row">
-                  <code>{entry.sample}</code> {entry.means}
+          {listsKinds ? (
+            <span className="shape-kinds">
+              {UNIVERSAL_KINDS.map((kind) => (
+                <span key={kind.id} className="shape-kind-row">
+                  <code>{kind.symbol}</code> {kind.name} — {kind.means}
                 </span>
               ))}
             </span>
@@ -144,8 +150,15 @@ function ToolCaption({ id, kind, label }: { id: string; kind: string; label: str
   );
 }
 
-/** Tools Mermaid draws. */
-const DIAGRAM_KINDS = new Set(["mermaid", "sequence"]);
+/** Tools Mermaid draws; a Flow is turned into Mermaid source first. */
+const DIAGRAM_KINDS = new Set(["flow", "mermaid", "sequence"]);
+
+/** A diagram tool's caption, distinct from the plain-text fallback caption. */
+function diagramLabel(kind: string): string {
+  if (kind === "sequence") return "Sequence";
+  if (kind === "flow") return "Flow";
+  return "Flowchart";
+}
 
 /** The header of each table tool; the writer sends only the rows. */
 const TABLE_COLUMNS: Record<string, readonly [string, string, string]> = {
@@ -205,19 +218,28 @@ function ShapeLayer({
   if (state === "empty") {
     return <p className="muted">Nothing to show: the change was too small to draw.</p>;
   }
+  const tools = node.shape?.tools ?? [];
+  const kinds = shapeKindsUsed(tools);
   return (
     <div className="shape-tools">
-      {node.shape?.tools.map((tool, index) => {
+      {kinds.length > 0 ? (
+        <div className="shape-legend" aria-label="Kinds in this Shape">
+          {kinds.map((kind) => (
+            <span key={kind.id} className="shape-kind">
+              <span className="shape-kind-symbol">{kind.symbol}</span>
+              {kind.name}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {tools.map((tool, index) => {
         const key = `${tool.kind}-${index}`;
-        if (DIAGRAM_KINDS.has(tool.kind) && tool.valid !== false)
+        const source = tool.kind === "flow" ? flowToMermaid(tool.text) : tool.text;
+        if (DIAGRAM_KINDS.has(tool.kind) && tool.valid !== false && source !== undefined)
           return (
             <figure key={key} className="shape-figure">
-              {renderMermaid(tool.text)}
-              <ToolCaption
-                id={key}
-                kind={tool.kind}
-                label={tool.kind === "sequence" ? "Sequence" : "Flowchart"}
-              />
+              {renderMermaid(source)}
+              <ToolCaption id={key} kind={tool.kind} label={diagramLabel(tool.kind)} />
             </figure>
           );
         const columns = TABLE_COLUMNS[tool.kind];
@@ -396,14 +418,20 @@ export function ShapeSection({
   const diagram = node.shape?.tools.find(
     (tool) => DIAGRAM_KINDS.has(tool.kind) && tool.valid !== false,
   );
+  const diagramSource =
+    diagram === undefined
+      ? undefined
+      : diagram.kind === "flow"
+        ? flowToMermaid(diagram.text)
+        : diagram.text;
   return (
     <section className="shape-section">
       <h3>Intent, Shape and Code</h3>
       {state === "ready" ? (
         preview ? (
           <pre className="shape-preview">{preview}</pre>
-        ) : diagram ? (
-          <MermaidDiagram source={diagram.text} className="shape-preview-diagram" />
+        ) : diagramSource !== undefined ? (
+          <MermaidDiagram source={diagramSource} className="shape-preview-diagram" />
         ) : null
       ) : state === "off" ? (
         <p className="muted">Shapes are off.</p>

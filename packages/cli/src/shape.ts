@@ -1,5 +1,11 @@
 import type { LineageNode, Shape, ShapeInput, ShapeKind, ShapeTool } from "./schema/session.js";
-import { SHAPE_NOTATION, tableRows } from "./view/shape.js";
+import {
+  FLOW_MAX_EDGES,
+  FLOW_MAX_NODES,
+  parseFlow,
+  tableRows,
+  UNIVERSAL_KINDS,
+} from "./view/shape.js";
 
 /**
  * The Shape catalogue (Story 13.6): a Shape sits between a message's Intent
@@ -21,6 +27,11 @@ export interface ShapeToolSpec {
   when: string;
   /** The JSON shape of one answer, as the prompt shows it. */
   output: string;
+  /**
+   * False for tools kept only so old records still validate and draw: the
+   * writer is no longer offered them in the catalogue.
+   */
+  offered?: boolean;
   /** True when the output can be shown as designed. */
   validate(text: string): boolean;
 }
@@ -72,6 +83,21 @@ export const SEQUENCE_MAX_ACTORS = 6;
 
 export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
   {
+    kind: "flow",
+    name: "Flow",
+    when:
+      "The change is a path through code across files: the functions, files, stores, hooks and " +
+      "outside calls it moves between. Every node gets a kind from the list below and a label " +
+      "in the project's own words; the map draws the symbol, never you. Set `ordered` true " +
+      "when the edges are steps over time and work is handed between parts. Node ids are short " +
+      `lowercase words; at most ${FLOW_MAX_NODES} nodes and ${FLOW_MAX_EDGES} edges.`,
+    output:
+      '{"kind": "flow", "text": "{\\"nodes\\":[{\\"id\\":\\"a\\",\\"kind\\":\\"event\\",\\"label\\":\\"after a commit\\"}],\\"edges\\":[{\\"from\\":\\"a\\",\\"to\\":\\"b\\",\\"label\\":\\"no\\"}],\\"ordered\\":false}"}',
+    validate(text) {
+      return parseFlow(text) !== undefined;
+    },
+  },
+  {
     kind: "pseudo",
     name: "Steps",
     when:
@@ -103,6 +129,8 @@ export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
   },
   {
     kind: "mermaid",
+    // Kept so old records still validate and draw; the writer gets Flow instead.
+    offered: false,
     name: "Flowchart",
     when:
       `The change is a flow between files or functions (a request path, a queue, a state ` +
@@ -119,6 +147,8 @@ export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
   },
   {
     kind: "sequence",
+    // Kept so old records still validate and draw; the writer gets Flow instead.
+    offered: false,
     name: "Sequence",
     when:
       "The change is a flow over time between actors that hand work to each other: a hook " +
@@ -271,11 +301,11 @@ export function shapeWanted(commits: readonly ShapeCommitInfo[]): {
 /** How much of the diff the side writer reads; enough to name the path, not the file. */
 export const SHAPE_DIFF_LIMIT = 7000;
 
-/** The tool catalogue as the prompt lists it. */
+/** The tool catalogue as the prompt lists it; retired tools are left out. */
 export function toolCatalogue(): string {
-  return SHAPE_TOOLS.map(
-    (tool) => `- "${tool.kind}" (${tool.name}): ${tool.when}\n  Output: ${tool.output}`,
-  ).join("\n");
+  return SHAPE_TOOLS.filter((tool) => tool.offered !== false)
+    .map((tool) => `- "${tool.kind}" (${tool.name}): ${tool.when}\n  Output: ${tool.output}`)
+    .join("\n");
 }
 
 /** The record's Intent for one message, as plain lines. */
@@ -316,20 +346,20 @@ export function shapePrompt(opts: {
     "Tools:",
     toolCatalogue(),
     "",
+    "Kinds (one per Flow node; the map draws the symbol, you never draw it):",
+    ...UNIVERSAL_KINDS.map((kind) => `- ${kind.id} (${kind.symbol} ${kind.name}): ${kind.means}`),
+    "",
     "Rules:",
     "- Give at most three tools, the ones that say the most about this change; never two that tell the same thing.",
-    "- A diagram for a change across two or more files: a sequence diagram when work is handed between actors over time, a flowchart for a path through code.",
+    "- A Flow for a change across two or more files: every node gets a kind from the list above and a label in the project's own words. Set `ordered` true when the edges are steps over time and work is handed between parts.",
     "- A Before / After table when behaviour someone can see changes (a fix, a new default, a rule).",
     "- A change nobody would notice from outside (a refactor, a rename, moved code, a wording tweak in a prompt or comment) takes no tool at all: return none.",
     "- An Interface table only for what is reached from outside the changed module: a CLI command or flag, an exported function or type other packages use, a config key, a stored schema field, an HTTP route. Never an internal helper, a component prop or a view-model field.",
     "- A new or changed command or flag always gets an example that runs it and shows what it prints, with real values from the diff; a file path in it must be one the diff touches, never an invented one. Otherwise an example only when one concrete case shows the change faster than steps.",
-    "- Steps only when the logic itself is the point and no other tool says it.",
-    `- Write names the same way in every tool: ${SHAPE_NOTATION.map((entry) => `${entry.sample} = ${entry.means}`).join("; ")}.`,
-    "- In a diagram, name actors and boxes by their role in plain words; put the code name after it in parentheses, written as above: Queue (shape-queue.ts). Arrow labels are plain verbs: puts it in the queue (enqueueShape()).",
+    "- Steps only when the logic itself is the point and no other tool says it; each step starts with the symbol of its kind after its number, e.g. `1. ⚡ After a commit, …`.",
     "- Tables have no header row (the map adds one); every line is one row of three cells split by |.",
     "- Order the tools: diagram, tables, example, steps. Return none when the change is a small fix not worth a picture.",
     `- Name real functions, files and modules from the diff. Never invent a path.`,
-    `- A flowchart starts with "flowchart TD" (or LR) and stays under ${MERMAID_MAX_NODES} nodes; quote labels that hold spaces or punctuation. A sequence diagram starts with "sequenceDiagram", names at most ${SEQUENCE_MAX_ACTORS} participants with short ids, and puts no semicolons or # in message text.`,
     "- Describe what the code does now, not the steps of the conversation.",
     `- Write the text in ${writing}; JSON keys stay English. Never write secrets, credentials or personal data.`,
     "",

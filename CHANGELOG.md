@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- A **Flow** Shape tool: the writer names each box's kind (function, data store, event, condition, …) with the project's own label, and cogit draws the fixed symbol and shape. A legend above the tools shows the kinds a Shape uses, and the Flow/Steps help lists all of them.
+
+### Changed
+- The Shape writer no longer gets the raw Mermaid flowchart and sequence tools; Flow replaces them, and old records still validate and draw. Steps start each line with its kind's symbol.
 
 ## [0.25.3] - 2026-10-31
 ### Added

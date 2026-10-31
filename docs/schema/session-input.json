@@ -267,7 +267,8 @@
                         "table",
                         "sequence",
                         "interface",
-                        "example"
+                        "example",
+                        "flow"
                       ]
                     },
                     "text": {

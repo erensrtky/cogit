@@ -77,7 +77,7 @@ export interface ViewChange {
 
 /** What a message's change does, between Intent and Code (Story 13.6). */
 export interface ViewShapeTool {
-  /** `pseudo`, `mermaid`, `table`, or a kind a newer CLI wrote (shown as text). */
+  /** `pseudo`, `flow`, `table`, or a kind a newer CLI wrote (shown as text). */
   kind: string;
   text: string;
   /** False when the registry refused the output; the map shows it as text. */

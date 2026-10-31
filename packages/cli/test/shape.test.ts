@@ -18,7 +18,7 @@ import {
   validateShapeTools,
 } from "../src/shape.js";
 import { loadSession } from "../src/store/stores.js";
-import { shapePreview, tableRows } from "../src/view/shape.js";
+import { flowToMermaid, shapeKindsUsed, shapePreview, tableRows } from "../src/view/shape.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
 const PSEUDO = "1. Read the record\n2. Merge the node";
@@ -151,7 +151,7 @@ describe("the Shape tool catalogue", () => {
     ]);
   });
 
-  it("asks for the diagram and the steps across files, and a table for a visible change", () => {
+  it("asks for a Flow, steps and a table, and lists the kinds", () => {
     const prompt = shapePrompt({
       node: message(),
       commits: [],
@@ -159,28 +159,33 @@ describe("the Shape tool catalogue", () => {
       diffTruncated: false,
       language: "auto",
     });
-    expect(prompt).toContain("A diagram for a change across two or more files");
+    expect(prompt).toContain("A Flow for a change across two or more files");
     expect(prompt).toContain("A Before / After table when behaviour someone can see changes");
     expect(prompt).toContain("A new or changed command or flag always gets an example");
     expect(prompt).toContain("Never an internal helper");
     expect(prompt).toContain("takes no tool at all");
     expect(prompt).toContain("never an invented one");
-    expect(prompt).toContain("drainShapeQueue() = a function, with ()");
-    expect(prompt).toContain("Arrow labels are plain verbs");
+    expect(prompt).toContain("fn (ƒ Function): a function or method");
+    expect(prompt).toContain("event (⚡ Event): something that starts the work");
+    expect(prompt).toContain("each step starts with the symbol of its kind after its number");
     expect(prompt).toContain('"table" (Before / After)');
-    expect(prompt).toContain('"sequence" (Sequence)');
+    expect(prompt).toContain('"flow" (Flow)');
     expect(prompt).toContain('"interface" (Interface)');
     expect(prompt).toContain('"example" (Example)');
-    expect(prompt).toContain("a sequence diagram when work is handed between actors");
+    // The retired Mermaid tools are no longer offered to the writer.
+    expect(prompt).not.toContain("mermaid");
+    expect(prompt).not.toContain("sequence");
   });
 
-  it("names both tools and says when to use each", () => {
+  it("names the offered tools and says when to use each", () => {
     const catalogue = toolCatalogue();
+    expect(catalogue).toContain('"flow"');
     expect(catalogue).toContain('"pseudo"');
-    expect(catalogue).toContain('"mermaid"');
-    expect(catalogue).toContain("10 nodes");
+    expect(catalogue).toContain('{"kind": "flow"');
     expect(catalogue).toContain('{"kind": "pseudo"');
-    expect(catalogue).toContain('{"kind": "mermaid"');
+    // The retired Mermaid tools stay in the registry but out of the catalogue.
+    expect(catalogue).not.toContain('"mermaid"');
+    expect(catalogue).not.toContain('"sequence"');
   });
 
   it("stamps who wrote it, when, and each answer's validity", () => {
@@ -201,6 +206,113 @@ describe("the Shape tool catalogue", () => {
     expect(shape.tools.map((tool) => tool.valid)).toEqual([true, false]);
     // The refused output keeps its text; the map shows it as source.
     expect(shape.tools[1]?.text).toBe("nope");
+  });
+});
+
+describe("the Flow tool", () => {
+  const flow = (nodes: unknown, edges: unknown, ordered: unknown = false) =>
+    JSON.stringify({ nodes, edges, ordered });
+
+  it("accepts a valid Flow and refuses bad JSON, an unknown kind, a duplicate id, a missing endpoint and too many nodes", () => {
+    const valid = flow(
+      [
+        { id: "a", kind: "event", label: "after a commit" },
+        { id: "b", kind: "fn", label: "write the shape" },
+      ],
+      [{ from: "a", to: "b", label: "yes" }],
+    );
+    expect(validateShapeTools([{ kind: "flow", text: valid }])[0]?.valid).toBe(true);
+
+    for (const bad of [
+      "not json",
+      flow([{ id: "a", kind: "wizard", label: "x" }], []),
+      flow(
+        [
+          { id: "a", kind: "event", label: "x" },
+          { id: "a", kind: "fn", label: "y" },
+        ],
+        [{ from: "a", to: "a" }],
+      ),
+      flow([{ id: "a", kind: "event", label: "x" }], [{ from: "a", to: "c" }]),
+      flow(
+        Array.from({ length: 13 }, (_, i) => ({ id: `n${i}`, kind: "fn", label: "x" })),
+        [],
+      ),
+      flow([{ id: "a", kind: "event", label: "x" }], [], "yes"),
+    ]) {
+      expect(validateShapeTools([{ kind: "flow", text: bad }])[0]?.valid).toBe(false);
+    }
+  });
+
+  it("draws a Flow deterministically, quoting labels and shaping each kind", () => {
+    const text = JSON.stringify({
+      nodes: [
+        { id: "a", kind: "event", label: "after a commit" },
+        { id: "b", kind: "cond", label: 'was it "recorded"?' },
+        { id: "c", kind: "store", label: "shape queue" },
+      ],
+      edges: [
+        { from: "a", to: "b" },
+        { from: "b", to: "c", label: "no" },
+      ],
+      ordered: false,
+    });
+    expect(flowToMermaid(text)).toBe(
+      [
+        "flowchart TD",
+        '  a>"⚡ after a commit"]',
+        `  b{"◇ was it 'recorded'?"}`,
+        '  c[("▤ shape queue")]',
+        "  a --> b",
+        '  b -->|"no"| c',
+      ].join("\n"),
+    );
+  });
+
+  it("numbers the edge labels when ordered, and refuses invalid input", () => {
+    const ordered = JSON.stringify({
+      nodes: [
+        { id: "a", kind: "event", label: "after a commit" },
+        { id: "b", kind: "fn", label: "enqueue" },
+        { id: "c", kind: "store", label: "queue" },
+      ],
+      edges: [
+        { from: "a", to: "b" },
+        { from: "b", to: "c", label: "puts it in" },
+      ],
+      ordered: true,
+    });
+    expect(flowToMermaid(ordered)).toBe(
+      [
+        "flowchart TD",
+        '  a>"⚡ after a commit"]',
+        '  b["ƒ enqueue"]',
+        '  c[("▤ queue")]',
+        '  a -->|"1."| b',
+        '  b -->|"2. puts it in"| c',
+      ].join("\n"),
+    );
+    expect(flowToMermaid("not json")).toBeUndefined();
+    expect(flowToMermaid(JSON.stringify({ nodes: [], edges: [] }))).toBeUndefined();
+  });
+
+  it("derives the kinds a Flow and its Steps use, in the universal order", () => {
+    const tools = [
+      {
+        kind: "flow",
+        text: JSON.stringify({
+          nodes: [
+            { id: "a", kind: "event", label: "after a commit" },
+            { id: "b", kind: "store", label: "queue" },
+          ],
+          edges: [{ from: "a", to: "b" }],
+          ordered: false,
+        }),
+      },
+      { kind: "pseudo", text: "1. ⚡ After a commit\n2. ƒ enqueue the shape" },
+    ];
+    expect(shapeKindsUsed(tools).map((kind) => kind.id)).toEqual(["fn", "event", "store"]);
+    expect(shapeKindsUsed([])).toEqual([]);
   });
 });
 

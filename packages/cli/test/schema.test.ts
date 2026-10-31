@@ -48,6 +48,20 @@ describe("Session schema", () => {
     expect(sent.success).toBe(false);
   });
 
+  it("accepts a Flow tool from a writer", () => {
+    const shape = {
+      tools: [
+        { kind: "flow", text: '{"nodes":[{"id":"a","kind":"event","label":"x"}],"edges":[]}' },
+      ],
+      commits: [],
+    };
+    const sent = SessionInput.safeParse({
+      sessionId: "abc",
+      nodes: [{ id: "m1", kind: "message", title: "t", shape }],
+    });
+    expect(sent.success).toBe(true);
+  });
+
   it("rejects ids that are not safe slugs", () => {
     for (const sessionId of ["../etc", "a/b", "", ".hidden"]) {
       expect(SessionInput.safeParse({ sessionId }).success).toBe(false);

@@ -34,13 +34,22 @@ export const MESSAGE_ID = /^m[1-9][0-9]*$/;
  * How a Shape shows what a change does (Story 13.6). The registry in `shape.ts`
  * says when each tool fits and validates its output.
  */
-export const ShapeKind = z.enum(["pseudo", "mermaid", "table", "sequence", "interface", "example"]);
+export const ShapeKind = z.enum([
+  "pseudo",
+  "mermaid",
+  "table",
+  "sequence",
+  "interface",
+  "example",
+  "flow",
+]);
 export type ShapeKind = z.infer<typeof ShapeKind>;
 
 /**
- * One tool's answer: plain-language pseudo-code, or Mermaid source. `valid` is
- * set by the CLI, never by a writer: an output the registry refused keeps its
- * text (so nothing is lost) and the map shows it as text instead of drawing it.
+ * One tool's answer: numbered steps, a table, a Flow's JSON, or Mermaid source
+ * (the two diagram tools kept for old records). `valid` is set by the CLI,
+ * never by a writer: an output the registry refused keeps its text (so nothing
+ * is lost) and the map shows it as text instead of drawing it.
  */
 export const ShapeTool = z.object({
   // Any kind is stored: a tool a newer CLI added must not make this record

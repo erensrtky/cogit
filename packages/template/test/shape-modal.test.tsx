@@ -85,6 +85,34 @@ describe("Intent, Shape and Code", () => {
     expect(invalid).toContain("Flowchart source (not drawn)");
   });
 
+  it("draws a Flow with a legend of the kinds it uses, and still draws an old flowchart", () => {
+    const flowText = JSON.stringify({
+      nodes: [
+        { id: "a", kind: "event", label: "after a commit" },
+        { id: "b", kind: "store", label: "queue" },
+      ],
+      edges: [{ from: "a", to: "b" }],
+      ordered: false,
+    });
+    const html = render("shape", {
+      shape: {
+        tools: [
+          { kind: "flow", text: flowText, valid: true },
+          { kind: "mermaid", text: "flowchart TD\nA --> B", valid: true },
+        ],
+        commits: [],
+      },
+    });
+    expect(html).toContain("<span>Flow</span>");
+    expect(html).toContain("<span>Flowchart</span>");
+    expect(html).toContain("diagram");
+    // The legend names only the kinds the Shape uses: event and store.
+    expect(html).toContain('class="shape-legend"');
+    expect(html).toContain("⚡");
+    expect(html).toContain("Data store");
+    expect(html).not.toContain("Function");
+  });
+
   it("lays out a Before / After table and shows an unknown tool as text", () => {
     const html = render("shape", {
       shape: {

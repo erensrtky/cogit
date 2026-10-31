@@ -2650,6 +2650,32 @@ time {
   padding-left: 18px;
 }
 
+/* The kinds a Shape uses, above its tools (Story 13.7). */
+.shape-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.shape-kind {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 9px;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-line);
+  border-radius: 999px;
+}
+
+.shape-kind-symbol {
+  font-size: 13px;
+}
+
 .shape-table {
   width: 100%;
   border-collapse: collapse;
@@ -2686,18 +2712,18 @@ time {
 }
 
 .shape-reading,
-.shape-notation,
-.shape-notation-row {
+.shape-kinds,
+.shape-kind-row {
   display: block;
 }
 
-.shape-notation {
+.shape-kinds {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--line);
 }
 
-.shape-notation-row + .shape-notation-row {
+.shape-kind-row + .shape-kind-row {
   margin-top: 3px;
 }
 
@@ -2706,7 +2732,7 @@ time {
   line-height: 1.5;
 }
 
-.shape-notation code {
+.shape-kinds code {
   font-size: 11px;
 }
 
