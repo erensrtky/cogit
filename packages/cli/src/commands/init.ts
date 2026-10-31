@@ -210,7 +210,8 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
         "git config --global user.email you@example.com",
     );
 
-  const name = opts.name ?? (await io.prompt.input("Project name?", basename(root)));
+  // The directory names the project; --name overrides it.
+  const name = opts.name ?? basename(root);
   const config = await loadConfig(io.env);
 
   // Story 9.3: the record travels with the repository by default.

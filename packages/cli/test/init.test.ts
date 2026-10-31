@@ -78,7 +78,7 @@ describe("init", () => {
     });
     expect((await loadConfig(env)).language).toBe("auto");
     // name, git policy and retention; the rest take their defaults
-    expect(io.asked).toHaveLength(3);
+    expect(io.asked).toHaveLength(2);
     expect(await readProjectSetup(root)).toBe(true);
     expect(await readSkillAllowed(env)).toBe(true);
     expect(io.lines.at(-2)).toMatch(/^Initialized proj/);
@@ -149,7 +149,7 @@ describe("init", () => {
 
   it("asks for the git policy in a repo and writes .gitignore", async () => {
     await mkdir(join(root, ".git"));
-    const io = fakeIo(env, ["proj", "ignore"]);
+    const io = fakeIo(env, ["ignore"]);
     await init(root, {}, io);
     expect(await readText(join(root, ".gitignore"))).toBe("# cogit\n/.cogit/\n");
     expect(io.lines).toContain("Added to .gitignore: /.cogit/");
@@ -158,7 +158,7 @@ describe("init", () => {
   it("raises transcript retention when asked, keeping other settings", async () => {
     await mkdir(join(dir, "claude"));
     await writeFile(settingsFile(), JSON.stringify({ model: "x" }));
-    const io = fakeIo(env, ["proj", "commit", "365"]);
+    const io = fakeIo(env, ["commit", "365"]);
     await init(root, {}, io);
     expect(JSON.parse(await readText(settingsFile()))).toEqual({
       model: "x",
@@ -182,7 +182,7 @@ describe("init", () => {
     const io = fakeIo(env);
     await init(root, {}, io);
     expect(io.lines).toContain("Claude Code keeps transcripts for 365 days.");
-    expect(io.asked).toHaveLength(2);
+    expect(io.asked).toHaveLength(1);
   });
 
   it("applies a retention option without asking, and skips an unchanged one", async () => {
@@ -234,7 +234,7 @@ describe("init", () => {
   });
 
   it("takes the conversation's language without asking, and the option when given", async () => {
-    const io = fakeIo(env, ["proj", "commit", "keep"]);
+    const io = fakeIo(env, ["commit", "keep"]);
     await init(root, {}, io);
     expect((await loadConfig(env)).language).toBe("auto");
     expect(io.asked.some((q) => q.startsWith("Language"))).toBe(false);
@@ -250,7 +250,7 @@ describe("init", () => {
       settingsFile(),
       JSON.stringify({ permissions: { allow: ["Bash(ls)"], deny: [] } }),
     );
-    const io = fakeIo(env, ["proj", "commit", "keep", "yes"]);
+    const io = fakeIo(env, ["commit", "keep", "yes"]);
     await init(root, {}, io);
     expect(JSON.parse(await readText(settingsFile())).permissions).toEqual({
       allow: ["Bash(ls)", SKILL_RULE],
@@ -265,7 +265,7 @@ describe("init", () => {
   });
 
   it("leaves permissions alone when declined with the flag", async () => {
-    const io = fakeIo(env, ["proj", "commit", "keep"]);
+    const io = fakeIo(env, ["commit", "keep"]);
     await init(root, { allowSkill: false }, io);
     expect(await readSkillAllowed(env)).toBe(false);
     expect(io.lines).toContain(

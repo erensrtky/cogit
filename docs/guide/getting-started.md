@@ -44,14 +44,15 @@ cd your-project
 cogit init
 ```
 
-`init` asks two questions; the rest have sensible defaults, and every one has a flag so
-`cogit init --yes` runs without asking.
+`init` asks at most two questions; the rest have sensible defaults, and every one has a flag
+so `cogit init --yes` runs without asking.
 
 | Question | Default | Flag |
 |---|---|---|
-| Project name | the directory name | `--name` |
 | Commit the session records to git? | yes | `--git commit\|ignore` |
 | Keep Claude Code transcripts longer? Claude Code deletes them after 30 days by default. | keep as is | `--retention <days\|keep>` |
+
+The project is named after its directory; `--name` overrides it.
 
 Without asking, `init` lets the agent run the cogit skill without a permission prompt (so it
 updates the record as it works), turns the plugin on for the project (writes
