@@ -367,7 +367,7 @@ export function ShapeLayers({
   enabled,
   onTab,
   regenerate,
-  renderMermaid = (source) => <MermaidDiagram source={source} />,
+  renderMermaid = (source) => <MermaidDiagram source={source} interactive />,
 }: {
   node: ShapeNode;
   root: string;

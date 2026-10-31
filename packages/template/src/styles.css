@@ -2827,6 +2827,68 @@ time {
   margin: 0 auto;
 }
 
+/* The Open window's diagram (Story 14.2): a fixed viewport it drags and zooms in. */
+.shape-diagram-interactive {
+  position: relative;
+  overflow: hidden;
+}
+
+.shape-viewport {
+  position: relative;
+  height: min(60vh, 560px);
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+.shape-viewport:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.shape-viewport.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.shape-pan-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  transform-origin: 0 0;
+}
+
+.shape-diagram-interactive .shape-pan-content svg {
+  max-width: none;
+  margin: 0;
+}
+
+.shape-zoom-controls {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 4px;
+}
+
+.shape-zoom-controls button {
+  min-width: 28px;
+  padding: 2px 8px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--chip-line);
+  border-radius: 5px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.shape-zoom-controls button:hover {
+  background: var(--hover);
+}
+
 .shape-by {
   color: var(--muted);
   font-size: 11px;

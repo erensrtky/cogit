@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- A diagram in the Shape's Open window opens fitted to the window and can be dragged, zoomed with the wheel or the **−** / **Fit** / **+** buttons, moved with the arrow keys and fitted again with a double-click, instead of being read through a horizontal scrollbar.
 - Captured work: `cogit captures` and the map's **Captured** list gather what the sessions left open — each session's pending items and each branch summary's open line — with the source message, who recorded it and how old it is; items waiting for you come first. Read-only and derived from the record; cogit keeps no planning state.
 
 ## [0.26.0] - 2026-10-31
