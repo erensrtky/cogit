@@ -21210,7 +21210,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-EIMRBWXQ.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-AMCDWEHG.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -24230,6 +24230,7 @@ function stampedIdentity(stored, here) {
 var DATA_ELEMENT_ID = "cogit-data";
 var LIVE_META_NAME = "cogit-live";
 var TOKEN_META_NAME = "cogit-token";
+var TOKEN_HEADER_NAME = "x-cogit-token";
 var PANEL_EDITABLE_KEYS = [
   "recorder",
   "messageSummaries",
@@ -25720,7 +25721,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "0.25.6",
+  version: "0.25.7",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [
@@ -26365,6 +26366,7 @@ export {
   stampedIdentity,
   LIVE_META_NAME,
   TOKEN_META_NAME,
+  TOKEN_HEADER_NAME,
   isPanelEditableKey,
   VIEW_SCHEMA,
   lastActive,
