@@ -21210,7 +21210,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-DQ2SKMD3.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-TNG3D3SU.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -21428,7 +21428,7 @@ var AgentDecision = external_exports.object({
   alternatives: external_exports.array(Alternative).max(10).optional()
 });
 var MESSAGE_ID = /^m[1-9][0-9]*$/;
-var ShapeKind = external_exports.enum(["pseudo", "mermaid", "table"]);
+var ShapeKind = external_exports.enum(["pseudo", "mermaid", "table", "sequence", "interface", "example"]);
 var ShapeTool = external_exports.object({
   // Any kind is stored: a tool a newer CLI added must not make this record
   // unreadable here. A kind this CLI does not know is shown as text.
@@ -25712,7 +25712,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "0.25.1",
+  version: "0.25.2",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [
