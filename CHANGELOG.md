@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- A **?** explanation that opens above its button (every Shape tool but the last, and Settings rows near the bottom) shows again; it was pushed off the window.
 
 ## [0.25.4] - 2026-10-31
 ### Added

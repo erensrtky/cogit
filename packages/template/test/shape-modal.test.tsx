@@ -194,6 +194,7 @@ describe("the help bubble", () => {
       position: "fixed",
       left: 92,
       top: 124,
+      bottom: "auto",
       maxHeight: 668,
       overflowY: "auto",
     });
@@ -201,6 +202,7 @@ describe("the help bubble", () => {
     expect(bubblePlace(low, 200, 1200, 800)).toEqual({
       position: "fixed",
       left: 832,
+      top: "auto",
       bottom: 106,
       maxHeight: 686,
       overflowY: "auto",

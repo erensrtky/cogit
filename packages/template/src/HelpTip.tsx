@@ -103,10 +103,19 @@ export function bubblePlace(
   const below = height - rect.bottom - 6 - EDGE;
   const above = rect.top - 6 - EDGE;
   if (bubbleHeight <= below || (bubbleHeight > above && below >= above))
-    return { position: "fixed", left, top: rect.bottom + 6, maxHeight: below, overflowY: "auto" };
+    return {
+      position: "fixed",
+      left,
+      top: rect.bottom + 6,
+      bottom: "auto",
+      maxHeight: below,
+      overflowY: "auto",
+    };
   return {
     position: "fixed",
     left,
+    // The stylesheet places the bubble with `top`; clear it, or both apply.
+    top: "auto",
     bottom: height - rect.top + 6,
     maxHeight: above,
     overflowY: "auto",
