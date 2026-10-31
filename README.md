@@ -79,7 +79,7 @@ cogit open .
 
 - [Getting started](docs/guide/getting-started.md): what `init` asks, your first session,
   setting up a team
-- [The map](docs/guide/map.md): sessions, branches, the inbox, unread work, files, search,
+- [The map](docs/guide/map.md): sessions, branches, the inbox, files, search,
   resuming and forking a session
 - [Reading the lineage](docs/guide/reading-the-lineage.md): `log`, `show`, `blame`, `why`,
   `search`

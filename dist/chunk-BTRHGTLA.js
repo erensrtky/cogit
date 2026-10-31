@@ -21109,12 +21109,6 @@ function projectPaths(root) {
     conversations: join6(base, "conversations"),
     conversation: (id) => join6(base, "conversations", `${id}.jsonl.gz`),
     state: (id) => join6(base, "state", `${id}.json`),
-    /**
-     * Which messages this user has marked read (Story 10.3). Local per-user
-     * state: never committed, never shared (`state/` stays ignored by both
-     * policies).
-     */
-    readState: join6(base, "state", "read.json"),
     /** Inbox rows the user dismissed, per session (Story 11.1); also local. */
     inboxState: join6(base, "state", "inbox.json"),
     /** How the user left the map: open sessions and dragged row widths; also local. */
@@ -21210,7 +21204,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-AMCDWEHG.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-WUFX2JYS.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -24609,26 +24603,6 @@ async function blame(opts) {
   return hits;
 }
 
-// src/store/changes.ts
-async function readProjectChanges(root, hashes) {
-  const wanted = [...new Set(hashes)];
-  if (wanted.length === 0) return /* @__PURE__ */ new Map();
-  const gitRoot = await findGitRoot(root);
-  if (gitRoot === void 0) return /* @__PURE__ */ new Map();
-  const raw = await readCommitChanges(gitRoot, wanted);
-  if (gitRoot === root) return raw;
-  const files = projectFiles(
-    gitRoot,
-    root,
-    new Map([...raw].map(([hash2, change]) => [hash2, change.files]))
-  );
-  const out = /* @__PURE__ */ new Map();
-  for (const [hash2, change] of raw) {
-    out.set(hash2, { ...change, files: files.get(hash2) ?? [] });
-  }
-  return out;
-}
-
 // src/store/events.ts
 import { appendFile as appendFile2, mkdir as mkdir5, readFile as readFile7 } from "fs/promises";
 import { dirname as dirname7 } from "path";
@@ -24734,114 +24708,6 @@ function seedEvents(nodes, at) {
       events.push({ at, type: "link", msg: node2.id, target: link, by: "agent" });
   }
   return events;
-}
-
-// src/store/read-state.ts
-var READ_STATE_SCHEMA = 1;
-var MESSAGE_ID2 = /^h[0-9a-f]{12}$/;
-var ReadState = external_exports.object({
-  schema: external_exports.literal(READ_STATE_SCHEMA),
-  /** Read message ids (`h` plus 12 hex). */
-  read: external_exports.array(external_exports.string().regex(MESSAGE_ID2)).default([])
-});
-async function readReadState(root) {
-  const read = await readJson(projectPaths(root).readState);
-  if (!read.found || "error" in read) return /* @__PURE__ */ new Set();
-  const parsed = ReadState.safeParse(read.value);
-  return new Set(parsed.success ? parsed.data.read : []);
-}
-async function setMessageRead(root, id, read) {
-  if (!MESSAGE_ID2.test(id)) throw new Error(`not a message id: ${id}`);
-  const p = projectPaths(root);
-  await withLock(
-    p.lock("read-state"),
-    async () => {
-      const ids = await readReadState(root);
-      if (read) ids.add(id);
-      else ids.delete(id);
-      await atomicWriteJson(p.readState, {
-        schema: READ_STATE_SCHEMA,
-        read: [...ids].sort()
-      });
-    },
-    { timeoutMs: 2e3 }
-  );
-}
-
-// src/view/change.ts
-function messageChange(commits, changes) {
-  if (commits === void 0 || commits.length === 0) return void 0;
-  const seen = /* @__PURE__ */ new Set();
-  const files = /* @__PURE__ */ new Set();
-  let added = 0;
-  let removed = 0;
-  for (const hash2 of commits) {
-    const change = changes.get(hash2);
-    if (change === void 0 || seen.has(change.full)) continue;
-    seen.add(change.full);
-    added += change.added;
-    removed += change.removed;
-    for (const file2 of change.files) files.add(file2);
-  }
-  if (seen.size === 0) return void 0;
-  return { added, removed, files: files.size };
-}
-function attachChanges(sessions, changes) {
-  if (changes.size === 0) return sessions.map((session) => session);
-  return sessions.map((session) => {
-    let changed = false;
-    const nodes = session.nodes.map((node2) => {
-      if (node2.kind !== "message") return node2;
-      const change = messageChange(node2.commits, changes);
-      if (change === void 0) {
-        if (node2.change === void 0) return node2;
-        changed = true;
-        const { change: _dropped, ...rest } = node2;
-        return rest;
-      }
-      changed = true;
-      return { ...node2, change };
-    });
-    return changed ? { ...session, nodes } : session;
-  });
-}
-function changeLines(change) {
-  return change.added + change.removed;
-}
-function isBigChange(change, threshold) {
-  return changeLines(change) >= threshold;
-}
-function unreadMessages(sessions, read) {
-  const out = [];
-  for (const session of sessions) {
-    for (const node2 of session.nodes) {
-      if (node2.kind !== "message" || node2.change === void 0) continue;
-      if (read.has(node2.id)) continue;
-      out.push({
-        sessionId: session.sessionId,
-        sessionTitle: session.title,
-        sessionStartedAt: session.startedAt,
-        messageId: node2.id,
-        label: node2.label ?? node2.id,
-        title: node2.title,
-        ...node2.at === void 0 ? {} : { at: node2.at },
-        change: node2.change
-      });
-    }
-  }
-  return out.sort(
-    (a, b) => changeLines(b.change) - changeLines(a.change) || b.change.files - a.change.files || a.title.localeCompare(b.title) || a.messageId.localeCompare(b.messageId)
-  );
-}
-function countBigUnread(sessions, read, threshold) {
-  return unreadMessages(sessions, read).filter((message) => isBigChange(message.change, threshold)).length;
-}
-function grouped(value) {
-  return String(Math.max(0, Math.trunc(value))).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-}
-function formatChange(change) {
-  const files = `${change.files} file${change.files === 1 ? "" : "s"}`;
-  return `+${grouped(change.added)} \u2212${grouped(change.removed)} \xB7 ${files}`;
 }
 
 // src/view/files.ts
@@ -25342,43 +25208,6 @@ async function log(opts) {
   for (const line of formatLog(model, opts.branchesOnly === true)) opts.io.out(line);
   return model;
 }
-async function logUnread(opts) {
-  const root = await openProject(opts.dir);
-  const sessions = await loadEffectiveSessions(root, opts.io);
-  const hashes = new Set(
-    sessions.flatMap((entry) => entry.messages.flatMap((message) => message.commits ?? []))
-  );
-  const changes = hashes.size === 0 ? /* @__PURE__ */ new Map() : await readProjectChanges(root, hashes);
-  const read = await readReadState(root);
-  const unread = unreadMessages(
-    sessions.map(({ session, messages }) => ({
-      sessionId: session.sessionId,
-      title: session.title,
-      startedAt: session.startedAt,
-      nodes: messages.map((message) => ({
-        ...message,
-        change: messageChange(message.commits, changes)
-      }))
-    })),
-    read
-  );
-  if (opts.json === true) {
-    opts.io.out(JSON.stringify(unread, null, 2));
-    return unread;
-  }
-  for (const line of formatUnread(unread)) opts.io.out(line);
-  return unread;
-}
-function formatUnread(messages) {
-  if (messages.length === 0) return ["No unread messages with linked commits."];
-  return messages.map((message) => {
-    const parts = [
-      `  ${shortHash(message.messageId)}  ${message.label}  ${clock(message.at)}  ${formatChange(message.change)}  ${oneLine3(message.title)}`
-    ];
-    parts.push(`  \xB7 ${oneLine3(message.sessionTitle)}`);
-    return parts.join("");
-  });
-}
 function normalizeFilePath(file2) {
   return file2.replace(/\\/g, "/").replace(/^(\.\/)+/, "").replace(/\/+$/, "");
 }
@@ -25721,7 +25550,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "0.25.7",
+  version: "0.26.0",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [
@@ -26377,11 +26206,6 @@ export {
   builtBy,
   embedViewModel,
   blame,
-  readProjectChanges,
-  readReadState,
-  setMessageRead,
-  attachChanges,
-  countBigUnread,
   buildFileHistory,
   modelSessions,
   loadEffectiveSessions,
@@ -26392,7 +26216,6 @@ export {
   show,
   formatShow,
   log,
-  logUnread,
   logFile,
   why,
   compareVersions,
