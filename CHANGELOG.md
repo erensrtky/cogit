@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.25.4] - 2026-10-31
 ### Added
 - A **Flow** Shape tool: the writer names each box's kind (function, data store, event, condition, …) with the project's own label, and cogit draws the fixed symbol and shape. A legend above the tools shows the kinds a Shape uses, and the Flow/Steps help lists all of them.
 
