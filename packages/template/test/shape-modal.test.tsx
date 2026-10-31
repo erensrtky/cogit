@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { ViewNode } from "../../cli/src/view/model.js";
+import { bubblePlace } from "../src/HelpTip.js";
 import { MermaidDiagram, mermaidAvailable } from "../src/MermaidDiagram.js";
 import { ShapeLayers } from "../src/ShapeModal.js";
 
@@ -102,7 +103,9 @@ describe("Intent, Shape and Code", () => {
     expect(html).toContain('<th scope="row">Long diff</th><td>runs past the window</td>');
     expect(html).toContain("Before / After");
     expect(html).toContain("a newer tool");
-    expect(html).toContain("<figcaption>timeline</figcaption>");
+    expect(html).toContain("<span>timeline</span>");
+    // A kind this map does not know has no reading to offer.
+    expect(html).not.toContain("How to read the timeline");
   });
 
   it("draws a sequence, lays out an Interface table and shows an example", () => {
@@ -116,10 +119,11 @@ describe("Intent, Shape and Code", () => {
         commits: [],
       },
     });
-    expect(html).toContain("<figcaption>Sequence</figcaption>");
+    expect(html).toContain("<span>Sequence</span>");
+    expect(html).toContain('aria-label="How to read the Sequence"');
     expect(html).toContain('<th scope="col">Item</th>');
-    expect(html).toContain("<figcaption>Interface</figcaption>");
-    expect(html).toContain("<figcaption>Example</figcaption>");
+    expect(html).toContain("<span>Interface</span>");
+    expect(html).toContain("<span>Example</span>");
     expect(html).toContain("→ queued");
   });
 
@@ -152,5 +156,36 @@ describe("the Mermaid diagram", () => {
     );
     expect(html).toContain('<pre class="shape-source">flowchart TD');
     expect(html).toContain("cogit open");
+  });
+});
+
+describe("the help bubble", () => {
+  it("opens below when it fits, above when only that fits, and caps its height otherwise", () => {
+    const anchor = { left: 100, top: 100, bottom: 118 };
+    expect(bubblePlace(anchor, 200, 1200, 800)).toEqual({
+      position: "fixed",
+      left: 92,
+      top: 124,
+      maxHeight: 668,
+      overflowY: "auto",
+    });
+    const low = { left: 1150, top: 700, bottom: 718 };
+    expect(bubblePlace(low, 200, 1200, 800)).toEqual({
+      position: "fixed",
+      left: 832,
+      bottom: 106,
+      maxHeight: 686,
+      overflowY: "auto",
+    });
+    // Too tall for either side: the roomier one, scrolling inside itself.
+    expect(bubblePlace({ left: 2, top: 240, bottom: 258 }, 400, 400, 493)).toMatchObject({
+      left: 8,
+      bottom: 259,
+      maxHeight: 226,
+    });
+    expect(bubblePlace({ left: 2, top: 200, bottom: 218 }, 400, 400, 493)).toMatchObject({
+      top: 224,
+      maxHeight: 261,
+    });
   });
 });

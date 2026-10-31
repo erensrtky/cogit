@@ -53,3 +53,40 @@ export function tableRows(text: string): [string, string, string][] | undefined 
   }
   return rows;
 }
+
+/**
+ * How names are written in every Shape tool, so a reader tells a role from a
+ * file, a function, a field, a command and the text it prints at a glance.
+ * The writer's prompt and the map's "?" read the same list.
+ */
+export const SHAPE_NOTATION: readonly { sample: string; means: string }[] = [
+  { sample: "Git, cogit, Record", means: "a role: a program, a person or a store that acts" },
+  { sample: "session.ts", means: "a file, with its extension" },
+  { sample: "drainShapeQueue()", means: "a function, with ()" },
+  { sample: "node.commits", means: "a field, variable or setting, with its owner and a dot" },
+  { sample: "$ cogit shape", means: "a command you type, after $" },
+  { sample: '"queued ba654e8"', means: "text the program shows, in quotes" },
+];
+
+/** What each tool shows and how to read it, for the "?" beside its caption. */
+export const SHAPE_READING: Readonly<Record<string, string>> = {
+  mermaid:
+    "Follow the arrows from the top. A box is a step; a diamond is a question, and the arrows leaving it are its answers.",
+  sequence:
+    "Each column is an actor, named at the top. Read from top to bottom: each arrow is one actor handing work to another at that moment, and a dashed arrow is a reply.",
+  table:
+    "One row per case: what happens, how it behaved before this change, and how it behaves now.",
+  interface:
+    "One row per thing other code or people use: a command, flag, function, setting or stored field. — means it did not exist before, or is gone now.",
+  example:
+    "One concrete run. The first line is what you do or what happens; each line after → is what you would see.",
+  pseudo: "What the code does now, in order, one step per line.",
+};
+
+/** Tools whose text names roles, files and functions, so their "?" shows the notation. */
+export const NOTATION_KINDS: ReadonlySet<string> = new Set([
+  "mermaid",
+  "sequence",
+  "example",
+  "pseudo",
+]);

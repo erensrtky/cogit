@@ -1,8 +1,16 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ViewNode } from "../../cli/src/view/model.js";
-import { shapePreview, shapeState, tableRows } from "../../cli/src/view/shape.js";
+import {
+  NOTATION_KINDS,
+  SHAPE_NOTATION,
+  SHAPE_READING,
+  shapePreview,
+  shapeState,
+  tableRows,
+} from "../../cli/src/view/shape.js";
 import { DiffView } from "./DiffView.js";
 import { isLivePage } from "./data.js";
+import { HelpTip } from "./HelpTip.js";
 import { MermaidDiagram } from "./MermaidDiagram.js";
 
 /**
@@ -109,6 +117,33 @@ const TEXT_CAPTION: Record<string, string> = {
   interface: "Interface (as written)",
 };
 
+/**
+ * A tool's caption with a "?" that says how to read it; tools that name roles,
+ * files and functions also list how those names are written.
+ */
+function ToolCaption({ id, kind, label }: { id: string; kind: string; label: string }) {
+  const reading = SHAPE_READING[kind];
+  return (
+    <figcaption className="shape-caption">
+      <span>{label}</span>
+      {reading ? (
+        <HelpTip id={`shape-${id}`} label={`How to read the ${label}`}>
+          <span className="shape-reading">{reading}</span>
+          {NOTATION_KINDS.has(kind) ? (
+            <span className="shape-notation">
+              {SHAPE_NOTATION.map((entry) => (
+                <span key={entry.sample} className="shape-notation-row">
+                  <code>{entry.sample}</code> {entry.means}
+                </span>
+              ))}
+            </span>
+          ) : null}
+        </HelpTip>
+      ) : null}
+    </figcaption>
+  );
+}
+
 /** Tools Mermaid draws. */
 const DIAGRAM_KINDS = new Set(["mermaid", "sequence"]);
 
@@ -178,7 +213,11 @@ function ShapeLayer({
           return (
             <figure key={key} className="shape-figure">
               {renderMermaid(tool.text)}
-              <figcaption>{tool.kind === "sequence" ? "Sequence" : "Flowchart"}</figcaption>
+              <ToolCaption
+                id={key}
+                kind={tool.kind}
+                label={tool.kind === "sequence" ? "Sequence" : "Flowchart"}
+              />
             </figure>
           );
         const columns = TABLE_COLUMNS[tool.kind];
@@ -187,13 +226,17 @@ function ShapeLayer({
           return (
             <figure key={key} className="shape-figure">
               <ShapeTable columns={columns} rows={rows} />
-              <figcaption>{tool.kind === "interface" ? "Interface" : "Before / After"}</figcaption>
+              <ToolCaption
+                id={key}
+                kind={tool.kind}
+                label={tool.kind === "interface" ? "Interface" : "Before / After"}
+              />
             </figure>
           );
         return (
           <figure key={key} className="shape-figure">
             <pre className={`shape-source is-${tool.kind}`}>{tool.text}</pre>
-            <figcaption>{TEXT_CAPTION[tool.kind] ?? tool.kind}</figcaption>
+            <ToolCaption id={key} kind={tool.kind} label={TEXT_CAPTION[tool.kind] ?? tool.kind} />
           </figure>
         );
       })}

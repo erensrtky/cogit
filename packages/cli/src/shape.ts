@@ -1,5 +1,5 @@
 import type { LineageNode, Shape, ShapeInput, ShapeKind, ShapeTool } from "./schema/session.js";
-import { tableRows } from "./view/shape.js";
+import { SHAPE_NOTATION, tableRows } from "./view/shape.js";
 
 /**
  * The Shape catalogue (Story 13.6): a Shape sits between a message's Intent
@@ -319,10 +319,13 @@ export function shapePrompt(opts: {
     "Rules:",
     "- Give at most three tools, the ones that say the most about this change; never two that tell the same thing.",
     "- A diagram for a change across two or more files: a sequence diagram when work is handed between actors over time, a flowchart for a path through code.",
-    "- A Before / After table when behaviour someone can see changes (a fix, a new default, a rule). A pure refactor takes none.",
+    "- A Before / After table when behaviour someone can see changes (a fix, a new default, a rule).",
+    "- A change nobody would notice from outside (a refactor, a rename, moved code, a wording tweak in a prompt or comment) takes no tool at all: return none.",
     "- An Interface table only for what is reached from outside the changed module: a CLI command or flag, an exported function or type other packages use, a config key, a stored schema field, an HTTP route. Never an internal helper, a component prop or a view-model field.",
-    "- A new or changed command or flag always gets an example that runs it and shows what it prints, with real values from the diff. Otherwise an example only when one concrete case shows the change faster than steps.",
+    "- A new or changed command or flag always gets an example that runs it and shows what it prints, with real values from the diff; a file path in it must be one the diff touches, never an invented one. Otherwise an example only when one concrete case shows the change faster than steps.",
     "- Steps only when the logic itself is the point and no other tool says it.",
+    `- Write names the same way in every tool: ${SHAPE_NOTATION.map((entry) => `${entry.sample} = ${entry.means}`).join("; ")}.`,
+    "- In a diagram, name actors and boxes by their role in plain words; put the code name after it in parentheses, written as above: Queue (shape-queue.ts). Arrow labels are plain verbs: puts it in the queue (enqueueShape()).",
     "- Tables have no header row (the map adds one); every line is one row of three cells split by |.",
     "- Order the tools: diagram, tables, example, steps. Return none when the change is a small fix not worth a picture.",
     `- Name real functions, files and modules from the diff. Never invent a path.`,

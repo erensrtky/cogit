@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Every Shape tool's caption has a **?** that says how to read it: which way the arrows go, what a row means. Diagrams, examples and steps also list how names are written: a role in plain words, a file with its extension, a function with `()`, a field with its owner, a command after `$`, printed text in quotes.
+
+### Changed
+- The Shape writer follows that notation, names diagram actors and boxes by their role with the code name in parentheses, labels arrows with plain verbs, and gives no tool at all for a change nobody would notice from outside.
+
+### Fixed
+- A **?** explanation near the edge of a window or a scrolling panel opens on the side with room instead of being cut off; this also applies to the Settings explanations.
 
 ## [0.25.2] - 2026-10-31
 ### Added

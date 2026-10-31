@@ -163,6 +163,10 @@ describe("the Shape tool catalogue", () => {
     expect(prompt).toContain("A Before / After table when behaviour someone can see changes");
     expect(prompt).toContain("A new or changed command or flag always gets an example");
     expect(prompt).toContain("Never an internal helper");
+    expect(prompt).toContain("takes no tool at all");
+    expect(prompt).toContain("never an invented one");
+    expect(prompt).toContain("drainShapeQueue() = a function, with ()");
+    expect(prompt).toContain("Arrow labels are plain verbs");
     expect(prompt).toContain('"table" (Before / After)');
     expect(prompt).toContain('"sequence" (Sequence)');
     expect(prompt).toContain('"interface" (Interface)');

@@ -2679,6 +2679,37 @@ time {
   font-weight: 600;
 }
 
+.shape-caption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shape-reading,
+.shape-notation,
+.shape-notation-row {
+  display: block;
+}
+
+.shape-notation {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.shape-notation-row + .shape-notation-row {
+  margin-top: 3px;
+}
+
+.shape-caption .settings-details {
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.shape-notation code {
+  font-size: 11px;
+}
+
 .shape-figure {
   margin: 0 0 16px;
 }

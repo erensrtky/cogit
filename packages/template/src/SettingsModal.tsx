@@ -7,6 +7,7 @@ import {
   withDefaults,
 } from "../../cli/src/view/settings.js";
 import { isLivePage, loadSettings, pageToken, saveSetting } from "./data.js";
+import { HelpTip } from "./HelpTip.js";
 
 /**
  * The settings modal (Story 8.13). Every page carries a ⚙ Settings button in
@@ -17,48 +18,12 @@ import { isLivePage, loadSettings, pageToken, saveSetting } from "./data.js";
 
 type SettingValue = PanelSettings[keyof PanelSettings];
 
-/**
- * The "?" next to a setting's label (Story 12.1): a plain-language answer to
- * "what is this, when do I change it, what does it cost". It floats over the
- * modal while the pointer rests on the "?" or the keyboard focuses it, so
- * nothing below it moves; there is nothing to click. Escape closes it.
- */
+/** The "?" next to a setting's label: what it is, when to change it, what it costs. */
 function FieldDetails({ id, field }: { id: string; field: SettingField }) {
-  const [hovered, setHovered] = useState(false);
-  const [focused, setFocused] = useState(false);
-  const open = hovered || focused;
-  const detailId = `${id}-details`;
   return (
-    <span
-      className="settings-why-wrap"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <span
-        className="settings-why"
-        // Focusable so the keyboard reaches the explanation too.
-        tabIndex={0}
-        role="img"
-        aria-label={`What does ${field.label} do?`}
-        aria-describedby={open ? detailId : undefined}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        onKeyDown={(event) => {
-          if (event.key !== "Escape" || !open) return;
-          // Close the bubble, not the modal around it.
-          event.stopPropagation();
-          setHovered(false);
-          setFocused(false);
-        }}
-      >
-        ?
-      </span>
-      {open ? (
-        <span className="settings-details" id={detailId} role="tooltip">
-          {field.details}
-        </span>
-      ) : null}
-    </span>
+    <HelpTip id={id} label={`What does ${field.label} do?`}>
+      {field.details}
+    </HelpTip>
   );
 }
 
