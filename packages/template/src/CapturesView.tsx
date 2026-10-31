@@ -75,7 +75,7 @@ export function captureSource(
 
 /**
  * How many `suggested` + `open` items each session stands for, for the map's
- * capture mark. `done` and `dismissed` items are closed and count nothing, so a
+ * capture badge. `done` and `dismissed` items are closed and count nothing, so a
  * store of only done items marks no row, like the Captured button.
  */
 export function captureCounts(captures: readonly ViewCapture[] | undefined): Map<string, number> {
@@ -85,37 +85,6 @@ export function captureCounts(captures: readonly ViewCapture[] | undefined): Map
     counts.set(item.source.sessionId, (counts.get(item.source.sessionId) ?? 0) + 1);
   }
   return counts;
-}
-
-/** Where each session's capture mark is drawn. */
-export interface CapturePlacements {
-  /** The session row, for a session whose anchor message is not drawn. */
-  sessions: Map<string, { count: number; messageId: string }>;
-  /** The anchor's message row, by message id. */
-  messages: Map<string, number>;
-}
-
-/**
- * Places each session's mark on the row the map actually draws: the anchored
- * first message when its row is visible, otherwise the session's own row (a
- * closed session, or a first message folded away). `visible` answers whether a
- * message row is on the map right now.
- */
-export function capturePlacements(
-  captures: readonly ViewCapture[] | undefined,
-  sessions: readonly ViewSession[],
-  visible: (sessionId: string, messageId: string) => boolean,
-): CapturePlacements {
-  const counts = captureCounts(captures);
-  const placements: CapturePlacements = { sessions: new Map(), messages: new Map() };
-  for (const session of sessions) {
-    const count = counts.get(session.sessionId);
-    const messageId = session.messages[0]?.id;
-    if (count === undefined || messageId === undefined) continue;
-    if (visible(session.sessionId, messageId)) placements.messages.set(messageId, count);
-    else placements.sessions.set(session.sessionId, { count, messageId });
-  }
-  return placements;
 }
 
 export function CapturesView({

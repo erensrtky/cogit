@@ -5,7 +5,6 @@ import type { ViewCapture, ViewSession } from "../../cli/src/view/model.js";
 import {
   CapturesView,
   captureCounts,
-  capturePlacements,
   captureSource,
   capturesButtonVisible,
 } from "../src/CapturesView.js";
@@ -143,7 +142,7 @@ describe("an item's session anchor (Story 15.2)", () => {
   });
 });
 
-describe("the map's capture mark count", () => {
+describe("the session row's capture count", () => {
   it("counts suggested and open items per session, and nothing when only done ones exist", () => {
     const counts = captureCounts([
       item({ id: "c00000001", state: "suggested" }),
@@ -156,36 +155,5 @@ describe("the map's capture mark count", () => {
     expect(counts.get("s2")).toBe(1);
     expect(captureCounts([item({ id: "c00000009", state: "done" })]).size).toBe(0);
     expect(captureCounts(undefined).size).toBe(0);
-  });
-
-  it("puts the mark on the anchor message when its row is drawn, else on the session row", () => {
-    const captures = [
-      item({ id: "c00000001", state: "suggested" }),
-      item({ id: "c00000002", state: "open" }),
-    ];
-    const open = capturePlacements(captures, sessions, () => true);
-    expect([...open.messages]).toEqual([["m3", 2]]);
-    expect(open.sessions.size).toBe(0);
-
-    const folded = capturePlacements(captures, sessions, () => false);
-    expect([...folded.sessions]).toEqual([["s1", { count: 2, messageId: "m3" }]]);
-    expect(folded.messages.size).toBe(0);
-
-    const none = capturePlacements(
-      [item({ id: "c00000009", state: "done" })],
-      sessions,
-      () => true,
-    );
-    expect(none.messages.size).toBe(0);
-    expect(none.sessions.size).toBe(0);
-
-    // A session with no messages has no row to anchor on.
-    const empty = capturePlacements(
-      captures,
-      [{ ...sessions[0], messages: [] } as ViewSession],
-      () => true,
-    );
-    expect(empty.messages.size).toBe(0);
-    expect(empty.sessions.size).toBe(0);
   });
 });

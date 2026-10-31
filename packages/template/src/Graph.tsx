@@ -19,7 +19,7 @@ import {
 } from "react";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
-import { CapturesView, capturePlacements, capturesButtonVisible } from "./CapturesView.js";
+import { CapturesView, captureCounts, capturesButtonVisible } from "./CapturesView.js";
 import { loadMapView, pageToken, saveOpenSessions, saveRowWidth } from "./data.js";
 import { type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
@@ -57,6 +57,8 @@ const GraphActions = createContext<{
   /** Changes at or above this many lines get the quiet highlight. */
   bigChangeLines: number;
   openSession: (sessionId: string) => void;
+  /** Opens the session's card with its Captured work in view (the capture badge). */
+  openSessionCard: (sessionId: string) => void;
   openNode: (sessionId: string, messageId: string) => void;
   openContinue: (sessionId: string, messageId: string) => void;
   unfold: (segmentId: string) => void;
@@ -71,6 +73,7 @@ const GraphActions = createContext<{
   openIds: new Set(),
   bigChangeLines: 300,
   openSession: () => {},
+  openSessionCard: () => {},
   openNode: () => {},
   openContinue: () => {},
   unfold: () => {},
@@ -102,14 +105,11 @@ function SessionMessages({
   git,
   highlights,
   activeHitId,
-  captured,
 }: {
   session: ViewSession;
   git: GitLayout;
   highlights: ReadonlySet<string> | undefined;
   activeHitId: string | null;
-  /** Capture marks for message rows, by the anchor message id (Story 15.2). */
-  captured?: ReadonlyMap<string, number> | undefined;
 }) {
   const { selection, bigChangeLines, openNode, unfold, resizeRows, storeRowWidth, person, people } =
     useContext(GraphActions);
@@ -125,7 +125,6 @@ function SessionMessages({
         highlightIds={highlights}
         activeHitId={activeHitId}
         bigChangeLines={bigChangeLines}
-        captured={captured}
         onSelect={(row) => openNode(session.sessionId, row.message.id)}
         onUnfold={unfold}
       />
@@ -139,18 +138,11 @@ function SessionMessages({
 }
 
 function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
-  const { openSession, openNode, openContinue, selection, openIds, person } =
+  const { openSession, openSessionCard, openNode, openContinue, selection, openIds, person } =
     useContext(GraphActions);
-  // A captured-work mark goes on the anchored message row when it is drawn; a
-  // session whose first message is not showing (folded away by branch folding,
-  // or the session is closed) carries the mark on its own row instead.
-  const capture = capturePlacements(data.model.captures, data.model.sessions, (sessionId, id) =>
-    data.openings.some(
-      (opening) =>
-        opening.session.sessionId === sessionId &&
-        opening.git.rows.some((row) => row.kind === "message" && row.message.id === id),
-    ),
-  );
+  // The capture badge sits on each session's own row, expanded or folded
+  // (Story 15.3): it counts the session's suggested + open items.
+  const capture = useMemo(() => captureCounts(data.model.captures), [data.model.captures]);
   return (
     <div className="map-node">
       <SessionMap
@@ -161,9 +153,9 @@ function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
         openIds={openIds}
         highlightSessionIds={data.sessionHits}
         person={person}
-        captured={capture.sessions}
+        captured={capture}
         onOpen={openSession}
-        onOpenMessage={openNode}
+        onOpenCard={openSessionCard}
         onContinue={openContinue}
       />
       {data.openings.map((opening) => {
@@ -181,7 +173,6 @@ function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
               activeHitId={
                 active?.sessionId === opening.session.sessionId ? active.messageId : null
               }
-              captured={capture.messages}
             />
           </div>
         );
@@ -564,9 +555,12 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     },
     [keep],
   );
+  /** A request to bring a session card's "Captured work" into view (Story 15.3). */
+  const [revealCaptures, setRevealCaptures] = useState(0);
   const toggleSession = useCallback(
     (sessionId: string) => {
       keep(sessionId);
+      setRevealCaptures(0);
       if (openIds.has(sessionId)) {
         const next = new Set(openIds);
         next.delete(sessionId);
@@ -581,9 +575,23 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     },
     [openIds, keep],
   );
+  /**
+   * The capture badge (Story 15.3): opens the session card without toggling the
+   * row, and asks the panel to show the Captured work section.
+   */
+  const openSessionCard = useCallback(
+    (sessionId: string) => {
+      keep(sessionId);
+      setFocusedId(`session:${sessionId}`);
+      setSelection({ type: "session", sessionId });
+      setRevealCaptures((value) => value + 1);
+    },
+    [keep],
+  );
   const openNode = useCallback(
     (sessionId: string, messageId: string) => {
       ensureOpen(sessionId);
+      setRevealCaptures(0);
       setFocusedId(`node:session:${sessionId}:${messageId}`);
       setSelection({ type: "node", sessionId, nodeId: messageId });
     },
@@ -621,6 +629,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   }, []);
   const selectFromOutline = useCallback(
     (target: OutlineTarget) => {
+      setRevealCaptures(0);
       setFocusedId(target.focusId);
       if (target.sessionId !== null) ensureOpen(target.sessionId);
       setSelection(target.selection);
@@ -655,6 +664,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       openIds,
       bigChangeLines,
       openSession: toggleSession,
+      openSessionCard,
       openNode,
       openContinue,
       unfold,
@@ -668,6 +678,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       openIds,
       bigChangeLines,
       toggleSession,
+      openSessionCard,
       openNode,
       openContinue,
       unfold,
@@ -867,7 +878,11 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
           <DrillDown
             model={model}
             selection={selection}
-            onClose={() => setSelection(null)}
+            captureReveal={revealCaptures}
+            onClose={() => {
+              setSelection(null);
+              setRevealCaptures(0);
+            }}
             onNavigate={selectFromOutline}
             bigChangeLines={bigChangeLines}
           />

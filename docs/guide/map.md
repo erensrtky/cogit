@@ -140,12 +140,12 @@ open costs no model call.
 Each drafted item waits in **To review** until you choose: **Accept** keeps it in **Open**,
 **Dismiss** closes it without doing it. An open item is closed with **Done**. The last ten
 closed items stay under **Done (last 10)**. An item belongs to the whole session it came from,
-not to one message: the map anchors it on the session's **first message** and marks that row
-with the number of items the session stands for (the session's own row while its messages are
-folded away). Clicking a row, the mark or the source line opens that first message, whose details
-list the session's items under **Captured here** — read-only, so a stray click cannot close
-work; accepting, dismissing and closing stay in the Captured list. A session with no messages
-anchors nowhere, and its items show only in the list. The model never reopens or rewrites an
+not to one message. The session's own row carries the number of items it stands for — a button,
+whether the session is expanded or folded — and clicking it opens that session's card, where the
+items are listed under **Captured work** with their state and age — read-only, so a stray click
+cannot close work; accepting, dismissing and closing stay in the Captured list. An item's source
+line in the list opens the session's **first message**. A session with no messages anchors
+nowhere, and its items show only in the list. The model never reopens or rewrites an
 item you already saw; closing is your act. In the terminal: `cogit captures`,
 `cogit captures accept|dismiss|done <id>`, and `cogit captures distill [--session <id> | --all]
 [--dry-run]` to backfill sessions by hand (`--dry-run` prints the proposals and writes nothing).

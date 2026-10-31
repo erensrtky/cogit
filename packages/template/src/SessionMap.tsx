@@ -29,7 +29,7 @@ function SessionRow({
   searchHit,
   captured,
   onOpen,
-  onOpenMessage,
+  onOpenCard,
   onContinue,
 }: {
   row: GitMessageRow;
@@ -43,14 +43,17 @@ function SessionRow({
   open: boolean;
   /** The session's title or status matches the search (Story 8.14). */
   searchHit: boolean;
-  /** Suggested + open captured items whose anchor is not shown on a message row. */
-  captured?: { count: number; messageId: string } | undefined;
+  /** Suggested + open captured items the session stands for (Story 15.3). */
+  captured?: number | undefined;
   onOpen: (sessionId: string) => void;
-  /** Selects one message and opens its details (the capture mark, Story 15.2). */
-  onOpenMessage: (sessionId: string, messageId: string) => void;
+  /** Opens the session's card, with its Captured work in view (the capture badge). */
+  onOpenCard: (sessionId: string) => void;
   onContinue: (continues: NonNullable<ViewSession["messages"][number]["continues"]>) => void;
 }) {
   const continues = session.messages[0]?.continues;
+  // A session with no messages anchors nowhere: its items live only in the
+  // Captured list, so its row gets no badge (Story 15.3).
+  const badge = session.messages.length === 0 ? undefined : captured;
   const style = { top: row.y - row.height / 2, height: row.height };
   const count = session.messages.length;
   const className = [
@@ -63,13 +66,23 @@ function SessionRow({
     .filter(Boolean)
     .join(" ");
   return (
-    <button
-      type="button"
+    // A div, not a button: the row holds the capture badge button (Story 15.3),
+    // and a button may not nest one.
+    <div
+      role="button"
+      tabIndex={0}
       className={className}
       style={style}
       aria-expanded={open}
       onClick={(event: MouseEvent) => {
         event.stopPropagation();
+        onOpen(session.sessionId);
+      }}
+      onKeyDown={(event) => {
+        // The badge handles its own keys; only the row's focus reaches here.
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
         onOpen(session.sessionId);
       }}
       title={session.status.goal || session.title}
@@ -79,17 +92,18 @@ function SessionRow({
       </span>
       <span className="git-time">{session.startedAt ? formatStamp(session.startedAt) : ""}</span>
       <span className="git-title">{session.title || session.sessionId}</span>
-      {captured === undefined ? null : (
-        <span
+      {badge === undefined ? null : (
+        <button
+          type="button"
           className="capture-mark session-capture"
-          title={`${captured.count} captured item${captured.count === 1 ? "" : "s"} from this session`}
+          title={`${badge} captured item${badge === 1 ? "" : "s"} from this session`}
           onClick={(event: MouseEvent) => {
             event.stopPropagation();
-            onOpenMessage(session.sessionId, captured.messageId);
+            onOpenCard(session.sessionId);
           }}
         >
-          {captured.count}
-        </span>
+          {badge}
+        </button>
       )}
       {showAuthor && session.author ? (
         <span className="muted session-author" title={`Recorded by ${session.author}`}>
@@ -117,7 +131,7 @@ function SessionRow({
         </span>
       ) : null}
       {row.head ? <span className="left-off">left off here</span> : null}
-    </button>
+    </div>
   );
 }
 
@@ -130,7 +144,7 @@ export function SessionMap({
   person = null,
   captured,
   onOpen,
-  onOpenMessage,
+  onOpenCard,
   onContinue,
 }: {
   model: LineageViewModel;
@@ -142,10 +156,11 @@ export function SessionMap({
   highlightSessionIds: ReadonlySet<string>;
   /** The person filter: everyone when left out. */
   person?: PersonFilter;
-  /** Captured-work marks, by session id (Story 15.2). */
-  captured?: ReadonlyMap<string, { count: number; messageId: string }> | undefined;
+  /** Suggested + open captured items, by session id (Story 15.3). */
+  captured?: ReadonlyMap<string, number> | undefined;
   onOpen: (sessionId: string) => void;
-  onOpenMessage: (sessionId: string, messageId: string) => void;
+  /** Opens the session's card, with its Captured work in view. */
+  onOpenCard: (sessionId: string) => void;
   onContinue: (sessionId: string, messageId: string) => void;
 }) {
   const { git } = graph;
@@ -246,7 +261,7 @@ export function SessionMap({
               searchHit={highlightSessionIds.has(session.sessionId)}
               captured={captured?.get(session.sessionId)}
               onOpen={onOpen}
-              onOpenMessage={onOpenMessage}
+              onOpenCard={onOpenCard}
               onContinue={(continues) => onContinue(continues.sessionId, continues.id)}
             />
           );

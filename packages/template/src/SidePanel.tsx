@@ -117,21 +117,28 @@ const CAPTURE_STATE_LABEL = {
 } as const;
 
 /**
- * The captured work a whole session stands for (Story 15.2), shown on its first
- * message — the anchor the map marks. Read-only: accepting, dismissing or
+ * The captured work the session stands for (Story 15.3), on its card — the card
+ * the session row's capture badge opens. Read-only: accepting, dismissing or
  * closing stays in the Captured list, so a stray click here cannot close work.
+ * `reveal` changes when the badge asked for the section; the card then brings it
+ * into view.
  */
-function CapturedHere({ items }: { items: readonly ViewCapture[] }) {
+function CapturedWork({ items, reveal = 0 }: { items: readonly ViewCapture[]; reveal?: number }) {
+  const section = useRef<HTMLElement>(null);
   // A dismissed item is closed away from the reading view, like in the list.
   const shown = items
     .filter((item) => item.state !== "dismissed")
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  useEffect(() => {
+    if (reveal === 0) return;
+    section.current?.scrollIntoView({ block: "nearest" });
+  }, [reveal]);
   if (shown.length === 0) return null;
   const now = new Date().toISOString();
   return (
-    <section className="captured-here">
+    <section className="captured-work" ref={section}>
       <h3>
-        Captured here <span className="count">{shown.length}</span>
+        Captured work <span className="count">{shown.length}</span>
       </h3>
       <ul className="drilldown-list capture-here-list">
         {shown.map((item) => {
@@ -415,13 +422,6 @@ function NodeDetails({
       {node.decidedBy ? (
         <p className="decided-by">Decided by: {DECIDED_LABEL[node.decidedBy]}</p>
       ) : null}
-      {node.kind === "message" && session?.messages[0]?.id === node.nodeId ? (
-        <CapturedHere
-          items={(model.captures ?? []).filter(
-            (item) => item.source.sessionId === session.sessionId,
-          )}
-        />
-      ) : null}
       {node.agentDecisions?.length ? (
         <section>
           <h3>Decided by the agent on its own</h3>
@@ -664,7 +664,16 @@ function FileItem({
  * The session's "squash message" (Story 8.7): what the whole session was for,
  * what it got done and what is still open.
  */
-function SessionDetails({ model, session }: { model: LineageViewModel; session: ViewSession }) {
+function SessionDetails({
+  model,
+  session,
+  captureReveal = 0,
+}: {
+  model: LineageViewModel;
+  session: ViewSession;
+  /** Changes when the session row's capture badge asked for its section (Story 15.3). */
+  captureReveal?: number;
+}) {
   const { done, pending } = session.status;
   return (
     <>
@@ -706,6 +715,10 @@ function SessionDetails({ model, session }: { model: LineageViewModel; session: 
         <h3>Next</h3>
         <p>{session.status.next || "No next step recorded."}</p>
       </section>
+      <CapturedWork
+        items={(model.captures ?? []).filter((item) => item.source.sessionId === session.sessionId)}
+        reveal={captureReveal}
+      />
       <SessionSummary model={model} session={session} />
     </>
   );
@@ -715,12 +728,15 @@ function SessionDetails({ model, session }: { model: LineageViewModel; session: 
 export function DrillDown({
   model,
   selection,
+  captureReveal = 0,
   onClose,
   onNavigate,
   bigChangeLines = 300,
 }: {
   model: LineageViewModel;
   selection: Selection | null;
+  /** Counts the clicks on a session row's capture badge; the card shows the section (15.3). */
+  captureReveal?: number;
   onClose: () => void;
   /** Moves the selection to another node and reveals it on the map. */
   onNavigate?: (target: OutlineTarget) => void;
@@ -756,7 +772,7 @@ export function DrillDown({
           </button>
         </header>
         <div className="drilldown-body">
-          <SessionDetails model={model} session={session} />
+          <SessionDetails model={model} session={session} captureReveal={captureReveal} />
         </div>
       </aside>
     );

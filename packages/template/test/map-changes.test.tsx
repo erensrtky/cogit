@@ -63,7 +63,7 @@ function modelOf(current: ViewSession): LineageViewModel {
   };
 }
 
-function renderGraph(bigChangeLines = 300, captured?: ReadonlyMap<string, number>): string {
+function renderGraph(bigChangeLines = 300): string {
   return renderToStaticMarkup(
     createElement(GitGraph, {
       git: layoutGitGraph(session.messages),
@@ -71,7 +71,6 @@ function renderGraph(bigChangeLines = 300, captured?: ReadonlyMap<string, number
       highlightIds: undefined,
       activeHitId: null,
       bigChangeLines,
-      captured,
       onSelect: () => {},
       onUnfold: () => {},
       onContinue: () => {},
@@ -96,10 +95,7 @@ describe("how much code landed on the map (10.3)", () => {
     expect(renderGraph(10_000)).not.toContain("is-big-change");
   });
 
-  it("puts the captured-work mark on the anchored message row only", () => {
-    const html = renderGraph(300, new Map([["h1", 2]]));
-    expect(html.match(/class="capture-mark git-capture"/g)).toHaveLength(1);
-    expect(html).toContain('title="2 captured items from this session"');
+  it("draws no capture mark on a message row (it lives on the session row now)", () => {
     expect(renderGraph()).not.toContain("capture-mark");
   });
 

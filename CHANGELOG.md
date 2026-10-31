@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `captures` setting (on by default, with a **?** in the settings panel) turns the drafting off; items already in the list are kept, not deleted.
 
 ### Changed
-- Captured items belong to their session, not to one message: the store is schema 2 (a schema-1 file is read with its message dropped and written back on the next change), the map marks the session's first message with the number of items it stands for, the message details list them under **Captured here** (read-only), and `cogit captures` names the session as the source.
+- Captured items belong to their session, not to one message: the store is schema 2 (a schema-1 file is read with its message dropped and written back on the next change), an item's source opens the session's first message, and `cogit captures` names the session as the source.
+- The captured-work count is a button on the session row, expanded or folded, and opens that session's card; the card lists the session's items under **Captured work** (read-only), and the message row no longer carries the mark.
 - The map's **Captured** button and `cogit captures` show the curated store instead of rows derived from the record, and the button appears only while the setting is on and something waits or is open.
 
 ## [0.27.0] - 2026-10-31

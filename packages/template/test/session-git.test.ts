@@ -42,7 +42,7 @@ describe("Story 9.3 on the map", () => {
           openIds: new Set<string>(),
           highlightSessionIds: new Set<string>(),
           onOpen: () => {},
-          onOpenMessage: () => {},
+          onOpenCard: () => {},
           onContinue: () => {},
         }),
       );
@@ -104,94 +104,99 @@ describe("Story 9.3 on the map", () => {
   });
 });
 
-describe("captured work on the map (Story 15.2)", () => {
-  it("marks the session row with its count while the first message is not drawn", () => {
+describe("the session row's capture badge (Story 15.3)", () => {
+  const render = (captured?: ReadonlyMap<string, number>, openIds = new Set<string>()): string => {
     const model = modelOf(session);
-    const render = (captured: Map<string, { count: number; messageId: string }> | undefined) =>
-      renderToStaticMarkup(
-        createElement(SessionMap, {
-          model,
-          graph: layoutSessionGraph(model),
-          selectedSessionId: null,
-          openIds: new Set<string>(),
-          highlightSessionIds: new Set<string>(),
-          captured,
-          onOpen: () => {},
-          onOpenMessage: () => {},
-          onContinue: () => {},
-        }),
-      );
-    const html = render(new Map([["s1", { count: 2, messageId: "h1" }]]));
-    expect(html).toContain("session-capture");
-    expect(html).toContain(">2<");
-    expect(render(undefined)).not.toContain("session-capture");
+    return renderToStaticMarkup(
+      createElement(SessionMap, {
+        model,
+        graph: layoutSessionGraph(model),
+        selectedSessionId: null,
+        openIds,
+        highlightSessionIds: new Set<string>(),
+        captured,
+        onOpen: () => {},
+        onOpenCard: () => {},
+        onContinue: () => {},
+      }),
+    );
+  };
+
+  it("always draws the count on the session row, expanded or folded", () => {
+    const counts = new Map([["s1", 2]]);
+    for (const openIds of [new Set<string>(), new Set(["s1"])]) {
+      const html = render(counts, openIds);
+      expect(html).toContain('class="capture-mark session-capture"');
+      expect(html).toContain('title="2 captured items from this session"');
+      expect(html).toContain(">2<");
+    }
+    // Empty store, or only done items: count nothing, mark nothing.
+    expect(render(undefined)).not.toContain("capture-mark");
+    expect(render(new Map())).not.toContain("capture-mark");
   });
 
-  it("lists the session's items in the first message's details, read-only", () => {
+  it("is a button inside the row, so its click cannot be the row's toggle", () => {
+    const html = render(new Map([["s1", 1]]));
+    // The row is not a button (a button may not nest one): the badge is the button.
+    expect(html).toMatch(/<div[^>]*class="git-row session-row"[^>]*>/);
+    expect(html).toContain('role="button"');
+    expect(html).toMatch(/<button[^>]*class="capture-mark session-capture"/);
+    expect(html.match(/<button/g)).toHaveLength(1);
+  });
+});
+
+describe("the session card's Captured work (Story 15.3)", () => {
+  const capture = (
+    id: string,
+    state: "suggested" | "open" | "done" | "dismissed",
+    text: string,
+  ) => ({
+    id,
+    text,
+    state,
+    source: { sessionId: "s1" },
+    createdAt: T0,
+    updatedAt: T0,
+  });
+
+  it("lists the session's items with their state and age, read-only", () => {
     const model: LineageViewModel = {
       ...modelOf(session),
       captures: [
-        {
-          id: "c00000001",
-          text: "write the docs",
-          state: "suggested",
-          source: { sessionId: "s1" },
-          createdAt: T0,
-          updatedAt: T0,
-        },
-        {
-          id: "c00000002",
-          text: "ship it",
-          state: "open",
-          source: { sessionId: "s1" },
-          createdAt: T0,
-          updatedAt: T0,
-        },
+        capture("c00000001", "suggested", "write the docs"),
+        capture("c00000002", "open", "ship it"),
+        capture("c00000003", "done", "close the release"),
+        capture("c00000004", "dismissed", "gone"),
       ],
     };
     const html = renderToStaticMarkup(
       createElement(DrillDown, {
         model,
-        selection: { type: "node", sessionId: "s1", nodeId: "h1" },
+        selection: { type: "session", sessionId: "s1" },
+        captureReveal: 1,
         onClose: () => {},
       }),
     );
-    expect(html).toContain("Captured here");
+    expect(html).toContain("Captured work");
     expect(html).toContain("write the docs");
     expect(html).toContain("To review");
     expect(html).toContain("Open");
+    expect(html).toContain("Done");
+    // A dismissed item is closed and stays out of the card, like the list.
+    expect(html).not.toContain("gone");
     // Actions stay in the Captured list.
     expect(html).not.toContain(">Accept<");
+    expect(html).not.toContain(">Dismiss<");
   });
 
-  it("shows the section only on the anchor, not on another message", () => {
-    const two = {
-      ...session,
-      messages: [
-        ...session.messages,
-        { id: "h2", label: "m2", kind: "message", title: "Later", at: T0, parent: "h1" },
-      ],
-    } as ViewSession;
-    const model: LineageViewModel = {
-      ...modelOf(two),
-      captures: [
-        {
-          id: "c00000001",
-          text: "write the docs",
-          state: "suggested",
-          source: { sessionId: "s1" },
-          createdAt: T0,
-          updatedAt: T0,
-        },
-      ],
-    };
+  it("shows no section on a session with no captured work", () => {
     const html = renderToStaticMarkup(
       createElement(DrillDown, {
-        model,
-        selection: { type: "node", sessionId: "s1", nodeId: "h2" },
+        model: modelOf(session),
+        selection: { type: "session", sessionId: "s1" },
         onClose: () => {},
       }),
     );
-    expect(html).not.toContain("Captured here");
+    expect(html).not.toContain("Captured work");
   });
 });

@@ -1291,13 +1291,15 @@ body:has(.map-shell.is-expanded) {
   overflow-wrap: anywhere;
 }
 
-/* Story 15.2: the mark on the message or session row a session's items anchor on. */
+/* Story 15.3: the button on the session row that opens its Captured work. */
 .capture-mark {
   flex: none;
   padding: 0 5px;
   color: var(--capture);
+  background: none;
   border: 1px solid var(--capture);
   border-radius: 999px;
+  font: inherit;
   font-size: 10px;
   font-weight: 600;
   line-height: 16px;
