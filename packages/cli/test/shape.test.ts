@@ -7,6 +7,7 @@ import { sessionWrite } from "../src/commands/session.js";
 import { needsShape, nextShapeNode } from "../src/commands/shape.js";
 import type { LineageNode } from "../src/schema/session.js";
 import {
+  mermaidNodeCount,
   parseShapeAnswer,
   SHAPE_DIFF_LIMIT,
   shapePrompt,
@@ -16,6 +17,7 @@ import {
   validateShapeTools,
 } from "../src/shape.js";
 import { loadSession } from "../src/store/stores.js";
+import { shapePreview, tableRows } from "../src/view/shape.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
 const PSEUDO = "1. Read the record\n2. Merge the node";
@@ -53,6 +55,69 @@ describe("the Shape tool catalogue", () => {
     ]) {
       expect(validateShapeTools([{ kind: "mermaid", text: bad }])[0]?.valid).toBe(false);
     }
+  });
+
+  it("counts a diagram's nodes, not the words in its labels", () => {
+    const labelled = [
+      "flowchart TD",
+      '  A["doctor.ts newestTranscript"] --> B["skip(file) for each transcript"]',
+      "  B --> C[isHeadlessTranscript reads the first lines]",
+      '  C --> E{"entrypoint starts with sdk?"}',
+      "  E -->|yes, a headless run| F(skip it)",
+      "  E -->|no| G[newest transcript] %% a note with many words in it",
+    ].join("\n");
+    expect(mermaidNodeCount(labelled)).toBe(6);
+    expect(validateShapeTools([{ kind: "mermaid", text: labelled }])[0]?.valid).toBe(true);
+  });
+
+  it("accepts a Before / After table and rejects rows without three cells", () => {
+    const ok =
+      "Commit before record | no Shape | queued, then shaped\nSkipped message | blocks the rest | passed over";
+    expect(validateShapeTools([{ kind: "table", text: ok }])[0]?.valid).toBe(true);
+    for (const bad of [
+      "only | two",
+      "a | b | c | d",
+      " | before | after",
+      "",
+      Array.from({ length: 9 }, (_, i) => `case ${i} | a | b`).join("\n"),
+    ]) {
+      expect(validateShapeTools([{ kind: "table", text: bad }])[0]?.valid).toBe(false);
+    }
+  });
+
+  it("previews the steps, or else the table's rows", () => {
+    const tools = (list: { kind: string; text: string }[]) => ({ tools: list, commits: [] });
+    expect(shapePreview(tools([{ kind: "table", text: "Diff | overflows | scrolls\nx" }]))).toBe(
+      "Diff: overflows → scrolls\nx",
+    );
+    expect(
+      shapePreview(
+        tools([
+          { kind: "table", text: "a | b | c" },
+          { kind: "pseudo", text: "1. one\n2. two" },
+        ]),
+      ),
+    ).toBe("1. one\n2. two");
+    expect(
+      shapePreview(tools([{ kind: "mermaid", text: "flowchart TD\nA --> B" }])),
+    ).toBeUndefined();
+    expect(tableRows("a | b | c\n\nd | e | f")).toEqual([
+      ["a", "b", "c"],
+      ["d", "e", "f"],
+    ]);
+  });
+
+  it("asks for the diagram and the steps across files, and a table for a visible change", () => {
+    const prompt = shapePrompt({
+      node: message(),
+      commits: [],
+      diff: "",
+      diffTruncated: false,
+      language: "auto",
+    });
+    expect(prompt).toContain("two or more files, give a diagram of the path and the steps");
+    expect(prompt).toContain("add a Before / After table");
+    expect(prompt).toContain('"table" (Before / After)');
   });
 
   it("names both tools and says when to use each", () => {

@@ -5,7 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- A third Shape tool, **Before / After**: a table with one row per case, saying how the change behaved before and how it behaves now. The side model adds it for a fix or any change you can see; a pure refactor gets none.
+
+### Changed
+- A change that touches two or more files gets a diagram of its path as well as the steps, instead of the writer usually stopping at the steps. A record holding a Shape tool this CLI does not know still loads, and the map shows that tool as text.
+
 ### Fixed
+- A Mermaid diagram with long labels is drawn again: the node limit counted every word in a label as a node, so most real diagrams were shown as source.
 - A long diff on the Code tab of **Open** scrolls inside the window instead of running past its bottom edge.
 
 ## [0.25.0] - 2026-10-31

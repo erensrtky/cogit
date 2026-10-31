@@ -303,10 +303,8 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "enum": [
-                        "pseudo",
-                        "mermaid"
-                      ]
+                      "minLength": 1,
+                      "maxLength": 40
                     },
                     "text": {
                       "type": "string",

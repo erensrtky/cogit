@@ -84,6 +84,35 @@ describe("Intent, Shape and Code", () => {
     expect(invalid).toContain("Diagram source (not drawn)");
   });
 
+  it("lays out a Before / After table and shows an unknown tool as text", () => {
+    const html = render("shape", {
+      shape: {
+        tools: [
+          {
+            kind: "table",
+            text: "Long diff | runs past the window | scrolls inside it",
+            valid: true,
+          },
+          { kind: "timeline", text: "a newer tool", valid: false },
+        ],
+        commits: [],
+      },
+    });
+    expect(html).toContain('<table class="shape-table">');
+    expect(html).toContain('<th scope="row">Long diff</th><td>runs past the window</td>');
+    expect(html).toContain("Before / After");
+    expect(html).toContain("a newer tool");
+    expect(html).toContain("<figcaption>timeline</figcaption>");
+  });
+
+  it("shows a table the registry refused as written", () => {
+    const html = render("shape", {
+      shape: { tools: [{ kind: "table", text: "only | two", valid: false }], commits: [] },
+    });
+    expect(html).toContain("Before / After (as written)");
+    expect(html).not.toContain("<table");
+  });
+
   it("has three named tabs", () => {
     const html = render("shape");
     expect(html).toContain("Intent");

@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ViewNode } from "../../cli/src/view/model.js";
-import { shapePreview, shapeState } from "../../cli/src/view/shape.js";
+import { shapePreview, shapeState, tableRows } from "../../cli/src/view/shape.js";
 import { DiffView } from "./DiffView.js";
 import { isLivePage } from "./data.js";
 import { MermaidDiagram } from "./MermaidDiagram.js";
@@ -99,7 +99,38 @@ function IntentLayer({ node }: { node: ShapeNode }) {
   );
 }
 
-/** The Shape layer: the tools' output, Mermaid drawn in the page. */
+/** How a tool's output is named when it is shown as plain text. */
+const TEXT_CAPTION: Record<string, string> = {
+  pseudo: "Steps",
+  mermaid: "Diagram source (not drawn)",
+  table: "Before / After (as written)",
+};
+
+/** A Before / After table: one row per case. */
+function BeforeAfter({ rows }: { rows: readonly (readonly [string, string, string])[] }) {
+  return (
+    <table className="shape-table">
+      <thead>
+        <tr>
+          <th scope="col">Case</th>
+          <th scope="col">Before</th>
+          <th scope="col">After</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(([what, before, after], index) => (
+          <tr key={`${index}-${what}`}>
+            <th scope="row">{what}</th>
+            <td>{before}</td>
+            <td>{after}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** The Shape layer: each tool's output; Mermaid drawn, the table laid out. */
 function ShapeLayer({
   node,
   enabled,
@@ -121,21 +152,31 @@ function ShapeLayer({
   }
   return (
     <div className="shape-tools">
-      {node.shape?.tools.map((tool, index) =>
-        tool.kind === "mermaid" && tool.valid !== false ? (
-          <figure key={`${tool.kind}-${index}`} className="shape-figure">
-            {renderMermaid(tool.text)}
-            <figcaption>Diagram</figcaption>
-          </figure>
-        ) : (
-          <figure key={`${tool.kind}-${index}`} className="shape-figure">
+      {node.shape?.tools.map((tool, index) => {
+        const key = `${tool.kind}-${index}`;
+        if (tool.kind === "mermaid" && tool.valid !== false)
+          return (
+            <figure key={key} className="shape-figure">
+              {renderMermaid(tool.text)}
+              <figcaption>Diagram</figcaption>
+            </figure>
+          );
+        const rows =
+          tool.kind === "table" && tool.valid !== false ? tableRows(tool.text) : undefined;
+        if (rows !== undefined)
+          return (
+            <figure key={key} className="shape-figure">
+              <BeforeAfter rows={rows} />
+              <figcaption>Before / After</figcaption>
+            </figure>
+          );
+        return (
+          <figure key={key} className="shape-figure">
             <pre className={`shape-source is-${tool.kind}`}>{tool.text}</pre>
-            <figcaption>
-              {tool.kind === "pseudo" ? "Steps" : "Diagram source (not drawn)"}
-            </figcaption>
+            <figcaption>{TEXT_CAPTION[tool.kind] ?? tool.kind}</figcaption>
           </figure>
-        ),
-      )}
+        );
+      })}
       {node.shape?.by ? (
         <p className="shape-by">
           Written by {node.shape.by === "side" ? "the side model" : "the agent"}.

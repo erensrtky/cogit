@@ -31,6 +31,23 @@ describe("Session schema", () => {
     expect(s.nodes).toEqual([]);
   });
 
+  it("keeps a Shape tool a newer CLI wrote, but takes only known tools from a writer", () => {
+    const shape = { tools: [{ kind: "timeline", text: "x" }], commits: [] };
+    const stored = Session.safeParse({
+      schema: 1,
+      sessionId: "abc",
+      startedAt: T0,
+      updatedAt: T0,
+      nodes: [{ id: "m1", parent: null, kind: "message", title: "t", shape }],
+    });
+    expect(stored.success).toBe(true);
+    const sent = SessionInput.safeParse({
+      sessionId: "abc",
+      nodes: [{ id: "m1", kind: "message", title: "t", shape }],
+    });
+    expect(sent.success).toBe(false);
+  });
+
   it("rejects ids that are not safe slugs", () => {
     for (const sessionId of ["../etc", "a/b", "", ".hidden"]) {
       expect(SessionInput.safeParse({ sessionId }).success).toBe(false);

@@ -1,4 +1,5 @@
 import type { LineageNode, Shape, ShapeInput, ShapeKind, ShapeTool } from "./schema/session.js";
+import { tableRows } from "./view/shape.js";
 
 /**
  * The Shape catalogue (Story 13.6): a Shape sits between a message's Intent
@@ -45,10 +46,21 @@ const MERMAID_KEYWORDS = new Set([
   "linkstyle",
 ]);
 
-/** A rough node count: identifiers plus shapes; enough to keep a diagram small. */
+/**
+ * A rough node count: the identifiers left once labels are taken out (quoted
+ * text, `[…]`, `(…)`, `{…}` shapes and `|…|` edge labels), so the words of a
+ * label never count as nodes. Enough to keep a diagram small.
+ */
 export function mermaidNodeCount(text: string): number {
+  const bare = text
+    .replace(/%%.*$/gm, "")
+    .replace(/"[^"\n]*"/g, "")
+    .replace(/\|[^|\n]*\|/g, "")
+    .replace(/\[[^\]\n]*\]/g, "")
+    .replace(/\([^)\n]*\)/g, "")
+    .replace(/\{[^}\n]*\}/g, "");
   const ids = new Set<string>();
-  for (const match of text.matchAll(/\b[A-Za-z_][\w-]*\b/g)) {
+  for (const match of bare.matchAll(/\b[A-Za-z_][\w-]*\b/g)) {
     const word = match[0];
     if (!MERMAID_KEYWORDS.has(word.toLowerCase())) ids.add(word);
   }
@@ -74,6 +86,19 @@ export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
     },
   },
   {
+    kind: "table",
+    name: "Before / After",
+    when:
+      "The change alters behaviour someone can see: a fix, a new default, a rule that now " +
+      "says yes or no. One row per case: what happens, how it behaved before, how it behaves now.",
+    output:
+      '{"kind": "table", "text": "A commit lands before its message is recorded | it never gets a Shape | it waits, then gets one"}',
+    validate(text) {
+      const rows = tableRows(text);
+      return rows !== undefined && rows.length >= 1 && rows.length <= TABLE_MAX_ROWS;
+    },
+  },
+  {
     kind: "mermaid",
     name: "Diagram",
     when:
@@ -91,6 +116,12 @@ export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
   },
 ];
 
+/** Rows a Before / After table may carry. */
+export const TABLE_MAX_ROWS = 8;
+
+/** A tool a writer sent, after validation: its kind is one this CLI knows. */
+export type KnownShapeTool = ShapeTool & { kind: ShapeKind };
+
 /** The registry entry for a kind, or undefined for a kind this CLI does not know. */
 export function shapeToolSpec(kind: string): ShapeToolSpec | undefined {
   return SHAPE_TOOLS.find((tool) => tool.kind === kind);
@@ -100,7 +131,7 @@ export function shapeToolSpec(kind: string): ShapeToolSpec | undefined {
  * Stamps each tool's validation result. The text is always kept: a diagram the
  * map cannot draw is shown as source, which is more useful than nothing.
  */
-export function validateShapeTools(tools: ShapeInput["tools"]): ShapeTool[] {
+export function validateShapeTools(tools: ShapeInput["tools"]): KnownShapeTool[] {
   return tools.map((tool) => {
     const spec = shapeToolSpec(tool.kind);
     return { kind: tool.kind, text: tool.text, valid: spec?.validate(tool.text) ?? false };
@@ -111,7 +142,11 @@ export function validateShapeTools(tools: ShapeInput["tools"]): ShapeTool[] {
  * A writer's Shape as the record stores it: the CLI owns `by` and `at`, and
  * every tool carries its validation result.
  */
-export function stampShape(shape: ShapeInput, by: "agent" | "side", at: string): Shape {
+export function stampShape(
+  shape: ShapeInput,
+  by: "agent" | "side",
+  at: string,
+): Shape & { tools: KnownShapeTool[] } {
   return {
     tools: validateShapeTools(shape.tools),
     commits: [...new Set(shape.commits)],
@@ -218,7 +253,10 @@ export function shapePrompt(opts: {
     toolCatalogue(),
     "",
     "Rules:",
-    "- Pick the tool that fits; both only when each adds something; none when the change is a small fix not worth a picture.",
+    "- When the change touches two or more files, give a diagram of the path and the steps; a single-file change takes the one tool that fits.",
+    "- When the change alters behaviour someone can see (a fix, a new default, a rule), add a Before / After table; a pure refactor takes none.",
+    "- A table has no header row (the map adds Case / Before / After); every line is one case.",
+    "- Order the tools diagram, table, steps; at most three. Return none when the change is a small fix not worth a picture.",
     `- Name real functions, files and modules from the diff. Never invent a path.`,
     `- The Mermaid source must start with "flowchart TD" (or LR) and stay under ${MERMAID_MAX_NODES} nodes; quote labels that hold spaces or punctuation.`,
     "- Describe what the code does now, not the steps of the conversation.",

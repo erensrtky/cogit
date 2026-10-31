@@ -31,10 +31,10 @@ export const AgentDecision = z.object({
 export const MESSAGE_ID = /^m[1-9][0-9]*$/;
 
 /**
- * How a Shape shows what a change does (Story 13.6). Two tools today; the
- * registry in `shape.ts` says when each fits and validates its output.
+ * How a Shape shows what a change does (Story 13.6). The registry in `shape.ts`
+ * says when each tool fits and validates its output.
  */
-export const ShapeKind = z.enum(["pseudo", "mermaid"]);
+export const ShapeKind = z.enum(["pseudo", "mermaid", "table"]);
 export type ShapeKind = z.infer<typeof ShapeKind>;
 
 /**
@@ -43,7 +43,9 @@ export type ShapeKind = z.infer<typeof ShapeKind>;
  * text (so nothing is lost) and the map shows it as text instead of drawing it.
  */
 export const ShapeTool = z.object({
-  kind: ShapeKind,
+  // Any kind is stored: a tool a newer CLI added must not make this record
+  // unreadable here. A kind this CLI does not know is shown as text.
+  kind: z.string().min(1).max(40),
   text: z.string().min(1).max(4000),
   valid: z.boolean().optional(),
 });
@@ -68,7 +70,8 @@ export const Shape = z.object({
 
 /** What a writer sends for a Shape: the tools' answers and the commits they cover. */
 export const ShapeInput = Shape.omit({ by: true, at: true }).extend({
-  tools: z.array(ShapeTool.omit({ valid: true })).max(3),
+  // A writer names a tool this CLI knows; the record keeps any kind it is given.
+  tools: z.array(ShapeTool.omit({ valid: true }).extend({ kind: ShapeKind })).max(3),
 });
 
 /**
