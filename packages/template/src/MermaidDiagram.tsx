@@ -57,7 +57,27 @@ function loadMermaid(): Promise<Mermaid> {
 
 let seq = 0;
 
-export function MermaidDiagram({ source, className }: { source: string; className?: string }) {
+/**
+ * Gives a drawn diagram its own width: Mermaid writes `width="100%"`, which
+ * shrinks a wide diagram's text to fit; the Open window scrolls it instead.
+ */
+export function naturalSize(svg: SVGSVGElement): void {
+  const width = svg.style.maxWidth;
+  if (width === "") return;
+  svg.style.width = width;
+  svg.style.maxWidth = "none";
+}
+
+export function MermaidDiagram({
+  source,
+  className,
+  fit = false,
+}: {
+  source: string;
+  className?: string;
+  /** Shrink to the box (the panel's preview) instead of keeping the drawn size. */
+  fit?: boolean;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const available = mermaidAvailable();
   const [failed, setFailed] = useState(false);
@@ -70,7 +90,10 @@ export function MermaidDiagram({ source, className }: { source: string; classNam
     loadMermaid()
       .then((mermaid) => mermaid.render(id, source))
       .then(({ svg }) => {
-        if (!cancelled && host.current !== null) host.current.innerHTML = svg;
+        if (cancelled || host.current === null) return;
+        host.current.innerHTML = svg;
+        const drawn = host.current.querySelector("svg");
+        if (!fit && drawn !== null) naturalSize(drawn);
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -78,7 +101,7 @@ export function MermaidDiagram({ source, className }: { source: string; classNam
     return () => {
       cancelled = true;
     };
-  }, [source, available]);
+  }, [source, available, fit]);
 
   const extra = className ? ` ${className}` : "";
   if (!available)

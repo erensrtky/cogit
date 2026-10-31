@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ViewNode } from "../../cli/src/view/model.js";
 import {
   flowToMermaid,
+  parseFlow,
   SHAPE_READING,
   shapeKindsUsed,
   shapePreview,
@@ -124,17 +125,28 @@ const KINDS_CAPTIONS = new Set(["flow", "pseudo"]);
 
 /**
  * A tool's caption with a "?" that says how to read it; a Flow or Steps also
- * lists every kind, so the symbols name themselves.
+ * lists every kind, so the symbols name themselves. `reading` swaps in another
+ * tool's explanation (an ordered Flow reads like a Sequence).
  */
-function ToolCaption({ id, kind, label }: { id: string; kind: string; label: string }) {
-  const reading = SHAPE_READING[kind];
+function ToolCaption({
+  id,
+  kind,
+  label,
+  reading = kind,
+}: {
+  id: string;
+  kind: string;
+  label: string;
+  reading?: string;
+}) {
+  const help = SHAPE_READING[reading];
   const listsKinds = KINDS_CAPTIONS.has(kind);
   return (
     <figcaption className="shape-caption">
       <span>{label}</span>
-      {reading ? (
+      {help ? (
         <HelpTip id={`shape-${id}`} label={`How to read the ${label}`}>
-          <span className="shape-reading">{reading}</span>
+          <span className="shape-reading">{help}</span>
           {listsKinds ? (
             <span className="shape-kinds">
               {UNIVERSAL_KINDS.map((kind) => (
@@ -235,11 +247,17 @@ function ShapeLayer({
       {tools.map((tool, index) => {
         const key = `${tool.kind}-${index}`;
         const source = tool.kind === "flow" ? flowToMermaid(tool.text) : tool.text;
+        const orderedFlow = tool.kind === "flow" && parseFlow(tool.text)?.ordered === true;
         if (DIAGRAM_KINDS.has(tool.kind) && tool.valid !== false && source !== undefined)
           return (
             <figure key={key} className="shape-figure">
               {renderMermaid(source)}
-              <ToolCaption id={key} kind={tool.kind} label={diagramLabel(tool.kind)} />
+              <ToolCaption
+                id={key}
+                kind={tool.kind}
+                label={orderedFlow ? "Sequence" : diagramLabel(tool.kind)}
+                reading={orderedFlow ? "sequence" : tool.kind}
+              />
             </figure>
           );
         const columns = TABLE_COLUMNS[tool.kind];
@@ -431,7 +449,7 @@ export function ShapeSection({
         preview ? (
           <pre className="shape-preview">{preview}</pre>
         ) : diagramSource !== undefined ? (
-          <MermaidDiagram source={diagramSource} className="shape-preview-diagram" />
+          <MermaidDiagram source={diagramSource} className="shape-preview-diagram" fit />
         ) : null
       ) : state === "off" ? (
         <p className="muted">Shapes are off.</p>

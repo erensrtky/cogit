@@ -113,6 +113,42 @@ describe("Intent, Shape and Code", () => {
     expect(html).not.toContain("Function");
   });
 
+  it("captions an ordered Flow as a Sequence and an unordered one as a Flow", () => {
+    const ordered = JSON.stringify({
+      nodes: [
+        { id: "a", kind: "event", label: "after a commit" },
+        { id: "b", kind: "store", label: "queue" },
+      ],
+      edges: [{ from: "a", to: "b", label: "enqueue" }],
+      ordered: true,
+    });
+    const sequence = render("shape", {
+      shape: {
+        tools: [{ kind: "flow", text: ordered, valid: true }],
+        commits: [],
+      },
+    });
+    expect(sequence).toContain("<span>Sequence</span>");
+    expect(sequence).toContain('aria-label="How to read the Sequence"');
+
+    const unordered = JSON.stringify({
+      nodes: [
+        { id: "a", kind: "event", label: "after a commit" },
+        { id: "b", kind: "store", label: "queue" },
+      ],
+      edges: [{ from: "a", to: "b", label: "enqueue" }],
+      ordered: false,
+    });
+    const flow = render("shape", {
+      shape: {
+        tools: [{ kind: "flow", text: unordered, valid: true }],
+        commits: [],
+      },
+    });
+    expect(flow).toContain("<span>Flow</span>");
+    expect(flow).toContain('aria-label="How to read the Flow"');
+  });
+
   it("lays out a Before / After table and shows an unknown tool as text", () => {
     const html = render("shape", {
       shape: {

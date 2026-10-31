@@ -89,7 +89,8 @@ A message that landed commits has three layers, in that order:
 - **Shape** — a small representation of what the change *does*, in up to three of these:
   - a **Flow** of the path through the code: each box is one kind of thing (a function, a
     store, a hook, an outside system) with its fixed symbol, and the arrows are the work
-    handed between them;
+    handed between them. An ordered Flow — work handed between parts over time — is drawn
+    as a sequence diagram, numbered arrow by arrow;
   - a **Before / After** table for a fix or any change you can see, and an **Interface**
     table for a command, flag, exported function, config key or schema field that changed;
   - an **Example**, one concrete run with real values (every new command gets one);

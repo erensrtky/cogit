@@ -197,25 +197,47 @@ function flowLabel(text: string): string {
 }
 
 /**
- * The deterministic `flowchart TD` a Flow draws (Story 13.7): one node per box
- * with its kind's symbol and shape, one edge per arrow; `ordered` numbers the
- * edge labels 1, 2, 3… in the order given. Undefined for input the rules
- * refuse. The same input is always byte-identical.
+ * A sequence participant's name or a message's text: the flowchart label rules
+ * plus no newlines; a `:` inside a participant's name reads ` -` so it cannot
+ * break the `participant … as …` line.
+ */
+function sequenceText(text: string, actor: boolean): string {
+  const base = flowLabel(text).replace(/[\r\n]+/g, "");
+  return actor ? base.replace(/:/g, " -") : base;
+}
+
+/**
+ * The deterministic Mermaid a Flow draws (Story 13.7): an ordered Flow is a
+ * `sequenceDiagram` — one `participant` column per node and one numbered arrow
+ * per edge, top to bottom — and an unordered one is a `flowchart TD`, one box
+ * per node with its kind's symbol and shape, one edge per arrow. Undefined for
+ * input the rules refuse. The same input is always byte-identical.
  */
 export function flowToMermaid(text: string): string | undefined {
   const flow = parseFlow(text);
   if (flow === undefined) return undefined;
   const symbol = (kind: string) => UNIVERSAL_KINDS.find((entry) => entry.id === kind)?.symbol ?? "";
+  if (flow.ordered) {
+    const lines = ["sequenceDiagram"];
+    for (const node of flow.nodes)
+      lines.push(
+        `  participant ${node.id} as ${symbol(node.kind)} ${sequenceText(node.label, true)}`,
+      );
+    flow.edges.forEach((edge, index) => {
+      const label =
+        edge.label !== undefined && edge.label !== "" ? ` ${sequenceText(edge.label, false)}` : "";
+      lines.push(`  ${edge.from}->>${edge.to}: ${index + 1}.${label}`);
+    });
+    return lines.join("\n");
+  }
   const lines = ["flowchart TD"];
   for (const node of flow.nodes) {
     const [open, close] = FLOW_NODE_SHAPE[node.kind] ?? ["[", "]"];
     lines.push(`  ${node.id}${open}"${symbol(node.kind)} ${flowLabel(node.label)}"${close}`);
   }
-  flow.edges.forEach((edge, index) => {
-    // Ordered edges keep their words after the step number: "2. puts it in the queue".
-    const label = flow.ordered ? `${index + 1}. ${edge.label ?? ""}`.trim() : edge.label;
-    if (label !== undefined && label !== "")
-      lines.push(`  ${edge.from} -->|"${flowLabel(label)}"| ${edge.to}`);
+  flow.edges.forEach((edge) => {
+    if (edge.label !== undefined && edge.label !== "")
+      lines.push(`  ${edge.from} -->|"${flowLabel(edge.label)}"| ${edge.to}`);
     else lines.push(`  ${edge.from} --> ${edge.to}`);
   });
   return lines.join("\n");

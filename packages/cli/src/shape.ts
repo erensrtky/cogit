@@ -89,8 +89,9 @@ export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
       "The change is a path through code across files: the functions, files, stores, hooks and " +
       "outside calls it moves between. Every node gets a kind from the list below and a label " +
       "in the project's own words; the map draws the symbol, never you. Set `ordered` true " +
-      "when the edges are steps over time and work is handed between parts. Node ids are short " +
-      `lowercase words; at most ${FLOW_MAX_NODES} nodes and ${FLOW_MAX_EDGES} edges.`,
+      "when work is handed between parts over time (a hook → a job → a store, a client → a " +
+      "server): the map draws it as a sequence diagram, so keep the edges in time order. " +
+      `Node ids are short lowercase words; at most ${FLOW_MAX_NODES} nodes and ${FLOW_MAX_EDGES} edges.`,
     output:
       '{"kind": "flow", "text": "{\\"nodes\\":[{\\"id\\":\\"a\\",\\"kind\\":\\"event\\",\\"label\\":\\"after a commit\\"}],\\"edges\\":[{\\"from\\":\\"a\\",\\"to\\":\\"b\\",\\"label\\":\\"no\\"}],\\"ordered\\":false}"}',
     validate(text) {
@@ -351,7 +352,7 @@ export function shapePrompt(opts: {
     "",
     "Rules:",
     "- Give at most three tools, the ones that say the most about this change; never two that tell the same thing.",
-    "- A Flow for a change across two or more files: every node gets a kind from the list above and a label in the project's own words. Set `ordered` true when the edges are steps over time and work is handed between parts.",
+    "- A Flow for a change across two or more files: every node gets a kind from the list above and a label in the project's own words. Set `ordered` true when work is handed between parts over time (a hook → a job → a store, a client → a server): the map draws it as a sequence diagram, so keep the edges in time order and give every edge a label saying what is handed over or done.",
     "- A Before / After table when behaviour someone can see changes (a fix, a new default, a rule).",
     "- A change nobody would notice from outside (a refactor, a rename, moved code, a wording tweak in a prompt or comment) takes no tool at all: return none.",
     "- An Interface table only for what is reached from outside the changed module: a CLI command or flag, an exported function or type other packages use, a config key, a stored schema field, an HTTP route. Never an internal helper, a component prop or a view-model field.",

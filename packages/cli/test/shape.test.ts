@@ -163,6 +163,7 @@ describe("the Shape tool catalogue", () => {
     expect(prompt).toContain("A Before / After table when behaviour someone can see changes");
     expect(prompt).toContain("A new or changed command or flag always gets an example");
     expect(prompt).toContain("Never an internal helper");
+    expect(prompt).toContain("give every edge a label");
     expect(prompt).toContain("takes no tool at all");
     expect(prompt).toContain("never an invented one");
     expect(prompt).toContain("fn (ƒ Function): a function or method");
@@ -174,7 +175,7 @@ describe("the Shape tool catalogue", () => {
     expect(prompt).toContain('"example" (Example)');
     // The retired Mermaid tools are no longer offered to the writer.
     expect(prompt).not.toContain("mermaid");
-    expect(prompt).not.toContain("sequence");
+    expect(prompt).not.toContain('"sequence"');
   });
 
   it("names the offered tools and says when to use each", () => {
@@ -269,27 +270,27 @@ describe("the Flow tool", () => {
     );
   });
 
-  it("numbers the edge labels when ordered, and refuses invalid input", () => {
+  it("draws an ordered Flow as a sequence diagram, and refuses invalid input", () => {
     const ordered = JSON.stringify({
       nodes: [
         { id: "a", kind: "event", label: "after a commit" },
         { id: "b", kind: "fn", label: "enqueue" },
-        { id: "c", kind: "store", label: "queue" },
+        { id: "c", kind: "store", label: "queue: pending" },
       ],
       edges: [
         { from: "a", to: "b" },
-        { from: "b", to: "c", label: "puts it in" },
+        { from: "b", to: "c", label: "puts; it in: the queue" },
       ],
       ordered: true,
     });
     expect(flowToMermaid(ordered)).toBe(
       [
-        "flowchart TD",
-        '  a>"⚡ after a commit"]',
-        '  b["ƒ enqueue"]',
-        '  c[("▤ queue")]',
-        '  a -->|"1."| b',
-        '  b -->|"2. puts it in"| c',
+        "sequenceDiagram",
+        "  participant a as ⚡ after a commit",
+        "  participant b as ƒ enqueue",
+        "  participant c as ▤ queue - pending",
+        "  a->>b: 1.",
+        "  b->>c: 2. puts it in: the queue",
       ].join("\n"),
     );
     expect(flowToMermaid("not json")).toBeUndefined();
