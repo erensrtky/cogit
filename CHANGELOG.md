@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.3] - 2026-11-01
+### Changed
+- The captured list is called **Tasks** now — in the map's toolbar, the session card and the settings — and it says what it is: "what your sessions left undone — cogit drafts, you decide." Each item carries a task bullet, and the sections read **Suggested** (drafted at session close), **Open** and **Done (last 10)**.
+
 ## [0.28.2] - 2026-11-01
 ### Fixed
 - The session-end catch-up no longer loses the whole record when the model's answer is only slightly off: nulls inside the status take the schema's defaults, a message summary written as an object keeps its text, and in mixed mode the side model's status, branch summaries and agent decisions are dropped instead of failing the write.
