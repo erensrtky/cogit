@@ -21206,7 +21206,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-6ROMVVPI.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-SGXDRKNY.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -24044,6 +24044,9 @@ var exec4 = promisify3(execFile3);
 var THOUGHT_TRAILER = "Thought";
 var THOUGHT_VALUE = /^h[0-9a-f]{12}$/;
 var FULL_HASH = /^[0-9a-f]{40}$/;
+var THOUGHT_LINE = new RegExp(`^[ \\t]*${THOUGHT_TRAILER}:[ \\t]*(h[0-9a-f]{12})[ \\t]*$`, "gim");
+var COMMIT_MARK = "";
+var LOG_MAX_BUFFER = 256 * 1024 * 1024;
 async function readable(path2) {
   return access2(path2).then(
     () => true,
@@ -24070,10 +24073,23 @@ async function writeTrailer(messageFile, value) {
     messagePath(messageFile)
   ]);
 }
+async function replayingCommits(dir, env) {
+  let gitDir;
+  try {
+    const { stdout } = await exec4("git", ["-C", dir, "rev-parse", "--absolute-git-dir"], { env });
+    gitDir = String(stdout).trim();
+  } catch {
+    return false;
+  }
+  const states = ["rebase-merge", "rebase-apply", "CHERRY_PICK_HEAD"];
+  const found = await Promise.all(states.map((state) => readable(resolve3(gitDir, state))));
+  return found.includes(true);
+}
 async function addThoughtTrailer(opts) {
   const env = opts.env ?? process.env;
   if (captureDisabled(env)) return false;
   if (opts.source === "merge" || opts.source === "squash") return false;
+  if (await replayingCommits(opts.dir, env)) return false;
   const agent = defaultAgent();
   const named = (env[agent.commitSessionEnv] ?? "").trim();
   if (named !== "") {
@@ -24101,17 +24117,14 @@ async function addThoughtTrailer(opts) {
 }
 function parseThoughtTrailers(stdout) {
   const out = /* @__PURE__ */ new Map();
-  for (const line of stdout.split("\n")) {
-    const separator = line.indexOf("\0");
+  for (const record2 of stdout.split(COMMIT_MARK)) {
+    const separator = record2.indexOf("\0");
     if (separator === -1) continue;
-    const commit = line.slice(0, separator);
+    const commit = record2.slice(0, separator);
     if (!FULL_HASH.test(commit)) continue;
-    for (const value of line.slice(separator + 1).split(/[,\s]+/)) {
-      if (THOUGHT_VALUE.test(value)) {
-        out.set(commit, value);
-        break;
-      }
-    }
+    const body = record2.slice(separator + 1);
+    const thoughts = [...body.matchAll(THOUGHT_LINE)].map((match) => match[1]);
+    if (thoughts.length > 0) out.set(commit, [...new Set(thoughts)]);
   }
   return out;
 }
@@ -24122,15 +24135,17 @@ async function readThoughtTrailers(root, opts = {}) {
     "-C",
     gitRoot,
     "log",
-    "--format=%H%x00%(trailers:key=Thought,valueonly)",
+    "--format=%x01%H%x00%B",
+    "--extended-regexp",
+    "--regexp-ignore-case",
+    `--grep=^[[:space:]]*${THOUGHT_TRAILER}:`,
     ...opts.since === void 0 ? [] : [`--since=${opts.since}`]
   ];
   try {
-    const { stdout } = await exec4(
-      "git",
-      args,
-      opts.env === void 0 ? void 0 : { env: opts.env }
-    );
+    const { stdout } = await exec4("git", args, {
+      maxBuffer: LOG_MAX_BUFFER,
+      ...opts.env === void 0 ? {} : { env: opts.env }
+    });
     return parseThoughtTrailers(String(stdout));
   } catch {
     return /* @__PURE__ */ new Map();
@@ -24158,19 +24173,21 @@ function earliestSessionStart(sessions) {
 function sameCommit(recorded, commit) {
   return commit.startsWith(recorded) || recorded.startsWith(commit);
 }
-function thoughtOf(recorded, trailers) {
-  for (const [commit, thought] of trailers) {
-    if (sameCommit(recorded, commit)) return thought;
+function thoughtsOf(recorded, trailers) {
+  for (const [commit, thoughts] of trailers) {
+    if (sameCommit(recorded, commit)) return thoughts;
   }
   return void 0;
 }
 function attachThoughtTrailers(sessions, trailers) {
   if (trailers.size === 0) return [...sessions];
   const byThought = /* @__PURE__ */ new Map();
-  for (const [commit, thought] of trailers) {
-    const list = byThought.get(thought);
-    if (list === void 0) byThought.set(thought, [commit]);
-    else if (!list.some((hash2) => sameCommit(hash2, commit))) list.push(commit);
+  for (const [commit, thoughts] of trailers) {
+    for (const thought of thoughts) {
+      const list = byThought.get(thought);
+      if (list === void 0) byThought.set(thought, [commit]);
+      else if (!list.some((hash2) => sameCommit(hash2, commit))) list.push(commit);
+    }
   }
   return sessions.map((session) => {
     let changed = false;
@@ -24178,8 +24195,8 @@ function attachThoughtTrailers(sessions, trailers) {
       if (node2.kind !== "message") return node2;
       const current = node2.commits ?? [];
       const kept = current.filter((hash2) => {
-        const thought = thoughtOf(hash2, trailers);
-        return thought === void 0 || thought === node2.id;
+        const thoughts = thoughtsOf(hash2, trailers);
+        return thoughts === void 0 || thoughts.includes(node2.id);
       });
       const claimed = (byThought.get(node2.id) ?? []).filter(
         (commit) => !kept.some((hash2) => sameCommit(hash2, commit))
@@ -25090,7 +25107,9 @@ async function show(opts) {
         `  ${candidate.sessionId} \xB7 ${candidate.label}${candidate.id === candidate.label ? "" : ` (${candidate.id})`}  ${candidate.title}`
       );
     }
-    throw new CliError(`"${opts.ref}" is ambiguous; use a longer prefix`);
+    throw new CliError(
+      COMMIT_REF.test(opts.ref) ? `commit ${opts.ref} comes from several thoughts; open one by its message hash` : `"${opts.ref}" is ambiguous; use a longer prefix`
+    );
   }
   const { session, messages, message } = result.hit;
   const sessionId = session.sessionId;
@@ -25559,7 +25578,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "0.30.0",
+  version: "0.31.0",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [

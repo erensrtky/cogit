@@ -11,6 +11,9 @@ asked, what came of it, and the message it answered. Your code commits point bac
 thought behind them, so `git log` tells you what changed and cogit tells you why. It works with
 Claude Code today.
 
+It runs as a Claude Code plugin and hooks in at SessionStart, Stop and SessionEnd, so the
+record is written while you work, not reconstructed from the diff afterwards.
+
 <img src="docs/images/map.png" alt="The map: sessions as a git graph, each with its messages, branches, commit chips and a left off here marker">
 
 *Your sessions as a git graph — one row per message, the decision behind it, and where you left
@@ -30,6 +33,10 @@ close each one.*
 
 *A changed file opens its history: every message that touched it, and the reason behind each —
 including the option that was rejected.*
+
+**[Click through a saved map](https://erensrtky.github.io/cogit/demo/)** — no install, no server:
+the same page `cogit open` writes, built from sample data. Read-only, so the Tasks buttons are
+inert.
 
 ## What it does
 
