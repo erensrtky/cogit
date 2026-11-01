@@ -21113,8 +21113,6 @@ function projectPaths(root) {
     inboxState: join6(base, "state", "inbox.json"),
     /** How the user left the map: open sessions and dragged row widths; also local. */
     mapView: join6(base, "state", "map.json"),
-    /** The curated captured-work list (Story 15.1); local, never committed. */
-    captures: join6(base, "state", "captures.json"),
     /** What the detached hook children (build, side run) printed; local, capped. */
     detachedLog: join6(base, "state", "detached.log"),
     /** Commits waiting for their message's record before a Shape; local. */
@@ -21206,7 +21204,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-BF6ZVJZE.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-U6GKF5YH.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -21330,12 +21328,6 @@ var Config = external_exports.object({
    * records. Off writes nothing; the map then says so.
    */
   shapes: external_exports.boolean().default(true),
-  /**
-   * Whether the side model distils each session's leftover work into a short
-   * curated list (Story 15.1). Off writes nothing; items already in the store
-   * are kept and come back when it is turned on again.
-   */
-  captures: external_exports.boolean().default(true),
   /**
    * Whether SessionStart hands the agent the lineage of the previous session and
    * how to read the record (`log` / `show`). On by default; costs only tokens.
@@ -24202,6 +24194,9 @@ function sameAuthor(a, b) {
   if (a.author !== void 0 && b.author !== void 0) return a.author === b.author;
   return true;
 }
+function personLabel(person) {
+  return person.author ?? person.authorEmail;
+}
 
 // src/author.ts
 async function sessionAuthor(root, env = process.env) {
@@ -24240,7 +24235,6 @@ var PANEL_EDITABLE_KEYS = [
   "recordHeadless",
   "tryBeforeNotes",
   "shapes",
-  "captures",
   "language",
   "shareConversations",
   "recordCommit"
@@ -25559,7 +25553,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "0.28.3",
+  version: "0.27.0",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [
@@ -26152,15 +26146,6 @@ export {
   labelsToHashes,
   hashesToLabels,
   upgradeSessionIds,
-  Slug,
-  IsoDate,
-  parseMessageRef,
-  SESSION_SCHEMA,
-  MESSAGE_ID,
-  BranchSummary,
-  Status,
-  LineageNodeInput,
-  SessionInput,
   findGitRoot,
   resolveCommit,
   ensureGitignore,
@@ -26176,7 +26161,15 @@ export {
   gitUserEmail,
   commitBetween,
   gitHooksDir,
+  Slug,
+  IsoDate,
+  parseMessageRef,
   Config,
+  SESSION_SCHEMA,
+  MESSAGE_ID,
+  BranchSummary,
+  Status,
+  SessionInput,
   LockBusyError,
   withLock,
   loadProject,
@@ -26201,6 +26194,7 @@ export {
   earliestSessionStart,
   attachThoughtTrailers,
   sameAuthor,
+  personLabel,
   sessionIdentity,
   stampedIdentity,
   LIVE_META_NAME,
@@ -26208,7 +26202,6 @@ export {
   TOKEN_HEADER_NAME,
   isPanelEditableKey,
   VIEW_SCHEMA,
-  buildMessages,
   lastActive,
   statusCard,
   sessionTitle,
