@@ -2,7 +2,7 @@ import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { DATA_ELEMENT_ID, type PageModel } from "../../cli/src/view/model.js";
 import { App } from "./App.js";
-import { isLivePage, loadViewModel, parseViewModel } from "./data.js";
+import { isLivePage, loadViewModel, parseViewModel, rememberEmbeddedDiffs } from "./data.js";
 import { Panel } from "./Panel.js";
 import "./styles.css";
 import { initTheme } from "./theme.js";
@@ -29,6 +29,9 @@ async function fetchLatestModel(): Promise<PageModel | null> {
  */
 function Page({ initial }: { initial: PageModel }) {
   const [model, setModel] = useState(initial);
+  // A saved page may carry its diffs; keep the newest model's copy for the
+  // rows that open without a server behind them.
+  rememberEmbeddedDiffs(model);
 
   useEffect(() => {
     if (!isLivePage()) return;

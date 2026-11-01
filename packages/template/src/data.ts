@@ -181,6 +181,28 @@ export async function saveCaptureState(
 }
 
 /**
+ * The patches the page itself carries, so a saved map (or the demo page) can
+ * show a diff with no server behind it. The reader keeps the latest model's
+ * copy; a page built without diffs simply has none.
+ */
+let embeddedDiffs: Record<string, Record<string, string>> | undefined;
+
+export function rememberEmbeddedDiffs(model: PageModel): void {
+  embeddedDiffs = model.kind === "lineage" ? model.diffs : undefined;
+}
+
+/** The patch for a commit (`""` for all of it) or one of its files, if the page carries it. */
+export function embeddedDiff(commit: string, file?: string): string | undefined {
+  const byFile = embeddedDiffs?.[commit];
+  return byFile === undefined ? undefined : byFile[file ?? ""];
+}
+
+/** Whether the page carries a patch for this commit (or file), so a row can open. */
+export function hasEmbeddedDiff(commit: string, file?: string): boolean {
+  return embeddedDiff(commit, file) !== undefined;
+}
+
+/**
  * One commit's patch for the message details (Story 10.5). Only the local
  * server answers this; over `file://` the diff rows do not expand.
  */

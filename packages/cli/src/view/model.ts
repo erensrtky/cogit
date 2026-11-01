@@ -327,6 +327,12 @@ export interface LineageViewModel {
    */
   files?: ViewFile[];
   /**
+   * Patches embedded at build time, by commit and then by file ("" for the
+   * whole commit), so a saved map can show a diff without the local server.
+   * A page built without them keeps saying the server is needed.
+   */
+  diffs?: Record<string, Record<string, string>>;
+  /**
    * Settings embedded at build time (Story 8.13). The settings modal shows them
    * read-only over `file://`; over the local server it reads the live values
    * instead. Absent on pages built before 8.13.

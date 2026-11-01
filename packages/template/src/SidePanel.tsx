@@ -11,7 +11,7 @@ import type {
 import { type CopyState, copyText } from "./clipboard.js";
 import { parseSubject, splitPath, typeColour } from "./codeRefs.js";
 import { DiffView } from "./DiffView.js";
-import { isLivePage, pageToken } from "./data.js";
+import { hasEmbeddedDiff, isLivePage, pageToken } from "./data.js";
 import { formatTime, kindLabel } from "./format.js";
 import { layoutGitGraph } from "./gitLayout.js";
 import {
@@ -493,7 +493,7 @@ function NodeDetails({
                   subject={tag?.subject}
                   missing={missing}
                   root={model.project.path}
-                  expandable={live && !missing}
+                  expandable={!missing && (live || hasEmbeddedDiff(commit))}
                 />
               );
             })}
@@ -518,7 +518,7 @@ function NodeDetails({
                   file={file}
                   root={model.project.path}
                   commit={owner?.hash}
-                  expandable={live && owner !== undefined}
+                  expandable={owner !== undefined && (live || hasEmbeddedDiff(owner.hash, file))}
                   onHistory={onOpenFileHistory}
                 />
               );
@@ -526,7 +526,9 @@ function NodeDetails({
           </ul>
         </section>
       ) : null}
-      {!live && (node.commits?.length || node.files?.length) ? (
+      {!live &&
+      (node.commits?.length || node.files?.length) &&
+      !(node.commits ?? []).some((hash) => hasEmbeddedDiff(hash)) ? (
         <p className="muted">Open with `cogit open` to see diffs.</p>
       ) : null}
       {node.kind === "message" ? <Conversation session={session} id={node.nodeId} /> : null}

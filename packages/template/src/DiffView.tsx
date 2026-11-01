@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { loadDiff, pageToken } from "./data.js";
+import { embeddedDiff, loadDiff, pageToken } from "./data.js";
 import { type DiffFile, type DiffHunk, parsePatch, sideBySide } from "./diffView.js";
 
 /** The viewer's choice of diff layout; kept locally, never sent anywhere. */
@@ -117,7 +117,11 @@ export function DiffView({
     setError(null);
     const token = pageToken();
     if (token === null) {
-      setError("Diffs need the local server: open the map with `cogit open`.");
+      // A saved page answers from the patches it was built with; when it has
+      // none, the row says why instead of failing.
+      const carried = embeddedDiff(commit, file);
+      if (carried !== undefined) setText(carried);
+      else setError("Diffs need the local server: open the map with `cogit open`.");
       return () => {
         mounted = false;
       };
