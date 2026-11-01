@@ -160,6 +160,28 @@ describe("cogit pr (Story 10.1)", () => {
     await commit({ "notes.txt": "notes\n" }, "chore: tidy notes");
   });
 
+  it("lists a squashed commit under every thought it names, once per session", async () => {
+    const before = await pr({ dir: root, io });
+    await writeFile(join(root, "squashed.txt"), "squashed\n");
+    await git("add", "squashed.txt");
+    await git(
+      "commit",
+      "-q",
+      "-m",
+      "feat: squash the branch",
+      "-m",
+      `    one\n\n    Thought: ${A}\n\n    two\n\n    Thought: ${D}`,
+    );
+
+    const model = await pr({ dir: root, io });
+    for (const id of [A, D]) {
+      const thought = model.thoughts.find((entry) => entry.id === id);
+      expect(thought?.commits.map((entry) => entry.subject)).toContain("feat: squash the branch");
+    }
+    expect(model.sessions[0]?.commitCount).toBe((before.sessions[0]?.commitCount ?? 0) + 1);
+    expect(model.unlinked.map((entry) => entry.subject)).not.toContain("feat: squash the branch");
+  });
+
   it("groups the branch's commits by thought, in commit order", async () => {
     const model = await pr({ dir: root, io });
     expect(model.base.ref).toBe("main");

@@ -120,6 +120,46 @@ describe("commands through the CLI", () => {
     expect(io.lines.join("\n")).toContain("not: Keep the loop — It loses data.");
   });
 
+  it("show names every thought of a squashed commit", async () => {
+    const run = promisify(execFile);
+    const git = async (...args: string[]): Promise<string> =>
+      (await run("git", ["-C", root, ...args])).stdout;
+    await git("init", "-q");
+    await cli("init", root, "--yes", "--retention", "keep");
+    await git("config", "user.email", "t@example.com");
+    await git("config", "user.name", "Tester");
+    await git(
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "feat: squashed",
+      "-m",
+      "    Thought: h111111111111\n\n    Thought: h222222222222",
+    );
+    const message = (id: string, title: string) => ({
+      id,
+      parent: null,
+      kind: "message",
+      title,
+      at: T0,
+    });
+    const record = {
+      schema: 1,
+      sessionId: "s1",
+      agent: "claude-code",
+      title: "CLI session",
+      startedAt: T0,
+      updatedAt: T0,
+      status: { goal: "", done: [], pending: [], next: "" },
+      nodes: [message("h111111111111", "One"), message("h222222222222", "Two")],
+    };
+    await writeFile(join(root, ".cogit", "sessions", "s1.json"), JSON.stringify(record));
+    const short = (await git("rev-parse", "--short=7", "HEAD")).trim();
+    expect(await cli("show", short, "-C", root)).toContain("comes from several thoughts");
+    expect(io.lines.join("\n")).toContain("h222222222222");
+  });
+
   it("runs config hint-off and hint-on", async () => {
     await cli("config", "hint-off", root);
     expect(io.lines.at(-1)).toBe(`Setup hint off in ${root}`);

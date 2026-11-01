@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A saved map can carry its diffs: when the page embeds patches, the Code rows open them without the local server, and the "open the map with `cogit open`" notice gives way. The demo page under `docs/demo/` is built this way.
 
 ### Fixed
+- A rebase or cherry-pick during a session no longer links old commits that had no `Thought:` trailer to the session's newest message.
+- A squashed commit keeps the link to every message it folded in, including commits already squashed: `cogit why`, `blame`, `pr` and the map read every `Thought:` line of the message, not only the last block. In `cogit pr --json`, a commit's `thought` is now `thoughts`, a list.
 - The diagram script is loaded relative to the page, so a map published under a subpath (the demo on GitHub Pages) draws its Shapes instead of falling back to the diagram's source.
 
 ## [0.30.0] - 2026-11-01

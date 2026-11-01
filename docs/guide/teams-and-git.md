@@ -29,11 +29,23 @@ Switching never deletes a record; switching to ignore leaves what git already tr
 setups work). The block never fails a commit.
 
 - **`prepare-commit-msg`** adds a `Thought: h<id>` trailer naming the message the commit came
-  from: the newest message of the current session. It is skipped for merges and squashes, and
-  when the last message is older than `trailerMaxAgeHours` (6 hours), since such a commit is
-  probably not about that message.
+  from: the newest message of the current session. It is skipped for merges and squashes, while
+  a rebase or cherry-pick replays old commits, and when the last message is older than
+  `trailerMaxAgeHours` (6 hours), since such a commit is probably not about that message.
 - **`pre-commit`** stages the current session's record with your code commit. It never creates
   a record-only commit.
+
+### Rebase and squash
+
+The link names a message, not a commit hash, so it follows the commit message:
+
+- **Rebase, cherry-pick:** the link stays, though the hash changes.
+- **`git merge --squash`, a squash in `rebase -i`:** the commit links to every message it folded
+  in, and `cogit why`, `blame` and the map show them all.
+- **GitHub's squash button:** depends on the commit message it writes. A pull request with one
+  commit keeps its message by default. With several, choose "Pull request title and commit
+  details" in the repository's settings. A squash that keeps only the title has no link to read;
+  the messages stay in the record, and `cogit search` still finds them.
 
 `recordCommit` decides what happens to messages recorded after your last code commit: `ask`
 (the next session start offers to commit them), `auto`, or `off`.

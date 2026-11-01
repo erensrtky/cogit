@@ -38,8 +38,8 @@ export interface PrCommit {
   short: string;
   at: string;
   subject: string;
-  /** The `Thought:` trailer value, when the commit carries one. */
-  thought?: string;
+  /** The messages the commit names; a squash can name several. */
+  thoughts?: string[];
   /** Repository-relative paths; empty when git no longer has the commit. */
   files: string[];
 }
@@ -227,53 +227,62 @@ export function buildPrModel(input: BuildPrInput): PrModel {
   const commitCounts = new Map<string, number>();
 
   for (const commit of input.commits) {
-    const id = commit.thought;
-    const hit = id === undefined ? undefined : index.get(id);
-    if (id === undefined || hit === undefined) {
+    const ids = commit.thoughts ?? [];
+    const known = ids.filter((id) => index.has(id));
+    if (known.length === 0) {
+      const named = ids[0];
       unlinked.push({
         full: commit.full,
         short: commit.short,
         subject: commit.subject,
-        ...(id === undefined ? {} : { thought: id }),
+        ...(named === undefined ? {} : { thought: named }),
       });
       continue;
     }
-    const { session } = hit.entry;
-    let thought = thoughts.get(id);
-    if (thought === undefined) {
-      const message = hit.message;
-      thought = {
-        id,
-        shortId: shortHash(id),
-        label: message.label ?? id,
-        sessionId: session.sessionId,
-        shortSessionId: session.sessionId.slice(0, 8),
-        sessionTitle: titleOf(session.sessionId, session.title),
-        title: message.title,
-        ...(message.summary === undefined ? {} : { summary: message.summary }),
-        ...(message.why === undefined ? {} : { why: message.why }),
-        ...(message.decidedBy === undefined ? {} : { decidedBy: message.decidedBy }),
-        alternatives: message.alternatives ?? [],
-        agentDecisions: (message.agentDecisions ?? []).map((decision) => ({
-          title: decision.title,
-          why: decision.why,
-          alternatives: decision.alternatives ?? [],
-        })),
-        commits: [],
-      };
-      thoughts.set(id, thought);
-      if (!entries.has(session.sessionId)) {
-        sessionOrder.push(session.sessionId);
-        entries.set(session.sessionId, hit.entry);
-        labels.set(session.sessionId, []);
-        thoughtCounts.set(session.sessionId, 0);
-        commitCounts.set(session.sessionId, 0);
+    // A squash names several messages, but it is still one commit in each session.
+    const counted = new Set<string>();
+    for (const id of known) {
+      const hit = index.get(id) as { entry: EffectiveSession; message: ViewNode };
+      const { session } = hit.entry;
+      let thought = thoughts.get(id);
+      if (thought === undefined) {
+        const message = hit.message;
+        thought = {
+          id,
+          shortId: shortHash(id),
+          label: message.label ?? id,
+          sessionId: session.sessionId,
+          shortSessionId: session.sessionId.slice(0, 8),
+          sessionTitle: titleOf(session.sessionId, session.title),
+          title: message.title,
+          ...(message.summary === undefined ? {} : { summary: message.summary }),
+          ...(message.why === undefined ? {} : { why: message.why }),
+          ...(message.decidedBy === undefined ? {} : { decidedBy: message.decidedBy }),
+          alternatives: message.alternatives ?? [],
+          agentDecisions: (message.agentDecisions ?? []).map((decision) => ({
+            title: decision.title,
+            why: decision.why,
+            alternatives: decision.alternatives ?? [],
+          })),
+          commits: [],
+        };
+        thoughts.set(id, thought);
+        if (!entries.has(session.sessionId)) {
+          sessionOrder.push(session.sessionId);
+          entries.set(session.sessionId, hit.entry);
+          labels.set(session.sessionId, []);
+          thoughtCounts.set(session.sessionId, 0);
+          commitCounts.set(session.sessionId, 0);
+        }
+        thoughtCounts.set(session.sessionId, (thoughtCounts.get(session.sessionId) ?? 0) + 1);
       }
-      thoughtCounts.set(session.sessionId, (thoughtCounts.get(session.sessionId) ?? 0) + 1);
+      thought.commits.push(commit);
+      labels.get(session.sessionId)?.push(labelIndex(thought.label) ?? 0);
+      if (!counted.has(session.sessionId)) {
+        counted.add(session.sessionId);
+        commitCounts.set(session.sessionId, (commitCounts.get(session.sessionId) ?? 0) + 1);
+      }
     }
-    thought.commits.push(commit);
-    labels.get(session.sessionId)?.push(labelIndex(thought.label) ?? 0);
-    commitCounts.set(session.sessionId, (commitCounts.get(session.sessionId) ?? 0) + 1);
   }
 
   const goals: PrGoal[] = [];
@@ -521,7 +530,7 @@ export async function pr(opts: PrOptions): Promise<PrModel> {
   const sessions = await loadEffectiveSessions(root, opts.io);
   const trailers =
     commits.length === 0
-      ? new Map<string, string>()
+      ? new Map<string, string[]>()
       : await readThoughtTrailers(gitRoot, {
           env,
           since: earliestSessionStart(sessions.map((entry) => entry.session)),
@@ -540,11 +549,11 @@ export async function pr(opts: PrOptions): Promise<PrModel> {
     policy: (await cogitIgnored(root)) ? "ignore" : "commit",
     sessions,
     commits: commits.map((commit) => {
-      const thought = trailers.get(commit.full);
+      const thoughts = trailers.get(commit.full);
       return {
         ...commit,
         files: files.get(commit.full) ?? [],
-        ...(thought === undefined ? {} : { thought }),
+        ...(thoughts === undefined ? {} : { thoughts }),
       };
     }),
   });

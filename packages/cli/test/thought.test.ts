@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -179,6 +179,63 @@ describe("the thought behind a commit (Story 9.4)", () => {
       const text = await readMessage(file);
       expect(text).toContain("Thought: h999999999999");
       expect(text).not.toContain(thoughtOf());
+    });
+
+    it("lands a squashed commit on every message it names, and keeps it where it is listed", () => {
+      const squashed = "a".repeat(40);
+      const sessions = [
+        session([
+          { id: "h111111111111", parent: null, kind: "message", title: "A", commits: [squashed] },
+          { id: "h222222222222", parent: null, kind: "message", title: "B", commits: [] },
+          { id: "h333333333333", parent: null, kind: "message", title: "C", commits: [] },
+        ]),
+      ];
+      const [next] = attachThoughtTrailers(
+        sessions,
+        new Map([[squashed, ["h111111111111", "h222222222222"]]]),
+      );
+      const [a, b, c] = next?.nodes ?? [];
+      expect(a?.commits).toEqual([squashed]);
+      expect(b?.commits).toEqual([squashed]);
+      expect(c?.commits).toEqual([]);
+    });
+
+    it("leaves a replayed commit alone during a rebase or a cherry-pick", async () => {
+      await writeHead();
+      const gitDir = (await git("rev-parse", "--absolute-git-dir")).trim();
+      for (const state of ["rebase-merge", "rebase-apply", "CHERRY_PICK_HEAD"]) {
+        await writeFile(join(gitDir, state), "");
+        const file = await messageFile();
+        expect(
+          await addThoughtTrailer({
+            dir: root,
+            messageFile: file,
+            source: "message",
+            env,
+            now: NOW,
+          }),
+        ).toBe(false);
+        expect(await readMessage(file)).toBe("feat: change the code\n");
+        await rm(join(gitDir, state));
+      }
+      const file = await messageFile();
+      expect(
+        await addThoughtTrailer({ dir: root, messageFile: file, source: "message", env, now: NOW }),
+      ).toBe(true);
+    });
+
+    it("counts as no replay when it cannot ask git", async () => {
+      await writeHead();
+      const file = await messageFile();
+      expect(
+        await addThoughtTrailer({
+          dir: root,
+          messageFile: file,
+          source: "message",
+          env: { ...env, PATH: "/nonexistent" },
+          now: NOW,
+        }),
+      ).toBe(true);
     });
 
     it("skips merges, squashes and an empty message-file argument", async () => {
@@ -366,19 +423,21 @@ describe("the thought behind a commit (Story 9.4)", () => {
   });
 
   describe("reading trailers", () => {
-    it("parses one commit line per commit, keeping the first valid id", () => {
+    it("reads every whole Thought line of a commit message, each once", () => {
       const a = "a".repeat(40);
       const b = "b".repeat(40);
+      const c = "c".repeat(40);
       const parsed = parseThoughtTrailers(
         [
-          `${a}\0h111111111111, h222222222222`,
-          `${b}\0not-a-thought`,
-          "no separator",
-          `${a}\0`,
+          `\x01${a}\0squash\n\n    one\n\n    Thought: h111111111111\n\nThought: h222222222222\nthought: h111111111111\n`,
+          `\x01${b}\0prose\n\nThis mentions Thought: h333333333333 in a sentence\nThought: not-a-thought\n`,
+          "\x01no separator",
+          `\x01not-a-hash\0Thought: h444444444444\n`,
+          `\x01${c}\0`,
         ].join("\n"),
       );
-      expect(parsed.get(a)).toBe("h111111111111");
-      expect(parsed.has(b)).toBe(false);
+      expect(parsed.get(a)).toEqual(["h111111111111", "h222222222222"]);
+      expect(parsed.size).toBe(1);
     });
 
     it("reads the trailers git holds, and only since a date", async () => {
@@ -394,7 +453,7 @@ describe("the thought behind a commit (Story 9.4)", () => {
         `Thought: ${thought}`,
       );
       const full = (await git("rev-parse", "HEAD")).trim();
-      expect((await readThoughtTrailers(root, { env })).get(full)).toBe(thought);
+      expect((await readThoughtTrailers(root, { env })).get(full)).toEqual([thought]);
       expect(await readThoughtTrailers(root, { env, since: "2030-01-01T00:00:00.000Z" })).toEqual(
         new Map(),
       );
@@ -423,9 +482,9 @@ describe("the thought behind a commit (Story 9.4)", () => {
       const [next] = attachThoughtTrailers(
         sessions,
         new Map([
-          [conflict, "h222222222222"],
-          [attached, "h222222222222"],
-          ["c".repeat(40), "h999999999999"],
+          [conflict, ["h222222222222"]],
+          [attached, ["h222222222222"]],
+          ["c".repeat(40), ["h999999999999"]],
         ]),
       );
       const [a, b, phase] = next?.nodes ?? [];

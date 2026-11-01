@@ -558,7 +558,11 @@ export async function show(opts: ShowOptions): Promise<ShowModel> {
         `  ${candidate.sessionId} · ${candidate.label}${candidate.id === candidate.label ? "" : ` (${candidate.id})`}  ${candidate.title}`,
       );
     }
-    throw new CliError(`"${opts.ref}" is ambiguous; use a longer prefix`);
+    throw new CliError(
+      COMMIT_REF.test(opts.ref)
+        ? `commit ${opts.ref} comes from several thoughts; open one by its message hash`
+        : `"${opts.ref}" is ambiguous; use a longer prefix`,
+    );
   }
 
   const { session, messages, message } = result.hit;
