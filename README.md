@@ -6,7 +6,7 @@ Git remembers what changed. cogit remembers why.
 
 <p align="center"><img src="docs/images/cogit-descartes.jpg" width="360" alt="René Descartes with git branches running through his hair"><br><i>Cogito, ergo commit.</i></p>
 
-<img src="docs/images/demo.gif" alt="cogit open shows the map; pasting a message hash jumps to that message and opens the decision behind it">
+<img src="docs/images/demo.gif" alt="cogit open shows the map; a session's card explains the work, its Shape draws the flow, the Tasks list holds what was left undone, and cogit why answers for a line of code">
 
 cogit records every message you send to an AI coding agent as a *thought commit*: what you
 asked, what came of it, and the message it answered. Your code commits point back to the
