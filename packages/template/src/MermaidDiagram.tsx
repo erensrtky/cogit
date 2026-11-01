@@ -17,7 +17,10 @@ import { getTheme, subscribeTheme, type ThemeMode } from "./theme.js";
  * no server, so it shows the diagram's source as text; a source the renderer
  * refuses falls back to the text too.
  */
-export const MERMAID_URL = "/assets/mermaid.js";
+// Relative, not rooted: the local server serves it at /assets/mermaid.js, and a
+// page published under a subpath (the demo on GitHub Pages) finds it beside
+// itself in assets/mermaid.js.
+export const MERMAID_URL = "assets/mermaid.js";
 
 interface Mermaid {
   initialize(config: Record<string, unknown>): void;
