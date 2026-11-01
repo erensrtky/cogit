@@ -513,11 +513,14 @@ export function ShapeSection({
     <section className="shape-section">
       <h3>Intent, Shape and Code</h3>
       {state === "ready" ? (
-        preview ? (
-          <pre className="shape-preview">{preview}</pre>
-        ) : diagramSource !== undefined ? (
-          <MermaidDiagram source={diagramSource} className="shape-preview-diagram" fit />
-        ) : null
+        // The diagram leads: a drawn Shape says more at a glance than three
+        // lines of steps, so it comes first and the steps follow it.
+        <>
+          {diagramSource === undefined ? null : (
+            <MermaidDiagram source={diagramSource} className="shape-preview-diagram" fit />
+          )}
+          {preview === undefined ? null : <pre className="shape-preview">{preview}</pre>}
+        </>
       ) : state === "off" ? (
         <p className="muted">Shapes are off.</p>
       ) : state === "empty" ? (
