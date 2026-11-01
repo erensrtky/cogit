@@ -26,6 +26,11 @@ what the change does, and the diff.*
 *Tasks — what your sessions left undone, drafted when a session closes. You accept, dismiss or
 close each one.*
 
+<img src="docs/images/files.png" alt="The Files view: a changed file opened, listing the messages that touched it with each message's reason and the option it rejected">
+
+*A changed file opens its history: every message that touched it, and the reason behind each —
+including the option that was rejected.*
+
 ## What it does
 
 - **Every message becomes a thought commit**: the question, the outcome, the decisions with
