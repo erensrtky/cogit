@@ -6,12 +6,25 @@ Git remembers what changed. cogit remembers why.
 
 <p align="center"><img src="docs/images/cogit-descartes.jpg" width="360" alt="René Descartes with git branches running through his hair"><br><i>Cogito, ergo commit.</i></p>
 
-<img src="docs/images/demo.gif" alt="cogit open shows the map; a session's card explains the work, its Shape draws the flow, the Tasks list holds what was left undone, and cogit why answers for a line of code">
-
 cogit records every message you send to an AI coding agent as a *thought commit*: what you
 asked, what came of it, and the message it answered. Your code commits point back to the
 thought behind them, so `git log` tells you what changed and cogit tells you why. It works with
 Claude Code today.
+
+<img src="docs/images/map.png" alt="The map: sessions as a git graph, each with its messages, branches, commit chips and a left off here marker">
+
+*Your sessions as a git graph — one row per message, the decision behind it, and where you left
+off.*
+
+<img src="docs/images/shape.png" alt="A message opened on its Shape tab: a flowchart of what the change does, under the tabs Intent, Shape and Code">
+
+*A message that landed commits opens as Intent, Shape and Code: why it happened, a picture of
+what the change does, and the diff.*
+
+<img src="docs/images/tasks.png" alt="The Tasks panel: suggested items with Accept and Dismiss, open items with Done, and a Done section">
+
+*Tasks — what your sessions left undone, drafted when a session closes. You accept, dismiss or
+close each one.*
 
 ## What it does
 

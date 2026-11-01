@@ -95,21 +95,32 @@ export const fixture: LineageViewModel = {
           alternatives: [{ option: "fetch the JSON", why: "breaks over file://" }],
         }),
         message("m4", "Build the dev fixture", "m3", "2026-10-24T09:41:00.000Z", {
-          summary: "Three sessions in start order.",
+          summary: "Three sessions in start order, enough to exercise every branch shape.",
+          decidedBy: "agreed",
+          alternatives: [
+            {
+              option: "ship the fixture as a separate JSON file",
+              why: "the map has to stay one file",
+            },
+            { option: "mock the model in the tests instead", why: "it never draws the real graph" },
+          ],
           commits: ["1a2b3c4", "9f8e7d6"],
           shape: {
             by: "side",
             commits: ["1a2b3c4", "9f8e7d6"],
             tools: [
               {
-                kind: "pseudo",
-                valid: true,
-                text: "1. Read the fixture data\n2. Render the map from it\n3. Keep the page offline",
-              },
-              {
                 kind: "mermaid",
                 valid: true,
-                text: "flowchart TD\n  Fixture[fixture.ts] --> Map[App.tsx]\n  Map --> DOM[cogit-data element]",
+                text: [
+                  "flowchart TD",
+                  "  F[fixture.ts] --> S[Three sessions, in start order]",
+                  "  S --> L[Lay out the git rows]",
+                  "  L --> G[Draw the graph]",
+                  "  G --> C{Every message placed?}",
+                  "  C -- yes --> R[Render the map]",
+                  "  C -- no --> L",
+                ].join("\n"),
               },
             ],
           },
@@ -311,6 +322,42 @@ export const fixture: LineageViewModel = {
           commits: [],
         },
       ],
+    },
+  ],
+  // Story 15.1: the Tasks list, as the distiller writes it after a session.
+  captures: [
+    {
+      id: "c1a2b3c4d",
+      text: "Pick the graph layout that survives 500 nodes",
+      state: "suggested",
+      source: { sessionId: "fixture-template" },
+      createdAt: "2026-10-24T11:42:00.000Z",
+      updatedAt: "2026-10-24T11:42:00.000Z",
+    },
+    {
+      id: "c2b3c4d5e",
+      text: "Write the resume command copy fallback",
+      state: "suggested",
+      source: { sessionId: "fixture-template" },
+      createdAt: "2026-10-24T10:20:00.000Z",
+      updatedAt: "2026-10-24T10:20:00.000Z",
+    },
+    {
+      id: "c3c4d5e6f",
+      text: "Define what counts as an active session",
+      state: "open",
+      source: { sessionId: "fixture-unassigned" },
+      createdAt: "2026-10-19T18:00:00.000Z",
+      updatedAt: "2026-10-21T09:00:00.000Z",
+    },
+    {
+      id: "c4d5e6f70",
+      text: "Add the turn counter to the status card",
+      state: "done",
+      source: { sessionId: "fixture-capture" },
+      createdAt: "2026-10-20T16:30:00.000Z",
+      updatedAt: "2026-10-21T10:00:00.000Z",
+      closedAt: "2026-10-21T10:00:00.000Z",
     },
   ],
   // Story 8.12: the switcher's data, as `build` collects it from the registry.

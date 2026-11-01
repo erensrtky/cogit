@@ -19,10 +19,7 @@ The panel lists every project `cogit init` set up on this machine. A project who
 was deleted or moved stays as a card marked "missing"; `cogit config prune` removes those
 (`--dry-run` lists them first).
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../images/map-dark.png">
-  <img src="../images/map-light.png" alt="The map: sessions as branches, each message's commits and where the work left off">
-</picture>
+<img src="../images/map.png" alt="The map: sessions as branches, each message's commits and where the work left off">
 
 ## Sessions and branches
 
