@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- A saved map can carry its diffs: when the page embeds patches, the Code rows open them without the local server, and the "open the map with `cogit open`" notice gives way. The demo page under `docs/demo/` is built this way.
+
+### Fixed
+- The diagram script is loaded relative to the page, so a map published under a subpath (the demo on GitHub Pages) draws its Shapes instead of falling back to the diagram's source.
 
 ## [0.30.0] - 2026-11-01
 ### Added
