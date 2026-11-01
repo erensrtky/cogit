@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- A changed file in a message's card opens its history: the Files view opens on that file and lists every message that touched it, each with the reason it happened or the option it rejected — the map's side of `cogit why <path>`.
+
+### Changed
+- The README gallery gains a fourth still, the file history above.
 
 ## [0.29.0] - 2026-11-01
 ### Changed

@@ -60,14 +60,14 @@ describe("plugin packaging", () => {
 
   it("keeps a README that shows the map and points at the guide and licence", async () => {
     const readme = await readFile(new URL("../../../README.md", import.meta.url), "utf8");
-    // The feature gallery: the map, a message's Shape and the Tasks panel.
-    for (const shot of ["map.png", "shape.png", "tasks.png"]) {
+    // The feature gallery: the map, a message's Shape, the Tasks panel and a file's history.
+    for (const shot of ["map.png", "shape.png", "tasks.png", "files.png"]) {
       expect(readme).toContain(`src="docs/images/${shot}"`);
     }
     expect(readme).toContain("(docs/guide/getting-started.md)");
     expect(readme).toContain("(LICENSE)");
     // A relative image only renders when the file it names is in the repository.
-    for (const image of ["map.png", "shape.png", "tasks.png"]) {
+    for (const image of ["map.png", "shape.png", "tasks.png", "files.png"]) {
       await expect(
         access(new URL(`../../../docs/images/${image}`, import.meta.url)),
       ).resolves.toBeUndefined();
