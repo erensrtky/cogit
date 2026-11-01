@@ -87,7 +87,8 @@ export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
     name: "Flow",
     when:
       "The change is a path through code across files: the functions, files, stores, hooks and " +
-      "outside calls it moves between. Every node gets a kind from the list below and a label " +
+      "outside calls it moves between. Prefer it whenever data or control crosses more than one " +
+      "file or layer, even when the change also reads like a list. Every node gets a kind from the list below and a label " +
       "in the project's own words; the map draws the symbol, never you. Set `ordered` true " +
       "when work is handed between parts over time (a hook → a job → a store, a client → a " +
       "server): the map draws it as a sequence diagram, so keep the edges in time order. " +
@@ -102,8 +103,9 @@ export const SHAPE_TOOLS: readonly ShapeToolSpec[] = [
     kind: "pseudo",
     name: "Steps",
     when:
-      "The change is mostly logic: a new path through functions, a rule, a check. " +
-      "Numbered plain-language steps, naming the functions and files they touch.",
+      "The change is logic that stays inside one function or module (a rule, a check, a " +
+      "rewrite) with no path across files to draw. Numbered plain-language steps, naming the " +
+      "functions and files they touch.",
     output: '{"kind": "pseudo", "text": "1. ...\\n2. ..."}',
     validate(text) {
       const lines = text
@@ -352,12 +354,12 @@ export function shapePrompt(opts: {
     "",
     "Rules:",
     "- Give at most three tools, the ones that say the most about this change; never two that tell the same thing.",
-    "- A Flow for a change across two or more files: every node gets a kind from the list above and a label in the project's own words. Set `ordered` true when work is handed between parts over time (a hook → a job → a store, a client → a server): the map draws it as a sequence diagram, so keep the edges in time order and give every edge a label saying what is handed over or done.",
+    "- A Flow whenever data or control crosses more than one file or layer — a request path, a hook into a store, a queue drained later — even when the change also reads like a list of steps: it is what the map draws best. Every node gets a kind from the list above and a label in the project's own words. Set `ordered` true when work is handed between parts over time (a hook → a job → a store, a client → a server): the map draws it as a sequence diagram, so keep the edges in time order and give every edge a label saying what is handed over or done.",
     "- A Before / After table when behaviour someone can see changes (a fix, a new default, a rule).",
     "- A change nobody would notice from outside (a refactor, a rename, moved code, a wording tweak in a prompt or comment) takes no tool at all: return none.",
     "- An Interface table only for what is reached from outside the changed module: a CLI command or flag, an exported function or type other packages use, a config key, a stored schema field, an HTTP route. Never an internal helper, a component prop or a view-model field.",
     "- A new or changed command or flag always gets an example that runs it and shows what it prints, with real values from the diff; a file path in it must be one the diff touches, never an invented one. Otherwise an example only when one concrete case shows the change faster than steps.",
-    "- Steps only when the logic itself is the point and no other tool says it; each step starts with the symbol of its kind after its number, e.g. `1. ⚡ After a commit, …`.",
+    "- Steps only for logic that stays inside one function or module (a rule, a check, a rewrite) with no path across files to draw; each step starts with the symbol of its kind after its number, e.g. `1. ⚡ After a commit, …`.",
     "- Tables have no header row (the map adds one); every line is one row of three cells split by |.",
     "- Order the tools: diagram, tables, example, steps. Return none when the change is a small fix not worth a picture.",
     `- Name real functions, files and modules from the diff. Never invent a path.`,
@@ -373,7 +375,7 @@ export function shapePrompt(opts: {
     `Diff${opts.diffTruncated ? " (cut to fit; the commits above are complete)" : ""}:`,
     opts.diff,
     "",
-    'Return only one JSON object, no code fences: {"tools": [{"kind": "pseudo", "text": "1. ...\\n2. ..."}]}. A change across two or more files always includes a Flow; return {"tools": []} only for a change that is not worth showing.',
+    'Return only one JSON object, no code fences: {"tools": [{"kind": "pseudo", "text": "1. ...\\n2. ..."}]}. A change across two or more files or layers always includes a Flow; return {"tools": []} only for a change that is not worth showing.',
   ].join("\n");
 }
 

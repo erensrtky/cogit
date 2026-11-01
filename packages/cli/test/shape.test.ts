@@ -159,9 +159,11 @@ describe("the Shape tool catalogue", () => {
       diffTruncated: false,
       language: "auto",
     });
-    expect(prompt).toContain("A Flow for a change across two or more files");
+    expect(prompt).toContain("A Flow whenever data or control crosses more than one file or layer");
     // The last line the writer reads says it again, since a small model forgets.
-    expect(prompt).toContain("A change across two or more files always includes a Flow");
+    expect(prompt).toContain("A change across two or more files or layers always includes a Flow");
+    // Steps stay for what cannot be drawn: logic inside one function.
+    expect(prompt).toContain("Steps only for logic that stays inside one function or module");
     expect(prompt).toContain("A Before / After table when behaviour someone can see changes");
     expect(prompt).toContain("A new or changed command or flag always gets an example");
     expect(prompt).toContain("Never an internal helper");

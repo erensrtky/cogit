@@ -93,7 +93,9 @@ message's node, with the node's commit hashes:
 
 Tools (at most three, the ones that say the most; never two that tell the same thing):
 
-- `flow`: a path through code as JSON. Every node has a `kind` from the table below and a
+- `flow`: a path through code as JSON. Take it whenever data or control crosses more than one
+  file or layer, even when the change also reads like a list of steps — it is what the map
+  draws best. Every node has a `kind` from the table below and a
   `label` in the project's own words; at most 12 nodes and 16 edges; ids are short lowercase
   words (`a`, `hook`), unique, and every edge names two of them. Set `ordered: true` when
   work is handed between parts over time (a hook → a job → a store, a client → a server): the
@@ -110,8 +112,9 @@ Tools (at most three, the ones that say the most; never two that tell the same t
   `—` for nothing.
 - `example`: one concrete case with real values, each result on its own line after `→`. A new
   or changed command or flag always gets one that runs it.
-- `pseudo`: numbered plain-language steps of the new logic, each starting with the symbol of
-  its kind after its number (`1. ⚡ After a commit, …`), naming the functions and files.
+- `pseudo`: numbered plain-language steps for logic that stays inside one function or module,
+  with no path across files to draw; each starts with the symbol of its kind after its number
+  (`1. ⚡ After a commit, …`), naming the functions and files.
 
 Kinds (one per Flow node, and the symbol a step starts with; the map draws the symbol, you
 never draw it):
