@@ -127,10 +127,10 @@ The Files view lists every file a recorded message touched, most recently first,
 count. Opening a file lists the messages that changed it; opening one of those jumps to it on
 the map. In the terminal: `cogit log --file <path>` and `cogit why <path>`.
 
-## Captured work
+## Tasks
 
 Working with an agent is improvised: things that would have been a plan's items get done,
-half-done or dropped along the way. The **Captured** list is a short, curated one. When a
+half-done or dropped along the way. The **Tasks** list is a short, curated one. When a
 session ends, the side model reads what its record left open — the record's own pending items
 first, with the open line of each branch summary and the last messages as supporting context —
 and drafts at most three **user-level** items: something you asked for or the session left
@@ -139,22 +139,22 @@ is never drafted, even when an older branch line still calls it open, and the mo
 invents a commit step, a test run, a status fact or a question a later message answered. A
 session with nothing open costs no model call.
 
-Each drafted item waits in **To review** until you choose: **Accept** keeps it in **Open**,
+Each drafted item waits in **Suggested** until you choose: **Accept** keeps it in **Open**,
 **Dismiss** closes it without doing it. An open item is closed with **Done**. The last ten
 closed items stay under **Done (last 10)**. An item belongs to the whole session it came from,
 not to one message. Clicking a session's row opens that session's card; the row also carries the
 number of items the session stands for, whether it is expanded or folded. The arrow at the left
 of the row is the one that opens and folds the session's messages, so the card never covers
-them. The card lists the items under **Captured work** with their state and age — read-only, so
-a stray click cannot close work; accepting, dismissing and closing stay in the Captured list. An item's source
+them. The card lists the items under **Tasks** with their state and age — read-only, so
+a stray click cannot close work; accepting, dismissing and closing stay in the Tasks list. An item's source
 line in the list opens the session's **first message**. A session with no messages anchors
 nowhere, and its items show only in the list. The model never reopens or rewrites an
 item you already saw; closing is your act. In the terminal: `cogit captures`,
 `cogit captures accept|dismiss|done <id>`, and `cogit captures distill [--session <id> | --all]
 [--dry-run]` to backfill sessions by hand (`--dry-run` prints the proposals and writes nothing).
 
-It is not a task board: no assignment, no priority, no tracker state. The list lives in
-`.cogit/state/captures.json` on this machine and is never committed. The **Captured** button
+It is not a board: no columns, no assignment, no priority, no tracker state. The list lives in
+`.cogit/state/captures.json` on this machine and is never committed. The **Tasks** button
 appears only while the setting is on and something waits or is open; with the setting off
 (`cogit config set captures false`) nothing is drafted, the button hides, and items already in
 the store are kept, not deleted.

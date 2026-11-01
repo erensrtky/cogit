@@ -670,7 +670,8 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   const [sessionJumps, setSessionJumps] = useState(0);
   const [sessionTarget, setSessionTarget] = useState<string | null>(null);
   const sessionPoint = useMemo(
-    () => (sessionTarget === null ? null : pointOfHit({ sessionId: sessionTarget, messageId: null })),
+    () =>
+      sessionTarget === null ? null : pointOfHit({ sessionId: sessionTarget, messageId: null }),
     [sessionTarget, pointOfHit],
   );
   const sessionJump = useMemo(
@@ -837,14 +838,14 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
               type="button"
               className="outline-button capture-button"
               aria-pressed={showCaptures}
-              title="A list you curate: what the sessions left undone"
+              title="Tasks: what your sessions left undone — cogit drafts, you decide"
               onClick={() => {
                 setShowCaptures((value) => !value);
                 setShowFiles(false);
                 setShowOutline(false);
               }}
             >
-              {showCaptures ? "Hide captured" : "Captured"}
+              {showCaptures ? "Hide tasks" : "Tasks"}
             </button>
           ) : null}
         </div>

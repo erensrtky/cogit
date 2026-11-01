@@ -1195,6 +1195,12 @@ body:has(.map-shell.is-expanded) {
   font-size: 11px;
 }
 
+/* A task marker, so the list reads as tasks, not as message rows. */
+.capture-task-mark {
+  margin-right: 6px;
+  color: var(--muted);
+}
+
 .capture-list {
   margin: 0;
   padding: 0 4px;
@@ -1216,6 +1222,13 @@ body:has(.map-shell.is-expanded) {
 
 .capture-done > summary.capture-heading {
   cursor: pointer;
+}
+
+/* The note after a section heading: same line, not a second uppercase label. */
+.capture-hint {
+  text-transform: none;
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 .capture-row {

@@ -149,7 +149,12 @@ export function CapturesView({
               onSelectSession(source.sessionId);
             }}
           >
-            <span className="capture-text">{item.text}</span>
+            <span className="capture-text">
+              <span className="capture-task-mark" aria-hidden="true">
+                {item.state === "done" ? "✓" : "○"}
+              </span>
+              {item.text}
+            </span>
             <span className="capture-meta">
               <span className="capture-session">{source.sessionTitle}</span>
               {source.label === undefined ? null : (
@@ -167,29 +172,28 @@ export function CapturesView({
   const empty = review.length === 0 && open.length === 0 && done.length === 0;
 
   return (
-    <nav className="outline capture-view" aria-label="Captured work">
+    <nav className="outline capture-view" aria-label="Tasks">
       <header className="outline-head capture-head">
-        <span className="outline-title capture-title">Captured work</span>
+        <span className="outline-title capture-title">Tasks</span>
         <span className="outline-badge capture-badge">{review.length + open.length}</span>
-        <button
-          type="button"
-          className="drilldown-close"
-          aria-label="Hide captured work"
-          onClick={onClose}
-        >
+        <button type="button" className="drilldown-close" aria-label="Hide tasks" onClick={onClose}>
           ×
         </button>
       </header>
-      <p className="capture-note">A list you curate, not a plan cogit keeps.</p>
+      <p className="capture-note">What your sessions left undone — cogit drafts, you decide.</p>
       {error === null ? null : <p className="muted capture-error">{error}</p>}
       <div className="outline-scroll">
         {empty ? (
-          <p className="empty">No captured work.</p>
+          <p className="empty">
+            No tasks yet. When a session ends, cogit drafts what it left undone here.
+          </p>
         ) : (
           <>
             {review.length === 0 ? null : (
               <section className="capture-section">
-                <h3 className="capture-heading">To review</h3>
+                <h3 className="capture-heading">
+                  Suggested <span className="capture-hint">· drafted at session close</span>
+                </h3>
                 <ul className="capture-list">
                   {review.map((item) =>
                     row(

@@ -191,9 +191,9 @@ describe("the session card's Captured work (Story 15.3)", () => {
         onClose: () => {},
       }),
     );
-    expect(html).toContain("Captured work");
+    expect(html).toContain("Tasks");
     expect(html).toContain("write the docs");
-    expect(html).toContain("To review");
+    expect(html).toContain("Suggested");
     expect(html).toContain("Open");
     expect(html).toContain("Done");
     // A dismissed item is closed and stays out of the card, like the list.
@@ -211,6 +211,6 @@ describe("the session card's Captured work (Story 15.3)", () => {
         onClose: () => {},
       }),
     );
-    expect(html).not.toContain("Captured work");
+    expect(html).not.toContain("Tasks");
   });
 });

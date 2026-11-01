@@ -120,13 +120,13 @@ const EDITABLE: FieldSpec[] = [
   },
   {
     key: "captures",
-    label: "Captured work",
+    label: "Tasks",
     help: "A short list of what each session left undone, drafted by the side model.",
     details:
       "When a session ends, the side model reads what its record left open and drafts at " +
       "most three things a person would ask for, in the conversation's language. The list " +
       "is yours: accept, dismiss or close each item. Sessions with nothing open cost no " +
-      "model call; the map's Captured button appears only while something waits or is open. " +
+      "model call; the map's Tasks button appears only while something waits or is open. " +
       "Off, nothing is drafted and the list already in the store is kept, not deleted.",
     kind: "boolean",
   },

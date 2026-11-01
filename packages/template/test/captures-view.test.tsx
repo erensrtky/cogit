@@ -54,9 +54,9 @@ function render(captures: ViewCapture[] | undefined, sessionsFor = sessions): st
 describe("CapturesView", () => {
   it("shows the three sections with their buttons", () => {
     const html = render(items);
-    expect(html).toContain("Captured work");
-    expect(html).toContain("A list you curate, not a plan cogit keeps.");
-    expect(html).toContain("To review");
+    expect(html).toContain("Tasks");
+    expect(html).toContain("What your sessions left undone — cogit drafts, you decide.");
+    expect(html).toContain("Suggested");
     expect(html).toContain("Open");
     expect(html).toContain("Done (last 10)");
     expect(html).toContain("decide the error format");
@@ -71,8 +71,8 @@ describe("CapturesView", () => {
   });
 
   it("is empty when nothing was drafted", () => {
-    expect(render(undefined)).toContain("No captured work.");
-    expect(render([item({ id: "c00000009", state: "dismissed" })])).toContain("No captured work.");
+    expect(render(undefined)).toContain("No tasks yet.");
+    expect(render([item({ id: "c00000009", state: "dismissed" })])).toContain("No tasks yet.");
   });
 
   it("opens the session's card, and only a missing session cannot be opened", () => {
@@ -88,7 +88,7 @@ describe("CapturesView", () => {
   });
 });
 
-describe("the Captured button", () => {
+describe("the Tasks button", () => {
   it("shows only while the setting is on and something waits or is open", () => {
     expect(capturesButtonVisible(items, true)).toBe(true);
     expect(capturesButtonVisible(items, undefined)).toBe(true);

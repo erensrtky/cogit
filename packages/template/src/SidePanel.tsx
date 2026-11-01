@@ -110,7 +110,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const CAPTURE_STATE_LABEL = {
-  suggested: "To review",
+  suggested: "Suggested",
   open: "Open",
   done: "Done",
   dismissed: "Dismissed",
@@ -138,7 +138,7 @@ function CapturedWork({ items, reveal = 0 }: { items: readonly ViewCapture[]; re
   return (
     <section className="captured-work" ref={section}>
       <h3>
-        Captured work <span className="count">{shown.length}</span>
+        Tasks <span className="count">{shown.length}</span>
       </h3>
       <ul className="drilldown-list capture-here-list">
         {shown.map((item) => {
