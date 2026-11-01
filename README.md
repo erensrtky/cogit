@@ -34,6 +34,10 @@ close each one.*
 *A changed file opens its history: every message that touched it, and the reason behind each —
 including the option that was rejected.*
 
+**[Click through a saved map](https://erensrtky.github.io/cogit/demo/)** — no install, no server:
+the same page `cogit open` writes, built from sample data. Read-only, so the Tasks buttons are
+inert.
+
 ## What it does
 
 - **Every message becomes a thought commit**: the question, the outcome, the decisions with

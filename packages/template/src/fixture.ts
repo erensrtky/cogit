@@ -219,6 +219,35 @@ export const fixture: LineageViewModel = {
       },
     ),
   ].sort((a, b) => a.startedAt.localeCompare(b.startedAt)),
+  // Patches carried by the page, so the demo map shows a diff with no server.
+  diffs: {
+    "1a2b3c4": {
+      "": [
+        "diff --git a/packages/template/src/fixture.ts b/packages/template/src/fixture.ts",
+        "new file mode 100644",
+        "index 0000000..1a2b3c4",
+        "--- /dev/null",
+        "+++ b/packages/template/src/fixture.ts",
+        "@@ -0,0 +1,4 @@",
+        '+import type { LineageViewModel } from "../../cli/src/view/model.js";',
+        "+",
+        '+export const fixture: LineageViewModel = { kind: "lineage", schema: 1 };',
+        "+",
+      ].join("\n"),
+      "packages/template/src/fixture.ts": [
+        "diff --git a/packages/template/src/fixture.ts b/packages/template/src/fixture.ts",
+        "new file mode 100644",
+        "index 0000000..1a2b3c4",
+        "--- /dev/null",
+        "+++ b/packages/template/src/fixture.ts",
+        "@@ -0,0 +1,4 @@",
+        '+import type { LineageViewModel } from "../../cli/src/view/model.js";',
+        "+",
+        '+export const fixture: LineageViewModel = { kind: "lineage", schema: 1 };',
+        "+",
+      ].join("\n"),
+    },
+  },
   // Story 8.15: the files view, as `build` unions message files and commit files.
   files: [
     {
