@@ -15,7 +15,7 @@ The current record (`cogit session show`):
 - `initialized: false`: reply exactly "cogit is not set up in this project yet; run
   `npx @cogit/cli init` here first." and stop.
 - `sessionError`: quote it and stop; never write over the record.
-- Nothing new or changed (`newMessages` empty): reply "Lineage is up to date." and stop.
+- Nothing new or changed (`newMessages` empty): reply "cogit is up to date." and stop.
 
 ## Look something up
 
@@ -36,8 +36,11 @@ One JSON object:
 
 - `sessionId`: always `"${CLAUDE_SESSION_ID}"`.
 - `title`: a few words; on the first write or when the focus changed.
-- `status`: replaces all four fields, so send each: `goal` (one sentence), `done`, `pending`
-  (`{ "text", "needsUser": true }` when it waits on the user), `next` (concrete step).
+- `status`: replaces all four fields, so send each: `goal` (one sentence), `done` (what
+  finished, as outcomes), `pending` (the work still open, one item per ask in the user's
+  words — never a checklist of commands; a release and the restart it needs are one item, and
+  a step that serves nothing is dropped; `{ "text", "needsUser": true }` when it waits on the
+  user), `next` (concrete step).
 - `nodes`: only new nodes or changed fields; the rest is kept.
 
 ## One node per user message
@@ -90,7 +93,9 @@ message's node, with the node's commit hashes:
 
 Tools (at most three, the ones that say the most; never two that tell the same thing):
 
-- `flow`: a path through code as JSON. Every node has a `kind` from the table below and a
+- `flow`: a path through code as JSON. Take it whenever data or control crosses more than one
+  file or layer, even when the change also reads like a list of steps — it is what the map
+  draws best. Every node has a `kind` from the table below and a
   `label` in the project's own words; at most 12 nodes and 16 edges; ids are short lowercase
   words (`a`, `hook`), unique, and every edge names two of them. Set `ordered: true` when
   work is handed between parts over time (a hook → a job → a store, a client → a server): the
@@ -107,8 +112,9 @@ Tools (at most three, the ones that say the most; never two that tell the same t
   `—` for nothing.
 - `example`: one concrete case with real values, each result on its own line after `→`. A new
   or changed command or flag always gets one that runs it.
-- `pseudo`: numbered plain-language steps of the new logic, each starting with the symbol of
-  its kind after its number (`1. ⚡ After a commit, …`), naming the functions and files.
+- `pseudo`: numbered plain-language steps for logic that stays inside one function or module,
+  with no path across files to draw; each starts with the symbol of its kind after its number
+  (`1. ⚡ After a commit, …`), naming the functions and files.
 
 Kinds (one per Flow node, and the symbol a step starts with; the map draws the symbol, you
 never draw it):
@@ -154,4 +160,4 @@ personal data, file contents or command output.
 2. `node "${CLAUDE_PLUGIN_ROOT}/dist/cli.js" session write -C "<dir from the record>" --file "<inbox path>" --consume`
 
 If it fails, fix the JSON according to the error and run it again. Then reply with one short
-line, e.g. "Lineage updated (3 nodes)"; never repeat the JSON.
+line, e.g. "cogit updated (3 nodes)"; never repeat the JSON.
