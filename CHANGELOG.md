@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.29.0] - 2026-11-01
 ### Changed
 - A message's card shows its Shape as a diagram first, with the steps under it, and the preview fits the drawing to the box instead of cropping it mid-shape; the **Open** window still holds every tool.
 - The Shape writer draws a Flow whenever data or control crosses more than one file or layer — even when the change also reads like a list — and keeps Steps for logic that stays inside one function or module, with no path across files to draw.
