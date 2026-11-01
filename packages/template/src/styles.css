@@ -1160,6 +1160,17 @@ body:has(.map-shell.is-expanded) {
   text-overflow: ellipsis;
 }
 
+/* The message's reason under its row, the way `cogit why` prints a decision. */
+.file-hit-reason {
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 11px;
+  font-style: italic;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .file-hit-branch,
 .file-hit-commit {
   font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
@@ -1690,6 +1701,36 @@ button.file-row {
 }
 
 button.file-row:hover {
+  background: var(--hover);
+}
+
+/* A changed file opens its history: every message that touched it, the map's
+   side of `cogit why <path>`. */
+.file-item {
+  display: flex;
+  align-items: center;
+}
+
+.file-item .file-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.file-history {
+  flex: none;
+  margin-right: 8px;
+  padding: 1px 8px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.file-history:hover {
+  color: var(--text);
   background: var(--hover);
 }
 

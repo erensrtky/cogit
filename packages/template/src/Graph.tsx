@@ -21,7 +21,7 @@ import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js"
 import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
 import { CapturesView, captureCounts, capturesButtonVisible } from "./CapturesView.js";
 import { loadMapView, pageToken, saveOpenSessions, saveRowWidth } from "./data.js";
-import { type FilesTarget, FilesView } from "./FilesView.js";
+import { type FilesFocus, type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
 import { type GitLayout, layoutGitGraph, ROW_WIDTH } from "./gitLayout.js";
@@ -338,6 +338,8 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   const [showOutline, setShowOutline] = useState(true);
   // The files and outline views share the left column; only one shows.
   const [showFiles, setShowFiles] = useState(false);
+  // The file a message's card asked the history of; the Files view opens on it.
+  const [filesFocus, setFilesFocus] = useState<FilesFocus | null>(null);
   const [showCaptures, setShowCaptures] = useState(false);
   const [person, setPerson] = useState<PersonFilter>(null);
   const people = useMemo(() => peopleOf(model), [model]);
@@ -645,6 +647,14 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     [ensureOpen],
   );
 
+  // A changed file in a message's card opens that file's history in the Files
+  // view: every message that touched it, the map's side of `cogit why <path>`.
+  const openFileHistory = useCallback((path: string) => {
+    setShowFiles(true);
+    setShowOutline(false);
+    setShowCaptures(false);
+    setFilesFocus((current) => ({ path, key: (current?.key ?? 0) + 1 }));
+  }, []);
   // A file row (8.15) opens its message exactly like a dot click, and the view
   // moves to it once the session's layout is in place.
   const [fileJumps, setFileJumps] = useState(0);
@@ -861,11 +871,13 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
           ) : showFiles ? (
             <FilesView
               files={model.files}
+              sessions={model.sessions}
               active={
                 selection?.type === "node"
                   ? { sessionId: selection.sessionId, messageId: selection.nodeId }
                   : null
               }
+              focus={filesFocus}
               onSelect={selectFromFiles}
               onClose={() => setShowFiles(false)}
             />
@@ -904,6 +916,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
               setRevealCaptures(0);
             }}
             onNavigate={selectFromOutline}
+            onOpenFileHistory={openFileHistory}
             bigChangeLines={bigChangeLines}
           />
         </div>

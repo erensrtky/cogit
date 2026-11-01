@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { ViewFile } from "../../cli/src/view/model.js";
+import type { ViewFile, ViewSession } from "../../cli/src/view/model.js";
 import { formatStamp } from "./format.js";
 import { shortHash } from "./graph.js";
 
@@ -15,20 +15,60 @@ export interface FilesTarget {
   messageId: string;
 }
 
+export interface FilesFocus {
+  /** The file whose history the card asked for. */
+  path: string;
+  /** Counts the asks, so the same file opens again after the user folded it. */
+  key: number;
+}
+
+/**
+ * The reason behind one hit, as `cogit why` prints it: the message's own why,
+ * or the first option it rejected when there is no why yet.
+ */
+function reasonOf(
+  sessions: readonly ViewSession[] | undefined,
+  hit: { sessionId: string; messageId: string },
+): string | undefined {
+  const node = sessions
+    ?.find((session) => session.sessionId === hit.sessionId)
+    ?.messages.find((message) => message.id === hit.messageId);
+  if (node?.why !== undefined && node.why !== "") return node.why;
+  const rejected = node?.alternatives?.[0];
+  return rejected === undefined ? undefined : `not: ${rejected.option}`;
+}
+
 export function FilesView({
   files,
+  sessions,
   active,
+  focus = null,
   onSelect,
   onClose,
 }: {
   files: readonly ViewFile[] | undefined;
+  /** The project's sessions, for each hit's reason. */
+  sessions?: readonly ViewSession[] | undefined;
   /** The message the map has selected, if any. */
   active: FilesTarget | null;
+  /** A file a message's card opened, shown with its history. */
+  focus?: FilesFocus | null;
   onSelect: (target: FilesTarget) => void;
   onClose: () => void;
 }) {
   const all = files ?? [];
-  const [openPath, setOpenPath] = useState<string | null>(null);
+  const [openPath, setOpenPath] = useState<string | null>(focus?.path ?? null);
+
+  // The card asks for a file's history (its messages, the way `cogit why`
+  // answers for a path): open that file and bring its row into view.
+  useEffect(() => {
+    if (focus === null) return;
+    setOpenPath(focus.path);
+    const row = [...document.querySelectorAll<HTMLElement>("[data-file-path]")].find(
+      (element) => element.dataset.filePath === focus.path,
+    );
+    row?.scrollIntoView({ block: "nearest" });
+  }, [focus]);
 
   // A map click (or a search hit) may land on a message whose file is not open;
   // reveal the file that holds it so the row and its history are visible.
@@ -63,7 +103,7 @@ export function FilesView({
             {all.map((file) => {
               const open = openPath === file.path;
               return (
-                <li key={file.path}>
+                <li key={file.path} data-file-path={file.path}>
                   <div className="outline-row">
                     <button
                       type="button"
@@ -89,6 +129,7 @@ export function FilesView({
                       {file.hits.map((hit) => {
                         const selected =
                           active?.sessionId === hit.sessionId && active.messageId === hit.messageId;
+                        const reason = reasonOf(sessions, hit);
                         return (
                           <li key={`${hit.sessionId}:${hit.messageId}`}>
                             <button
@@ -115,6 +156,11 @@ export function FilesView({
                                   </span>
                                 )}
                               </span>
+                              {reason === undefined ? null : (
+                                <span className="file-hit-reason" title={reason}>
+                                  {reason}
+                                </span>
+                              )}
                             </button>
                           </li>
                         );

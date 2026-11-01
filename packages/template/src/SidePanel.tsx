@@ -375,11 +375,13 @@ function NodeDetails({
   model,
   node,
   onNavigate,
+  onOpenFileHistory,
   bigChangeLines,
 }: {
   model: LineageViewModel;
   node: NodeDetail;
   onNavigate: ((target: OutlineTarget) => void) | undefined;
+  onOpenFileHistory: ((file: string) => void) | undefined;
   /** A change at or above this many lines is marked as big. */
   bigChangeLines: number;
 }) {
@@ -517,6 +519,7 @@ function NodeDetails({
                   root={model.project.path}
                   commit={owner?.hash}
                   expandable={live && owner !== undefined}
+                  onHistory={onOpenFileHistory}
                 />
               );
             })}
@@ -626,11 +629,14 @@ function FileItem({
   root,
   commit,
   expandable,
+  onHistory,
 }: {
   file: string;
   root: string;
   commit: string | undefined;
   expandable: boolean;
+  /** Opens the file's history in the Files view; absent on a map without one. */
+  onHistory: ((file: string) => void) | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const { dir, name } = splitPath(file);
@@ -643,18 +649,30 @@ function FileItem({
   );
   return (
     <li title={file}>
-      {expandable && commit !== undefined ? (
-        <button
-          type="button"
-          className="file-row"
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {content}
-        </button>
-      ) : (
-        <div className="file-row">{content}</div>
-      )}
+      <div className="file-item">
+        {expandable && commit !== undefined ? (
+          <button
+            type="button"
+            className="file-row"
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+          >
+            {content}
+          </button>
+        ) : (
+          <div className="file-row">{content}</div>
+        )}
+        {onHistory === undefined ? null : (
+          <button
+            type="button"
+            className="file-history"
+            title={`Every message that touched ${file}`}
+            onClick={() => onHistory(file)}
+          >
+            history
+          </button>
+        )}
+      </div>
       {open && commit !== undefined ? <DiffView dir={root} commit={commit} file={file} /> : null}
     </li>
   );
@@ -731,6 +749,7 @@ export function DrillDown({
   captureReveal = 0,
   onClose,
   onNavigate,
+  onOpenFileHistory,
   bigChangeLines = 300,
 }: {
   model: LineageViewModel;
@@ -740,6 +759,8 @@ export function DrillDown({
   onClose: () => void;
   /** Moves the selection to another node and reveals it on the map. */
   onNavigate?: (target: OutlineTarget) => void;
+  /** Opens a changed file's history in the Files view, like `cogit why <path>`. */
+  onOpenFileHistory?: ((file: string) => void) | undefined;
   bigChangeLines?: number;
 }) {
   useEffect(() => {
@@ -798,6 +819,7 @@ export function DrillDown({
           model={model}
           node={node}
           onNavigate={onNavigate}
+          onOpenFileHistory={onOpenFileHistory}
           bigChangeLines={bigChangeLines}
         />
       </div>
