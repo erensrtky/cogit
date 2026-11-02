@@ -11,8 +11,8 @@ asked, what came of it, and the message it answered. Your code commits point bac
 thought behind them, so `git log` tells you what changed and cogit tells you why. It works with
 Claude Code today.
 
-It runs as a Claude Code plugin and hooks in at SessionStart, Stop and SessionEnd, so the
-record is written while you work, not reconstructed from the diff afterwards.
+It runs as a Claude Code plugin and works through Claude Code hooks, so the record is written
+while you work, not reconstructed from the diff afterwards.
 
 <img src="docs/images/map.png" alt="The map: sessions as a git graph, each with its messages, branches, commit chips and a left off here marker">
 
@@ -60,15 +60,24 @@ inert.
   editing a file the agent hears what was already tried and rejected there.
 - **Cheap by default**: a small side model records in the background; in our sessions it
   cost about 1–2% of a session's tokens.
-- **Private by default**: no server, no account. The raw conversation stays on your machine
-  and keys are redacted.
+- **No server, no account**: it runs on your machine. Your chats are not committed. The record
+  (titles, decisions and reasons) is, so it travels with your branch; `cogit init` lets you keep
+  it local instead. Key and token patterns are redacted.
 
 ## Why
 
-AI coding agents made writing code faster and moved the bottleneck to review: in a study of
-718 firms, they opened 23% more pull requests while review time rose 49% and finished work did
-not measurably grow. A reviewer sees what changed, not why; the why stays in a chat nobody else
-reads. cogit keeps it next to the code. [More, with sources](docs/guide/why.md).
+I've been building with coding agents for about two years, and the whole time I felt something
+was slipping away. When you write code yourself, it sinks in bit by bit: you know why that table
+exists and why you wrote that class. When an agent writes it, that feeling goes away.
+
+The information isn't really gone. It sits in your messages, the agent's replies and your commits,
+just in separate places. cogit ties them together, so you can always walk back and see why
+something was done. It helps most when you juggle projects: I run 5-10 agents at once across 2-3
+of them, and a few minutes later I can lose track of what I did where.
+
+The problem is bigger than one person's memory. In a working paper on 718 firms, agents brought
+23% more pull requests and 49% longer time to merge, with no significant rise in finished work.
+A reviewer sees what changed, not why. [More, with sources](docs/guide/why.md).
 
 ## Install
 
