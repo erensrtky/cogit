@@ -8,8 +8,8 @@ Git remembers what changed. cogit remembers why.
 
 cogit records every message you send to an AI coding agent as a *thought commit*: what you
 asked, what came of it, and the message it answered. Your code commits point back to the
-thought behind them, so `git log` tells you what changed and cogit tells you why. It works with
-Claude Code today.
+thought behind them, so `cogit why` takes any line of code back to the reason it exists. It works
+with Claude Code today.
 
 It runs as a Claude Code plugin and works through Claude Code hooks, so the record is written
 while you work, not reconstructed from the diff afterwards.
@@ -26,8 +26,8 @@ what the change does, and the diff.*
 
 <img src="docs/images/tasks.png" alt="The Tasks panel: suggested items with Accept and Dismiss, open items with Done, and a Done section">
 
-*Tasks — what your sessions left undone, drafted when a session closes. You accept, dismiss or
-close each one.*
+*Tasks — work that came up in a session and didn't get finished, caught when the session closes.
+You accept, dismiss or close each one.*
 
 <img src="docs/images/files.png" alt="The Files view: a changed file opened, listing the messages that touched it with each message's reason and the option it rejected">
 
@@ -50,8 +50,9 @@ inert.
 - **Intent, Shape, Code**: a message that landed commits shows why it happened, a small
   picture of what the change does (a diagram, a before/after or interface table, an example
   or plain steps), and the diff, in one place.
-- **Tasks**: when a session ends, a small model drafts a few user-level items from what it
-  left undone; you accept, dismiss or close them (`cogit captures`, and on the map).
+- **Tasks**: when a session ends, a small model catches the work that came up and didn't get
+  finished as a few user-level items; you accept, dismiss or close them (`cogit captures`, and
+  on the map).
 - **Pull request descriptions with the decisions**: `cogit pr` writes the goal, the
   decisions and the rejected options, never the raw chat.
 - **Teams share the record through git**: after a pull, your teammates' sessions are on the
