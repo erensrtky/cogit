@@ -11,6 +11,8 @@ asked, what came of it, and the message it answered. Your code commits point bac
 thought behind them, so `cogit why` takes any line of code back to the reason it exists. It works
 with Claude Code today.
 
+Agent memory helps your agent remember. cogit helps you understand.
+
 It runs as a Claude Code plugin and works through Claude Code hooks, so the record is written
 while you work, not reconstructed from the diff afterwards.
 
@@ -33,6 +35,18 @@ of them, and a few minutes later I can lose track of what I did where.
 
 It's bigger than one person's memory: a reviewer sees what changed, not why.
 [More, with research and sources](docs/guide/why.md).
+
+cogit isn't:
+
+- **Agent memory** (OpenViking, Mem0): that helps your agent recall what you talked about.
+- **A token saver** (RTK, Headroom): that sends the model less.
+- **A code map** (graphify): that shows how a codebase fits together.
+- **An orchestrator** (Herdr, Conductor): that runs many agents at once.
+- **A planning framework** (BMAD, Spec Kit): that decides what to build next.
+- **An AI review bot** (CodeRabbit, Greptile): that comments on whether a diff looks right.
+
+It answers the one question they leave open: why is this code the way it is? I use several of
+them alongside it.
 
 ## See it
 
@@ -75,13 +89,14 @@ including the option that was rejected.*
   decisions and the rejected options, never the raw chat.
 - **Teams share the record through git**: after a pull, your teammates' sessions are on the
   map too, with who ran them and what changed most.
-- **The agent remembers**: a new session starts where the last one left off, and before
-  editing a file the agent hears what was already tried and rejected there.
 - **Cheap by default**: a small side model records in the background; in our sessions it
   cost about 1–2% of a session's tokens.
 - **No server, no account**: it runs on your machine. Your chats are not committed. The record
   (titles, decisions and reasons) is, so it travels with your branch; `cogit init` lets you keep
   it local instead. Key and token patterns are redacted.
+- **The agent gets the context too**: a new session starts where the last one left off, and
+  before editing a file the agent hears what was already tried and rejected there. It works
+  alongside memory tools; it doesn't replace them.
 
 ## Install
 
