@@ -76,6 +76,8 @@ just in separate places. cogit ties them together, so you can always walk back a
 something was done. It helps most when you juggle projects: I run 5-10 agents at once across 2-3
 of them, and a few minutes later I can lose track of what I did where.
 
+<img src="docs/images/why-abstraction.png" alt="A conceptual chart from machine code to software factories: abstraction keeps rising, while how much of the why you can still trace falls sharply once AI starts writing code. cogit keeps what falls away.">
+
 The problem is bigger than one person's memory. In a working paper on 718 firms, agents brought
 23% more pull requests and 49% longer time to merge, with no significant rise in finished work.
 A reviewer sees what changed, not why. [More, with sources](docs/guide/why.md).
