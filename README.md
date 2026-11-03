@@ -14,6 +14,28 @@ with Claude Code today.
 It runs as a Claude Code plugin and works through Claude Code hooks, so the record is written
 while you work, not reconstructed from the diff afterwards.
 
+**[Click through a saved map](https://erensrtky.github.io/cogit/demo/)**: no install, no server.
+It's the page `cogit open` writes, built from sample data and read-only.
+
+## Why
+
+I started by copying code out of ChatGPT, then moved to browser tools, editor extensions and now
+terminal agents. Each step moved the code further from me, and I kept feeling something was
+slipping away. When you write code yourself, it sinks in bit by bit: you know why that table
+exists and why you wrote that class. When an agent writes it, that feeling goes away.
+
+The information isn't really gone. It sits in your messages, the agent's replies and your commits,
+just in separate places. cogit ties them together, so you can always walk back and see why
+something was done. It helps most when you juggle projects: I run 5-10 agents at once across 2-3
+of them, and a few minutes later I can lose track of what I did where.
+
+<img src="docs/images/why-abstraction.png" alt="A conceptual chart from machine code to software factories: abstraction keeps rising, while how much of the why you can still trace falls sharply once AI starts writing code. cogit keeps what falls away.">
+
+It's bigger than one person's memory: a reviewer sees what changed, not why.
+[More, with research and sources](docs/guide/why.md).
+
+## See it
+
 <img src="docs/images/map.png" alt="The map: sessions as a git graph, each with its messages, branches, commit chips and a left off here marker">
 
 *Your sessions as a git graph — one row per message, the decision behind it, and where you left
@@ -33,10 +55,6 @@ You accept, dismiss or close each one.*
 
 *A changed file opens its history: every message that touched it, and the reason behind each —
 including the option that was rejected.*
-
-**[Click through a saved map](https://erensrtky.github.io/cogit/demo/)** — no install, no server:
-the same page `cogit open` writes, built from sample data. Read-only, so the Tasks buttons are
-inert.
 
 ## What it does
 
@@ -64,23 +82,6 @@ inert.
 - **No server, no account**: it runs on your machine. Your chats are not committed. The record
   (titles, decisions and reasons) is, so it travels with your branch; `cogit init` lets you keep
   it local instead. Key and token patterns are redacted.
-
-## Why
-
-I've been building with coding agents for about two years, and the whole time I felt something
-was slipping away. When you write code yourself, it sinks in bit by bit: you know why that table
-exists and why you wrote that class. When an agent writes it, that feeling goes away.
-
-The information isn't really gone. It sits in your messages, the agent's replies and your commits,
-just in separate places. cogit ties them together, so you can always walk back and see why
-something was done. It helps most when you juggle projects: I run 5-10 agents at once across 2-3
-of them, and a few minutes later I can lose track of what I did where.
-
-<img src="docs/images/why-abstraction.png" alt="A conceptual chart from machine code to software factories: abstraction keeps rising, while how much of the why you can still trace falls sharply once AI starts writing code. cogit keeps what falls away.">
-
-The problem is bigger than one person's memory. In a working paper on 718 firms, agents brought
-23% more pull requests and 49% longer time to merge, with no significant rise in finished work.
-A reviewer sees what changed, not why. [More, with sources](docs/guide/why.md).
 
 ## Install
 
