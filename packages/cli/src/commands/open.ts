@@ -1,5 +1,6 @@
 import { type SpawnOptions, spawn } from "node:child_process";
 import type { Io } from "../io.js";
+import { prepareRecords } from "../record-prepare.js";
 import { ensureServer, mapPageUrl } from "../server.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
@@ -87,6 +88,7 @@ async function openTarget(target: string, opts: OpenOptions): Promise<void> {
 export async function openProject(opts: OpenProjectOptions): Promise<void> {
   const { io } = opts;
   const { root } = await resolveProjectRoot(opts.dir);
+  await prepareRecords(root, io.env, io.warn);
   await buildProject({
     dir: root,
     io,

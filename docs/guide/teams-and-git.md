@@ -1,39 +1,90 @@
 # Teams and git
 
-cogit keeps its record in `.cogit/` next to your code and ties it to your commits.
+cogit keeps its record in `.cogit/` on your machine and ties it to your commits. The record never
+enters a commit, so your branches, pull requests and `git status` show only code.
 
-## What is committed
+## What is shared
 
-`init` asks whether to commit the record. The answer is per project.
+`init` asks whether to share the record with your team. The answer is per project, and no answer
+means no.
 
-| | Commit (default) | Ignore |
+| | Shared | Private (default) |
 |---|---|---|
-| `.cogit/sessions/`, `.cogit/project.json` (the record) | committed | ignored |
-| `.cogit/conversations/` (raw chat) | ignored, unless `shareConversations` is on | ignored |
+| `.cogit/sessions/` (the record) | sent with `git push`, outside your branches | stays here |
+| `.cogit/conversations/` (raw chat) | stays here, unless `shareConversations` is on | stays here |
+| `.cogit/project.json`, `.cogit/.gitignore` | committed: they mark the project for a clone | ignored |
 | Local state: map, inbox, locks, `HEAD` | ignored | ignored |
 
-Under the commit policy, `.cogit/.gitignore` decides what stays local. Under the ignore policy,
-one `/.cogit/` line in the root `.gitignore` hides all of it.
+In a private project, one `/.cogit/` line in the root `.gitignore` hides all of it.
 
 ```bash
-cogit config git           # this project's policy
-cogit config git commit    # switch it
+cogit config git           # this project's setting
+cogit config git share     # switch it
 cogit config git ignore
 ```
 
-Switching never deletes a record; switching to ignore leaves what git already tracks alone.
+Switching never deletes a record. Switching to `ignore` stops sending; what the repository already
+holds stays there until you `cogit prune` it.
+
+### Where it goes
+
+Each session sits on its own ref in your repository: `refs/cogit/sessions/<id>`. A normal clone
+does not download them, so someone without cogit gets a clone of the usual size and never sees
+them. They do not appear in `git log --all` or `git branch`, nor in a pull request or on GitHub's
+pages, which also means the record cannot be read there: reading it takes cogit.
+
+- **Sending:** `git push` to `origin` (or your only remote) prints how many records it sends and
+  sends them in the background. It never slows the push, never asks for anything and never fails
+  it. What could not be sent stays queued, the next session start tries again, and `cogit doctor`
+  tells you why. Pushing to any other remote, such as a deploy target, sends nothing.
+- **Receiving:** the first time cogit runs in a clone, it adds one fetch line to that clone's
+  `.git/config` and downloads the team's records, showing progress in a terminal. After that a
+  plain `git pull` brings them, even when no code changed. Each new record adds a line to its
+  output.
+- **Your own unsent work:** a pull never overwrites a session you have changed and not sent. A
+  `git clean -fdx` does not lose anything either: the refs hold a copy and cogit puts the files back.
+- **Only your own sessions go out:** a session is sent by the person it is stamped with.
+
+Records follow the repository, not the branch: a session stays on the map after its branch is
+deleted, and shows which branch it ran on.
+
+A pull request from a fork brings the code but not the record, which went to the fork.
+
+### Deleting old sessions
+
+```bash
+cogit prune --older-than 1y --dry-run   # what would go
+cogit prune --older-than 1y             # lists them, asks, then deletes
+```
+
+It deletes your own sessions here and in the repository, and only when you run it; add `--all` to
+include teammates'. It cannot be undone. Copies already on teammates' machines stay until they
+delete them. If the repository cannot be reached, nothing is deleted.
+
+### Coming from a version that committed the record
+
+Older versions committed `.cogit/sessions/`. After upgrading, your files stay put and the next
+`git push` sends them. Stop tracking them once, in one clone, or they keep showing in `git status`:
+
+```bash
+git rm -r --cached .cogit/sessions
+git commit -m "chore: stop tracking the cogit record"
+```
+
+Old commits keep the files they had, so the repository's size does not shrink. `cogit doctor`
+reminds you until this is done.
 
 ## The git hooks
 
-`init` adds a block to two git hooks in your clone (and follows `core.hooksPath`, so Husky
-setups work). The block never fails a commit.
+`init` adds a block to three git hooks in your clone (and follows `core.hooksPath`, so Husky
+setups work). The block never fails a commit or a push.
 
 - **`prepare-commit-msg`** adds a `Thought: h<id>` trailer naming the message the commit came
   from: the newest message of the current session. It is skipped for merges and squashes, while
   a rebase or cherry-pick replays old commits, and when the last message is older than
   `trailerMaxAgeHours` (6 hours), since such a commit is probably not about that message.
-- **`pre-commit`** stages the current session's record with your code commit. It never creates
-  a record-only commit.
+- **`post-commit`** starts the commit's Shape in the background.
+- **`pre-push`** sends the session records of a project that shares them.
 
 ### Rebase and squash
 
@@ -47,9 +98,6 @@ The link names a message, not a commit hash, so it follows the commit message:
   details" in the repository's settings. A squash that keeps only the title has no link to read;
   the messages stay in the record, and `cogit search` still finds them.
 
-`recordCommit` decides what happens to messages recorded after your last code commit: `ask`
-(the next session start offers to commit them), `auto`, or `off`.
-
 ```bash
 cogit hooks install      # add or refresh the block
 cogit hooks uninstall    # remove only the cogit block
@@ -57,11 +105,11 @@ cogit hooks uninstall    # remove only the cogit block
 
 ## Working as a team
 
-1. One person runs `cogit init` with the team setup and commits `.cogit/` and
-   `.claude/settings.json`.
+1. One person runs `cogit init`, answers yes to sharing, and commits `.cogit/.gitignore`,
+   `.cogit/project.json` and `.claude/settings.json`.
 2. Everyone installs the CLI and runs `cogit init` once in their clone. It sees the project is
    set up, registers it on their machine and installs the git hooks.
-3. Each person's sessions are committed with their code. After a pull, teammates' sessions
+3. Each person's sessions go out with their `git push`. After a pull, teammates' sessions
    appear on the map with their author, most recent first.
 
 A session belongs to the person who recorded it: cogit stamps it with their git `user.name`
@@ -77,6 +125,5 @@ teammates see the record (titles, decisions, reasons) but not the chat itself.
 
 ## Worktrees
 
-Sessions in a linked git worktree (`claude -w`) record into the main checkout's `.cogit/`
-under the ignore policy, and into the worktree's own copy under the commit policy. The
-details show which worktree and branch a session ran in.
+Sessions in a linked git worktree (`claude -w`) record into the main checkout's `.cogit/`, so
+they outlive the worktree. The details show which worktree and branch a session ran in.

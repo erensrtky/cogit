@@ -13,6 +13,7 @@ import {
 } from "../git.js";
 import { installGitHooks } from "../git-hooks.js";
 import { CliError, type Io } from "../io.js";
+import { addRecordRefspec } from "../record-sync.js";
 import { readJson } from "../store/fs.js";
 import { migrateProject } from "../store/migrate.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
@@ -52,25 +53,26 @@ async function bestEffort(io: Io, what: string, fn: () => Promise<unknown>): Pro
 }
 
 /**
- * Where the record lives. This one changes what a clone contains — the record
- * holds titles, summaries, decisions and open items — so it is asked with a
- * note, in a colour that stands apart from the routine questions.
+ * Whether the team sees the record. This one decides what leaves the machine — the
+ * record holds titles, summaries, decisions and open items — so it is asked with a
+ * note, in a colour that stands apart from the routine questions. No answer keeps
+ * the record here: nothing is ever published by default.
  */
-async function askGitPolicy(io: Io, fallback: GitPolicy): Promise<GitPolicy> {
+async function askGitPolicy(io: Io): Promise<GitPolicy> {
   const paint = (text: string): string =>
     process.stdout.isTTY === true ? styleText("yellow", text) : text;
   io.out(
     paint("⚠  Session records carry your messages' titles, summaries, decisions and open items."),
   );
-  io.out(paint("   Committing .cogit/ shares all of that with anyone who clones this repository."));
-  io.out(paint("   Keep it local if the repository is public or the sessions are private."));
+  io.out(paint("   Sharing sends them with every `git push` to anyone who can read this"));
+  io.out(paint("   repository. If it is public, that means everyone."));
   return io.prompt.select<GitPolicy>(
-    "Where should the session records live?",
+    "Share the session records with your team?",
     [
-      { value: "commit", name: "In the repository — shared with whoever clones it" },
-      { value: "ignore", name: "Only on this machine — private" },
+      { value: "ignore", name: "No — keep them on this machine" },
+      { value: "share", name: "Yes — send them with `git push`" },
     ],
-    fallback,
+    "ignore",
   );
 }
 
@@ -160,40 +162,40 @@ export async function register(io: Io, root: string, name: string): Promise<void
 }
 
 /**
- * Applies a policy to the two ignore files and, under `commit`, installs the git
- * hooks that carry the current session's record and link it to the commit
- * (Stories 9.3, 9.4). Each step is best-effort: a read-only `.gitignore` or a
- * repository git will not report hooks for must never fail setup.
+ * Applies a policy to the two ignore files and installs the git hooks that link
+ * commits to messages and send the record (Stories 9.3, 9.4). Each step is
+ * best-effort: a read-only `.gitignore` or a repository git will not report hooks
+ * for must never fail setup.
  */
-async function applyGitPolicy(
-  io: Io,
-  root: string,
-  policy: GitPolicy,
-  shareConversations: boolean,
-): Promise<void> {
+async function applyGitPolicy(io: Io, root: string, policy: GitPolicy): Promise<void> {
   const added: string[] = [];
   await bestEffort(io, "could not update .gitignore", async () => {
     added.push(...(await ensureGitignore(root, policy)));
   });
   if (added.length > 0) io.out(`Added to .gitignore: ${added.join(", ")}`);
   await bestEffort(io, "could not write .cogit/.gitignore", () =>
-    ensureCogitGitignore(root, policy, shareConversations),
+    ensureCogitGitignore(root, policy),
   );
-  // Every policy: the trailer links commits locally; staging follows the policy.
+  // Every policy: the trailer links commits locally; sending follows the policy.
   await bestEffort(io, "could not install the git hooks", () => installGitHooks(root));
+  if (policy === "share")
+    await bestEffort(io, "could not set up fetching the records", () =>
+      addRecordRefspec(root, io.env),
+    );
 }
 
 /**
  * Brings an already initialized project up to date: every repository gets the
- * hooks, one that commits its records also the new `.cogit/.gitignore`, without
- * changing the policy the user chose at setup.
+ * hooks, a shared one also the current `.cogit/.gitignore`, without changing the
+ * policy the project chose at setup. A teammate's first `init` in a clone lands here.
  */
 async function refreshGitIntegration(io: Io, root: string): Promise<void> {
   if ((await findGitRoot(root)) === undefined) return;
   await bestEffort(io, "could not refresh the git integration", async () => {
-    if (!(await cogitIgnored(root)))
-      await refreshCogitGitignore(root, (await loadConfig(io.env)).shareConversations);
     await installGitHooks(root);
+    if (await cogitIgnored(root)) return;
+    await refreshCogitGitignore(root);
+    await addRecordRefspec(root, io.env);
   });
 }
 
@@ -238,8 +240,7 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
   const name = opts.name ?? basename(root);
   const config = await loadConfig(io.env);
 
-  // Story 9.3: the record travels with the repository by default.
-  const policy: GitPolicy = opts.git ?? (await askGitPolicy(io, config.gitPolicy));
+  const policy: GitPolicy = opts.git ?? (await askGitPolicy(io));
 
   await askRetention(io, opts);
   await askSkillPermission(io, opts);
@@ -248,13 +249,19 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
 
   await updateProject(root, (cur) => cur ?? { schema: 1, name });
   await mkdir(projectPaths(root).sessions, { recursive: true });
-  await applyGitPolicy(io, root, policy, config.shareConversations);
+  await applyGitPolicy(io, root, policy);
   await register(io, root, name);
 
+  if (policy === "share") {
+    io.out("Session records will be sent with `git push` to whoever can read this repository.");
+    io.out(
+      "Commit .cogit/.gitignore and .cogit/project.json so your team's clones share them too.",
+    );
+  }
   io.out(
-    config.shareConversations
-      ? "Conversations are stored in .cogit/conversations/ (shared through git: shareConversations is on)."
-      : "Conversations are stored in .cogit/conversations/ (kept out of git; turn on shareConversations to share them).",
+    policy === "share" && config.shareConversations
+      ? "Conversations are stored in .cogit/conversations/ (sent too: shareConversations is on)."
+      : "Conversations are stored in .cogit/conversations/ and stay on this machine.",
   );
   io.out(`Initialized ${name} in ${projectPaths(root).base}`);
   const installed = await agent.readPluginInstalled(io.env).catch(() => undefined);

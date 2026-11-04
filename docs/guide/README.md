@@ -9,7 +9,7 @@ part in detail.
 | [The map](map.md) | Sessions, branches, the "Your turn" inbox, files, search, resuming or forking a session, the people filter |
 | [Reading the lineage](reading-the-lineage.md) | `log`, `show`, `blame`, `why`, `search` in the terminal, and how the agent uses them |
 | [Pull requests](pull-requests.md) | `cogit pr`: a review-ready description with the decisions behind the code |
-| [Teams and git](teams-and-git.md) | What is committed, the `Thought:` trailer, the git hooks, teammates' records |
+| [Teams and git](teams-and-git.md) | What is shared, the `Thought:` trailer, the git hooks, teammates' records |
 | [Recording and cost](recording-and-cost.md) | Who writes the record, the side model, what it costs |
 | [Privacy](privacy.md) | What is recorded, what never is, what leaves your machine |
 | [Settings](settings.md) | Every setting with a plain-language explanation |

@@ -47,7 +47,7 @@ Commits:
 ## Dig deeper
 - `cogit show <message-hash>` opens a thought: its decisions, the options it rejected, and the conversation turn for whoever has it locally.
 - `cogit show <sha>` opens the thought behind a commit.
-- This branch commits its record, so a reviewer who checks it out gets the same `cogit show` output.
+- This project shares its record, so a reviewer with cogit in their clone gets the same `cogit show` output once the author has pushed.
 ```
 
 ## Safe on a public pull request
@@ -57,10 +57,10 @@ text or your prompts as written.
 
 ## For the reviewer
 
-Under the default commit policy the record travels with the branch, so a reviewer who checks
-it out and has cogit installed can run `cogit show <hash>` or open the map on the same
-messages. Under the ignore policy the description says the hashes resolve only on the author's
-machine.
+In a project that shares its record, a reviewer with cogit installed can run `cogit show <hash>`
+or open the map on the same messages once the author has pushed. A pull request from a fork is
+the exception: the record went to the fork, so its hashes resolve only there. In a project that
+keeps its record private, the description says the hashes resolve only on the author's machine.
 
 cogit does not promise a faster review; nothing has measured that yet. It hands the reviewer
 the intent they would otherwise have to ask for in comments.

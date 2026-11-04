@@ -142,20 +142,11 @@ const EDITABLE: FieldSpec[] = [
   {
     key: "shareConversations",
     label: "Share conversations",
-    help: "Commit the raw chat text too, not only the session record (off: chat stays local).",
+    help: "Send the raw chat text too, not only the session record (off: chat stays local).",
     details:
-      "Also commit the raw chat text, not only the record. Leave it off to keep conversations " +
-      "on your machine while the record still travels with the branch.",
+      "In a project that shares its record, also send the raw chat text. Leave it off to keep " +
+      "conversations on your machine while teammates still see titles, decisions and reasons.",
     kind: "boolean",
-  },
-  {
-    key: "recordCommit",
-    label: "Commit the record",
-    help: "ask, auto or off: what to do with the last messages after the last code commit.",
-    details:
-      "What happens to record changes made after your last code commit: ask you next time, " +
-      "commit them automatically, or leave them for you to commit.",
-    kind: "text",
   },
 ];
 
@@ -202,15 +193,6 @@ export const CLI_ONLY: CliSetting[] = [
       "The small model behind every side record: every few turns in mixed mode, all the " +
       "time in side mode, and at session end. Haiku is cheap and good enough for titles, " +
       "parents and short decisions.",
-  },
-  {
-    key: "gitPolicy",
-    label: "Git policy",
-    help: "What `cogit init` offers a new project: commit the record to git, or ignore it.",
-    details:
-      "Only the default for new projects: each project answers it during `cogit init`. " +
-      "`cogit config git` shows the current project's policy and `cogit config git commit` " +
-      "or `ignore` switches it.",
   },
   {
     key: "agents",
@@ -297,8 +279,6 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   shapes: true,
   captures: true,
   shareConversations: false,
-  recordCommit: "ask",
-  gitPolicy: "commit",
   agents: ["claude-code"],
   bigChangeLines: 300,
 };
@@ -319,7 +299,6 @@ export function editableSettings(settings: PanelSettings): PanelEditableSettings
     captures: settings.captures,
     language: settings.language,
     shareConversations: settings.shareConversations,
-    recordCommit: settings.recordCommit,
   };
 }
 

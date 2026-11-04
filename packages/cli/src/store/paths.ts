@@ -40,6 +40,8 @@ export function projectPaths(root: string) {
     captures: join(base, "state", "captures.json"),
     /** What the detached hook children (build, side run) printed; local, capped. */
     detachedLog: join(base, "state", "detached.log"),
+    /** What the record refs last looked like, and what waits to be sent; local. */
+    recordSync: join(base, "state", "record-sync.json"),
     /** Commits waiting for their message's record before a Shape; local. */
     shapeQueue: join(base, "state", "shape-queue"),
     locks: join(base, "locks"),

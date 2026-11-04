@@ -581,8 +581,6 @@ describe("cogit build", () => {
       recorder: "side",
       updateEveryTurns: 15,
       shareConversations: false,
-      recordCommit: "ask",
-      gitPolicy: "commit",
       agents: ["claude-code"],
     });
     expect(embedded(await readFile(paths().html, "utf8"))).toEqual(model);
@@ -834,13 +832,14 @@ describe("cogit build", () => {
 
   it("writes the project ignore rules once, also in an existing project", async () => {
     const ignore = join(paths().base, ".gitignore");
-    // A commit-policy project: a git dir and no root rule hiding .cogit/.
+    // A shared project: a git dir and no root rule hiding .cogit/.
     await mkdir(join(root, ".git"));
+    await rm(join(root, ".gitignore"), { force: true });
     await rm(ignore, { force: true });
     await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(await readFile(ignore, "utf8")).toBe(cogitGitignore(false));
+    expect(await readFile(ignore, "utf8")).toBe(cogitGitignore());
     await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
-    expect(await readFile(ignore, "utf8")).toBe(cogitGitignore(false));
+    expect(await readFile(ignore, "utf8")).toBe(cogitGitignore());
   });
 
   it("keeps the map when the conversation store cannot be written", async () => {
@@ -869,12 +868,13 @@ describe("cogit build", () => {
   it("warns but still builds when the inner gitignore cannot be written", async () => {
     const ignore = join(paths().base, ".gitignore");
     await mkdir(join(root, ".git"));
+    await rm(join(root, ".gitignore"), { force: true });
     await rm(ignore, { force: true });
     await mkdir(ignore);
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
     expect(model.sessions).toEqual([]);
     expect(io.warnings).toEqual(
-      expect.arrayContaining([expect.stringMatching(/^could not update \.cogit\/\.gitignore: /)]),
+      expect.arrayContaining([expect.stringMatching(/^could not update the shared record: /)]),
     );
   });
 

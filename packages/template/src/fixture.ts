@@ -63,8 +63,6 @@ export const fixture: LineageViewModel = {
     shapes: true,
     captures: true,
     shareConversations: false,
-    recordCommit: "ask",
-    gitPolicy: "ignore",
     agents: ["claude-code"],
     bigChangeLines: 300,
   },

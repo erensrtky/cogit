@@ -45,7 +45,7 @@ async function project(name = "proj"): Promise<string> {
     root,
     {
       name,
-      git: "commit",
+      git: "share",
       retention: "keep",
       allowSkill: false,
       projectSettings: false,
@@ -390,6 +390,7 @@ describe("doctor", () => {
       "plugin",
       "git",
       "project",
+      "record",
       "skill",
       "transcripts",
       "sessions",

@@ -60,18 +60,11 @@ export const Config = z.object({
   recordHeadless: z.boolean().default(false),
   /** Port the local map server binds on `127.0.0.1`. */
   serverPort: z.int().min(1).max(65535).default(4747),
-  /** Default for new projects; `init` asks per repo. Story 9.3: the record travels. */
-  gitPolicy: z.enum(["ignore", "commit"]).default("commit"),
   /**
    * Whether `.cogit/conversations/` (the raw chat text) travels too. Off by
-   * default: the session record can be committed while the chat stays local.
+   * default: the session record can be shared while the chat stays local.
    */
   shareConversations: z.boolean().default(false),
-  /**
-   * What happens to the session files the last code commit left behind: ask the
-   * user at the next session start, commit them at session end, or do nothing.
-   */
-  recordCommit: z.enum(["ask", "auto", "off"]).default("ask"),
   /**
    * How long `.cogit/HEAD` stays fresh for the `Thought:` trailer (Story 9.4).
    * A commit made hours after the last message is probably not that message.

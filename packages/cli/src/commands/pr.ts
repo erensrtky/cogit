@@ -98,7 +98,7 @@ export interface PrModel {
   base: PrBase;
   head: string;
   /** What the project does with its record: it travels, or it stays local. */
-  policy: "commit" | "ignore";
+  policy: "share" | "ignore";
   goals: PrGoal[];
   sessions: PrSessionLine[];
   thoughts: PrThought[];
@@ -204,7 +204,7 @@ export interface BuildPrInput {
   head: string;
   commits: readonly PrCommit[];
   sessions: readonly EffectiveSession[];
-  policy: "commit" | "ignore";
+  policy: "share" | "ignore";
 }
 
 /**
@@ -414,8 +414,8 @@ export function formatPr(model: PrModel, opts: PrFormatOptions): string {
     model.policy === "ignore"
       ? "- This project keeps its record out of git, so these hashes resolve only on the " +
           "author's machine; ask the author to run `cogit show`."
-      : "- This branch commits its record, so a reviewer who checks it out gets the same " +
-          "`cogit show` output.",
+      : "- This project shares its record, so a reviewer with cogit in their clone gets the " +
+          "same `cogit show` output once the author has pushed.",
   );
 
   const dropped = opts.dropped ?? [];
@@ -546,7 +546,7 @@ export async function pr(opts: PrOptions): Promise<PrModel> {
   const model = buildPrModel({
     base,
     head,
-    policy: (await cogitIgnored(root)) ? "ignore" : "commit",
+    policy: (await cogitIgnored(root)) ? "ignore" : "share",
     sessions,
     commits: commits.map((commit) => {
       const thoughts = trailers.get(commit.full);

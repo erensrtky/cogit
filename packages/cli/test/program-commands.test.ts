@@ -279,7 +279,7 @@ describe("commands through the CLI", () => {
     expect(io.lines.at(-1)).toMatch(new RegExp(`^Removed .+ \\(${gone}\\)$`));
   });
 
-  it("runs the git hook and the detached record commit through the CLI", async () => {
+  it("runs the git hooks through the CLI", async () => {
     const run = promisify(execFile);
     const git = async (...args: string[]): Promise<string> =>
       (await run("git", ["-C", root, ...args])).stdout;
@@ -295,7 +295,7 @@ describe("commands through the CLI", () => {
       root,
       "--yes",
       "--git",
-      "commit",
+      "share",
       "--name",
       "P",
       "--retention",
@@ -303,8 +303,8 @@ describe("commands through the CLI", () => {
       "--language",
       "auto",
     );
-    expect(await readFile(join(root, ".git", "hooks", "pre-commit"), "utf8")).toContain(
-      "cogit hook pre-commit",
+    expect(await readFile(join(root, ".git", "hooks", "pre-push"), "utf8")).toContain(
+      "cogit hook pre-push",
     );
     await cli("hooks", "install", root);
     expect(io.lines.at(-1)).toBe("The cogit hook blocks are already current.");
@@ -324,25 +324,29 @@ describe("commands through the CLI", () => {
     await writeFile(join(root, ".cogit", "HEAD"), JSON.stringify({ sessionId: "s1", at: T0 }));
     await writeFile(join(root, "a.txt"), "two\n");
     await git("add", "a.txt");
+    // A block a past version left behind stays quiet and stages nothing.
+    await git("add", "a.txt");
     await cli("hook", "pre-commit", "--dir", root);
-    expect(await git("diff", "--cached", "--name-only")).toContain(".cogit/sessions/s1.json");
-
-    await cli("config", "set", "recordCommit", "auto");
-    await cli("record-commit", "s1", "-C", root);
-    expect((await git("log", "-1", "--format=%s")).trim()).toBe("chore(cogit): record CLI session");
-
-    expect(await cli("config", "git", "nope")).toMatch(/^error: invalid git policy "nope"/);
-    // Without a policy it reports the current one instead of refusing.
-    expect(await cli("config", "git")).not.toMatch(/invalid git policy/);
-    expect(await cli("config", "git", "ignore", root)).toBe("");
-    expect(await readFile(join(root, ".gitignore"), "utf8")).toBe("# cogit\n/.cogit/\n");
+    expect(await git("diff", "--cached", "--name-only")).not.toContain(".cogit/sessions");
+    // No remote to send to: the hook is silent.
+    await cli("hook", "pre-push", "--dir", root, "origin", "nowhere");
+    await cli("record-sync", "send", "-C", root);
+    await cli("record-sync", "download", "-C", root);
+    expect(await cli("record-sync", "elsewhere", "-C", root)).toMatch(/unknown record-sync action/);
+    await cli("config", "git", "share", root);
+    expect(io.lines.at(-1)).toBe("Git policy for P: share");
+    expect(await cli("config", "git", "commit", root)).toMatch(/invalid git policy/);
+    await cli("prune", "--older-than", "1y", "--dry-run", "-C", root);
+    expect(io.lines.at(-1)).toBe("No sessions older than 1y.");
+    // Outside any project the read command reports it, after looking all the way up.
+    expect(await cli("log", await noGitDir())).toMatch(/not initialized/);
   });
 
   it("refuses init and config git outside a git repository", async () => {
     const outside = await noGitDir();
     expect(await cli("init", outside, "--yes")).toMatch(/not in a git repository.*git init/);
     const plain = await noGitProject(envFor(dir));
-    expect(await cli("config", "git", "commit", plain)).toMatch(/not in a git repository/);
+    expect(await cli("config", "git", "share", plain)).toMatch(/not in a git repository/);
   });
 
   it("prints user errors as one line", async () => {

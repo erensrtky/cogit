@@ -28,8 +28,6 @@ describe("settings model", () => {
       shapes: parsed.shapes,
       captures: parsed.captures,
       shareConversations: parsed.shareConversations,
-      recordCommit: parsed.recordCommit,
-      gitPolicy: parsed.gitPolicy,
       agents: parsed.agents,
       bigChangeLines: parsed.bigChangeLines,
     });
@@ -37,10 +35,9 @@ describe("settings model", () => {
 
   it("lets the embedded values override the defaults", () => {
     expect(withDefaults(undefined)).toEqual(DEFAULT_SETTINGS);
-    expect(withDefaults({ updateEveryTurns: 9, gitPolicy: "commit" })).toEqual({
+    expect(withDefaults({ updateEveryTurns: 9 })).toEqual({
       ...DEFAULT_SETTINGS,
       updateEveryTurns: 9,
-      gitPolicy: "commit",
     });
   });
 
@@ -76,7 +73,6 @@ describe("settings model", () => {
       captures: true,
       language: "tr",
       shareConversations: false,
-      recordCommit: "ask",
     });
     expect(Object.keys(editableSettings(settings)).sort()).toEqual([...PANEL_EDITABLE_KEYS].sort());
   });

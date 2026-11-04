@@ -6,7 +6,8 @@ import { atomicWrite } from "./store/fs.js";
 
 const exec = promisify(execFile);
 
-export type GitPolicy = "ignore" | "commit";
+/** Shared with the team through the repository, or kept on this machine. */
+export type GitPolicy = "ignore" | "share";
 
 /** Walks up from `dir` looking for `.git` (a directory, or a file in worktrees). */
 export async function findGitRoot(dir: string): Promise<string | undefined> {
@@ -46,23 +47,24 @@ const HEADER = "# cogit";
 const IGNORE_ALL = "/.cogit/";
 
 /**
- * What the root `.gitignore` needs for a policy (Story 9.3). Under `commit` the
- * root lists nothing: the project's own `.cogit/.gitignore` keeps local state out
- * and lets the session records travel. Under `ignore` a single line hides it all.
+ * What the root `.gitignore` needs for a policy. A shared project lists nothing:
+ * the project's own `.cogit/.gitignore` keeps everything but the project marker
+ * out. Under `ignore` a single line hides it all, and that line is what later
+ * commands read the policy from.
  */
 export function gitignoreLines(policy: GitPolicy): string[] {
   return policy === "ignore" ? [IGNORE_ALL] : [];
 }
 
 /**
- * Applies the policy to `<root>/.gitignore`: adds the ignore line, or removes the
- * one an older init wrote when the project switches to `commit`. User lines are
- * never touched. Returns the lines added (none when switching to commit).
+ * Applies the policy to `<root>/.gitignore`: adds the ignore line, or removes it
+ * when the project starts sharing. User lines are never touched. Returns the
+ * lines added (none when sharing).
  */
 export async function ensureGitignore(root: string, policy: GitPolicy): Promise<string[]> {
   const file = join(root, ".gitignore");
   const text = await readFile(file, "utf8").catch(() => "");
-  if (policy === "commit") {
+  if (policy === "share") {
     const lines = text.split(/\r?\n/);
     const kept = lines.filter((line) => line.trim() !== IGNORE_ALL);
     if (kept.length !== lines.length) await atomicWrite(file, kept.join("\n"));
@@ -84,56 +86,37 @@ export async function cogitIgnored(root: string): Promise<boolean> {
 }
 
 /**
- * The `.cogit/.gitignore` the commit policy writes (Story 9.3): everything in the
- * directory stays local except the session records, `project.json` and these
- * rules themselves. The file has to travel: without it a clone would not ignore
- * the conversation store and one `git add -A` would publish the raw chat. The
- * list has no timestamps and a stable order, so switching a setting rewrites it
- * once and later builds leave it alone.
+ * The `.cogit/.gitignore` of a shared project: only the marker that tells a clone
+ * this project uses cogit is tracked. The sessions travel on their own refs
+ * (record-sync.ts), and the file has to travel too: without it a clone would not
+ * ignore the record, and one `git add -A` would commit it.
  */
-export function cogitGitignore(shareConversations: boolean): string {
-  return [
-    HEADER,
-    "*",
-    "!.gitignore",
-    "!sessions/",
-    "!sessions/**",
-    "!project.json",
-    ...(shareConversations ? ["!conversations/", "!conversations/**"] : []),
-    "",
-  ].join("\n");
+export function cogitGitignore(): string {
+  return [HEADER, "*", "!.gitignore", "!project.json", ""].join("\n");
 }
 
 /**
- * Writes `.cogit/.gitignore` for the commit policy; a no-op under `ignore`
- * (the root already hides everything). Returns true when the file changed.
+ * Writes `.cogit/.gitignore` for a shared project; a no-op under `ignore` (the
+ * root already hides everything). Returns true when the file changed.
  */
-export async function ensureCogitGitignore(
-  root: string,
-  policy: GitPolicy,
-  shareConversations: boolean,
-): Promise<boolean> {
-  if (policy !== "commit") return false;
+export async function ensureCogitGitignore(root: string, policy: GitPolicy): Promise<boolean> {
+  if (policy !== "share") return false;
   const file = join(root, ".cogit", ".gitignore");
-  const content = cogitGitignore(shareConversations);
-  const current = await readFile(file, "utf8").catch(() => undefined);
-  if (current === content) return false;
+  const content = cogitGitignore();
+  if ((await readFile(file, "utf8").catch(() => undefined)) === content) return false;
   await atomicWrite(file, content);
   return true;
 }
 
 /**
- * Keeps an existing project's `.cogit/.gitignore` in step with the settings
- * (Story 9.3): reads the policy from the root ignore file, so a project that
- * committed its records before this story gets the new rules on its next build.
+ * Keeps an existing project's `.cogit/.gitignore` current: reads the policy from
+ * the root ignore file, so a project set up by an older version gets the new rules
+ * on its next build.
  */
-export async function refreshCogitGitignore(
-  root: string,
-  shareConversations: boolean,
-): Promise<boolean> {
+export async function refreshCogitGitignore(root: string): Promise<boolean> {
   if ((await findGitRoot(root)) === undefined) return false;
   if (await cogitIgnored(root)) return false;
-  return ensureCogitGitignore(root, "commit", shareConversations);
+  return ensureCogitGitignore(root, "share");
 }
 
 interface CommitLine {

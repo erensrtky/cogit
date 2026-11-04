@@ -44,11 +44,12 @@ async function readBranch(gitdir: string): Promise<string | null> {
 }
 
 /**
- * Finds the `.cogit/` for a directory. A linked git worktree has no copy of
- * a git-ignored `.cogit/`, so it shares the main checkout's, the same way
- * Claude Code keeps worktree state in the main checkout. With `.cogit/`
- * committed, the worktree has its own copy and keeps it. Only files are read
- * (`.git` → `gitdir` → `commondir`), so git itself is never needed.
+ * Finds the `.cogit/` for a directory. The record is ignored by git, so a linked
+ * worktree shares the main checkout's, the same way Claude Code keeps worktree
+ * state there: a session must not vanish with its worktree. A shared project's
+ * marker is tracked and so appears in the worktree too, which is why the main
+ * checkout is asked first. Only files are read (`.git` → `gitdir` → `commondir`),
+ * so git itself is never needed.
  */
 export async function resolveProjectRoot(dir: string): Promise<ProjectRoot> {
   const start = resolve(dir);
@@ -60,11 +61,12 @@ export async function resolveProjectRoot(dir: string): Promise<ProjectRoot> {
     }
     const worktree = { path: linked.top, branch: await readBranch(linked.gitdir) };
     await migrateProject(start);
-    if (existsSync(projectPaths(start).project)) return { root: start, worktree };
     const common = (await readFile(join(linked.gitdir, "commondir"), "utf8")).trim();
     const mainTop = dirname(resolve(linked.gitdir, common));
     const root = join(mainTop, relative(linked.top, start));
     await migrateProject(root);
+    if (!existsSync(projectPaths(root).project) && existsSync(projectPaths(start).project))
+      return { root: start, worktree };
     return { root, worktree };
   } catch {
     // An unreadable or odd `.git` layout falls back to the directory itself.

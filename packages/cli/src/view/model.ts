@@ -42,7 +42,6 @@ export const PANEL_EDITABLE_KEYS = [
   "captures",
   "language",
   "shareConversations",
-  "recordCommit",
 ] as const;
 
 export type PanelEditableKey = (typeof PANEL_EDITABLE_KEYS)[number];
@@ -299,6 +298,8 @@ export interface ViewInboxRow {
 }
 
 export interface LineageViewModel {
+  /** A shared project's first download failed, so an empty map does not mean an empty record. */
+  recordDownloadFailed?: boolean;
   kind: "lineage";
   schema: typeof VIEW_SCHEMA;
   project: {
@@ -430,7 +431,7 @@ export interface PanelProject {
 }
 
 /**
- * Global settings on the panel. `gitPolicy` and `agents` are shown read-only;
+ * Global settings on the panel. `agents` is shown read-only;
  * the keys in `PANEL_EDITABLE_KEYS` are editable when the page comes from the
  * local server (over `file://` everything stays read-only).
  */
@@ -464,8 +465,6 @@ export interface PanelSettings {
    */
   captures: boolean;
   shareConversations: boolean;
-  recordCommit: "ask" | "auto" | "off";
-  gitPolicy: "ignore" | "commit";
   agents: string[];
   /** A message whose linked commits crossed this many lines counts as big (10.3). */
   bigChangeLines: number;

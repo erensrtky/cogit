@@ -891,7 +891,11 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
           ) : null}
           <div className="graph-canvas">
             {sessionGraph.git.rows.length === 0 ? (
-              <p className="graph-status empty">No sessions recorded yet.</p>
+              <p className="graph-status empty">
+                {model.recordDownloadFailed === true
+                  ? "Your team's session records could not be downloaded. Check your connection and run cogit open again."
+                  : "No sessions recorded yet. They appear here as you work with Claude Code."}
+              </p>
             ) : (
               <MapCanvas
                 nodes={nodes}

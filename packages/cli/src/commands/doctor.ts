@@ -5,9 +5,10 @@ import type { AgentAdapter } from "../agents/index.js";
 import { defaultAgent } from "../agents/index.js";
 import { compareVersions, versionNotice } from "../cli-version.js";
 import { cogitIgnored, findGitRoot, gitHooksDir, gitUserEmail, gitUserName } from "../git.js";
-import { BLOCK_START, hookBlock } from "../git-hooks.js";
+import { BLOCK_START, GIT_HOOK_EVENTS, hookBlock } from "../git-hooks.js";
 import type { Io } from "../io.js";
 import { hashTurns, isRecorded, upgradeSessionIds } from "../messages.js";
+import { recordSyncStatus, trackedRecordFiles } from "../record-sync.js";
 import type { Session } from "../schema/session.js";
 import { checkHealth } from "../server.js";
 import { applyEvents, readEvents } from "../store/events.js";
@@ -301,6 +302,45 @@ const CHECK_SPECS: CheckSpec[] = [
   },
 
   {
+    id: "record",
+    run: async (ctx) => {
+      const tracked = await trackedRecordFiles(ctx.root, ctx.env);
+      if (tracked > 0)
+        return {
+          id: "record",
+          status: "warn",
+          message: `git still tracks ${tracked} session file${tracked === 1 ? "" : "s"} an older version committed`,
+          fix: "git rm -r --cached .cogit/sessions, then commit",
+        };
+      const sync = await recordSyncStatus(ctx.root, ctx.env);
+      if (!sync.sharing)
+        return { id: "record", status: "ok", message: "the record stays on this machine" };
+      if (sync.sendError !== undefined)
+        return {
+          id: "record",
+          status: "warn",
+          message: `${sync.pending} session record${sync.pending === 1 ? "" : "s"} could not be sent: ${sync.sendError}`,
+          fix: "check your access to the remote; the next session start tries again",
+        };
+      if (sync.downloadError !== undefined && !sync.downloaded)
+        return {
+          id: "record",
+          status: "warn",
+          message: `the team's records could not be downloaded: ${sync.downloadError}`,
+          fix: "cogit open",
+        };
+      return {
+        id: "record",
+        status: "ok",
+        message:
+          sync.remote === undefined
+            ? "the record is shared, but this repository has no remote yet"
+            : `the record is shared through ${sync.remote}`,
+      };
+    },
+  },
+
+  {
     id: "skill",
     run: async (ctx) => {
       const allowed = await ctx.agent.readSkillAllowed(ctx.env);
@@ -455,7 +495,7 @@ async function hookProblems(ctx: DoctorContext): Promise<string[]> {
   const dir = await gitHooksDir(gitRoot);
   if (dir === undefined) return ["the git hooks directory could not be found"];
   const problems: string[] = [];
-  for (const event of ["prepare-commit-msg", "pre-commit", "post-commit"] as const) {
+  for (const event of GIT_HOOK_EVENTS) {
     const text = await readFile(join(dir, event), "utf8").catch(() => undefined);
     if (text === undefined || !text.includes(BLOCK_START)) {
       problems.push(`the ${event} hook is missing`);

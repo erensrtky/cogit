@@ -4,8 +4,9 @@ import { installedCliVersion, versionNotice } from "../cli-version.js";
 import { branchesOf, type LogBranch } from "../commands/log.js";
 import { findGitRoot } from "../git.js";
 import { isRecorded, readSessionMessages, upgradeSessionIds } from "../messages.js";
+import { setUpClone } from "../record-prepare.js";
+import { isSharing, reconcileRecords, recordSyncStatus } from "../record-sync.js";
 import type { Session } from "../schema/session.js";
-import { uncommittedSession } from "../session-git.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { loadAllSessions, loadConfig, loadSession } from "../store/stores.js";
 import { buildMessages } from "../view/lineage.js";
@@ -94,10 +95,28 @@ async function sessionStartOutput(ctx: HookContext): Promise<HookOutput | undefi
   // Sessions whose closing pass never finished get it now, detached (a failure
   // here must not cost the handoff).
   await retryUnclosed(ctx).catch(() => undefined);
+  await syncRecordsAtStart(ctx).catch(() => undefined);
   const config = await loadConfig(ctx.env);
   // SessionStart runs inside the chat's startup budget: opt out and it is silent.
   if (!config.startupContext) return undefined;
-  return additionalContext(ctx, await startupContext(ctx, config.recordCommit));
+  return additionalContext(ctx, await startupContext(ctx));
+}
+
+/**
+ * A clone's first session sets it up and downloads the team's records in the
+ * background; later ones read what a pull brought, and retry what the user's last
+ * push could not send. Nothing new goes out here: only what that push queued.
+ */
+async function syncRecordsAtStart(ctx: HookContext): Promise<void> {
+  if (!(await isSharing(ctx.root))) return;
+  await setUpClone(ctx.root, ctx.env);
+  const status = await recordSyncStatus(ctx.root, ctx.env);
+  if (status.remote !== undefined && !status.downloaded) {
+    ctx.spawnDetached(["record-sync", "download", "-C", ctx.root]);
+    return;
+  }
+  await reconcileRecords(ctx.root, ctx.env);
+  if (status.pending > 0) ctx.spawnDetached(["record-sync", "send", "-C", ctx.root]);
 }
 
 function additionalContext(ctx: HookContext, text: string): HookOutput {
@@ -130,11 +149,9 @@ function clip(text: string, max: number): string {
 
 /**
  * What the agent needs to continue the project: where the lineage lives, how to
- * read it, and the compressed view of the last session before this one. Under
- * `recordCommit: ask` (Story 9.3) it also says when that session's record is
- * still uncommitted, so the agent can offer to commit it.
+ * read it, and the compressed view of the last session before this one.
  */
-async function startupContext(ctx: HookContext, recordCommit: string): Promise<string> {
+async function startupContext(ctx: HookContext): Promise<string> {
   const command = cli(ctx);
   const header =
     `cogit records this project's lineage (one node per user message, hanging from the ` +
@@ -151,26 +168,7 @@ async function startupContext(ctx: HookContext, recordCommit: string): Promise<s
 
   const events = await readEvents(ctx.root, previous.sessionId);
   const messages = buildMessages(applyEvents(previous.nodes, events));
-  const recordLine =
-    recordCommit === "ask" && (await uncommittedSession(ctx.root, previous.sessionId, ctx.env))
-      ? recordCommitLine(previous)
-      : "";
-  return composeStartupContext(
-    header,
-    previous,
-    branchesOf(previous.sessionId, messages),
-    recordLine,
-  );
-}
-
-/** The offer the agent makes for a record the last code commit did not carry. */
-export function recordCommitLine(session: Session): string {
-  const title = session.title.trim() === "" ? session.sessionId : clip(oneLine(session.title), 120);
-  return (
-    "The last session's record is not committed. Offer to commit it with the message " +
-    `\`chore(cogit): record ${title}\`, only the .cogit/sessions/ paths (never other staged ` +
-    "changes), and run it only if the user agrees."
-  );
+  return composeStartupContext(header, previous, branchesOf(previous.sessionId, messages));
 }
 
 /** The session with the newest activity, ignoring this one. */
@@ -193,14 +191,8 @@ export function composeStartupContext(
   header: string,
   session: Session,
   branches: readonly LogBranch[],
-  recordLine = "",
 ): string {
-  const head = [
-    header,
-    ...(recordLine === "" ? [] : ["", recordLine]),
-    "",
-    ...statusLines(session),
-  ];
+  const head = [header, "", ...statusLines(session)];
   const blocks = branches.map(branchLines);
   const cutNote = (cut: number): string[] =>
     cut === 0

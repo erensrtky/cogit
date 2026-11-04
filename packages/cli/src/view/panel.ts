@@ -68,8 +68,6 @@ export function panelSettings(config: Config): PanelSettings {
     shapes: config.shapes,
     captures: config.captures,
     shareConversations: config.shareConversations,
-    recordCommit: config.recordCommit,
-    gitPolicy: config.gitPolicy,
     agents: config.agents,
     bigChangeLines: config.bigChangeLines,
   };

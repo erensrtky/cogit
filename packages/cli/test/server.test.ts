@@ -438,14 +438,7 @@ describe("settings write", () => {
     expect(
       (await configWrite(server, token, { key: "shareConversations", value: true })).status,
     ).toBe(200);
-    expect((await configWrite(server, token, { key: "recordCommit", value: "auto" })).status).toBe(
-      200,
-    );
     expect((await loadConfig(env)).shareConversations).toBe(true);
-    expect((await loadConfig(env)).recordCommit).toBe("auto");
-    expect(
-      (await configWrite(server, token, { key: "recordCommit", value: "sometimes" })).status,
-    ).toBe(400);
   });
 
   it("rebuilds an open map so the page picks the new setting up", async () => {
@@ -508,7 +501,7 @@ describe("settings write", () => {
   it("rejects a read-only key, an unknown key and a bad value type", async () => {
     const server = await start();
     const token = await panelToken(server);
-    expect((await configWrite(server, token, { key: "gitPolicy", value: "commit" })).status).toBe(
+    expect((await configWrite(server, token, { key: "gitPolicy", value: "share" })).status).toBe(
       400,
     );
     expect((await configWrite(server, token, { key: "nope", value: 1 })).status).toBe(400);
@@ -518,7 +511,6 @@ describe("settings write", () => {
     expect(
       (await configWrite(server, token, { key: "messageSummaries", value: "true" })).status,
     ).toBe(400);
-    expect((await loadConfig(env)).gitPolicy).toBe("commit");
     expect((await loadConfig(env)).messageSummaries).toBe(false);
   });
 
@@ -591,7 +583,6 @@ describe("settings read", () => {
         captures: true,
         language: "auto",
         shareConversations: false,
-        recordCommit: "ask",
       },
     });
   });

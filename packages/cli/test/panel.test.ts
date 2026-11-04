@@ -94,8 +94,6 @@ describe("buildPanel", () => {
         shapes: true,
         captures: true,
         shareConversations: false,
-        recordCommit: "ask",
-        gitPolicy: "commit",
         agents: ["claude-code"],
         bigChangeLines: 300,
       },

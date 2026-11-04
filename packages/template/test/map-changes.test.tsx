@@ -55,8 +55,6 @@ function modelOf(current: ViewSession): LineageViewModel {
       messageSummaries: false,
       startupContext: true,
       shareConversations: false,
-      recordCommit: "ask",
-      gitPolicy: "ignore",
       agents: ["claude-code"],
       bigChangeLines: 300,
     },

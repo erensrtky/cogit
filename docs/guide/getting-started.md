@@ -49,13 +49,12 @@ so `cogit init --yes` runs without asking.
 
 | Question | Default | Flag |
 |---|---|---|
-| Where should the session records live? | in the repository | `--git commit\|ignore` |
+| Share the session records with your team? | no | `--git share\|ignore` |
 | Keep Claude Code transcripts longer? Claude Code deletes them after 30 days by default. | keep as is | `--retention <days\|keep>` |
 
-The record holds your messages' titles, branch summaries, decisions and open items, so
-committing `.cogit/` shares all of that with anyone who clones the repository; keep it local
-for a public repository or private sessions. The project is named after its directory;
-`--name` overrides it.
+The record holds your messages' titles, branch summaries, decisions and open items. Sharing
+sends all of that with every `git push` to anyone who can read the repository; if the repository
+is public, that means everyone. So it stays on your machine unless you say yes.
 
 Without asking, `init` lets the agent run the cogit skill without a permission prompt (so it
 updates the record as it works), turns the plugin on for the project (writes
@@ -104,8 +103,8 @@ If you agreed to turn the plugin on for the repository, `init` wrote the project
 
 Each teammate runs `npm install -g @cogit/cli` and `cogit init` once on their machine; `init` sees
 the project is already set up, registers it on their machine and installs the git hooks in
-their clone. With the default commit policy,
-everyone's records travel with the branch. See [Teams and git](teams-and-git.md).
+their clone. In a project that shares its record, everyone's sessions then arrive with `git pull`.
+See [Teams and git](teams-and-git.md).
 
 ## Stop recording
 

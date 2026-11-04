@@ -13,21 +13,32 @@ and a redaction pass for key and token patterns runs over everything the map wri
 ## What stays on your machine
 
 - **The raw conversation.** `.cogit/conversations/` keeps a copy of each transcript so the map
-  still works after Claude Code deletes it. It stays out of git unless you turn
-  `shareConversations` on. Turn it on only if everyone who can read the repository may read
-  your chats, and never in a public repository.
-- **The map** (`.cogit/map.html`) shows the conversation, so it is never committed.
+  still works after Claude Code deletes it. It is never sent unless you turn
+  `shareConversations` on in a project that shares its record. Turn it on only if everyone who
+  can read the repository may read your chats, and never in a public repository.
+- **The map** (`.cogit/map.html`) shows the conversation, so it is never committed or sent.
 - **Local state:** the inbox, the map view, locks.
+- **The record itself**, unless you choose to share it. `cogit init` asks, and no answer means
+  no. Private is the default for public and private repositories alike.
 
-## What git carries
+## What sharing sends
 
-Under the default commit policy, the record travels with your branch. Anyone who can read the
-repository can read the titles, decisions and reasons. If the repository is public, so is the
-record. Choose the ignore policy for a project where that is not wanted; see
-[Teams and git](teams-and-git.md).
+If you share the record, `git push` also sends it to your own repository, on refs outside your
+branches (`refs/cogit/`). It does not appear in the file tree, in pull requests or on GitHub's
+pages, but **hidden is not private**: anyone who can read the repository can download the titles,
+decisions and reasons with one command. If the repository is public, so is the record. Each push
+prints how many session records it sends. A repository you share in while it is private shows
+that record to everyone if it later goes public.
 
 `cogit pr` reads only the record, never the conversation, so its output is safe to paste into
 a public pull request.
+
+## Deleting
+
+`cogit prune --older-than 1y` deletes your old sessions here and in the repository. Use it to
+keep the record small, not to take back a secret: copies already on teammates' machines stay
+until they delete them, and a host can keep deleted data for a while. To remove a secret, treat
+it as leaked and rotate it.
 
 ## Transcripts
 

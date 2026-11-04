@@ -3,7 +3,7 @@ import { chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { findGitRoot, gitHooksDir, resolveCommit } from "./git.js";
 import { spawnDetachedProcess } from "./hooks/run.js";
-import { stageSessionFiles } from "./session-git.js";
+import { queueRecords } from "./record-sync.js";
 import { atomicWrite } from "./store/fs.js";
 import { captureDisabled, projectPaths } from "./store/paths.js";
 import { loadConfig } from "./store/stores.js";
@@ -114,11 +114,14 @@ export async function installGitHook(root: string, event: string): Promise<boole
 /**
  * The git-side events cogit answers (Stories 9.3, 9.4, 13.6). A git hook's stdin
  * is not the Claude Code hook JSON, so these never go through `runHook`.
- * `pre-commit` carries the session record with a code commit; `prepare-commit-msg`
+ * `pre-push` sends the session records along with the code; `prepare-commit-msg`
  * adds the `Thought:` trailer that names the message behind it; `post-commit`
  * queues the Shape of a message that landed commits, outside the commit.
  */
-export const GIT_HOOK_EVENTS = ["pre-commit", "prepare-commit-msg", "post-commit"] as const;
+export const GIT_HOOK_EVENTS = ["prepare-commit-msg", "post-commit", "pre-push"] as const;
+
+/** Hooks older versions installed: their block is removed on the next refresh. */
+const RETIRED_GIT_HOOK_EVENTS = ["pre-commit"] as const;
 export type GitHookEvent = (typeof GIT_HOOK_EVENTS)[number];
 
 export function isGitHookEvent(event: string): event is GitHookEvent {
@@ -144,11 +147,15 @@ export async function refreshGitHooks(root: string): Promise<GitHookEvent[]> {
   const dir = await gitHooksDir(gitRoot);
   if (dir === undefined) return [];
   const refreshed: GitHookEvent[] = [];
+  const hasBlock = async (event: string): Promise<boolean> =>
+    ((await readFile(join(dir, event), "utf8").catch(() => undefined)) ?? "").includes(BLOCK_START);
+  // A hook this version added reaches a clone that already has cogit's others.
+  const installed = await hasBlock("prepare-commit-msg");
   for (const event of GIT_HOOK_EVENTS) {
-    const current = await readFile(join(dir, event), "utf8").catch(() => undefined);
-    if (current === undefined || !current.includes(BLOCK_START)) continue;
+    if (!installed && !(await hasBlock(event))) continue;
     if (await installGitHook(root, event)) refreshed.push(event);
   }
+  await removeHookBlocks(dir, RETIRED_GIT_HOOK_EVENTS);
   return refreshed;
 }
 
@@ -162,8 +169,17 @@ export async function uninstallGitHooks(root: string): Promise<GitHookEvent[]> {
   if (gitRoot === undefined) return [];
   const dir = await gitHooksDir(gitRoot);
   if (dir === undefined) return [];
-  const removed: GitHookEvent[] = [];
-  for (const event of GIT_HOOK_EVENTS) {
+  await removeHookBlocks(dir, RETIRED_GIT_HOOK_EVENTS);
+  return removeHookBlocks(dir, GIT_HOOK_EVENTS);
+}
+
+/** Takes cogit's block out of these hooks; returns the ones that had one. */
+async function removeHookBlocks<Event extends string>(
+  dir: string,
+  events: readonly Event[],
+): Promise<Event[]> {
+  const removed: Event[] = [];
+  for (const event of events) {
     const file = join(dir, event);
     const current = await readFile(file, "utf8").catch(() => undefined);
     if (current === undefined || !current.includes(BLOCK_START)) continue;
@@ -173,6 +189,29 @@ export async function uninstallGitHooks(root: string): Promise<GitHookEvent[]> {
     removed.push(event);
   }
   return removed;
+}
+
+/**
+ * The `pre-push` hook: queues the records and sends them in the background, so
+ * the user's push never waits for the network, never meets a second SSH prompt and
+ * never fails because of a record. The line is the only sign that something else
+ * is leaving the machine, so it goes out even though the push itself is quiet.
+ */
+async function sendWithPush(
+  dir: string,
+  env: NodeJS.ProcessEnv,
+  pushedRemote: string | undefined,
+  spawn: typeof spawnDetachedProcess,
+): Promise<void> {
+  if (captureDisabled(env)) return;
+  const queued = await queueRecords(dir, env, pushedRemote);
+  if (queued === 0) return;
+  const cli = currentCliPath();
+  if (cli === undefined) return;
+  process.stderr.write(
+    `cogit: sending ${queued} session record${queued === 1 ? "" : "s"} to ${pushedRemote ?? "the remote"}\n`,
+  );
+  spawn(cli, ["record-sync", "send", "-C", dir], env, projectPaths(dir).detachedLog);
 }
 
 /**
@@ -214,8 +253,8 @@ export async function runGitHook(
   now: Date = new Date(),
   spawn: typeof spawnDetachedProcess = spawnDetachedProcess,
 ): Promise<void> {
-  if (event === "pre-commit") {
-    await stageSessionFiles(dir, env);
+  if (event === "pre-push") {
+    await sendWithPush(dir, env, args[0], spawn);
     return;
   }
   if (event === "post-commit") {

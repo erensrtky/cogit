@@ -147,9 +147,7 @@ describe("Project and Config schemas", () => {
       sideModel: "haiku",
       sideEveryTurns: 5,
       sessionEndCatchUp: true,
-      gitPolicy: "commit",
       shareConversations: false,
-      recordCommit: "ask",
       inboxMaxAgeDays: 1,
     });
   });

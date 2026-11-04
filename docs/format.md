@@ -14,15 +14,15 @@ fails when a file and the code disagree.
 
 ```
 <project>/.cogit/
-  project.json                    # name, schema version (shared, versioned)
-  sessions/<session-id>.json      # one file per session, the notes (versioned)
-  sessions/<session-id>.events.jsonl  # append-only structure facts (versioned)
+  project.json                    # name, schema version (committed when shared)
+  sessions/<session-id>.json      # one file per session, the notes
+  sessions/<session-id>.events.jsonl  # append-only structure facts
   conversations/<session-id>.jsonl.gz # the conversation store (local by default)
   state/<session-id>.json         # hook state: turn counter (local)
   locks/                          # lock files (local)
   inbox/<session-id>.json         # JSON the agent hands to `session write` (local)
   HEAD                            # the session the next commit carries (local)
-  .gitignore                      # which local paths stay out of git
+  .gitignore                      # keeps all but the marker out of commits
   map.html                        # generated map (local)
 
 ~/.config/cogit/                  # or $COGIT_HOME / $XDG_CONFIG_HOME/cogit
@@ -35,23 +35,38 @@ fails when a file and the code disagree.
 a fallback). A pre-rename `.codelineage/` is migrated to `.cogit/` silently on
 the first command or hook in the project.
 
-### What travels with a git clone
+### What travels, and how
 
-Under the default `gitPolicy: "commit"`, the root `.gitignore` says nothing about
-`.cogit/`; instead `.cogit/.gitignore` ignores everything except the files that
-make up the record:
+In a project that shares its record the root `.gitignore` says nothing about `.cogit/`;
+`.cogit/.gitignore` keeps everything but the marker out of commits:
 
 ```gitignore
 *
 !.gitignore
-!sessions/
-!sessions/**
 !project.json
 ```
 
-With `shareConversations: true` it also keeps `conversations/`. Everything else
-(`state/`, `locks/`, `inbox/`, `map.html`, `HEAD`, backups) stays local. Under
-`gitPolicy: "ignore"` the root `.gitignore` holds `/.cogit/` and nothing travels.
+The sessions travel on refs instead, one per session, in the same repository:
+
+```
+refs/cogit/sessions/<session-id>                 # what this clone wrote
+refs/cogit-remote/sessions/<session-id>          # what the remote last said (local name)
+refs/cogit/projects/<hash>/sessions/<session-id> # a project in a repository subdirectory
+```
+
+Each ref names a tree, not a commit, so no history builds up and `git log --all` stays
+clean. The tree holds `session.json`, `events.jsonl` when it exists, and, with
+`shareConversations: true`, `conversation.jsonl.gz`. A clone receives them through one
+fetch line, `+refs/cogit/*:refs/cogit-remote/*`, which cogit adds the first time it runs
+there. To read a session without cogit:
+
+```bash
+git fetch origin '+refs/cogit/*:refs/cogit-remote/*'
+git show refs/cogit-remote/sessions/<session-id>:session.json
+```
+
+Everything else (`state/`, `locks/`, `inbox/`, `map.html`, `HEAD`, backups) stays local.
+In a private project the root `.gitignore` holds `/.cogit/` and nothing travels.
 
 ## Versioning
 
@@ -216,12 +231,14 @@ holds one or more JSON lines:
 - `text`, `replies` and `tools` are redacted before writing. Tool output is
   never stored, only counts and edited file paths.
 
-`conversations/` is **local** unless `shareConversations` is on.
+`conversations/` is **local** unless `shareConversations` is on, which adds it to the session's ref.
 
 ## state, locks, inbox, HEAD
 
 - `state/<id>.json`: `{schema, turns, turnsSinceUpdate, recordUpdatedAt}`. Derived
   and machine-local; losing it only restarts the turn count.
+- `state/record-sync.json`: what waits to be sent, what the last download or send said, and
+  each session's file stamps. Derived and machine-local; losing it costs a re-hash.
 - `locks/`: lock directories for the build and for one session's writes.
 - `inbox/<id>.json`: where the record skill writes its JSON before
   `cogit session write --file … --consume`. The CLI validates, redacts, merges
@@ -264,11 +281,9 @@ back from `git log` (`%(trailers:key=Thought,valueonly)`) and attaches those
 commits to their message nodes. A trailer wins over a commit hash the agent also
 listed on the node.
 
-The git `pre-commit` hook stages the current session's record
-(`sessions/<id>.json` and `.events.jsonl`) when they changed **and** something
-else is already staged, so a code commit carries its why and the hook never
-creates a record-only commit. `git commit -a`, `git commit <paths>` and a
-temporary index (`GIT_INDEX_FILE`) all work.
+The git `pre-push` hook queues the sessions the remote does not have yet and sends them in the
+background, with `--no-verify` so that push does not set off the hook again. A code commit
+carries only the trailer; the record never enters a commit.
 
 ## Reading a branch for a pull request
 

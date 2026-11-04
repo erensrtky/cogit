@@ -18,7 +18,6 @@ import { regenerateShape } from "./commands/shape.js";
 import { diffTooLarge, isDiffSha, readCommitDiff } from "./diff.js";
 import { defaultsPrompter, type Io } from "./io.js";
 import { Config } from "./schema/config.js";
-import { refreshShareConversations } from "./share.js";
 import {
   CAPTURE_ID,
   CaptureTransitionError,
@@ -597,8 +596,6 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       return;
     }
     // Story 9.3: un-ignore (or hide) the conversation store in every project.
-    if (key === "shareConversations")
-      await refreshShareConversations(env, next.data.shareConversations);
     res.writeHead(200, {
       "content-type": "application/json",
       "cache-control": "no-store",

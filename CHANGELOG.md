@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **Breaking:** the record no longer enters commits. Each session sits on its own ref in your repository, outside every branch, so pull requests, `git status` and `git grep` show only code and a normal clone stays small. If you shared your record before, run `git rm -r --cached .cogit/sessions` once and commit; `cogit doctor` reminds you. Old commits keep the files they had.
+- **Breaking:** the record is private unless you say otherwise. `cogit init` asks one question, "Share the session records with your team?", and no answer means no. `cogit init --git` and `cogit config git` take `share` or `ignore`.
+- `git push` sends the record of a project that shares it, in the background: it prints how many, never slows or fails the push, and only goes to `origin` or your only remote. What cannot be sent stays queued and `cogit doctor` says why.
+- The first time cogit runs in a clone of a shared project it downloads the team's records, and from then on a plain `git pull` brings them. An empty map says whether the download failed.
+- A linked worktree always uses the main checkout's record, so a session outlives its worktree.
+
+### Added
+- `cogit prune --older-than <age>` deletes old sessions here and in the repository, after listing them and asking. Your own by default, `--all` for everyone's.
+- `git clean -fdx` no longer loses a shared project's sessions: cogit puts the files back from their refs.
+
+### Removed
+- **Breaking:** the `gitPolicy` and `recordCommit` settings, the commit policy, the `pre-commit` hook and the record commit. An old `pre-commit` block is removed on its own.
 
 ## [0.31.1] - 2026-11-04
 ### Fixed

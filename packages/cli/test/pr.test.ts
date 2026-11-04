@@ -136,7 +136,7 @@ describe("cogit pr (Story 10.1)", () => {
     await git("branch", "main");
     await init(
       root,
-      { name: "proj", git: "commit", retention: "keep", language: "auto" },
+      { name: "proj", git: "share", retention: "keep", language: "auto" },
       fakeIo(env),
     );
     await writeFile(projectPaths(root).session("s1"), JSON.stringify(session()));
@@ -225,7 +225,7 @@ describe("cogit pr (Story 10.1)", () => {
       `- \`${commitHashes[3]?.slice(0, 7)}\` docs: describe the parser — thought \`${C}\` not recorded yet`,
     );
     expect(text).toContain("## Dig deeper");
-    expect(text).toContain("a reviewer who checks it out");
+    expect(text).toContain("a reviewer with cogit in their clone");
     expect(text).not.toContain(SECRET);
     expect(text).not.toContain("Conversation:");
   });
@@ -280,7 +280,7 @@ describe("cogit pr (Story 10.1)", () => {
     await run("git", ["-C", empty, "init", "-q"], { env });
     await init(
       empty,
-      { name: "empty", git: "commit", retention: "keep", language: "auto" },
+      { name: "empty", git: "share", retention: "keep", language: "auto" },
       fakeIo(env),
     );
     await expect(pr({ dir: empty, io })).rejects.toThrow(/HEAD has no commits yet/);
@@ -310,7 +310,7 @@ describe("cogit pr (Story 10.1)", () => {
     const model: PrModel = {
       base: { ref: "main", commit: "0".repeat(40) },
       head: "1".repeat(40),
-      policy: "commit",
+      policy: "share",
       goals: [{ text: "A goal", sessionId: "s1", sessionTitle: "Session" }],
       sessions: [
         {

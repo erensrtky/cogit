@@ -4,7 +4,7 @@ import { userInfo } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
-import { configGit, configGitShow, configSet } from "../src/commands/config.js";
+import { configGit, configGitShow } from "../src/commands/config.js";
 import { hooksInstall, hooksUninstall } from "../src/commands/hooks.js";
 import { sessionAuthor, sessionWrite } from "../src/commands/session.js";
 import {
@@ -20,23 +20,15 @@ import {
   refreshGitHooks,
   withHookBlock,
 } from "../src/git-hooks.js";
-import { runHook } from "../src/hooks/run.js";
 import type { Session } from "../src/schema/session.js";
-import {
-  commitSessionFiles,
-  maybeAutoCommit,
-  readSessionHead,
-  recordMessage,
-  stageSessionFiles,
-  uncommittedSession,
-} from "../src/session-git.js";
+import { readSessionHead } from "../src/session-git.js";
 import { projectPaths } from "../src/store/paths.js";
 import { loadSession, projectJson } from "../src/store/stores.js";
 import { envFor, fakeIo, noGitDir, T0, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
 
-describe("the record travels with the repo (Story 9.3)", () => {
+describe("the session HEAD and author (Story 9.3)", () => {
   let dir: string;
   let root: string;
   let env: NodeJS.ProcessEnv;
@@ -101,85 +93,6 @@ describe("the record travels with the repo (Story 9.3)", () => {
     expect(await readSessionHead(root)).toBeUndefined();
   });
 
-  it("stages the current session only when something else is already staged", async () => {
-    await makeProject();
-    await writeFile(projectPaths(root).head, JSON.stringify({ sessionId: "s1", at: T0 }));
-    // Nothing staged: the hook must not create a record-only commit.
-    expect(await stageSessionFiles(root)).toBe(false);
-    expect((await git("diff", "--cached", "--name-only")).trim()).toBe("");
-
-    await writeFile(join(root, "a.txt"), "two\n");
-    await git("add", "a.txt");
-    expect(await stageSessionFiles(root)).toBe(true);
-    const staged = (await git("diff", "--cached", "--name-only")).trim().split("\n");
-    expect(staged).toContain(".cogit/sessions/s1.json");
-    expect(staged).toContain(".cogit/sessions/s1.events.jsonl");
-  });
-
-  it("stages into the temporary index of git commit <paths>", async () => {
-    await makeProject();
-    await writeFile(projectPaths(root).head, JSON.stringify({ sessionId: "s1", at: T0 }));
-    // git commit <paths> builds a temporary index; its path arrives as GIT_INDEX_FILE.
-    const tempEnv = { GIT_INDEX_FILE: join(dir, "temp-index") };
-    await gitEnv(tempEnv, "read-tree", "HEAD");
-    expect(await stageSessionFiles(root, { ...process.env, ...tempEnv })).toBe(false);
-    await writeFile(join(root, "a.txt"), "three\n");
-    await gitEnv(tempEnv, "add", "a.txt");
-    expect(await stageSessionFiles(root, { ...process.env, ...tempEnv })).toBe(true);
-    const temp = (await gitEnv(tempEnv, "diff", "--cached", "--name-only")).trim();
-    expect(temp).toContain(".cogit/sessions/s1.json");
-    // The real index is untouched by the temporary one.
-    expect((await git("diff", "--cached", "--name-only")).trim()).toBe("");
-  });
-
-  it("does nothing when the ignore policy hides the record", async () => {
-    await makeProject();
-    await writeFile(projectPaths(root).head, JSON.stringify({ sessionId: "s1", at: T0 }));
-    await writeFile(join(root, ".gitignore"), "/.cogit/\n");
-    await writeFile(join(root, "a.txt"), "two\n");
-    await git("add", "a.txt");
-    expect(await stageSessionFiles(root)).toBe(false);
-    expect(await uncommittedSession(root, "s1")).toBe(false);
-    expect((await git("diff", "--cached", "--name-only")).trim()).toBe("a.txt");
-  });
-
-  it("commits exactly the record files, leaving other staged changes alone", async () => {
-    await makeProject();
-    await writeFile(join(root, "a.txt"), "two\n");
-    await git("add", "a.txt");
-    expect(await commitSessionFiles(root, "s1", "My session")).toBe(true);
-    expect((await git("log", "-1", "--format=%s")).trim()).toBe("chore(cogit): record My session");
-    const files = (await git("show", "--name-only", "--format=")).trim().split("\n");
-    expect(files).toContain(".cogit/sessions/s1.json");
-    expect(files).not.toContain("a.txt");
-    expect((await git("diff", "--cached", "--name-only")).trim()).toBe("a.txt");
-    expect(await uncommittedSession(root, "s1")).toBe(false);
-  });
-
-  it("commits at session end only in auto mode", async () => {
-    await makeProject();
-    const io = fakeIo(env);
-    await configSet("recordCommit", "off", io);
-    expect(await maybeAutoCommit(root, "s1", env)).toBe(false);
-    expect((await git("log", "--format=%s")).trim().split("\n")).toEqual(["feat: base"]);
-
-    await configSet("recordCommit", "auto", io);
-    expect(await maybeAutoCommit(root, "s1", env)).toBe(true);
-    expect((await git("log", "-1", "--format=%s")).trim()).toBe("chore(cogit): record My session");
-    // Nothing left to commit is a quiet no-op, not an error.
-    expect(await commitSessionFiles(root, "s1", "My session")).toBe(false);
-    // Changing the sharing setting also walks the registry's ignore files.
-    await configSet("shareConversations", "true", io);
-  });
-
-  it("keeps the record commit message to one short line", () => {
-    expect(recordMessage("  Multi\nline   title ", "s1")).toBe(
-      "chore(cogit): record Multi line title",
-    );
-    expect(recordMessage("", "s1")).toBe("chore(cogit): record s1");
-    expect(recordMessage("x".repeat(200), "s1")).toHaveLength("chore(cogit): record ".length + 120);
-  });
-
   it("stamps the author from git on the first write, else the OS user", async () => {
     await makeProject();
     expect(await sessionAuthor(root, env)).toBe("Tester");
@@ -233,25 +146,21 @@ describe("ignore files and git hooks", () => {
   it("adds and removes the root ignore line with the policy", async () => {
     await ensureGitignore(root, "ignore");
     await expect(readFile(join(root, ".gitignore"), "utf8")).resolves.toBe("# cogit\n/.cogit/\n");
-    await ensureGitignore(root, "commit");
-    await expect(refreshCogitGitignore(root, false)).resolves.toBe(true);
-    await expect(readFile(projectPaths(root).gitignore, "utf8")).resolves.toBe(
-      cogitGitignore(false),
-    );
+    await ensureGitignore(root, "share");
+    await expect(refreshCogitGitignore(root)).resolves.toBe(true);
+    await expect(readFile(projectPaths(root).gitignore, "utf8")).resolves.toBe(cogitGitignore());
     // A project that still ignores .cogit/ keeps no inner file.
     await ensureGitignore(root, "ignore");
-    await expect(refreshCogitGitignore(root, true)).resolves.toBe(false);
+    await expect(refreshCogitGitignore(root)).resolves.toBe(false);
   });
 
-  it("switches an existing project between commit and ignore", async () => {
+  it("switches an existing project between share and ignore", async () => {
     const io = fakeIo(env);
-    await configGit(root, "commit", io);
-    await expect(readFile(projectPaths(root).gitignore, "utf8")).resolves.toBe(
-      cogitGitignore(false),
-    );
-    const hook = await readFile(join(root, ".git", "hooks", "pre-commit"), "utf8");
+    await configGit(root, "share", io);
+    await expect(readFile(projectPaths(root).gitignore, "utf8")).resolves.toBe(cogitGitignore());
+    const hook = await readFile(join(root, ".git", "hooks", "pre-push"), "utf8");
     expect(hook).toContain("# >>> cogit");
-    expect(hook).toContain("cogit hook pre-commit --dir");
+    expect(hook).toContain("cogit hook pre-push --dir");
     expect(await readFile(projectPaths(root).project, "utf8")).toContain('"proj"');
 
     await configGitShow(root, io);
@@ -259,8 +168,8 @@ describe("ignore files and git hooks", () => {
     await expect(readFile(join(root, ".gitignore"), "utf8")).resolves.toBe("# cogit\n/.cogit/\n");
     await configGitShow(root, io);
     expect(io.lines.filter((line) => line.startsWith("Git policy"))).toEqual([
-      "Git policy for proj: commit",
-      "Git policy for proj: commit",
+      "Git policy for proj: share",
+      "Git policy for proj: share",
       "Git policy for proj: ignore",
       "Git policy for proj: ignore",
     ]);
@@ -293,25 +202,6 @@ describe("ignore files and git hooks", () => {
     expect(next.match(/# >>> cogit/g)).toHaveLength(1);
     expect(next).not.toContain("cogit hook pre-commit || true");
     expect(next).toContain("--dir '/p'");
-  });
-
-  it("carries project.json and the inner ignore file with the first record", async () => {
-    await mkdir(projectPaths(root).sessions, { recursive: true });
-    await writeFile(projectPaths(root).session("s1"), "{}\n");
-    await writeFile(projectPaths(root).gitignore, cogitGitignore(false));
-    await writeFile(projectPaths(root).head, JSON.stringify({ sessionId: "s1", at: T0 }));
-    await writeFile(join(root, "a.txt"), "two\n");
-    await git("add", "a.txt");
-    expect(await stageSessionFiles(root)).toBe(true);
-    const staged = (await git("diff", "--cached", "--name-only")).trim().split("\n");
-    expect(staged).toEqual(
-      expect.arrayContaining([
-        "a.txt",
-        ".cogit/sessions/s1.json",
-        ".cogit/project.json",
-        ".cogit/.gitignore",
-      ]),
-    );
   });
 
   it("falls back to the installing CLI under node, else does nothing", () => {
@@ -365,19 +255,33 @@ describe("ignore files and git hooks", () => {
   it("refreshes only the hooks that already carry a cogit block", async () => {
     const hooks = join(root, ".git", "hooks");
     await writeFile(
-      join(hooks, "pre-commit"),
-      "#!/bin/sh\n# >>> cogit\ncogit hook pre-commit || true\n# <<< cogit\n",
+      join(hooks, "post-commit"),
+      "#!/bin/sh\n# >>> cogit\ncogit hook post-commit || true\n# <<< cogit\n",
     );
     await writeFile(join(hooks, "prepare-commit-msg"), "#!/bin/sh\necho mine\n");
-    expect(await refreshGitHooks(root)).toEqual(["pre-commit"]);
-    expect(await readFile(join(hooks, "pre-commit"), "utf8")).toContain(
-      hookBlock("pre-commit", root),
+    expect(await refreshGitHooks(root)).toEqual(["post-commit"]);
+    expect(await readFile(join(hooks, "post-commit"), "utf8")).toContain(
+      hookBlock("post-commit", root),
     );
     expect(await readFile(join(hooks, "prepare-commit-msg"), "utf8")).toBe(
       "#!/bin/sh\necho mine\n",
     );
     expect(await refreshGitHooks(root)).toEqual([]);
     expect(await refreshGitHooks(await noGitDir())).toEqual([]);
+  });
+
+  it("adds pre-push to an installed clone and retires an old pre-commit block", async () => {
+    const hooks = join(root, ".git", "hooks");
+    const block = (event: string): string =>
+      `#!/bin/sh\n# >>> cogit\ncogit hook ${event} || true\n# <<< cogit\n`;
+    await writeFile(join(hooks, "prepare-commit-msg"), block("prepare-commit-msg"));
+    await writeFile(
+      join(hooks, "pre-commit"),
+      `#!/bin/sh\necho mine\n${block("pre-commit").slice(10)}`,
+    );
+    await refreshGitHooks(root);
+    expect(await readFile(join(hooks, "pre-push"), "utf8")).toContain("cogit hook pre-push");
+    expect(await readFile(join(hooks, "pre-commit"), "utf8")).toBe("#!/bin/sh\necho mine\n");
   });
 
   it("installs the hooks on request and with the ignore policy", async () => {
@@ -388,58 +292,12 @@ describe("ignore files and git hooks", () => {
     await hooksInstall(root, io);
     await hooksInstall(root, io);
     expect(io.lines).toEqual([
-      "Added the cogit block to: pre-commit, prepare-commit-msg, post-commit",
+      "Added the cogit block to: prepare-commit-msg, post-commit, pre-push",
       "The cogit hook blocks are already current.",
     ]);
     await hooksUninstall(root, io);
     await configGit(root, "ignore", io);
     const hook = await readFile(join(root, ".git", "hooks", "prepare-commit-msg"), "utf8");
     expect(hook).toContain("hook prepare-commit-msg --dir");
-  });
-
-  it("offers the uncommitted record at session start only in ask mode", async () => {
-    const paths = projectPaths(root);
-    await mkdir(paths.sessions, { recursive: true });
-    const earlier: Session = {
-      schema: 1,
-      sessionId: "s0",
-      agent: "claude-code",
-      title: "Earlier work",
-      startedAt: T0,
-      updatedAt: T0,
-      status: { goal: "", done: [], pending: [], next: "" },
-      nodes: [],
-    };
-    await writeFile(paths.session("s0"), JSON.stringify(earlier));
-    await writeFile(paths.events("s0"), "");
-    const io = fakeIo(env);
-    await configSet("recordCommit", "ask", io);
-
-    const start = async (): Promise<string> => {
-      const out = await runHook(
-        "sessionstart",
-        JSON.stringify({ session_id: "s1", cwd: root, source: "startup" }),
-        env,
-        T0,
-        () => {},
-      );
-      return (
-        (JSON.parse(out ?? "{}") as { hookSpecificOutput?: { additionalContext?: string } })
-          .hookSpecificOutput?.additionalContext ?? ""
-      );
-    };
-
-    expect(await start()).toContain("The last session's record is not committed");
-    expect(await start()).toContain("chore(cogit): record Earlier work");
-
-    await git("add", "-A");
-    await git("commit", "-q", "-m", "chore(cogit): record Earlier work");
-    expect(await start()).not.toContain("The last session's record is not committed");
-
-    // `off` and `auto` never ask the agent.
-    await configSet("recordCommit", "auto", io);
-    await writeFile(paths.head, JSON.stringify({ sessionId: "s0", at: T0 }));
-    await writeFile(paths.session("s0"), JSON.stringify({ ...earlier, title: "Changed" }));
-    expect(await start()).not.toContain("The last session's record is not committed");
   });
 });

@@ -12,7 +12,7 @@ export async function isDirectory(path: string): Promise<boolean> {
 }
 
 /** Writes via a temp file in the same directory and renames it into place. */
-export async function atomicWrite(file: string, data: string): Promise<void> {
+export async function atomicWrite(file: string, data: string | Uint8Array): Promise<void> {
   const dir = dirname(file);
   await mkdir(dir, { recursive: true });
   const tmp = join(dir, `.${basename(file)}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`);

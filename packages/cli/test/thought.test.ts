@@ -503,16 +503,16 @@ describe("the thought behind a commit (Story 9.4)", () => {
     const userHook = "#!/bin/sh\necho user-hook\n";
 
     it("installs both events, keeps the user's lines, and uninstalls only its block", async () => {
-      const preCommit = join(root, ".git", "hooks", "pre-commit");
+      const preCommit = join(root, ".git", "hooks", "pre-push");
       await writeFile(preCommit, userHook);
       await chmod(preCommit, 0o755);
       expect(await installGitHooks(root)).toEqual([
-        "pre-commit",
         "prepare-commit-msg",
         "post-commit",
+        "pre-push",
       ]);
       expect(await readFile(preCommit, "utf8")).toBe(
-        `${userHook}\n${hookBlock("pre-commit", root)}\n`,
+        `${userHook}\n${hookBlock("pre-push", root)}\n`,
       );
       expect(await readFile(join(root, ".git", "hooks", "prepare-commit-msg"), "utf8")).toContain(
         "cogit hook prepare-commit-msg",
@@ -520,9 +520,9 @@ describe("the thought behind a commit (Story 9.4)", () => {
       expect(await installGitHooks(root)).toEqual([]);
 
       expect(await uninstallGitHooks(root)).toEqual([
-        "pre-commit",
         "prepare-commit-msg",
         "post-commit",
+        "pre-push",
       ]);
       expect(await readFile(preCommit, "utf8")).toBe(userHook);
       // The file held nothing but cogit's shebang and block, so it is gone.
@@ -533,17 +533,17 @@ describe("the thought behind a commit (Story 9.4)", () => {
     it("follows core.hooksPath and leaves a hook without the block alone", async () => {
       await git("config", "core.hooksPath", ".husky");
       await mkdir(join(root, ".husky"), { recursive: true });
-      await writeFile(join(root, ".husky", "pre-commit"), userHook);
+      await writeFile(join(root, ".husky", "pre-push"), userHook);
       await installGitHooks(root);
       expect(await readFile(join(root, ".husky", "prepare-commit-msg"), "utf8")).toContain(
         "cogit hook prepare-commit-msg",
       );
       expect(await uninstallGitHooks(root)).toEqual([
-        "pre-commit",
         "prepare-commit-msg",
         "post-commit",
+        "pre-push",
       ]);
-      expect(await readFile(join(root, ".husky", "pre-commit"), "utf8")).toBe(userHook);
+      expect(await readFile(join(root, ".husky", "pre-push"), "utf8")).toBe(userHook);
 
       // No repository and no block: nothing to do.
       expect(await uninstallGitHooks(await noGitDir())).toEqual([]);
@@ -573,7 +573,7 @@ describe("the thought behind a commit (Story 9.4)", () => {
       program.exitOverride().configureOutput({ writeOut: () => {}, writeErr: () => {} });
       await program.parseAsync(["hooks", "uninstall", root], { from: "user" });
       expect(io.lines.at(-1)).toBe(
-        "Removed the cogit block from: pre-commit, prepare-commit-msg, post-commit",
+        "Removed the cogit block from: prepare-commit-msg, post-commit, pre-push",
       );
 
       await program.parseAsync(["hooks", "uninstall", root], { from: "user" });
@@ -584,14 +584,14 @@ describe("the thought behind a commit (Story 9.4)", () => {
     });
   });
 
-  it("init installs both hooks under the commit policy", async () => {
+  it("init installs the hooks for a shared project", async () => {
     await init(
       root,
-      { name: "proj", retention: "keep", language: "auto", git: "commit" },
+      { name: "proj", retention: "keep", language: "auto", git: "share" },
       fakeIo(env),
     );
-    expect(await readFile(join(root, ".git", "hooks", "pre-commit"), "utf8")).toContain(
-      "cogit hook pre-commit",
+    expect(await readFile(join(root, ".git", "hooks", "pre-push"), "utf8")).toContain(
+      "cogit hook pre-push",
     );
     expect(await readFile(join(root, ".git", "hooks", "prepare-commit-msg"), "utf8")).toContain(
       "cogit hook prepare-commit-msg",

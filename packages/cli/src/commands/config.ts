@@ -7,8 +7,8 @@ import {
 } from "../git.js";
 import { installGitHooks } from "../git-hooks.js";
 import { CliError, type Io } from "../io.js";
+import { addRecordRefspec } from "../record-sync.js";
 import { Config, type RegistryEntry } from "../schema/config.js";
-import { refreshShareConversations } from "../share.js";
 import { isDirectory } from "../store/fs.js";
 import { resolveProjectRoot } from "../store/root.js";
 import {
@@ -73,9 +73,6 @@ export async function configSet(key: string, raw: string, io: Io): Promise<void>
   }
   const name = canonicalKey(key);
   await updateConfig((c) => ({ ...c, [name]: next.data[key] }), io.env);
-  // Sharing the raw chat changes the project ignore files, not just the config.
-  if (name === "shareConversations")
-    await refreshShareConversations(io.env, next.data.shareConversations);
   io.out(`${name} = ${JSON.stringify(next.data[key])}`);
 }
 
@@ -85,14 +82,14 @@ export async function configGitShow(dir: string, io: Io): Promise<void> {
   const project = await loadProject(root);
   if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
   if (!project.ok) throw new CliError(project.error);
-  const policy: GitPolicy = (await cogitIgnored(root)) ? "ignore" : "commit";
+  const policy: GitPolicy = (await cogitIgnored(root)) ? "ignore" : "share";
   io.out(`Git policy for ${project.data.name}: ${policy}`);
 }
 
 /**
- * `cogit config git commit|ignore` (Story 9.3): switches an existing project.
- * Both ignore files are edited; no record file is ever deleted, so switching to
- * `ignore` leaves what git already tracks alone.
+ * `cogit config git share|ignore`: switches an existing project. Both ignore files
+ * are edited and no record file is ever deleted. Switching to `ignore` stops
+ * sending; what the remote already holds stays there until `cogit prune`.
  */
 export async function configGit(dir: string, policy: GitPolicy, io: Io): Promise<void> {
   const { root } = await resolveProjectRoot(dir);
@@ -103,9 +100,9 @@ export async function configGit(dir: string, policy: GitPolicy, io: Io): Promise
     throw new CliError(`${root} is not in a git repository`);
 
   const added = await ensureGitignore(root, policy);
-  const config = await loadConfig(io.env);
-  await ensureCogitGitignore(root, policy, config.shareConversations);
+  await ensureCogitGitignore(root, policy);
   await installGitHooks(root);
+  if (policy === "share") await addRecordRefspec(root, io.env);
   io.out(`Git policy for ${project.data.name}: ${policy}`);
   if (added.length > 0) io.out(`Added to .gitignore: ${added.join(", ")}`);
 }

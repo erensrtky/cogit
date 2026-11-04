@@ -84,10 +84,11 @@ describe("init", () => {
     expect(io.lines.at(-2)).toMatch(/^Initialized proj/);
     // No plugin list in this Claude Code config: the last line says how to install it.
     expect(io.lines.at(-1)).toContain("claude plugin install cogit --marketplace erensrtky/cogit");
-    // The default commit policy writes the project's own ignore rules.
-    expect(await readText(join(root, ".cogit", ".gitignore"))).toBe(cogitGitignore(false));
+    // No answer shares nothing: the root rule hides the whole folder.
+    expect(await readText(join(root, ".gitignore"))).toContain("/.cogit/");
+    expect(existsSync(join(root, ".cogit", ".gitignore"))).toBe(false);
     expect(io.lines).toContain(
-      "Conversations are stored in .cogit/conversations/ (kept out of git; turn on shareConversations to share them).",
+      "Conversations are stored in .cogit/conversations/ and stay on this machine.",
     );
   });
 
@@ -116,14 +117,13 @@ describe("init", () => {
     expect(await readPluginInstalled({ CLAUDE_CONFIG_DIR: join(dir, "nowhere") })).toBeUndefined();
   });
 
-  it("writes the project ignore file once for the commit policy", async () => {
+  it("writes the project ignore file once for a shared project", async () => {
     await mkdir(join(root, ".cogit"));
-    expect(await ensureCogitGitignore(root, "commit", false)).toBe(true);
-    expect(await ensureCogitGitignore(root, "commit", false)).toBe(false);
-    expect(await readText(join(root, ".cogit", ".gitignore"))).toBe(cogitGitignore(false));
-    // Sharing the conversation store un-ignores it in the same file.
-    expect(await ensureCogitGitignore(root, "commit", true)).toBe(true);
-    expect(await readText(join(root, ".cogit", ".gitignore"))).toContain("!conversations/");
+    expect(await ensureCogitGitignore(root, "share")).toBe(true);
+    expect(await ensureCogitGitignore(root, "share")).toBe(false);
+    expect(await readText(join(root, ".cogit", ".gitignore"))).toBe(cogitGitignore());
+    // Only the marker travels through commits; the sessions have their own refs.
+    expect(await readText(join(root, ".cogit", ".gitignore"))).not.toContain("sessions");
   });
 
   it("asks nothing when every answer is given as an option", async () => {
@@ -133,7 +133,7 @@ describe("init", () => {
       root,
       {
         name: "P",
-        git: "commit",
+        git: "share",
         retention: "keep",
         allowSkill: false,
         projectSettings: false,
@@ -144,7 +144,7 @@ describe("init", () => {
     expect((await loadConfig(env)).language).toBe("Turkish");
     // Commit policy: the root file stays untouched, the project writes its own rules.
     expect(existsSync(join(root, ".gitignore"))).toBe(false);
-    expect(await readText(join(root, ".cogit", ".gitignore"))).toBe(cogitGitignore(false));
+    expect(await readText(join(root, ".cogit", ".gitignore"))).toBe(cogitGitignore());
   });
 
   it("asks for the git policy in a repo and writes .gitignore", async () => {
@@ -158,7 +158,7 @@ describe("init", () => {
   it("raises transcript retention when asked, keeping other settings", async () => {
     await mkdir(join(dir, "claude"));
     await writeFile(settingsFile(), JSON.stringify({ model: "x" }));
-    const io = fakeIo(env, ["commit", "365"]);
+    const io = fakeIo(env, ["share", "365"]);
     await init(root, {}, io);
     expect(JSON.parse(await readText(settingsFile()))).toEqual({
       model: "x",
@@ -190,7 +190,7 @@ describe("init", () => {
       root,
       {
         name: "p",
-        git: "commit",
+        git: "share",
         retention: 90,
         allowSkill: false,
         projectSettings: false,
@@ -204,7 +204,7 @@ describe("init", () => {
     const io = fakeIo(env, [], true);
     await init(
       again,
-      { name: "o", git: "commit", retention: 90, allowSkill: false, projectSettings: false },
+      { name: "o", git: "share", retention: 90, allowSkill: false, projectSettings: false },
       io,
     );
     expect(io.lines.some((l) => l.includes("cleanupPeriodDays"))).toBe(false);
@@ -213,7 +213,7 @@ describe("init", () => {
   it("applies a retention option to a project that is already set up", async () => {
     const options = {
       name: "p",
-      git: "commit",
+      git: "share",
       allowSkill: false,
       projectSettings: false,
       language: "auto",
@@ -234,7 +234,7 @@ describe("init", () => {
   });
 
   it("takes the conversation's language without asking, and the option when given", async () => {
-    const io = fakeIo(env, ["commit", "keep"]);
+    const io = fakeIo(env, ["share", "keep"]);
     await init(root, {}, io);
     expect((await loadConfig(env)).language).toBe("auto");
     expect(io.asked.some((q) => q.startsWith("Language"))).toBe(false);
@@ -250,7 +250,7 @@ describe("init", () => {
       settingsFile(),
       JSON.stringify({ permissions: { allow: ["Bash(ls)"], deny: [] } }),
     );
-    const io = fakeIo(env, ["commit", "keep", "yes"]);
+    const io = fakeIo(env, ["share", "keep", "yes"]);
     await init(root, {}, io);
     expect(JSON.parse(await readText(settingsFile())).permissions).toEqual({
       allow: ["Bash(ls)", SKILL_RULE],
@@ -265,7 +265,7 @@ describe("init", () => {
   });
 
   it("leaves permissions alone when declined with the flag", async () => {
-    const io = fakeIo(env, ["commit", "keep"]);
+    const io = fakeIo(env, ["share", "keep"]);
     await init(root, { allowSkill: false }, io);
     expect(await readSkillAllowed(env)).toBe(false);
     expect(io.lines).toContain(
@@ -329,7 +329,7 @@ describe("git helpers", () => {
   it("adds the ignore line under the ignore policy and removes it when switching", async () => {
     const gi = join(root, ".gitignore");
     await writeFile(gi, "node_modules/");
-    expect(await ensureGitignore(root, "commit")).toEqual([]);
+    expect(await ensureGitignore(root, "share")).toEqual([]);
     expect(await readText(gi)).toBe("node_modules/");
     expect(await ensureGitignore(root, "ignore")).toEqual(["/.cogit/"]);
     expect(await ensureGitignore(root, "ignore")).toEqual([]);
@@ -337,7 +337,7 @@ describe("git helpers", () => {
     expect(text).toBe("node_modules/\n# cogit\n/.cogit/\n");
     expect(text.match(/# cogit/g)).toHaveLength(1);
     // Switching back removes only our line, never the user's.
-    expect(await ensureGitignore(root, "commit")).toEqual([]);
+    expect(await ensureGitignore(root, "share")).toEqual([]);
     expect(await readText(gi)).toBe("node_modules/\n# cogit\n");
     expect(basename(gi)).toBe(".gitignore");
   });
@@ -373,7 +373,7 @@ describe("git helpers", () => {
     expect(set.warnings.join("\n")).not.toMatch(/user\.email/);
   });
 
-  it("restores the record hook when init runs again on a commit project", async () => {
+  it("restores the send hook when init runs again on a shared project", async () => {
     const run = promisify(execFile);
     const git = (...args: string[]) => run("git", ["-C", root, ...args]);
     await git("init", "-q");
@@ -381,10 +381,10 @@ describe("git helpers", () => {
     await git("config", "user.name", "Tester");
     await init(
       root,
-      { name: "P", git: "commit", retention: "keep", allowSkill: false, language: "auto" },
+      { name: "P", git: "share", retention: "keep", allowSkill: false, language: "auto" },
       fakeIo(env),
     );
-    const hook = join(root, ".git", "hooks", "pre-commit");
+    const hook = join(root, ".git", "hooks", "pre-push");
     expect(existsSync(hook)).toBe(true);
     await rm(hook);
     const io = fakeIo(env);

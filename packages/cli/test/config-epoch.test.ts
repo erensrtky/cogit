@@ -27,8 +27,6 @@ describe("config", () => {
     expect(io.lines.some((line) => line.startsWith("catchUpModel"))).toBe(false);
     expect(io.lines).toContain("messageSummaries = false");
     expect(io.lines).toContain("startupContext = true");
-    await configGet("gitPolicy", io);
-    expect(io.lines.at(-1)).toBe('"commit"');
     // The old name reads as the new one (Story 12.1).
     await configGet("catchUpModel", io);
     expect(io.lines.at(-1)).toBe('"haiku"');
@@ -85,7 +83,7 @@ describe("config", () => {
     await expect(configSet("schema", "2", fakeIo(env))).rejects.toThrow(/unknown key/);
     await expect(configGet("nope", fakeIo(env))).rejects.toBeInstanceOf(CliError);
     await expect(configSet("updateEveryTurns", "0", fakeIo(env))).rejects.toThrow(/invalid value/);
-    await expect(configSet("gitPolicy", "maybe", fakeIo(env))).rejects.toThrow(/invalid value/);
+    await expect(configSet("gitPolicy", "share", fakeIo(env))).rejects.toThrow(/unknown key/);
   });
 });
 

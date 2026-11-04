@@ -533,20 +533,6 @@ describe("runHook", () => {
     expect(spawned).toEqual([]);
   });
 
-  it("commits the record at session end in auto mode, even with the catch-up off", async () => {
-    await initialized(2);
-    await configSet("recordCommit", "auto", fakeIo(env));
-    // Nothing to catch up: the last update still leaves files to commit.
-    expect(await sessionEnd()).toBeUndefined();
-    expect(spawned).toEqual([["/plugin/dist/cli.js", "record-commit", "s1", "-C", root]]);
-
-    spawned = [];
-    await transcript([typed("first", 1)]);
-    await configSet("sessionEndCatchUp", "false", fakeIo(env));
-    expect(await sessionEnd()).toBeUndefined();
-    expect(spawned).toEqual([["/plugin/dist/cli.js", "record-commit", "s1", "-C", root]]);
-  });
-
   it("records the current session for the next code commit", async () => {
     await initialized(2);
     await runHook(
@@ -578,8 +564,8 @@ describe("runHook", () => {
   it("points an existing git hook block at the CLI running now", async () => {
     await initialized(2);
     await promisify(execFile)("git", ["-C", root, "init", "-q"]);
-    const hook = join(root, ".git", "hooks", "pre-commit");
-    await writeFile(hook, "#!/bin/sh\n# >>> cogit\ncogit hook pre-commit || true\n# <<< cogit\n");
+    const hook = join(root, ".git", "hooks", "post-commit");
+    await writeFile(hook, "#!/bin/sh\n# >>> cogit\ncogit hook post-commit || true\n# <<< cogit\n");
     await runHook(
       "promptsubmit",
       JSON.stringify({ session_id: "s1", cwd: root }),
@@ -587,7 +573,7 @@ describe("runHook", () => {
       T0,
       () => {},
     );
-    expect(await readFile(hook, "utf8")).toContain(hookBlock("pre-commit", root));
+    expect(await readFile(hook, "utf8")).toContain(hookBlock("post-commit", root));
   });
 
   it("stays quiet at session end without a readable transcript or before init", async () => {

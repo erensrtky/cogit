@@ -19,6 +19,7 @@ import {
   storedMessages,
   upgradeSessionIds,
 } from "../messages.js";
+import { reconcileRecords, recordSyncStatus } from "../record-sync.js";
 import { redactDeep } from "../redact.js";
 import { Slug } from "../schema/common.js";
 import { SESSION_SCHEMA, type Session } from "../schema/session.js";
@@ -297,12 +298,14 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
 
   const paths = projectPaths(root);
   const config = await loadConfig(io.env);
-  // Projects initialized before the conversation store get the privacy rules on
-  // their next build; an unwritable record must never fail the map.
+  // Projects set up by an older version get the current rules on their next build,
+  // and every build keeps the refs and the files in step. An unwritable record or
+  // a failing git must never fail the map.
   try {
-    await refreshCogitGitignore(root, config.shareConversations);
+    await refreshCogitGitignore(root);
+    await reconcileRecords(root, io.env);
   } catch (err) {
-    io.warn(`could not update .cogit/.gitignore: ${(err as Error).message}`);
+    io.warn(`could not update the shared record: ${(err as Error).message}`);
   }
   // The map's switcher (8.12) and the panel read the same project list; collect
   // it once. A broken registry is a warning: it must never fail the map.
@@ -336,6 +339,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       // Story 10.3: each message carries the numstat totals of its linked
       // commits. A project outside git simply has no numbers to show.
       const withChanges = attachChanges(withThoughts, commits.changes);
+      const sync = await recordSyncStatus(root, io.env).catch(() => undefined);
       const built = buildViewModel({
         project: project.data,
         sessions: withChanges,
@@ -355,6 +359,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         unrecorded: config.sessionEndCatchUp ? undefined : views.unrecorded,
       });
       built.switcher = switcher;
+      if (sync?.downloadError !== undefined && !sync.downloaded) built.recordDownloadFailed = true;
       const view = await readMapView(root);
       built.rowWidths = view.rowWidths;
       built.openSessions = view.open;

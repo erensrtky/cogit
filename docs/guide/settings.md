@@ -76,17 +76,9 @@ The language the record is written in. With auto, it follows the language of the
 
 `shareConversations` · default `false`
 
-**Commit the raw chat text too, not only the session record (off: chat stays local).**
+**Send the raw chat text too, not only the session record (off: chat stays local).**
 
-Also commit the raw chat text, not only the record. Leave it off to keep conversations on your machine while the record still travels with the branch.
-
-### Commit the record
-
-`recordCommit` · default `ask`
-
-**ask, auto or off: what to do with the last messages after the last code commit.**
-
-What happens to record changes made after your last code commit: ask you next time, commit them automatically, or leave them for you to commit.
+In a project that shares its record, also send the raw chat text. Leave it off to keep conversations on your machine while teammates still see titles, decisions and reasons.
 
 ## Only through `cogit config`
 
@@ -123,14 +115,6 @@ When a session ends, the side model records whatever nobody got to, then reads t
 **The small model that records outside the chat.**
 
 The small model behind every side record: every few turns in mixed mode, all the time in side mode, and at session end. Haiku is cheap and good enough for titles, parents and short decisions.
-
-### Git policy
-
-`gitPolicy` · default `commit`
-
-**What `cogit init` offers a new project: commit the record to git, or ignore it.**
-
-Only the default for new projects: each project answers it during `cogit init`. `cogit config git` shows the current project's policy and `cogit config git commit` or `ignore` switches it.
 
 ### Agents
 

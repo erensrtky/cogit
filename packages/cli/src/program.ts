@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { Command, InvalidArgumentError, Option } from "commander";
 import pkg from "../package.json" with { type: "json" };
 import { backfillTail } from "./commands/backfill.js";
@@ -20,6 +22,7 @@ import { formatShow, log, logFile, show } from "./commands/log.js";
 import { migrateIds } from "./commands/migrate.js";
 import { openPanel, openProject } from "./commands/open.js";
 import { pr } from "./commands/pr.js";
+import { pruneRecords } from "./commands/prune.js";
 import { search } from "./commands/search.js";
 import { readStdin, sessionShow, sessionWrite } from "./commands/session.js";
 import { shapeMessage } from "./commands/shape.js";
@@ -27,9 +30,12 @@ import { why } from "./commands/why.js";
 import { isGitHookEvent, runGitHook } from "./git-hooks.js";
 import { runHook } from "./hooks/run.js";
 import { CliError, type Io, processIo } from "./io.js";
+import { prepareRecords } from "./record-prepare.js";
+import { downloadRecords, reconcileRecords, sendRecords } from "./record-sync.js";
 import { startMapServer } from "./server.js";
-import { maybeAutoCommit } from "./session-git.js";
 import { takeMigrationWarnings } from "./store/migrate.js";
+import { projectPaths } from "./store/paths.js";
+import { resolveProjectRoot } from "./store/root.js";
 import { loadConfig } from "./store/stores.js";
 import { configHelpLines } from "./view/settings.js";
 
@@ -66,6 +72,22 @@ function examples(...commands: string[]): string {
   return `\nExamples:\n${commands.map((command) => `  $ ${command}`).join("\n")}\n`;
 }
 
+/**
+ * Before a command reads the record: in a clone of a shared project this is what
+ * brings the team's sessions in. Walks up like `why` does, since a command may run
+ * from a subfolder; outside a project it does nothing and the command reports that.
+ */
+async function readyToRead(dir: string, io: Io): Promise<void> {
+  for (let cur = resolve(dir); ; cur = dirname(cur)) {
+    const { root } = await resolveProjectRoot(cur);
+    if (existsSync(projectPaths(root).project)) {
+      await prepareRecords(root, io.env, io.warn);
+      return;
+    }
+    if (dirname(cur) === cur) return;
+  }
+}
+
 export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps = {}): Command {
   const program = new Command().name("cogit").description(pkg.description).version(pkg.version);
 
@@ -94,7 +116,9 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .addHelpText("after", examples("cogit blame src/auth.ts:42", "cogit blame src/auth.ts"))
     .action(
       run(async (target: string, dir: string, opts: { dir?: string }) => {
-        await blame({ dir: opts.dir ?? dir, target, io: makeIo(false) });
+        const io = makeIo(false);
+        await readyToRead(opts.dir ?? dir, io);
+        await blame({ dir: opts.dir ?? dir, target, io });
       }),
     );
 
@@ -117,11 +141,13 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .action(
       run(async (file: string, dir: string | undefined, opts: { dir?: string; line?: number }) => {
         const project = opts.dir ?? dir;
+        const io = makeIo(false);
+        await readyToRead(project ?? process.cwd(), io);
         await why({
           ...(project === undefined ? { cwd: process.cwd() } : { dir: project }),
           file,
           ...(opts.line === undefined ? {} : { line: opts.line }),
-          io: makeIo(false),
+          io,
         });
       }),
     );
@@ -152,18 +178,20 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
           },
         ) => {
           const target = opts.dir ?? dir;
+          const io = makeIo(false);
+          await readyToRead(target, io);
           if (opts.file !== undefined) {
             await logFile({
               dir: target,
               file: opts.file,
-              io: makeIo(false),
+              io,
               json: opts.json === true,
             });
             return;
           }
           await log({
             dir: target,
-            io: makeIo(false),
+            io,
             session: opts.session,
             limit: opts.number,
             branchesOnly: opts.branches === true,
@@ -191,6 +219,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
           opts: { dir?: string; chat?: boolean; json?: boolean },
         ) => {
           const io = makeIo(false);
+          await readyToRead(opts.dir ?? dir, io);
           const model = await show({ dir: opts.dir ?? dir, ref, io, chat: opts.chat !== false });
           if (opts.json === true) io.out(JSON.stringify(model, null, 2));
           else for (const line of formatShow(model)) io.out(line);
@@ -291,9 +320,11 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
           dir: string,
           opts: { dir?: string; session?: string; number?: number; json?: boolean },
         ) => {
+          const io = makeIo(false);
+          await readyToRead(opts.dir ?? dir, io);
           await search({
             dir: opts.dir ?? dir,
-            io: makeIo(false),
+            io,
             text,
             session: opts.session,
             limit: opts.number,
@@ -323,10 +354,12 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .action(
       run(
         async (base: string | undefined, opts: { dir: string; json?: boolean; copy?: boolean }) => {
+          const io = makeIo(false);
+          await readyToRead(opts.dir, io);
           await pr({
             dir: opts.dir,
             base,
-            io: makeIo(false),
+            io,
             json: opts.json === true,
             copy: opts.copy === true,
           });
@@ -360,7 +393,10 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .argument("[dir]", "project directory", ".")
     .option("--name <name>", "project name")
     .addOption(
-      new Option("--git <policy>", "commit or ignore .cogit/").choices(["ignore", "commit"]),
+      new Option(
+        "--git <policy>",
+        "share the session records with `git push`, or keep them here",
+      ).choices(["ignore", "share"]),
     )
     .option("--language <lang>", 'summary language: "auto" or a language')
     .option("--retention <days>", 'Claude Code transcript retention, or "keep"', retention)
@@ -445,13 +481,13 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
   config
     .command("git")
     .description("show, or switch to commit or ignore, this project's session records (story 9.3)")
-    .argument("[policy]", "commit or ignore; without it, shows the current policy")
+    .argument("[policy]", "share or ignore; without it, shows the current policy")
     .argument("[dir]", "project directory", ".")
     .action(
       run(async (policy: string | undefined, dir: string) => {
         if (policy === undefined) return configGitShow(dir, makeIo(false));
-        if (policy !== "commit" && policy !== "ignore")
-          throw new CliError(`invalid git policy "${policy}"; use commit or ignore`);
+        if (policy !== "share" && policy !== "ignore")
+          throw new CliError(`invalid git policy "${policy}"; use share or ignore`);
         await configGit(dir, policy, makeIo(false));
       }),
     );
@@ -477,6 +513,40 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .action(
       run(async (opts: { dryRun?: boolean }) =>
         configPrune({ dryRun: opts.dryRun === true }, makeIo(false)),
+      ),
+    );
+
+  program
+    .command("prune")
+    .description("delete old sessions for good, here and in the repository")
+    .helpGroup("Map:")
+    .requiredOption("--older-than <age>", "how old a session must be: 30d, 2w, 6m, 1y")
+    .option("--all", "teammates' sessions too, not only your own")
+    .option("--dry-run", "list what would be deleted without deleting")
+    .option("-y, --yes", "do not ask for confirmation")
+    .option("-C, --dir <dir>", "project directory", ".")
+    .addHelpText(
+      "after",
+      examples("cogit prune --older-than 1y --dry-run", "cogit prune --older-than 6m"),
+    )
+    .action(
+      run(
+        async (opts: {
+          olderThan: string;
+          all?: boolean;
+          dryRun?: boolean;
+          yes?: boolean;
+          dir: string;
+        }) => {
+          await pruneRecords({
+            dir: opts.dir,
+            olderThan: opts.olderThan,
+            all: opts.all === true,
+            dryRun: opts.dryRun === true,
+            yes: opts.yes === true,
+            io: makeIo(process.stdin.isTTY === true),
+          });
+        },
       ),
     );
 
@@ -591,9 +661,11 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .argument("[args...]", "arguments git passed to its hook: $1, $2, …")
     .option("-C, --dir <dir>", "project directory (git hooks pass theirs)")
     .allowExcessArguments(true)
-    .addHelpText("after", examples("cogit hook stop", "cogit hook pre-commit --dir ../my-app"))
+    .addHelpText("after", examples("cogit hook stop", "cogit hook pre-push --dir ../my-app"))
     .action(async (event: string, args: string[], opts: { dir?: string }) => {
       const io = makeIo(false);
+      // A block a past version left in a hook it has since retired: quiet until refreshed.
+      if (event === "pre-commit") return;
       if (isGitHookEvent(event)) {
         try {
           await runGitHook(event, opts.dir ?? process.cwd(), io.env, args, new Date(io.now()));
@@ -645,15 +717,21 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       }),
     );
 
-  // Started detached by the SessionEnd hook when `recordCommit` is `auto`.
+  // Started detached by the pre-push hook and by SessionStart.
   program
-    .command("record-commit", { hidden: true })
-    .description("commit the session record files without touching other staged changes")
-    .argument("<session-id>", "session id")
+    .command("record-sync", { hidden: true })
+    .description("send the queued session records, or download the team's")
+    .argument("<action>", "send or download")
     .option("-C, --dir <dir>", "project directory", ".")
     .action(
-      run(async (sessionId: string, opts: { dir: string }) => {
-        await maybeAutoCommit(opts.dir, sessionId, makeIo(false).env);
+      run(async (action: string, opts: { dir: string }) => {
+        const io = makeIo(false);
+        const { root } = await resolveProjectRoot(opts.dir);
+        if (action === "send") await sendRecords(root, io.env);
+        else if (action === "download") {
+          await downloadRecords(root, io.env);
+          await reconcileRecords(root, io.env);
+        } else throw new CliError(`unknown record-sync action "${action}"`);
       }),
     );
 

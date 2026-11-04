@@ -23,7 +23,7 @@ export async function noGitDir(): Promise<string> {
 export async function noGitProject(env: NodeJS.ProcessEnv, name = "plain"): Promise<string> {
   const dir = join(await noGitDir(), name);
   await mkdir(join(dir, ".git"), { recursive: true });
-  const options = { name, git: "commit", retention: "keep", language: "auto" } as const;
+  const options = { name, git: "share", retention: "keep", language: "auto" } as const;
   await init(dir, { ...options, allowSkill: false, projectSettings: false }, fakeIo(env));
   await rm(join(dir, ".git"), { recursive: true, force: true });
   return dir;

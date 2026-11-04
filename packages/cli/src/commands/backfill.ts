@@ -3,7 +3,6 @@ import { type ChatTurn, defaultAgent } from "../agents/index.js";
 import { CliError, type Io } from "../io.js";
 import { hashTurns, isRecorded, type SessionMessage, upgradeSessionIds } from "../messages.js";
 import { LineageNodeInput, type Session, Status } from "../schema/session.js";
-import { maybeAutoCommit } from "../session-git.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { LockBusyError, withLock } from "../store/lock.js";
 import { projectPaths } from "../store/paths.js";
@@ -357,8 +356,6 @@ export async function backfillTail(
   if (turns.length === 0) {
     io.out(`session ${sessionId} has nothing left to record`);
     if (opts.close === true) await closeSession(root, sessionId, io);
-    // Story 9.3: `recordCommit: auto` still commits what an earlier update wrote.
-    await maybeAutoCommit(root, sessionId, io.env);
     return;
   }
 
@@ -388,5 +385,4 @@ export async function backfillTail(
   if (opts.close === true) await closeSession(root, sessionId, io);
   // The session end wrote the last messages after the last code commit; auto
   // mode commits exactly those record files now (Story 9.3).
-  await maybeAutoCommit(root, sessionId, io.env);
 }
