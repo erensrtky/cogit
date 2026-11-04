@@ -5,7 +5,12 @@ import { branchesOf, type LogBranch } from "../commands/log.js";
 import { findGitRoot } from "../git.js";
 import { isRecorded, readSessionMessages, upgradeSessionIds } from "../messages.js";
 import { setUpClone } from "../record-prepare.js";
-import { isSharing, reconcileRecords, recordSyncStatus } from "../record-sync.js";
+import {
+  isSharing,
+  reconcileRecords,
+  recordSyncStatus,
+  restoreCommittedRecords,
+} from "../record-sync.js";
 import type { Session } from "../schema/session.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { loadAllSessions, loadConfig, loadSession } from "../store/stores.js";
@@ -115,6 +120,7 @@ async function syncRecordsAtStart(ctx: HookContext): Promise<void> {
     ctx.spawnDetached(["record-sync", "download", "-C", ctx.root]);
     return;
   }
+  await restoreCommittedRecords(ctx.root, ctx.env);
   await reconcileRecords(ctx.root, ctx.env);
   if (status.pending > 0) ctx.spawnDetached(["record-sync", "send", "-C", ctx.root]);
 }

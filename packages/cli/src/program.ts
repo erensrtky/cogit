@@ -31,7 +31,7 @@ import { isGitHookEvent, runGitHook } from "./git-hooks.js";
 import { runHook } from "./hooks/run.js";
 import { CliError, type Io, processIo } from "./io.js";
 import { prepareRecords } from "./record-prepare.js";
-import { downloadRecords, reconcileRecords, sendRecords } from "./record-sync.js";
+import { downloadRecords, reconcileRecords, sendAfterPush, sendRecords } from "./record-sync.js";
 import { startMapServer } from "./server.js";
 import { takeMigrationWarnings } from "./store/migrate.js";
 import { projectPaths } from "./store/paths.js";
@@ -668,7 +668,15 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       if (event === "pre-commit") return;
       if (isGitHookEvent(event)) {
         try {
-          await runGitHook(event, opts.dir ?? process.cwd(), io.env, args, new Date(io.now()));
+          await runGitHook(
+            event,
+            opts.dir ?? process.cwd(),
+            io.env,
+            args,
+            new Date(io.now()),
+            undefined,
+            deps.stdin ?? readStdin,
+          );
         } catch {
           // A hook must never block the commit or the session.
         }
@@ -721,13 +729,15 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
   program
     .command("record-sync", { hidden: true })
     .description("send the queued session records, or download the team's")
-    .argument("<action>", "send or download")
+    .argument("<action>", "send, send-pushed or download")
+    .option("--after <ref=sha>", "with send-pushed: wait until the remote holds this")
     .option("-C, --dir <dir>", "project directory", ".")
     .action(
-      run(async (action: string, opts: { dir: string }) => {
+      run(async (action: string, opts: { dir: string; after?: string }) => {
         const io = makeIo(false);
         const { root } = await resolveProjectRoot(opts.dir);
         if (action === "send") await sendRecords(root, io.env);
+        else if (action === "send-pushed") await sendAfterPush(root, io.env, opts.after);
         else if (action === "download") {
           await downloadRecords(root, io.env);
           await reconcileRecords(root, io.env);

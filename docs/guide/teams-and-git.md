@@ -33,10 +33,11 @@ does not download them, so someone without cogit gets a clone of the usual size 
 them. They do not appear in `git log --all` or `git branch`, nor in a pull request or on GitHub's
 pages, which also means the record cannot be read there: reading it takes cogit.
 
-- **Sending:** `git push` to `origin` (or your only remote) prints how many records it sends and
-  sends them in the background. It never slows the push, never asks for anything and never fails
-  it. What could not be sent stays queued, the next session start tries again, and `cogit doctor`
-  tells you why. Pushing to any other remote, such as a deploy target, sends nothing.
+- **Sending:** `git push` to `origin` (or your only remote) prints how many records will follow,
+  and they go in the background once the push has landed. It never slows the push, never asks
+  for anything and never fails it. A `--dry-run` or a rejected push sends nothing. What could not
+  be sent stays queued, the next session start tries again, and `cogit doctor` tells you why.
+  Pushing to any other remote, such as a deploy target, sends nothing.
 - **Receiving:** the first time cogit runs in a clone, it adds one fetch line to that clone's
   `.git/config` and downloads the team's records, showing progress in a terminal. After that a
   plain `git pull` brings them, even when no code changed. Each new record adds a line to its
@@ -63,16 +64,18 @@ delete them. If the repository cannot be reached, nothing is deleted.
 
 ### Coming from a version that committed the record
 
-Older versions committed `.cogit/sessions/`. After upgrading, your files stay put and the next
-`git push` sends them. Stop tracking them once, in one clone, or they keep showing in `git status`:
+Older versions committed `.cogit/sessions/`. After upgrading, stop tracking them once, in one
+clone, or they keep showing in `git status`:
 
 ```bash
 git rm -r --cached .cogit/sessions
 git commit -m "chore: stop tracking the cogit record"
 ```
 
-Old commits keep the files they had, so the repository's size does not shrink. `cogit doctor`
-reminds you until this is done.
+That commit makes `git pull` delete the files from teammates' disks. cogit brings them back from
+history the next time it runs, for them and for new clones, so nothing is lost and nothing is
+sent again. Sessions recorded after the upgrade travel the new way. Old commits keep the files
+they had, so the repository's size does not shrink. `cogit doctor` reminds you until this is done.
 
 ## The git hooks
 

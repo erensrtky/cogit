@@ -27,7 +27,7 @@ If you share the record, `git push` also sends it to your own repository, on ref
 branches (`refs/cogit/`). It does not appear in the file tree, in pull requests or on GitHub's
 pages, but **hidden is not private**: anyone who can read the repository can download the titles,
 decisions and reasons with one command. If the repository is public, so is the record. Each push
-prints how many session records it sends. A repository you share in while it is private shows
+prints how many session records will follow it. A repository you share in while it is private shows
 that record to everyone if it later goes public.
 
 `cogit pr` reads only the record, never the conversation, so its output is safe to paste into

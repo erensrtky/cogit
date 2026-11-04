@@ -12,14 +12,18 @@ import { runHook } from "../src/hooks/run.js";
 import { prepareRecords } from "../src/record-prepare.js";
 import {
   addRecordRefspec,
+  countUnsentRecords,
   deleteRecords,
   downloadRecords,
   importRecords,
   isSharing,
+  pushLanded,
   queueRecords,
   RECORD_REFSPEC,
   reconcileRecords,
   recordSyncStatus,
+  restoreCommittedRecords,
+  sendAfterPush,
   sendRecords,
   snapshotRecords,
   syncRemote,
@@ -92,7 +96,7 @@ describe("the record on its own refs", () => {
   };
 
   const push = async (root: string): Promise<number> => {
-    const queued = await queueRecords(root, env, "origin");
+    const queued = await queueRecords(root, env);
     if (queued > 0) await sendRecords(root, env);
     return queued;
   };
@@ -160,7 +164,8 @@ describe("the record on its own refs", () => {
     await record(alice, "s1", "First", "alice@example.com");
     await snapshotRecords(alice, env);
     expect(await git(alice, "ls-remote", remote, "refs/cogit/*")).toBe("");
-    expect(await queueRecords(alice, env, "deploy")).toBe(0);
+    expect(await countUnsentRecords(alice, env, "deploy")).toBe(0);
+    expect(await countUnsentRecords(alice, env, "origin")).toBe(1);
     expect(await sendRecords(alice, env)).toBe(0);
     expect(await git(alice, "ls-remote", remote, "refs/cogit/*")).toBe("");
     await push(alice);
@@ -202,10 +207,10 @@ describe("the record on its own refs", () => {
     await push(alice);
     const bob = await cloneAs("bob");
     await prepareRecords(bob, env, () => {});
-    expect(await queueRecords(bob, env, "origin")).toBe(0);
+    expect(await queueRecords(bob, env)).toBe(0);
     // A stale or hand-edited copy of Alice's session is still hers to send.
     await record(bob, "s1", "Edited by accident", "alice@example.com");
-    expect(await queueRecords(bob, env, "origin")).toBe(0);
+    expect(await queueRecords(bob, env)).toBe(0);
     expect(await refs(bob)).toEqual([]);
   });
 
@@ -253,7 +258,8 @@ describe("the record on its own refs", () => {
     expect(await isSharing(privateRoot)).toBe(false);
     await record(privateRoot, "s1", "Private", "alice@example.com");
     expect(await snapshotRecords(privateRoot, env)).toBe(0);
-    expect(await queueRecords(privateRoot, env, "origin")).toBe(0);
+    expect(await queueRecords(privateRoot, env)).toBe(0);
+    expect(await countUnsentRecords(privateRoot, env, "origin")).toBe(0);
     expect(await refs(privateRoot)).toEqual([]);
     expect(await git(privateRoot, "config", "--get-all", "remote.origin.fetch")).not.toContain(
       "cogit",
@@ -272,7 +278,7 @@ describe("the record on its own refs", () => {
 
     await git(alice, "remote", "add", "upstream", join(dir, "nowhere.git"));
     expect(await syncRemote(alice, env)).toBe("upstream");
-    await queueRecords(alice, env, "upstream");
+    await queueRecords(alice, env);
     expect(await sendRecords(alice, env)).toBe(0);
     const failed = await recordSyncStatus(alice, env);
     expect(failed.pending).toBe(1);
@@ -325,7 +331,7 @@ describe("the record on its own refs", () => {
     );
   });
 
-  it("queues in the pre-push hook and starts the send in the background", async () => {
+  it("announces in the pre-push hook and hands the send to the background", async () => {
     await record(alice, "s1", "First", "alice@example.com");
     const started: string[][] = [];
     const spawned = ((_cli: string, args: string[]) => {
@@ -337,15 +343,138 @@ describe("the record on its own refs", () => {
       printed.push(text);
       return true;
     }) as typeof process.stderr.write;
+    const sha = "a".repeat(40);
+    const zero = "0".repeat(40);
+    const hook = (remoteName: string, refs: string): Promise<void> =>
+      runGitHook(
+        "pre-push",
+        alice,
+        env,
+        [remoteName, remote],
+        new Date(T0),
+        spawned,
+        async () => refs,
+      );
     try {
-      await runGitHook("pre-push", alice, env, ["origin", remote], new Date(T0), spawned);
+      await hook("origin", `refs/heads/main ${sha} refs/heads/main ${zero}\n`);
+      await hook("deploy", `refs/heads/main ${sha} refs/heads/main ${zero}\n`);
+      await hook("origin", `(delete) ${zero} refs/heads/old ${sha}\n`);
+      await hook("origin", "");
       await runGitHook("pre-push", alice, env, ["deploy", remote], new Date(T0), spawned);
     } finally {
       process.stderr.write = stderr;
     }
-    expect(started).toHaveLength(1);
-    expect(started[0]?.slice(0, 2)).toEqual(["record-sync", "send"]);
-    expect(printed.join("")).toContain("sending 1 session record to origin");
+    expect(started).toHaveLength(2);
+    expect(started[0]?.slice(0, 4)).toEqual([
+      "record-sync",
+      "send-pushed",
+      "--after",
+      `refs/heads/main=${sha}`,
+    ]);
+    expect(started[1]?.slice(0, 3)).toEqual(["record-sync", "send-pushed", "-C"]);
+    expect(printed.join("")).toContain("1 session record will follow this push to origin");
+    // Nothing is queued until the push has landed.
+    expect((await recordSyncStatus(alice, env)).pending).toBe(0);
+  });
+
+  it("sends only after the code has landed", async () => {
+    const quick = { intervalMs: 1, timeoutMs: 30 };
+    await record(alice, "s1", "First", "alice@example.com");
+    const head = (await git(alice, "rev-parse", "HEAD")).trim();
+    const unpushed = "b".repeat(40);
+
+    // A dry run or a rejected push: the remote never holds it, so nothing goes.
+    expect(await sendAfterPush(alice, env, `refs/heads/main=${unpushed}`, quick)).toBe(0);
+    expect(await git(alice, "ls-remote", remote, "refs/cogit/*")).toBe("");
+    expect((await recordSyncStatus(alice, env)).pending).toBe(0);
+
+    expect(await sendAfterPush(alice, env, `refs/heads/main=${head}`, quick)).toBe(1);
+    expect(await git(alice, "ls-remote", remote, "refs/cogit/*")).toContain("s1");
+
+    // Nothing to land: `git push` with the code already there still sends.
+    await record(alice, "s2", "Second", "alice@example.com");
+    expect(await sendAfterPush(alice, env)).toBe(1);
+
+    await git(alice, "remote", "remove", "origin");
+    expect(await pushLanded(alice, env, "refs/heads/main", head, quick)).toBe(false);
+  });
+
+  describe("a project that used to commit its record", () => {
+    /** Alice committed sessions under an older version; Bob has them, and one of his own. */
+    const committed = async (): Promise<string> => {
+      await record(alice, "old1", "Alice old", "alice@example.com");
+      await git(
+        alice,
+        "add",
+        "-f",
+        projectPaths(alice).session("old1"),
+        projectPaths(alice).events("old1"),
+      );
+      await git(alice, "commit", "-qm", "chore: record");
+      await git(alice, "push", "-q");
+      const bob = await cloneAs("bob");
+      await record(bob, "old2", "Bob old", "bob@example.com");
+      await git(bob, "add", "-f", projectPaths(bob).session("old2"));
+      await git(bob, "commit", "-qm", "chore: record");
+      await git(bob, "push", "-q");
+      await git(alice, "pull", "-q");
+      await git(alice, "rm", "-rq", "--cached", ".cogit/sessions");
+      await git(alice, "commit", "-qm", "chore: stop tracking the cogit record");
+      await git(alice, "push", "-q");
+      return bob;
+    };
+
+    it("brings back what the pull deleted from a teammate's disk", async () => {
+      const bob = await committed();
+      await git(bob, "pull", "-q");
+      expect(existsSync(projectPaths(bob).session("old2"))).toBe(false);
+      await prepareRecords(bob, env, () => {});
+      expect(await title(bob, "old1")).toBe("Alice old");
+      expect(await title(bob, "old2")).toBe("Bob old");
+      expect(await readFile(projectPaths(bob).events("old1"), "utf8")).toContain("Alice old");
+      // Already public in history: nothing goes out again.
+      expect(await countUnsentRecords(bob, env, "origin")).toBe(0);
+      expect(await git(bob, "status", "--short")).toBe("");
+    });
+
+    it("gives a new clone the old sessions too", async () => {
+      await committed();
+      const carol = await cloneAs("carol");
+      await prepareRecords(carol, env, () => {});
+      expect(await title(carol, "old1")).toBe("Alice old");
+      expect(await title(carol, "old2")).toBe("Bob old");
+    });
+
+    it("reads a commit once, so a later prune stays deleted", async () => {
+      const bob = await committed();
+      await git(bob, "pull", "-q");
+      expect(await restoreCommittedRecords(bob, env)).toBe(2);
+      expect(await restoreCommittedRecords(bob, env)).toBe(0);
+      await deleteRecords(bob, ["old2"], env);
+      await writeFile(join(bob, "a.txt"), "new\n");
+      await git(bob, "commit", "-qam", "feat: later");
+      expect(await restoreCommittedRecords(bob, env)).toBe(0);
+      expect(existsSync(projectPaths(bob).session("old2"))).toBe(false);
+    });
+
+    it("ignores other deleted files, and does nothing without history or sharing", async () => {
+      await writeFile(join(alice, ".cogit", "sessions-note"), "x");
+      const empty = join(dir, "empty");
+      await mkdir(empty);
+      await git(empty, "init", "-q", "-b", "main");
+      await initShared(empty);
+      expect(await restoreCommittedRecords(empty, env)).toBe(0);
+      await mkdir(projectPaths(alice).sessions, { recursive: true });
+      await writeFile(join(alice, ".cogit", "sessions", "bad name.json"), "{}");
+      await git(alice, "add", "-f", join(alice, ".cogit", "sessions", "bad name.json"));
+      await git(alice, "commit", "-qm", "chore: odd file");
+      await git(alice, "rm", "-q", "--cached", join(alice, ".cogit", "sessions", "bad name.json"));
+      await git(alice, "commit", "-qm", "chore: drop it");
+      await rm(join(alice, ".cogit", "sessions", "bad name.json"));
+      expect(await restoreCommittedRecords(alice, env)).toBe(0);
+      await writeFile(join(alice, ".gitignore"), "/.cogit/\n");
+      expect(await restoreCommittedRecords(alice, env)).toBe(0);
+    });
   });
 
   it("a real git push fires the hook and never fails because of it", async () => {
@@ -428,7 +557,7 @@ describe("the record on its own refs", () => {
     expect((await check(alice))?.message).toContain("shared through origin");
 
     await record(alice, "s1", "First", "alice@example.com");
-    await queueRecords(alice, env, "origin");
+    await queueRecords(alice, env);
     await git(alice, "remote", "set-url", "origin", join(dir, "nowhere.git"));
     await sendRecords(alice, env);
     expect((await check(alice))?.message).toMatch(/1 session record could not be sent/);
@@ -503,7 +632,7 @@ describe("the record on its own refs", () => {
       await record(bob, "b1", "Unpushed", "bob@example.com");
       expect((await start(bob)).some((args) => args[0] === "record-sync")).toBe(false);
 
-      await queueRecords(bob, env, "origin");
+      await queueRecords(bob, env);
       const retried = await start(bob);
       expect(retried.some((args) => args.join(" ").startsWith("record-sync send"))).toBe(true);
     });

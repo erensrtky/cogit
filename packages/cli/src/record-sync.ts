@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { rm, stat } from "node:fs/promises";
 import { relative, sep } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { z } from "zod";
 import { cogitIgnored, findGitRoot, gitUserEmail } from "./git.js";
 import { atomicWrite, atomicWriteJson, readJson } from "./store/fs.js";
@@ -49,6 +50,10 @@ const SyncState = z.object({
   stamps: z.record(z.string(), z.string()).default({}),
   /** The remote tree each session's files were last written from. */
   imported: z.record(z.string(), z.string()).default({}),
+  /** The HEAD last searched for commits that stopped tracking the record. */
+  historyCheckedAt: z.string().optional(),
+  /** Those commits, once their sessions were brought back. */
+  restoredFrom: z.array(z.string()).default([]),
 });
 type SyncState = z.infer<typeof SyncState>;
 
@@ -364,6 +369,81 @@ export async function importRecords(root: string, env: NodeJS.ProcessEnv): Promi
   return written;
 }
 
+/**
+ * Older versions committed the record, so the commit that stopped tracking it makes
+ * every `git pull` delete those files from a teammate's disk, and a new clone never
+ * gets them. They are still in history: this brings back what such a commit
+ * removed. They count as seen, so old sessions are not sent again. A later prune
+ * stays a prune here, since a commit is only read once. Returns how many came back.
+ */
+export async function restoreCommittedRecords(
+  root: string,
+  env: NodeJS.ProcessEnv,
+): Promise<number> {
+  if (!(await isSharing(root))) return 0;
+  const head = (await runGit(root, ["rev-parse", "HEAD"], env)).stdout.toString("utf8").trim();
+  if (head === "" || (await readState(root)).historyCheckedAt === head) return 0;
+  const log = await runGit(
+    root,
+    [
+      "log",
+      "--diff-filter=D",
+      "--format=commit %H",
+      "--name-only",
+      "--relative",
+      "--",
+      ".cogit/sessions",
+    ],
+    env,
+  );
+  let restored = 0;
+  const conversations = (await loadConfig(env)).shareConversations;
+  await updateState(root, async (state) => {
+    const done = new Set(state.restoredFrom);
+    const newest = new Map<string, string>();
+    let commit = "";
+    for (const line of log.stdout.toString("utf8").split("\n")) {
+      if (line.startsWith("commit ")) commit = line.slice("commit ".length);
+      else if (line !== "" && !done.has(commit) && !newest.has(line)) newest.set(line, commit);
+    }
+    const paths = projectPaths(root);
+    const wanted = [...newest].flatMap(([file, from]) => {
+      const name = /^\.cogit\/sessions\/([^/]+?)(\.events\.jsonl|\.json)$/.exec(file);
+      if (name === null || !SESSION_ID.test(name[1] as string)) return [];
+      const id = name[1] as string;
+      const target = name[2] === ".json" ? paths.session(id) : paths.events(id);
+      return existsSync(target) ? [] : [{ id, target, spec: `${from}^:./${file}` }];
+    });
+    const blobs =
+      wanted.length === 0
+        ? new Map<string, Buffer>()
+        : await readBlobs(
+            root,
+            wanted.map((item) => item.spec),
+            env,
+          );
+    const stamps = { ...state.stamps };
+    const ids = new Set<string>();
+    for (const { id, target, spec } of wanted) {
+      const blob = blobs.get(spec);
+      if (blob === undefined) continue;
+      await atomicWrite(target, blob);
+      ids.add(id);
+    }
+    for (const id of ids) {
+      stamps[id] = await stampOf(await sessionFiles(root, id, conversations), conversations);
+    }
+    restored = ids.size;
+    return {
+      ...state,
+      stamps,
+      historyCheckedAt: head,
+      restoredFrom: [...done, ...new Set(newest.values())],
+    };
+  });
+  return restored;
+}
+
 /** Local writes first, so a session this clone just changed is never overwritten. */
 export async function reconcileRecords(root: string, env: NodeJS.ProcessEnv): Promise<void> {
   await snapshotRecords(root, env);
@@ -417,19 +497,77 @@ export async function downloadRecords(
 }
 
 /**
- * The `pre-push` step: writes what changed and queues every session the remote
- * does not have yet, without any network. Pushes to other remotes queue nothing,
- * so a deploy remote or a fork never receives the record. Returns the queue's size.
+ * What the `pre-push` hook announces: how many sessions this push would take along,
+ * without any network. Pushes to other remotes take none, so a deploy remote or a
+ * fork never receives the record.
  */
-export async function queueRecords(
+export async function countUnsentRecords(
   root: string,
   env: NodeJS.ProcessEnv,
-  pushedRemote?: string,
+  pushedRemote: string | undefined,
 ): Promise<number> {
   if (!(await isSharing(root))) return 0;
+  if (pushedRemote !== (await syncRemote(root, env))) return 0;
+  await snapshotRecords(root, env);
+  const scope = await sessionScope(root);
+  const local = await listRefs(root, LOCAL, scope, env);
+  const tracking = await listRefs(root, TRACKING, scope, env);
+  return [...local].filter(([id, tree]) => tracking.get(id) !== tree).length;
+}
+
+/**
+ * Whether the remote now holds what the hook saw going out. `pre-push` runs before
+ * the push, and also for `--dry-run` and for a push the remote goes on to reject;
+ * git has no hook for "it worked", so this asks the remote.
+ */
+export async function pushLanded(
+  root: string,
+  env: NodeJS.ProcessEnv,
+  ref: string,
+  sha: string,
+  wait: { intervalMs: number; timeoutMs: number } = { intervalMs: 3000, timeoutMs: 600_000 },
+): Promise<boolean> {
   const remote = await syncRemote(root, env);
-  if (remote === undefined) return 0;
-  if (pushedRemote !== undefined && pushedRemote !== remote) return 0;
+  if (remote === undefined) return false;
+  const deadline = Date.now() + wait.timeoutMs;
+  for (;;) {
+    const seen = await runGit(root, ["ls-remote", remote, ref], quietEnv(env));
+    if (
+      seen.stdout
+        .toString("utf8")
+        .split("\n")
+        .some((line) => line.startsWith(`${sha}\t`))
+    )
+      return true;
+    if (Date.now() >= deadline) return false;
+    await sleep(wait.intervalMs);
+  }
+}
+
+/**
+ * The background half of `git push`: once the code has landed (`after` names the
+ * ref and hash the hook saw; a push with nothing to send has none), queues what the
+ * remote does not have and sends it. A dry run or a rejected push queues nothing.
+ */
+export async function sendAfterPush(
+  root: string,
+  env: NodeJS.ProcessEnv,
+  after?: string,
+  wait?: { intervalMs: number; timeoutMs: number },
+): Promise<number> {
+  if (after !== undefined) {
+    const split = after.lastIndexOf("=");
+    if (!(await pushLanded(root, env, after.slice(0, split), after.slice(split + 1), wait)))
+      return 0;
+  }
+  await queueRecords(root, env);
+  return sendRecords(root, env);
+}
+
+/** Writes what changed and queues every session the remote does not have. Returns its size. */
+export async function queueRecords(root: string, env: NodeJS.ProcessEnv): Promise<number> {
+  if (!(await isSharing(root))) return 0;
+  if ((await syncRemote(root, env)) === undefined) return 0;
   await snapshotRecords(root, env);
   const scope = await sessionScope(root);
   const local = await listRefs(root, LOCAL, scope, env);

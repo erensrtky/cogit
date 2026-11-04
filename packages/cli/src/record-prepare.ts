@@ -5,6 +5,7 @@ import {
   isSharing,
   reconcileRecords,
   recordSyncStatus,
+  restoreCommittedRecords,
 } from "./record-sync.js";
 
 /**
@@ -37,6 +38,7 @@ export async function prepareRecords(
       if (!(await downloadRecords(root, env, showProgress)))
         warn("could not download your team's session records; check your connection and try again");
     }
+    await restoreCommittedRecords(root, env);
     await reconcileRecords(root, env);
   } catch (err) {
     warn(`could not update the session records: ${(err as Error).message}`);

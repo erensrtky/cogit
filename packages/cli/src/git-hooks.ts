@@ -3,7 +3,7 @@ import { chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { findGitRoot, gitHooksDir, resolveCommit } from "./git.js";
 import { spawnDetachedProcess } from "./hooks/run.js";
-import { queueRecords } from "./record-sync.js";
+import { countUnsentRecords } from "./record-sync.js";
 import { atomicWrite } from "./store/fs.js";
 import { captureDisabled, projectPaths } from "./store/paths.js";
 import { loadConfig } from "./store/stores.js";
@@ -191,27 +191,42 @@ async function removeHookBlocks<Event extends string>(
   return removed;
 }
 
+const NO_OBJECT = /^0+$/;
+
 /**
- * The `pre-push` hook: queues the records and sends them in the background, so
- * the user's push never waits for the network, never meets a second SSH prompt and
- * never fails because of a record. The line is the only sign that something else
- * is leaving the machine, so it goes out even though the push itself is quiet.
+ * The `pre-push` hook (`pushedRefs` is git's stdin: one `<ref> <sha> <remote ref> <sha>` a
+ * line): hands the records to a background run that waits for this
+ * push to land, so the user's push never waits for the network, never meets a second
+ * SSH prompt and never fails because of a record. A push that only deletes sends
+ * nothing. The line is the only sign that something else is leaving the machine.
  */
 async function sendWithPush(
   dir: string,
   env: NodeJS.ProcessEnv,
   pushedRemote: string | undefined,
+  pushedRefs: string,
   spawn: typeof spawnDetachedProcess,
 ): Promise<void> {
   if (captureDisabled(env)) return;
-  const queued = await queueRecords(dir, env, pushedRemote);
-  if (queued === 0) return;
+  const lines = pushedRefs.split("\n").filter(Boolean);
+  const going = lines
+    .map((line) => line.split(" "))
+    .find((part) => !NO_OBJECT.test(part[1] ?? "0"));
+  if (lines.length > 0 && going === undefined) return;
+  const unsent = await countUnsentRecords(dir, env, pushedRemote);
+  if (unsent === 0) return;
   const cli = currentCliPath();
   if (cli === undefined) return;
   process.stderr.write(
-    `cogit: sending ${queued} session record${queued === 1 ? "" : "s"} to ${pushedRemote ?? "the remote"}\n`,
+    `cogit: ${unsent} session record${unsent === 1 ? "" : "s"} will follow this push to ${pushedRemote}\n`,
   );
-  spawn(cli, ["record-sync", "send", "-C", dir], env, projectPaths(dir).detachedLog);
+  const after = going === undefined ? [] : ["--after", `${going[2]}=${going[1]}`];
+  spawn(
+    cli,
+    ["record-sync", "send-pushed", ...after, "-C", dir],
+    env,
+    projectPaths(dir).detachedLog,
+  );
 }
 
 /**
@@ -252,9 +267,10 @@ export async function runGitHook(
   args: readonly string[] = [],
   now: Date = new Date(),
   spawn: typeof spawnDetachedProcess = spawnDetachedProcess,
+  pushedRefs: () => Promise<string> = async () => "",
 ): Promise<void> {
   if (event === "pre-push") {
-    await sendWithPush(dir, env, args[0], spawn);
+    await sendWithPush(dir, env, args[0], await pushedRefs(), spawn);
     return;
   }
   if (event === "post-commit") {
