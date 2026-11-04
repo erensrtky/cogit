@@ -91,9 +91,11 @@ including the option that was rejected.*
   map too, with who ran them and what changed most.
 - **Cheap by default**: a small side model records in the background; in our sessions it
   cost about 1–2% of a session's tokens.
-- **No server, no account**: it runs on your machine. Your chats are not committed. The record
-  (titles, decisions and reasons) is, so it travels with your branch; `cogit init` lets you keep
-  it local instead. Key and token patterns are redacted.
+- **No server, no account**: it runs on your machine. Nothing leaves it unless you say so: `cogit
+  init` asks whether to share the record (titles, decisions and reasons) with your team. If you
+  do, `git push` sends it to your own repository, outside your branches, so it never shows up in
+  a pull request or `git status`. Your chats stay local, `cogit prune` deletes old sessions, and
+  key and token patterns are redacted.
 - **The agent gets the context too**: a new session starts where the last one left off, and
   before editing a file the agent hears what was already tried and rejected there. It works
   alongside memory tools; it doesn't replace them.
@@ -139,7 +141,7 @@ cogit open .
 - [Reading the lineage](docs/guide/reading-the-lineage.md): `log`, `show`, `blame`, `why`,
   `search`
 - [Pull requests](docs/guide/pull-requests.md): `cogit pr`
-- [Teams and git](docs/guide/teams-and-git.md): what is committed, the trailer, the hooks
+- [Teams and git](docs/guide/teams-and-git.md): what is shared, the trailer, the hooks
 - [Recording and cost](docs/guide/recording-and-cost.md): who writes the record, what it
   costs
 - [Privacy](docs/guide/privacy.md): what is recorded and what never leaves your machine

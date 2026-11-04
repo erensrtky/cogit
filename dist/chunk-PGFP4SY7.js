@@ -209,7 +209,7 @@ var require_lib = __commonJS({
 
 // src/git-hooks.ts
 import { realpathSync } from "fs";
-import { chmod, mkdir as mkdir6, readFile as readFile9, rm as rm3, stat as stat11 } from "fs/promises";
+import { chmod, mkdir as mkdir6, readFile as readFile9, rm as rm4, stat as stat12 } from "fs/promises";
 import { join as join12 } from "path";
 
 // src/git.ts
@@ -303,7 +303,7 @@ function gitignoreLines(policy) {
 async function ensureGitignore(root, policy) {
   const file2 = join2(root, ".gitignore");
   const text = await readFile2(file2, "utf8").catch(() => "");
-  if (policy === "commit") {
+  if (policy === "share") {
     const lines = text.split(/\r?\n/);
     const kept = lines.filter((line) => line.trim() !== IGNORE_ALL);
     if (kept.length !== lines.length) await atomicWrite(file2, kept.join("\n"));
@@ -322,31 +322,21 @@ async function cogitIgnored(root) {
   const text = await readFile2(join2(root, ".gitignore"), "utf8").catch(() => "");
   return text.split(/\r?\n/).some((line) => line.trim() === IGNORE_ALL);
 }
-function cogitGitignore(shareConversations) {
-  return [
-    HEADER,
-    "*",
-    "!.gitignore",
-    "!sessions/",
-    "!sessions/**",
-    "!project.json",
-    ...shareConversations ? ["!conversations/", "!conversations/**"] : [],
-    ""
-  ].join("\n");
+function cogitGitignore() {
+  return [HEADER, "*", "!.gitignore", "!project.json", ""].join("\n");
 }
-async function ensureCogitGitignore(root, policy, shareConversations) {
-  if (policy !== "commit") return false;
+async function ensureCogitGitignore(root, policy) {
+  if (policy !== "share") return false;
   const file2 = join2(root, ".cogit", ".gitignore");
-  const content = cogitGitignore(shareConversations);
-  const current = await readFile2(file2, "utf8").catch(() => void 0);
-  if (current === content) return false;
+  const content = cogitGitignore();
+  if (await readFile2(file2, "utf8").catch(() => void 0) === content) return false;
   await atomicWrite(file2, content);
   return true;
 }
-async function refreshCogitGitignore(root, shareConversations) {
+async function refreshCogitGitignore(root) {
   if (await findGitRoot(root) === void 0) return false;
   if (await cogitIgnored(root)) return false;
-  return ensureCogitGitignore(root, "commit", shareConversations);
+  return ensureCogitGitignore(root, "share");
 }
 function parseCommitLines(stdout) {
   const out = [];
@@ -640,7 +630,7 @@ async function gitHooksDir(root) {
 }
 
 // src/hooks/run.ts
-import { spawn } from "child_process";
+import { spawn as spawn2 } from "child_process";
 import { closeSync, existsSync as existsSync5, mkdirSync, openSync, statSync as statSync2, writeSync } from "fs";
 import { dirname as dirname10 } from "path";
 import { fileURLToPath } from "url";
@@ -21117,6 +21107,8 @@ function projectPaths(root) {
     captures: join6(base, "state", "captures.json"),
     /** What the detached hook children (build, side run) printed; local, capped. */
     detachedLog: join6(base, "state", "detached.log"),
+    /** What the record refs last looked like, and what waits to be sent; local. */
+    recordSync: join6(base, "state", "record-sync.json"),
     /** Commits waiting for their message's record before a Shape; local. */
     shapeQueue: join6(base, "state", "shape-queue"),
     locks: join6(base, "locks"),
@@ -21206,7 +21198,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-KQ3BN2VC.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-2N5RF34K.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -21276,11 +21268,12 @@ async function resolveProjectRoot(dir) {
     }
     const worktree = { path: linked.top, branch: await readBranch(linked.gitdir) };
     await migrateProject(start);
-    if (existsSync2(projectPaths(start).project)) return { root: start, worktree };
     const common2 = (await readFile4(join8(linked.gitdir, "commondir"), "utf8")).trim();
     const mainTop = dirname4(resolve2(linked.gitdir, common2));
     const root = join8(mainTop, relative2(linked.top, start));
     await migrateProject(root);
+    if (!existsSync2(projectPaths(root).project) && existsSync2(projectPaths(start).project))
+      return { root: start, worktree };
     return { root, worktree };
   } catch {
     return { root: start };
@@ -21349,18 +21342,11 @@ var Config = external_exports.object({
   recordHeadless: external_exports.boolean().default(false),
   /** Port the local map server binds on `127.0.0.1`. */
   serverPort: external_exports.int().min(1).max(65535).default(4747),
-  /** Default for new projects; `init` asks per repo. Story 9.3: the record travels. */
-  gitPolicy: external_exports.enum(["ignore", "commit"]).default("commit"),
   /**
    * Whether `.cogit/conversations/` (the raw chat text) travels too. Off by
-   * default: the session record can be committed while the chat stays local.
+   * default: the session record can be shared while the chat stays local.
    */
   shareConversations: external_exports.boolean().default(false),
-  /**
-   * What happens to the session files the last code commit left behind: ask the
-   * user at the next session start, commit them at session end, or do nothing.
-   */
-  recordCommit: external_exports.enum(["ask", "auto", "off"]).default("ask"),
   /**
    * How long `.cogit/HEAD` stays fresh for the `Thought:` trailer (Story 9.4).
    * A commit made hours after the last message is probably not that message.
@@ -21797,12 +21783,12 @@ var updateState = (root, id, fn, opts) => {
 };
 
 // src/hooks/pretooluse.ts
-import { isAbsolute as isAbsolute5, relative as relative6, resolve as resolve6, sep as sep6 } from "path";
+import { isAbsolute as isAbsolute5, relative as relative5, resolve as resolve6, sep as sep5 } from "path";
 
 // src/commands/why.ts
-import { existsSync as existsSync4 } from "fs";
+import { existsSync as existsSync3 } from "fs";
 import { stat as stat9 } from "fs/promises";
-import { dirname as dirname8, isAbsolute as isAbsolute4, join as join10, relative as relative5, resolve as resolve5, sep as sep5 } from "path";
+import { dirname as dirname8, isAbsolute as isAbsolute4, join as join10, relative as relative4, resolve as resolve5, sep as sep4 } from "path";
 
 // ../../node_modules/@inquirer/core/dist/lib/key.js
 var keybindings = ["emacs", "vim"];
@@ -23715,14 +23701,14 @@ function exitOnClosedPipe(stream = process.stdout, exit = process.exit) {
 
 // src/commands/blame.ts
 import { stat as stat8 } from "fs/promises";
-import { isAbsolute as isAbsolute3, relative as relative4, resolve as resolve4, sep as sep4 } from "path";
+import { isAbsolute as isAbsolute3, relative as relative3, resolve as resolve4, sep as sep3 } from "path";
 import { pathToFileURL } from "url";
 
 // src/thought.ts
-import { execFile as execFile3 } from "child_process";
+import { execFile as execFile2 } from "child_process";
 import { access as access2 } from "fs/promises";
 import { isAbsolute as isAbsolute2, resolve as resolve3 } from "path";
-import { promisify as promisify3 } from "util";
+import { promisify as promisify2 } from "util";
 
 // src/messages.ts
 import { createHash } from "crypto";
@@ -23973,11 +23959,6 @@ function upgradeSessionIds(session, messages) {
 }
 
 // src/session-git.ts
-import { execFile as execFile2 } from "child_process";
-import { existsSync as existsSync3 } from "fs";
-import { relative as relative3, sep as sep3 } from "path";
-import { promisify as promisify2 } from "util";
-var exec3 = promisify2(execFile2);
 var SessionHead = external_exports.object({
   sessionId: Slug,
   transcriptPath: external_exports.string().optional(),
@@ -23989,77 +23970,9 @@ async function readSessionHead(root) {
   const parsed = SessionHead.safeParse(read.value);
   return parsed.success ? parsed.data : void 0;
 }
-async function git(root, args, env = process.env) {
-  try {
-    const { stdout } = await exec3("git", ["-C", root, ...args], { env });
-    return { code: 0, stdout };
-  } catch (err) {
-    const failure2 = err;
-    return {
-      code: typeof failure2.code === "number" ? failure2.code : 1,
-      stdout: failure2.stdout ?? ""
-    };
-  }
-}
-async function sessionPaths(gitRoot, root, sessionId) {
-  const paths = projectPaths(root);
-  const session = [paths.session(sessionId), paths.events(sessionId)].filter(
-    (file2) => existsSync3(file2)
-  );
-  if (session.length === 0) return [];
-  const shared = [paths.project, paths.gitignore].filter((file2) => existsSync3(file2));
-  return [...session, ...shared].map((file2) => relative3(gitRoot, file2).split(sep3).join("/")).filter((file2) => file2 !== "" && !file2.startsWith(".."));
-}
-async function ignored(gitRoot, path2, env) {
-  return (await git(gitRoot, ["check-ignore", "-q", "--", path2], env)).code === 0;
-}
-async function hasStagedChanges(gitRoot, env) {
-  return (await git(gitRoot, ["diff", "--cached", "--quiet", "--exit-code"], env)).code !== 0;
-}
-async function uncommittedSession(root, sessionId, env = process.env) {
-  const gitRoot = await findGitRoot(root);
-  if (gitRoot === void 0) return false;
-  const paths = await sessionPaths(gitRoot, root, sessionId);
-  if (paths.length === 0) return false;
-  if (await ignored(gitRoot, paths[0], env)) return false;
-  return (await git(gitRoot, ["status", "--porcelain", "--", ...paths], env)).stdout.trim() !== "";
-}
-async function stageSessionFiles(root, env = process.env) {
-  const head = await readSessionHead(root);
-  if (head === void 0) return false;
-  const gitRoot = await findGitRoot(root);
-  if (gitRoot === void 0) return false;
-  const paths = await sessionPaths(gitRoot, root, head.sessionId);
-  if (paths.length === 0) return false;
-  if (await ignored(gitRoot, paths[0], env)) return false;
-  if (!await hasStagedChanges(gitRoot, env)) return false;
-  return (await git(gitRoot, ["add", "--", ...paths], env)).code === 0;
-}
-function recordMessage(title, sessionId) {
-  const clean = title.replace(/\s+/g, " ").trim() || sessionId;
-  return `chore(cogit): record ${clean.length > 120 ? `${clean.slice(0, 119)}\u2026` : clean}`;
-}
-async function commitSessionFiles(root, sessionId, title, env = process.env) {
-  const gitRoot = await findGitRoot(root);
-  if (gitRoot === void 0) return false;
-  const paths = await sessionPaths(gitRoot, root, sessionId);
-  if (paths.length === 0) return false;
-  if (await ignored(gitRoot, paths[0], env)) return false;
-  if ((await git(gitRoot, ["status", "--porcelain", "--", ...paths], env)).stdout.trim() === "")
-    return false;
-  if ((await git(gitRoot, ["add", "--", ...paths], env)).code !== 0) return false;
-  const message = recordMessage(title, sessionId);
-  return (await git(gitRoot, ["commit", "--no-verify", "-m", message, "--", ...paths], env)).code === 0;
-}
-async function maybeAutoCommit(root, sessionId, env) {
-  if ((await loadConfig(env)).recordCommit !== "auto") return false;
-  const loaded = await loadSession(root, sessionId);
-  const title = loaded.found && loaded.ok ? loaded.data.title : "";
-  return commitSessionFiles(root, sessionId, title, env);
-}
 
 // src/thought.ts
-var exec4 = promisify3(execFile3);
+var exec3 = promisify2(execFile2);
 var THOUGHT_TRAILER = "Thought";
 var THOUGHT_VALUE = /^h[0-9a-f]{12}$/;
 var FULL_HASH = /^[0-9a-f]{40}$/;
@@ -24081,7 +23994,7 @@ async function newestThought(agent, transcript, sessionId) {
   return newest === void 0 ? void 0 : messageHash(sessionId, newest);
 }
 async function writeTrailer(messageFile, value) {
-  await exec4("git", [
+  await exec3("git", [
     "interpret-trailers",
     "--in-place",
     "--if-exists",
@@ -24095,7 +24008,7 @@ async function writeTrailer(messageFile, value) {
 async function replayingCommits(dir, env) {
   let gitDir;
   try {
-    const { stdout } = await exec4("git", ["-C", dir, "rev-parse", "--absolute-git-dir"], { env });
+    const { stdout } = await exec3("git", ["-C", dir, "rev-parse", "--absolute-git-dir"], { env });
     gitDir = String(stdout).trim();
   } catch {
     return false;
@@ -24161,7 +24074,7 @@ async function readThoughtTrailers(root, opts = {}) {
     ...opts.since === void 0 ? [] : [`--since=${opts.since}`]
   ];
   try {
-    const { stdout } = await exec4("git", args, {
+    const { stdout } = await exec3("git", args, {
       maxBuffer: LOG_MAX_BUFFER,
       ...opts.env === void 0 ? {} : { env: opts.env }
     });
@@ -24175,7 +24088,7 @@ async function readCommitThought(root, ref, env) {
   if (gitRoot === void 0) return void 0;
   const args = ["-C", gitRoot, "log", "-1", "--format=%(trailers:key=Thought,valueonly)", ref];
   try {
-    const { stdout } = await exec4("git", args, env === void 0 ? void 0 : { env });
+    const { stdout } = await exec3("git", args, env === void 0 ? void 0 : { env });
     const value = String(stdout).trim().split("\n")[0]?.trim() ?? "";
     return THOUGHT_VALUE.test(value) ? value : void 0;
   } catch {
@@ -24278,8 +24191,7 @@ var PANEL_EDITABLE_KEYS = [
   "shapes",
   "captures",
   "language",
-  "shareConversations",
-  "recordCommit"
+  "shareConversations"
 ];
 function isPanelEditableKey(key) {
   return PANEL_EDITABLE_KEYS.includes(key);
@@ -24606,7 +24518,7 @@ async function blame(opts) {
     throw new CliError(`${root} is not inside a git repository; blame needs one`);
   const { file: file2, line } = parseBlameTarget(opts.target);
   const absolute = resolve4(root, file2);
-  const path2 = relative4(gitRoot, absolute);
+  const path2 = relative3(gitRoot, absolute);
   if (path2 === "" || path2.startsWith("..") || isAbsolute3(path2))
     throw new CliError(`${file2} is outside ${gitRoot}`);
   const exists = await stat8(absolute).then(
@@ -24614,7 +24526,7 @@ async function blame(opts) {
     () => false
   );
   if (!exists) throw new CliError(`${file2} does not exist`);
-  const repoPath = path2.split(sep4).join("/");
+  const repoPath = path2.split(sep3).join("/");
   let commits;
   try {
     commits = await blameCommitHashes(gitRoot, repoPath, line);
@@ -25314,9 +25226,9 @@ function oneLine4(text) {
   return text.replace(/\s+/g, " ").trim();
 }
 function repositoryPath(gitRoot, root, file2) {
-  const rel = relative5(gitRoot, resolve5(root, file2));
+  const rel = relative4(gitRoot, resolve5(root, file2));
   if (rel === "" || rel.startsWith("..") || isAbsolute4(rel)) return void 0;
-  return rel.split(sep5).join("/");
+  return rel.split(sep4).join("/");
 }
 function decisionsOf(message) {
   const decisions = [];
@@ -25402,7 +25314,7 @@ function formatWhy(hits) {
 }
 async function nearestProjectDir(start) {
   for (let dir = resolve5(start); ; dir = dirname8(dir)) {
-    if (existsSync4(projectPaths(dir).project) || existsSync4(join10(dir, ".git"))) return dir;
+    if (existsSync3(projectPaths(dir).project) || existsSync3(join10(dir, ".git"))) return dir;
     if (dirname8(dir) === dir) return void 0;
   }
 }
@@ -25414,7 +25326,7 @@ async function why(opts) {
   let target = opts.file;
   if (opts.cwd !== void 0) {
     start = await nearestProjectDir(opts.cwd) ?? opts.cwd;
-    target = relative5(start, resolve5(opts.cwd, opts.file));
+    target = relative4(start, resolve5(opts.cwd, opts.file));
   }
   const parsed = parseBlameTarget(target);
   const file2 = parsed.file;
@@ -25521,9 +25433,9 @@ async function onPreToolUse(ctx) {
   const config2 = await loadConfig(ctx.env);
   if (!config2.tryBeforeNotes) return void 0;
   const absolute = isAbsolute5(filePath) ? filePath : resolve6(ctx.input.cwd ?? ctx.root, filePath);
-  const rel = relative6(ctx.root, absolute);
+  const rel = relative5(ctx.root, absolute);
   if (rel === "" || rel.startsWith("..") || isAbsolute5(rel)) return void 0;
-  const key = rel.split(sep6).join("/");
+  const key = rel.split(sep5).join("/");
   let firstLook = false;
   await updateState(
     ctx.root,
@@ -25576,19 +25488,9 @@ async function onPromptSubmit(ctx) {
 async function onSessionEnd(ctx) {
   if (!ctx.initialized) return void 0;
   const config2 = await loadConfig(ctx.env);
-  const commitOnly = () => {
-    if (config2.recordCommit === "auto")
-      ctx.spawnDetached(["record-commit", ctx.sessionId, "-C", ctx.root]);
-  };
-  if (!config2.sessionEndCatchUp) {
-    commitOnly();
-    return void 0;
-  }
+  if (!config2.sessionEndCatchUp) return void 0;
   const messages = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
-  if (!messages || messages.length === 0) {
-    commitOnly();
-    return void 0;
-  }
+  if (!messages || messages.length === 0) return void 0;
   ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "--close", "-C", ctx.root]);
   return void 0;
 }
@@ -25596,7 +25498,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "0.31.1",
+  version: "1.0.0",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [
@@ -25686,6 +25588,533 @@ function versionNotice(running, installed) {
   return void 0;
 }
 
+// src/record-sync.ts
+import { spawn } from "child_process";
+import { createHash as createHash2 } from "crypto";
+import { existsSync as existsSync4 } from "fs";
+import { rm as rm3, stat as stat11 } from "fs/promises";
+import { relative as relative6, sep as sep6 } from "path";
+import { setTimeout as sleep2 } from "timers/promises";
+var LOCAL = "refs/cogit";
+var TRACKING = "refs/cogit-remote";
+var RECORD_REFSPEC = `+${LOCAL}/*:${TRACKING}/*`;
+var PUSH_BATCH = 2e3;
+var IMPORT_BATCH = 500;
+var SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+var SESSION_FILE = "session.json";
+var EVENTS_FILE = "events.jsonl";
+var CONVERSATION_FILE = "conversation.jsonl.gz";
+var SyncState = external_exports.object({
+  /** When the records were first downloaded into this clone. */
+  downloadedAt: external_exports.string().optional(),
+  downloadError: external_exports.string().optional(),
+  sendError: external_exports.string().optional(),
+  /** Refs the user's last push asked to send, with the tree each should reach. */
+  pending: external_exports.record(external_exports.string(), external_exports.string()).default({}),
+  /** Each session's files as last seen, so an unchanged session costs one stat. */
+  stamps: external_exports.record(external_exports.string(), external_exports.string()).default({}),
+  /** The remote tree each session's files were last written from. */
+  imported: external_exports.record(external_exports.string(), external_exports.string()).default({}),
+  /** The HEAD last searched for commits that stopped tracking the record. */
+  historyCheckedAt: external_exports.string().optional(),
+  /** Those commits, once their sessions were brought back. */
+  restoredFrom: external_exports.array(external_exports.string()).default([])
+});
+function runGit(root, args, env, input2) {
+  return new Promise((done) => {
+    const child = spawn("git", ["-C", root, ...args], {
+      env,
+      stdio: [input2 === void 0 ? "ignore" : "pipe", "pipe", "pipe"]
+    });
+    const out = [];
+    const err = [];
+    child.stdout?.on("data", (chunk) => out.push(chunk));
+    child.stderr?.on("data", (chunk) => err.push(chunk));
+    child.on("error", (error62) => done({ code: 1, stdout: Buffer.alloc(0), stderr: error62.message }));
+    child.on(
+      "close",
+      (code) => done({
+        code: code ?? 1,
+        stdout: Buffer.concat(out),
+        stderr: Buffer.concat(err).toString("utf8")
+      })
+    );
+    if (input2 !== void 0) {
+      child.stdin?.on("error", () => void 0);
+      child.stdin?.end(input2);
+    }
+  });
+}
+function quietEnv(env) {
+  return { ...env, GIT_TERMINAL_PROMPT: "0", SSH_ASKPASS_REQUIRE: "never" };
+}
+function gitError(text) {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "");
+  const reason = lines.find((line) => line.startsWith("fatal:")) ?? lines.at(-1) ?? "git failed";
+  return reason.slice(0, 300);
+}
+async function isSharing(root) {
+  if (!existsSync4(projectPaths(root).project)) return false;
+  if (await findGitRoot(root) === void 0) return false;
+  return !await cogitIgnored(root);
+}
+async function syncRemote(root, env) {
+  const result = await runGit(root, ["remote"], env);
+  if (result.code !== 0) return void 0;
+  const remotes = result.stdout.toString("utf8").split("\n").filter(Boolean);
+  if (remotes.includes("origin")) return "origin";
+  return remotes.length === 1 ? remotes[0] : void 0;
+}
+async function sessionScope(root) {
+  const gitRoot = await findGitRoot(root);
+  const prefix = gitRoot === void 0 ? "" : relative6(gitRoot, root).split(sep6).join("/");
+  if (prefix === "") return "sessions";
+  return `projects/${createHash2("sha256").update(prefix).digest("hex").slice(0, 16)}/sessions`;
+}
+async function listRefs(root, base, scope, env) {
+  const result = await runGit(
+    root,
+    ["for-each-ref", "--format=%(objectname) %(refname)", `${base}/${scope}/`],
+    env
+  );
+  const refs = /* @__PURE__ */ new Map();
+  if (result.code !== 0) return refs;
+  const start = `${base}/${scope}/`.length;
+  for (const line of result.stdout.toString("utf8").split("\n")) {
+    const space = line.indexOf(" ");
+    if (space < 0) continue;
+    const id = line.slice(space + 1 + start);
+    if (SESSION_ID.test(id)) refs.set(id, line.slice(0, space));
+  }
+  return refs;
+}
+async function readState(root) {
+  const read = await readJson(projectPaths(root).recordSync).catch(() => ({
+    found: false
+  }));
+  if (read.found && "value" in read) {
+    const parsed = SyncState.safeParse(read.value);
+    if (parsed.success) return parsed.data;
+  }
+  return SyncState.parse({});
+}
+async function updateState2(root, fn) {
+  const paths = projectPaths(root);
+  return withLock(paths.lock("record-sync"), async () => {
+    const current = await readState(root);
+    const next = await fn(current);
+    if (next !== current) await atomicWriteJson(paths.recordSync, next);
+    return next;
+  });
+}
+async function sessionFiles(root, id, conversations) {
+  const paths = projectPaths(root);
+  const all = [
+    [SESSION_FILE, paths.session(id)],
+    [EVENTS_FILE, paths.events(id)],
+    ...conversations ? [[CONVERSATION_FILE, paths.conversation(id)]] : []
+  ];
+  return all.filter(([, path2]) => existsSync4(path2));
+}
+async function stampOf(files, conversations) {
+  const parts = [conversations ? "c" : "-"];
+  for (const [name, path2] of files) {
+    const info = await stat11(path2);
+    parts.push(`${name}:${info.mtimeMs}:${info.size}`);
+  }
+  return parts.join("|");
+}
+async function isOwnSession(root, id, me) {
+  const read = await readJson(projectPaths(root).session(id));
+  if (!read.found || !("value" in read)) return false;
+  const author = read.value.authorEmail;
+  return typeof author !== "string" || me === void 0 || author === me;
+}
+async function snapshotRecords(root, env) {
+  if (!await isSharing(root)) return 0;
+  const conversations = (await loadConfig(env)).shareConversations;
+  const me = await gitUserEmail(root, env);
+  const scope = await sessionScope(root);
+  let moved = 0;
+  await updateState2(root, async (state) => {
+    const stamps = { ...state.stamps };
+    let touched = false;
+    const changed = [];
+    for (const id of await listSessionIds(projectPaths(root).sessions)) {
+      if (!SESSION_ID.test(id)) continue;
+      const files = await sessionFiles(root, id, conversations);
+      const stamp2 = await stampOf(files, conversations);
+      if (stamps[id] === stamp2) continue;
+      stamps[id] = stamp2;
+      touched = true;
+      if (await isOwnSession(root, id, me)) changed.push({ id, files });
+    }
+    if (!touched) return state;
+    if (changed.length === 0) return { ...state, stamps };
+    const paths = changed.flatMap(({ files }) => files.map(([, path2]) => path2));
+    const hashed = await runGit(
+      root,
+      ["hash-object", "-w", "--stdin-paths"],
+      env,
+      `${paths.join("\n")}
+`
+    );
+    if (hashed.code !== 0) throw new Error(gitError(hashed.stderr));
+    const blobs = hashed.stdout.toString("utf8").trim().split("\n");
+    let next = 0;
+    const listing = changed.map(
+      ({ files }) => files.map(([name]) => `100644 blob ${blobs[next++]}	${name}
+`).join("")
+    ).join("\n");
+    const made = await runGit(root, ["mktree", "--batch"], env, `${listing}
+`);
+    if (made.code !== 0) throw new Error(gitError(made.stderr));
+    const trees = made.stdout.toString("utf8").trim().split("\n");
+    const local = await listRefs(root, LOCAL, scope, env);
+    const tracking = await listRefs(root, TRACKING, scope, env);
+    const commands = [];
+    changed.forEach(({ id }, index) => {
+      const tree = trees[index];
+      if (local.get(id) === tree) return;
+      if (!local.has(id) && tracking.get(id) === tree) return;
+      commands.push(`update ${LOCAL}/${scope}/${id} ${tree}
+`);
+    });
+    if (commands.length > 0) {
+      const updated = await runGit(root, ["update-ref", "--stdin"], env, commands.join(""));
+      if (updated.code !== 0) throw new Error(gitError(updated.stderr));
+      moved = commands.length;
+    }
+    return { ...state, stamps };
+  });
+  return moved;
+}
+async function readBlobs(root, specs, env) {
+  const result = await runGit(root, ["cat-file", "--batch"], env, `${specs.join("\n")}
+`);
+  const blobs = /* @__PURE__ */ new Map();
+  if (result.code !== 0) throw new Error(gitError(result.stderr));
+  const out = result.stdout;
+  let at = 0;
+  for (const spec of specs) {
+    const end = out.indexOf(10, at);
+    if (end < 0) break;
+    const header = out.subarray(at, end).toString("utf8");
+    at = end + 1;
+    const match = /^[0-9a-f]+ blob (\d+)$/.exec(header);
+    if (match === null) continue;
+    const size = Number(match[1]);
+    blobs.set(spec, out.subarray(at, at + size));
+    at += size + 1;
+  }
+  return blobs;
+}
+async function importRecords(root, env) {
+  if (!await isSharing(root)) return 0;
+  const scope = await sessionScope(root);
+  const local = await listRefs(root, LOCAL, scope, env);
+  const tracking = await listRefs(root, TRACKING, scope, env);
+  if (local.size === 0 && tracking.size === 0) return 0;
+  const paths = projectPaths(root);
+  const conversations = (await loadConfig(env)).shareConversations;
+  let written = 0;
+  await updateState2(root, async (state) => {
+    const imported = { ...state.imported };
+    const stamps = { ...state.stamps };
+    const wanted = /* @__PURE__ */ new Map();
+    for (const [id, tree] of tracking) {
+      const mine = local.get(id);
+      const missing = !existsSync4(paths.session(id));
+      if (missing) wanted.set(id, mine ?? tree);
+      else if (mine !== void 0) {
+        if (mine === tree) imported[id] = tree;
+      } else if (imported[id] !== tree) wanted.set(id, tree);
+    }
+    for (const [id, tree] of local) {
+      if (!tracking.has(id) && !existsSync4(paths.session(id))) wanted.set(id, tree);
+    }
+    const ids = [...wanted.keys()];
+    const agreed = Object.keys(imported).length !== Object.keys(state.imported).length;
+    if (ids.length === 0 && !agreed) return state;
+    for (let start = 0; start < ids.length; start += IMPORT_BATCH) {
+      const part = ids.slice(start, start + IMPORT_BATCH);
+      const specs = part.flatMap((id) => {
+        const tree = wanted.get(id);
+        return [SESSION_FILE, EVENTS_FILE, CONVERSATION_FILE].map((name) => `${tree}:${name}`);
+      });
+      const blobs = await readBlobs(root, specs, env);
+      for (const id of part) {
+        const tree = wanted.get(id);
+        const session = blobs.get(`${tree}:${SESSION_FILE}`);
+        if (session === void 0) continue;
+        await atomicWrite(paths.session(id), session);
+        const events = blobs.get(`${tree}:${EVENTS_FILE}`);
+        if (events !== void 0) await atomicWrite(paths.events(id), events);
+        const conversation = blobs.get(`${tree}:${CONVERSATION_FILE}`);
+        if (conversation !== void 0) await atomicWrite(paths.conversation(id), conversation);
+        if (tracking.get(id) === tree) imported[id] = tree;
+        stamps[id] = await stampOf(await sessionFiles(root, id, conversations), conversations);
+        written++;
+      }
+    }
+    return { ...state, imported, stamps };
+  });
+  return written;
+}
+async function restoreCommittedRecords(root, env) {
+  if (!await isSharing(root)) return 0;
+  const head = (await runGit(root, ["rev-parse", "HEAD"], env)).stdout.toString("utf8").trim();
+  if (head === "" || (await readState(root)).historyCheckedAt === head) return 0;
+  const log2 = await runGit(
+    root,
+    [
+      "log",
+      "--diff-filter=D",
+      "--format=commit %H",
+      "--name-only",
+      "--relative",
+      "--",
+      ".cogit/sessions"
+    ],
+    env
+  );
+  let restored = 0;
+  const conversations = (await loadConfig(env)).shareConversations;
+  await updateState2(root, async (state) => {
+    const done = new Set(state.restoredFrom);
+    const newest = /* @__PURE__ */ new Map();
+    let commit = "";
+    for (const line of log2.stdout.toString("utf8").split("\n")) {
+      if (line.startsWith("commit ")) commit = line.slice("commit ".length);
+      else if (line !== "" && !done.has(commit) && !newest.has(line)) newest.set(line, commit);
+    }
+    const paths = projectPaths(root);
+    const wanted = [...newest].flatMap(([file2, from]) => {
+      const name = /^\.cogit\/sessions\/([^/]+?)(\.events\.jsonl|\.json)$/.exec(file2);
+      if (name === null || !SESSION_ID.test(name[1])) return [];
+      const id = name[1];
+      const target = name[2] === ".json" ? paths.session(id) : paths.events(id);
+      return existsSync4(target) ? [] : [{ id, target, spec: `${from}^:./${file2}` }];
+    });
+    const blobs = wanted.length === 0 ? /* @__PURE__ */ new Map() : await readBlobs(
+      root,
+      wanted.map((item) => item.spec),
+      env
+    );
+    const stamps = { ...state.stamps };
+    const ids = /* @__PURE__ */ new Set();
+    for (const { id, target, spec } of wanted) {
+      const blob = blobs.get(spec);
+      if (blob === void 0) continue;
+      await atomicWrite(target, blob);
+      ids.add(id);
+    }
+    for (const id of ids) {
+      stamps[id] = await stampOf(await sessionFiles(root, id, conversations), conversations);
+    }
+    restored = ids.size;
+    return {
+      ...state,
+      stamps,
+      historyCheckedAt: head,
+      restoredFrom: [...done, ...new Set(newest.values())]
+    };
+  });
+  return restored;
+}
+async function reconcileRecords(root, env) {
+  await snapshotRecords(root, env);
+  await importRecords(root, env);
+}
+async function addRecordRefspec(root, env) {
+  const remote = await syncRemote(root, env);
+  if (remote === void 0) return false;
+  const key = `remote.${remote}.fetch`;
+  const current = await runGit(root, ["config", "--get-all", key], env);
+  if (current.stdout.toString("utf8").split("\n").includes(RECORD_REFSPEC)) return false;
+  return (await runGit(root, ["config", "--add", key, RECORD_REFSPEC], env)).code === 0;
+}
+async function downloadRecords(root, env, showProgress = false) {
+  const remote = await syncRemote(root, env);
+  if (remote === void 0) return false;
+  const args = ["fetch", "--no-tags", "--no-write-fetch-head", remote, RECORD_REFSPEC];
+  const result = showProgress ? await new Promise((done) => {
+    const child = spawn("git", ["-C", root, ...args], { env, stdio: "inherit" });
+    const failed = (code) => done({ code, stdout: Buffer.alloc(0), stderr: "the download failed" });
+    child.on("error", () => failed(1));
+    child.on("close", (code) => failed(code ?? 1));
+  }) : await runGit(root, [...args.slice(0, 1), "--quiet", ...args.slice(1)], quietEnv(env));
+  await updateState2(root, (state) => {
+    if (result.code === 0) {
+      const { downloadError: _cleared, ...rest } = state;
+      return { ...rest, downloadedAt: (/* @__PURE__ */ new Date()).toISOString() };
+    }
+    return { ...state, downloadError: gitError(result.stderr) };
+  });
+  return result.code === 0;
+}
+async function countUnsentRecords(root, env, pushedRemote) {
+  if (!await isSharing(root)) return 0;
+  if (pushedRemote !== await syncRemote(root, env)) return 0;
+  await snapshotRecords(root, env);
+  const scope = await sessionScope(root);
+  const local = await listRefs(root, LOCAL, scope, env);
+  const tracking = await listRefs(root, TRACKING, scope, env);
+  return [...local].filter(([id, tree]) => tracking.get(id) !== tree).length;
+}
+async function pushLanded(root, env, ref, sha, wait = { intervalMs: 3e3, timeoutMs: 6e5 }) {
+  const remote = await syncRemote(root, env);
+  if (remote === void 0) return false;
+  const deadline = Date.now() + wait.timeoutMs;
+  for (; ; ) {
+    const seen = await runGit(root, ["ls-remote", remote, ref], quietEnv(env));
+    if (seen.stdout.toString("utf8").split("\n").some((line) => line.startsWith(`${sha}	`)))
+      return true;
+    if (Date.now() >= deadline) return false;
+    await sleep2(wait.intervalMs);
+  }
+}
+async function sendAfterPush(root, env, after, wait) {
+  if (after !== void 0) {
+    const split = after.lastIndexOf("=");
+    if (!await pushLanded(root, env, after.slice(0, split), after.slice(split + 1), wait))
+      return 0;
+  }
+  await queueRecords(root, env);
+  return sendRecords(root, env);
+}
+async function queueRecords(root, env) {
+  if (!await isSharing(root)) return 0;
+  if (await syncRemote(root, env) === void 0) return 0;
+  await snapshotRecords(root, env);
+  const scope = await sessionScope(root);
+  const local = await listRefs(root, LOCAL, scope, env);
+  const tracking = await listRefs(root, TRACKING, scope, env);
+  const state = await updateState2(root, (cur) => {
+    const pending = { ...cur.pending };
+    for (const [id, tree] of local) {
+      const ref = `${LOCAL}/${scope}/${id}`;
+      if (tracking.get(id) === tree) delete pending[ref];
+      else pending[ref] = tree;
+    }
+    return { ...cur, pending };
+  });
+  return Object.keys(state.pending).length;
+}
+async function sendRecords(root, env) {
+  const remote = await syncRemote(root, env);
+  if (remote === void 0) return 0;
+  const queue = Object.entries((await readState(root)).pending);
+  let sent = 0;
+  for (let start = 0; start < queue.length; start += PUSH_BATCH) {
+    const part = queue.slice(start, start + PUSH_BATCH);
+    const specs = part.map(([ref, tree]) => `+${tree}:${ref}`);
+    const pushed = await runGit(
+      root,
+      ["push", "--no-verify", "--quiet", remote, ...specs],
+      quietEnv(env)
+    );
+    if (pushed.code !== 0) {
+      const error62 = gitError(pushed.stderr);
+      await updateState2(root, (state) => ({ ...state, sendError: error62 }));
+      return sent;
+    }
+    const commands = part.map(([ref, tree]) => `update ${TRACKING}${ref.slice(LOCAL.length)} ${tree}
+`).join("");
+    await runGit(root, ["update-ref", "--stdin"], env, commands);
+    await updateState2(root, (state) => {
+      const pending = { ...state.pending };
+      for (const [ref, tree] of part) if (pending[ref] === tree) delete pending[ref];
+      const { sendError: _cleared, ...rest } = state;
+      return { ...rest, pending };
+    });
+    sent += part.length;
+  }
+  return sent;
+}
+async function trackedRecordFiles(root, env) {
+  const result = await runGit(root, ["ls-files", "--", ".cogit/sessions"], env);
+  return result.stdout.toString("utf8").split("\n").filter(Boolean).length;
+}
+async function recordSyncStatus(root, env) {
+  const sharing = await isSharing(root);
+  if (!sharing) return { sharing, downloaded: false, pending: 0 };
+  const remote = await syncRemote(root, env);
+  const state = await readState(root);
+  return {
+    sharing,
+    ...remote === void 0 ? {} : { remote },
+    downloaded: state.downloadedAt !== void 0,
+    ...state.downloadError === void 0 ? {} : { downloadError: state.downloadError },
+    pending: Object.keys(state.pending).length,
+    ...state.sendError === void 0 ? {} : { sendError: state.sendError }
+  };
+}
+async function deleteRecords(root, ids, env) {
+  const paths = projectPaths(root);
+  if (await isSharing(root)) {
+    const scope = await sessionScope(root);
+    const tracking = await listRefs(root, TRACKING, scope, env);
+    const remote = await syncRemote(root, env);
+    const published = ids.filter((id) => tracking.has(id));
+    if (remote !== void 0) {
+      for (let start = 0; start < published.length; start += PUSH_BATCH) {
+        const part = published.slice(start, start + PUSH_BATCH);
+        const specs = part.map((id) => `:${LOCAL}/${scope}/${id}`);
+        const pushed = await runGit(
+          root,
+          ["push", "--no-verify", "--quiet", remote, ...specs],
+          quietEnv(env)
+        );
+        if (pushed.code !== 0) throw new Error(gitError(pushed.stderr));
+      }
+    }
+    const commands = ids.flatMap((id) => [`delete ${LOCAL}/${scope}/${id}
+`, `delete ${TRACKING}/${scope}/${id}
+`]).join("");
+    await runGit(root, ["update-ref", "--stdin"], env, commands);
+    await updateState2(root, (state) => {
+      const pending = { ...state.pending };
+      const imported = { ...state.imported };
+      const stamps = { ...state.stamps };
+      for (const id of ids) {
+        delete pending[`${LOCAL}/${scope}/${id}`];
+        delete imported[id];
+        delete stamps[id];
+      }
+      return { ...state, pending, imported, stamps };
+    });
+  }
+  for (const id of ids) {
+    await rm3(paths.session(id), { force: true });
+    await rm3(paths.events(id), { force: true });
+    await rm3(paths.conversation(id), { force: true });
+    await rm3(paths.state(id), { force: true });
+  }
+}
+
+// src/record-prepare.ts
+async function setUpClone(root, env) {
+  if (await addRecordRefspec(root, env)) await installGitHooks(root);
+}
+async function prepareRecords(root, env, warn2) {
+  try {
+    if (!await isSharing(root)) return;
+    await setUpClone(root, env);
+    const status = await recordSyncStatus(root, env);
+    if (status.remote !== void 0 && !status.downloaded) {
+      const showProgress = process.stderr.isTTY === true;
+      if (showProgress) process.stderr.write("Downloading your team's session records...\n");
+      if (!await downloadRecords(root, env, showProgress))
+        warn2("could not download your team's session records; check your connection and try again");
+    }
+    await restoreCommittedRecords(root, env);
+    await reconcileRecords(root, env);
+  } catch (err) {
+    warn2(`could not update the session records: ${err.message}`);
+  }
+}
+
 // src/hooks/close-retry.ts
 import { statSync } from "fs";
 var CLOSE_RETRY_IDLE_MS = 10 * 6e4;
@@ -25769,9 +26198,22 @@ async function sessionStartOutput(ctx) {
     return additionalContext2(ctx, setupHint(ctx));
   }
   await retryUnclosed(ctx).catch(() => void 0);
+  await syncRecordsAtStart(ctx).catch(() => void 0);
   const config2 = await loadConfig(ctx.env);
   if (!config2.startupContext) return void 0;
-  return additionalContext2(ctx, await startupContext(ctx, config2.recordCommit));
+  return additionalContext2(ctx, await startupContext(ctx));
+}
+async function syncRecordsAtStart(ctx) {
+  if (!await isSharing(ctx.root)) return;
+  await setUpClone(ctx.root, ctx.env);
+  const status = await recordSyncStatus(ctx.root, ctx.env);
+  if (status.remote !== void 0 && !status.downloaded) {
+    ctx.spawnDetached(["record-sync", "download", "-C", ctx.root]);
+    return;
+  }
+  await restoreCommittedRecords(ctx.root, ctx.env);
+  await reconcileRecords(ctx.root, ctx.env);
+  if (status.pending > 0) ctx.spawnDetached(["record-sync", "send", "-C", ctx.root]);
 }
 function additionalContext2(ctx, text) {
   return ctx.agent.additionalContext("SessionStart", text);
@@ -25796,7 +26238,7 @@ function oneLine5(text) {
 function clip(text, max) {
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}\u2026`;
 }
-async function startupContext(ctx, recordCommit) {
+async function startupContext(ctx) {
   const command = cli(ctx);
   const header = `cogit records this project's lineage (one node per user message, hanging from the message it reacts to, grouped in sessions with branch summaries). Read it with \`${command} log -C "${ctx.root}"\`, find where something was discussed with \`${command} search "<text>" -C "${ctx.root}"\`, and one message with \`${command} show <ref> -C "${ctx.root}"\` (a ref is a message hash, an h+hex prefix of six or more characters, or <session-id>:mN). When the user mentions a message hash or another session's mN, run show before answering.`;
   const sessions = await loadAllSessions(ctx.root, () => {
@@ -25805,30 +26247,15 @@ async function startupContext(ctx, recordCommit) {
   if (previous === void 0) return header;
   const events = await readEvents(ctx.root, previous.sessionId);
   const messages = buildMessages(applyEvents(previous.nodes, events));
-  const recordLine = recordCommit === "ask" && await uncommittedSession(ctx.root, previous.sessionId, ctx.env) ? recordCommitLine(previous) : "";
-  return composeStartupContext(
-    header,
-    previous,
-    branchesOf(previous.sessionId, messages),
-    recordLine
-  );
-}
-function recordCommitLine(session) {
-  const title = session.title.trim() === "" ? session.sessionId : clip(oneLine5(session.title), 120);
-  return `The last session's record is not committed. Offer to commit it with the message \`chore(cogit): record ${title}\`, only the .cogit/sessions/ paths (never other staged changes), and run it only if the user agrees.`;
+  return composeStartupContext(header, previous, branchesOf(previous.sessionId, messages));
 }
 function mostRecentOtherSession(sessions, sessionId) {
   return sessions.filter((session) => session.sessionId !== sessionId).sort(
     (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.startedAt.localeCompare(a.startedAt) || a.sessionId.localeCompare(b.sessionId)
   )[0];
 }
-function composeStartupContext(header, session, branches, recordLine = "") {
-  const head = [
-    header,
-    ...recordLine === "" ? [] : ["", recordLine],
-    "",
-    ...statusLines(session)
-  ];
+function composeStartupContext(header, session, branches) {
+  const head = [header, "", ...statusLines(session)];
   const blocks = branches.map(branchLines2);
   const cutNote = (cut2) => cut2 === 0 ? [] : [
     `  \u2026 ${cut2} older branch summar${cut2 === 1 ? "y" : "ies"} cut; read them with \`log --branches\`.`
@@ -25969,7 +26396,7 @@ function spawnDetachedProcess(cli2, args, env, log2) {
   const fd = log2 === void 0 ? void 0 : openLog(log2, args);
   const out = fd ?? "ignore";
   try {
-    spawn(process.execPath, [cli2, ...args], {
+    spawn2(process.execPath, [cli2, ...args], {
       detached: true,
       stdio: ["ignore", out, out],
       env: { ...env, COGIT_DISABLE: "1" }
@@ -26073,7 +26500,7 @@ async function installGitHook(root, event) {
   if (dir === void 0) return false;
   await mkdir6(dir, { recursive: true });
   const file2 = join12(dir, event);
-  const exists = await stat11(file2).then(
+  const exists = await stat12(file2).then(
     () => true,
     () => false
   );
@@ -26088,7 +26515,8 @@ ${block}
   await chmod(file2, 493);
   return true;
 }
-var GIT_HOOK_EVENTS = ["pre-commit", "prepare-commit-msg", "post-commit"];
+var GIT_HOOK_EVENTS = ["prepare-commit-msg", "post-commit", "pre-push"];
+var RETIRED_GIT_HOOK_EVENTS = ["pre-commit"];
 function isGitHookEvent(event) {
   return GIT_HOOK_EVENTS.includes(event);
 }
@@ -26105,11 +26533,13 @@ async function refreshGitHooks(root) {
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return [];
   const refreshed = [];
+  const hasBlock = async (event) => (await readFile9(join12(dir, event), "utf8").catch(() => void 0) ?? "").includes(BLOCK_START);
+  const installed = await hasBlock("prepare-commit-msg");
   for (const event of GIT_HOOK_EVENTS) {
-    const current = await readFile9(join12(dir, event), "utf8").catch(() => void 0);
-    if (current === void 0 || !current.includes(BLOCK_START)) continue;
+    if (!installed && !await hasBlock(event)) continue;
     if (await installGitHook(root, event)) refreshed.push(event);
   }
+  await removeHookBlocks(dir, RETIRED_GIT_HOOK_EVENTS);
   return refreshed;
 }
 async function uninstallGitHooks(root) {
@@ -26117,19 +26547,45 @@ async function uninstallGitHooks(root) {
   if (gitRoot === void 0) return [];
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return [];
+  await removeHookBlocks(dir, RETIRED_GIT_HOOK_EVENTS);
+  return removeHookBlocks(dir, GIT_HOOK_EVENTS);
+}
+async function removeHookBlocks(dir, events) {
   const removed = [];
-  for (const event of GIT_HOOK_EVENTS) {
+  for (const event of events) {
     const file2 = join12(dir, event);
     const current = await readFile9(file2, "utf8").catch(() => void 0);
     if (current === void 0 || !current.includes(BLOCK_START)) continue;
     const next = withoutHookBlock(current);
-    if (onlyGeneratedShebang(next)) await rm3(file2, { force: true });
+    if (onlyGeneratedShebang(next)) await rm4(file2, { force: true });
     else await atomicWrite(file2, next);
     removed.push(event);
   }
   return removed;
 }
-async function queueShape(dir, env, spawn2) {
+var NO_OBJECT = /^0+$/;
+async function sendWithPush(dir, env, pushedRemote, pushedRefs, spawn3) {
+  if (captureDisabled(env)) return;
+  const lines = pushedRefs.split("\n").filter(Boolean);
+  const going = lines.map((line) => line.split(" ")).find((part) => !NO_OBJECT.test(part[1] ?? "0"));
+  if (lines.length > 0 && going === void 0) return;
+  const unsent = await countUnsentRecords(dir, env, pushedRemote);
+  if (unsent === 0) return;
+  const cli2 = currentCliPath();
+  if (cli2 === void 0) return;
+  process.stderr.write(
+    `cogit: ${unsent} session record${unsent === 1 ? "" : "s"} will follow this push to ${pushedRemote}
+`
+  );
+  const after = going === void 0 ? [] : ["--after", `${going[2]}=${going[1]}`];
+  spawn3(
+    cli2,
+    ["record-sync", "send-pushed", ...after, "-C", dir],
+    env,
+    projectPaths(dir).detachedLog
+  );
+}
+async function queueShape(dir, env, spawn3) {
   if (captureDisabled(env)) return;
   const config2 = await loadConfig(env).catch(() => void 0);
   if (config2 === void 0 || !config2.shapes || config2.recorder === "agent") return;
@@ -26139,15 +26595,15 @@ async function queueShape(dir, env, spawn2) {
   if (commit === void 0) return;
   const cli2 = currentCliPath();
   if (cli2 === void 0) return;
-  spawn2(cli2, ["shape", "--commit", commit, "-C", dir], env, projectPaths(dir).detachedLog);
+  spawn3(cli2, ["shape", "--commit", commit, "-C", dir], env, projectPaths(dir).detachedLog);
 }
-async function runGitHook(event, dir, env = process.env, args = [], now = /* @__PURE__ */ new Date(), spawn2 = spawnDetachedProcess) {
-  if (event === "pre-commit") {
-    await stageSessionFiles(dir, env);
+async function runGitHook(event, dir, env = process.env, args = [], now = /* @__PURE__ */ new Date(), spawn3 = spawnDetachedProcess, pushedRefs = async () => "") {
+  if (event === "pre-push") {
+    await sendWithPush(dir, env, args[0], await pushedRefs(), spawn3);
     return;
   }
   if (event === "post-commit") {
-    await queueShape(dir, env, spawn2);
+    await queueShape(dir, env, spawn3);
     return;
   }
   const [messageFile, source] = args;
@@ -26198,6 +26654,13 @@ export {
   Status,
   LineageNodeInput,
   SessionInput,
+  readEvents,
+  appendEvents,
+  sideOwnedParents,
+  applyEvents,
+  seedEvents,
+  LockBusyError,
+  withLock,
   findGitRoot,
   resolveCommit,
   ensureGitignore,
@@ -26214,8 +26677,6 @@ export {
   commitBetween,
   gitHooksDir,
   Config,
-  LockBusyError,
-  withLock,
   loadProject,
   updateProject,
   loadSession,
@@ -26227,12 +26688,6 @@ export {
   loadRegistry,
   updateRegistry,
   readSessionHead,
-  maybeAutoCommit,
-  readEvents,
-  appendEvents,
-  sideOwnedParents,
-  applyEvents,
-  seedEvents,
   readThoughtTrailers,
   readCommitThought,
   earliestSessionStart,
@@ -26268,6 +26723,16 @@ export {
   why,
   compareVersions,
   versionNotice,
+  isSharing,
+  reconcileRecords,
+  addRecordRefspec,
+  downloadRecords,
+  sendAfterPush,
+  sendRecords,
+  trackedRecordFiles,
+  recordSyncStatus,
+  deleteRecords,
+  prepareRecords,
   spawnDetachedProcess,
   runHook,
   BLOCK_START,
