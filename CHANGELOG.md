@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-11-04
 ### Changed
 - **Breaking:** the record no longer enters commits. Each session sits on its own ref in your repository, outside every branch, so pull requests, `git status` and `git grep` show only code and a normal clone stays small. If you shared your record before, run `git rm -r --cached .cogit/sessions` once and commit; `cogit doctor` reminds you. Teammates' files come back from history on their next cogit run. Old commits keep the files they had.
 - **Breaking:** the record is private unless you say otherwise. `cogit init` asks one question, "Share the session records with your team?", and no answer means no. `cogit init --git` and `cogit config git` take `share` or `ignore`.
