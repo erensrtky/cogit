@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Breaking:** the record no longer enters commits. Each session sits on its own ref in your repository, outside every branch, so pull requests, `git status` and `git grep` show only code and a normal clone stays small. If you shared your record before, run `git rm -r --cached .cogit/sessions` once and commit; `cogit doctor` reminds you. Teammates' files come back from history on their next cogit run. Old commits keep the files they had.
 - **Breaking:** the record is private unless you say otherwise. `cogit init` asks one question, "Share the session records with your team?", and no answer means no. `cogit init --git` and `cogit config git` take `share` or `ignore`.
-- `git push` sends the record of a project that shares it, in the background once the push has landed: it prints how many, never slows or fails the push, and only goes to `origin` or your only remote. A dry run or a rejected push sends nothing. What cannot be sent stays queued and `cogit doctor` says why.
+- `git push` sends the record of a project that shares it, in the background once the push has landed: it prints how many, never slows or fails the push, and only goes to `origin` or your only remote. A rejected push sends nothing. What cannot be sent stays queued and `cogit doctor` says why.
 - The first time cogit runs in a clone of a shared project it downloads the team's records, and from then on a plain `git pull` brings them. An empty map says whether the download failed.
 - A linked worktree always uses the main checkout's record, so a session outlives its worktree.
 
