@@ -94,7 +94,8 @@ including the option that was rejected.*
 - **No server, no account**: it runs on your machine. Nothing leaves it unless you say so: `cogit
   init` asks whether to share the record (titles, decisions and reasons) with your team. If you
   do, `git push` sends it to your own repository, outside your branches, so it never shows up in
-  a pull request or `git status`. Your chats stay local. Key and token patterns are redacted.
+  a pull request or `git status`. Your chats stay local, `cogit prune` deletes old sessions, and
+  key and token patterns are redacted.
 - **The agent gets the context too**: a new session starts where the last one left off, and
   before editing a file the agent hears what was already tried and rejected there. It works
   alongside memory tools; it doesn't replace them.

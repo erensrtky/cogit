@@ -20,6 +20,15 @@ cogit doctor --json
 cogit ties its record to commits, so it needs git. Run `git init` (or work in a clone), then
 `cogit init` again.
 
+## A teammate's sessions do not appear
+
+In a project that shares its record, they arrive in two steps: they send with `git push`, you
+receive with `git pull`, and cogit shows them the next time it runs. If they still do not appear,
+run `cogit doctor` on both machines: its record line says when a send or download failed and
+why. An SSH key that needs a passphrase has to be in `ssh-agent`, since the record is sent in the
+background where nothing can ask for it. If your project keeps its record private, nothing
+is shared; `cogit config git` shows which it is.
+
 ## Nothing is recorded
 
 1. **Is the plugin on in this session?** Run `/plugin` in Claude Code and look for cogit. A
