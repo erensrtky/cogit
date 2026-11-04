@@ -429,7 +429,7 @@ describe("settings write", () => {
       if (html.includes('"messageSummaries":true')) break;
       await delay(25);
     }
-    expect(html).toContain('"messageSummaries":true');
+    expect(html).toContain('"messageSummaries": true');
   });
 
   it("accepts the Story 9.3 settings and validates their values", async () => {

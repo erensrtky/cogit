@@ -406,9 +406,10 @@ export function embedViewModel(template: string, model: PageModel): string {
   if (!template.includes(EMPTY_DATA_ELEMENT)) {
     throw new Error(`the template has no empty <script id="${DATA_ELEMENT_ID}"> element`);
   }
-  const data = `<script id="${DATA_ELEMENT_ID}" type="application/json">${escapeForScript(
-    JSON.stringify(model),
-  )}</script>`;
+  // One value per line, so a text search in the project prints a line and not the
+  // whole record. A string in JSON has no raw newline, so every one here is layout.
+  const json = JSON.stringify(model, null, 1).replace(/\n +/g, "\n");
+  const data = `<script id="${DATA_ELEMENT_ID}" type="application/json">${escapeForScript(json)}</script>`;
   // A function, not a string: a `$'` or `$&` in the data must not act as a replace pattern.
   return template.replace(EMPTY_DATA_ELEMENT, () => data);
 }

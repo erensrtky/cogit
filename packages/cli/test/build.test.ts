@@ -409,6 +409,14 @@ describe("embedViewModel", () => {
     expect(embedded(html)).toEqual(model);
   });
 
+  it("writes one value per line, so a text search prints a line and not the record", () => {
+    const long = { ...model, project: { ...model.project, name: "line one\nline two" } };
+    const html = embedViewModel(TEMPLATE, long);
+    expect(html).toContain('"name": "line one\\nline two"');
+    expect(html).toMatch(/\n"name": /);
+    expect(embedded(html)).toEqual(long);
+  });
+
   it("escapes markup and line separators inside the JSON", () => {
     const risky = {
       ...model,

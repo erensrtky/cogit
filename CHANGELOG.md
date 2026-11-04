@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - The conversation store keeps the agent's full answer. A turn stored while the agent was still answering stayed empty or partial for good, so the map showed those messages without their answer; the next build fills in what the transcript still holds.
+- `.cogit/map.html` holds its data one value per line, so a text search like `grep -r` that matches it prints far less.
 
 ## [0.31.0] - 2026-11-01
 ### Added
