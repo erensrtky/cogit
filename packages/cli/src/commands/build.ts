@@ -153,8 +153,7 @@ async function readTranscriptViews(
     const file = transcripts.get(session.sessionId);
     const recordsMessages = session.nodes.some((node) => node.kind === "message");
     const roots = [session.worktree?.path, root].filter((r): r is string => Boolean(r));
-    const stored = await readConversationStore(root, session.sessionId);
-    const storedByUuid = new Map(stored.map((turn) => [turn.uuid, turn]));
+    let stored = await readConversationStore(root, session.sessionId);
     let transcript: ChatTurn[] | null = null;
     if (file) {
       try {
@@ -169,21 +168,19 @@ async function readTranscriptViews(
     const fromTranscript =
       transcript && transcript.length > 0 ? hashTurns(session.sessionId, transcript) : null;
     if (fromTranscript) {
-      const fresh = fromTranscript.filter(
-        (turn) => turn.uuid !== undefined && !storedByUuid.has(turn.uuid),
-      );
       const hashes = new Map(
         fromTranscript.flatMap((turn) =>
           turn.uuid === undefined ? [] : [[turn.uuid, turn.hash] as [string, string]],
         ),
       );
       try {
-        if (fresh.length > 0)
-          await appendConversationTurns(
-            root,
-            session.sessionId,
-            fresh.map((turn) => agent.displayTurn(turn, roots)),
-          );
+        const appended = await appendConversationTurns(
+          root,
+          session.sessionId,
+          fromTranscript.map((turn) => agent.displayTurn(turn, roots)),
+        );
+        // The page reads these turns below, so it shows the answer this build just stored.
+        if (appended > 0) stored = await readConversationStore(root, session.sessionId);
         // Turns stored before ids were stable get theirs now, before Claude Code
         // deletes the transcript this hash comes from.
         await appendConversationHashes(root, session.sessionId, hashes);
@@ -212,6 +209,7 @@ async function readTranscriptViews(
     };
     prepared.push(effective);
 
+    const storedByUuid = new Map(stored.map((turn) => [turn.uuid, turn]));
     let turns: ViewChatTurn[];
     if (fromTranscript) {
       turns = fromTranscript.map((turn) => {

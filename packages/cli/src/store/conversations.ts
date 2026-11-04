@@ -8,7 +8,9 @@ import { projectPaths } from "./paths.js";
 /**
  * The conversation as the drill-down shows it, kept in the project so it
  * survives Claude Code deleting the transcript. One JSON line per turn, each
- * append one more gzip member: the file is append-only and never rewritten.
+ * append one more gzip member: the file is append-only and never rewritten. A
+ * turn first stored while the agent was still answering gets a later, fuller
+ * line for the same uuid.
  */
 export interface StoredTurn {
   /** The transcript's uuid for the user line; the key that makes appends idempotent. */
@@ -39,6 +41,13 @@ function isStoredTurn(value: unknown): value is StoredTurn {
   );
 }
 
+/** How much of the answer a turn holds, to tell a finished turn from a snapshot of it. */
+function answerSize(turn: Pick<StoredTurn, "replies" | "tools">): number {
+  return (
+    turn.replies.reduce((sum, reply) => sum + reply.length, 0) + JSON.stringify(turn.tools).length
+  );
+}
+
 /**
  * Every turn stored for the session, in the order they were appended. A missing
  * file is an empty store; a corrupted member ends the read at what parsed, so a
@@ -58,7 +67,7 @@ export async function readConversationStore(
   } catch {
     return [];
   }
-  /** Later records for one uuid add a stable id without rewriting the turn. */
+  /** Later records for one uuid add a stable id or a fuller answer without rewriting the turn. */
   const byUuid = new Map<string, StoredTurn>();
   const order: string[] = [];
   for (const line of text.split("\n")) {
@@ -76,27 +85,41 @@ export async function readConversationStore(
       order.push(value.uuid);
       continue;
     }
-    if (prev.hash === undefined && value.hash !== undefined) byUuid.set(value.uuid, value);
+    const fuller = answerSize(value) > answerSize(prev) ? value : prev;
+    const hash = prev.hash ?? value.hash;
+    byUuid.set(value.uuid, {
+      ...prev,
+      ...(hash === undefined ? {} : { hash }),
+      replies: fuller.replies,
+      tools: fuller.tools,
+    });
   }
   return order.map((uuid) => byUuid.get(uuid) as StoredTurn);
 }
 
 /**
- * Appends the turns the store does not hold yet, redacted, and returns how many
- * were written. Turns without a transcript uuid cannot be recognised again, so
- * they are left to the transcript; a build that has a transcript keeps showing
- * them. Never rewrites an existing turn.
+ * Appends the turns the store does not hold yet, and the ones whose answer has
+ * grown since they were stored, redacted, and returns how many were written. A
+ * build runs while the agent is still answering, so the first copy of a turn is
+ * often a snapshot with no replies. Turns without a transcript uuid cannot be
+ * recognised again, so they are left to the transcript; a build that has a
+ * transcript keeps showing them. Never rewrites an existing line.
  */
 export async function appendConversationTurns(
   root: string,
   sessionId: string,
   turns: ChatTurn[],
 ): Promise<number> {
-  const known = new Set((await readConversationStore(root, sessionId)).map((turn) => turn.uuid));
+  const stored = new Map(
+    (await readConversationStore(root, sessionId)).map((turn) => [turn.uuid, turn]),
+  );
+  const seen = new Set<string>();
   const fresh: StoredTurn[] = [];
   for (const turn of turns) {
-    if (turn.uuid === undefined || known.has(turn.uuid)) continue;
-    known.add(turn.uuid);
+    if (turn.uuid === undefined || seen.has(turn.uuid)) continue;
+    seen.add(turn.uuid);
+    const held = stored.get(turn.uuid);
+    if (held && answerSize(turn) <= answerSize(held)) continue;
     fresh.push({
       uuid: turn.uuid,
       ...(turn.hash === undefined ? {} : { hash: turn.hash }),
@@ -108,13 +131,19 @@ export async function appendConversationTurns(
   }
   if (fresh.length === 0) return 0;
   // The store outlives the transcript and may be committed by mistake, so it
-  // gets the same secret net as the page, not the raw text.
-  const { value } = redactDeep(fresh);
+  // gets the same secret net as the page, not the raw text. Compared again after
+  // it: a turn with a secret is longer raw than stored, and must not append on
+  // every build.
+  const value = redactDeep(fresh).value.filter((turn) => {
+    const held = stored.get(turn.uuid);
+    return !held || answerSize(turn) > answerSize(held);
+  });
+  if (value.length === 0) return 0;
   const chunk = `${value.map((turn) => JSON.stringify(turn)).join("\n")}\n`;
   const file = projectPaths(root).conversation(sessionId);
   await mkdir(dirname(file), { recursive: true });
   await appendFile(file, gzipSync(Buffer.from(chunk, "utf8")));
-  return fresh.length;
+  return value.length;
 }
 
 /**

@@ -17,6 +17,33 @@ function turn(uuid: string | undefined, text: string, replies: string[] = []): C
 }
 
 describe("conversation store", () => {
+  it("takes a fuller answer for a turn first stored mid-answer, once", async () => {
+    const root = await tempDir();
+    await appendConversationTurns(root, "s1", [{ ...turn("u1", "one"), hash: "h1" }]);
+    expect(await appendConversationTurns(root, "s1", [turn("u1", "one", ["the answer"])])).toBe(1);
+    expect(await appendConversationTurns(root, "s1", [turn("u1", "one", ["the answer"])])).toBe(0);
+    const stored = await readConversationStore(root, "s1");
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({ hash: "h1", text: "one", replies: ["the answer"] });
+  });
+
+  it("keeps the fuller answer when a later turn holds less", async () => {
+    const root = await tempDir();
+    await appendConversationTurns(root, "s1", [turn("u1", "one", ["the whole answer"])]);
+    expect(await appendConversationTurns(root, "s1", [turn("u1", "one", ["the"])])).toBe(0);
+    expect((await readConversationStore(root, "s1"))[0]?.replies).toEqual(["the whole answer"]);
+  });
+
+  it("does not append again for a reply that only looks longer before redaction", async () => {
+    const root = await tempDir();
+    const secret = `token: ghp_${"a".repeat(36)}`;
+    await appendConversationTurns(root, "s1", [turn("u1", "one", [secret])]);
+    const held = (await readConversationStore(root, "s1"))[0]?.replies[0] ?? "";
+    expect(held).not.toContain("ghp_");
+    expect(held.length).toBeLessThan(secret.length);
+    expect(await appendConversationTurns(root, "s1", [turn("u1", "one", [secret])])).toBe(0);
+  });
+
   it("is empty when the session was never stored", async () => {
     expect(await readConversationStore(await tempDir(), "s1")).toEqual([]);
   });

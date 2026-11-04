@@ -685,6 +685,35 @@ describe("cogit build", () => {
     ]);
   });
 
+  it("shows and stores the answer of a turn first stored before the agent answered", async () => {
+    const folder = join(dir, "claude", "projects", "-proj");
+    await mkdir(folder, { recursive: true });
+    const user = {
+      type: "user",
+      uuid: "u1",
+      parentUuid: null,
+      timestamp: T0,
+      message: { content: "First" },
+    };
+    const answer = {
+      type: "assistant",
+      uuid: "a1",
+      parentUuid: "u1",
+      message: { content: [{ type: "text", text: "The answer" }] },
+    };
+    const transcript = join(folder, "s1.jsonl");
+    await writeFile(transcript, JSON.stringify(user));
+    await saveSession("s1", session({ sessionId: "s1", nodes: [node("m1", "message", "First")] }));
+
+    const early = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(early.sessions[0]?.chat?.[0]?.replies).toEqual([]);
+
+    await writeFile(transcript, [user, answer].map((line) => JSON.stringify(line)).join("\n"));
+    const late = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+    expect(late.sessions[0]?.chat?.[0]?.replies).toEqual(["The answer"]);
+    expect((await readConversationStore(root, "s1"))[0]?.replies).toEqual(["The answer"]);
+  });
+
   it("keeps the conversation in the project and shows it after the transcript is gone", async () => {
     const folder = join(dir, "claude", "projects", "-proj");
     await mkdir(folder, { recursive: true });
