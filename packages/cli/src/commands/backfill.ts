@@ -80,6 +80,8 @@ function rules(language: string, messageSummaries: boolean, recorder: RecordMode
     "- parent: an earlier message id, or null when the message starts a new thread; never a topic or phase node.",
     "- Back to an older thread: that message is the parent and the previous one goes in links (at most 5). Unsure: use the previous message.",
     '- When the message itself made a decision (the user asked for it, picked an option or approved a proposal): decidedBy ("user" or "agreed"), the reason in why, and the options not taken in alternatives [{"option": "...", "why": "..."}].',
+    "- alternatives lists only options someone actually named in the conversation before the decision. Never infer one from the decision, never list the current state as an option, and leave the field out when none was named. Its why says what the conversation said: no durations, sizes or reasons it does not contain. An option only postponed was not rejected.",
+    '- decidedBy "agreed" needs the user approving the proposal in this message. A proposal the user has not answered is not a decision.',
     '- The agent\'s work belongs inside the message node that caused it, never in nodes of its own: work (short items), agentDecisions ([{"title": "...", "why": "...", "alternatives": [...]}]) only for technical choices with a reason — never for proposals or work items — commits (short hashes) and files (a few paths).',
     "- Write a branch summary ({title, asked, outcome, open}) on the first message of a branch when the branch ends.",
     '- Never send "at"; the CLI takes each message\'s time from the transcript.',

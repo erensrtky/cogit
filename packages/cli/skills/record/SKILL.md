@@ -55,7 +55,11 @@ transcript is unreadable: send only `status`.
 - `summary`: what came of it, ONLY when `messageSummaries` is true; otherwise leave it out,
   like a commit with a subject and no body.
 - A decision: `decidedBy` (`"user"` or `"agreed"`), `why`, `alternatives`
-  (`{ "option", "why" }`).
+  (`{ "option", "why" }`). `alternatives` lists only options someone actually named in the
+  conversation before the decision: never one inferred from the decision, never the current
+  state, and no durations, sizes or reasons the conversation does not contain. An option only
+  postponed was not rejected. `"agreed"` needs the user approving the proposal in this message;
+  a proposal the user has not answered is not a decision.
 - Your work belongs to the message that caused it: `work`, `agentDecisions`
   (`{ "title", "why", "alternatives" }`), `commits` (short hashes), `files` (a few paths).
   Work spanning messages goes on the one it ended in; update an earlier node only to correct it.

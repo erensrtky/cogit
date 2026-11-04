@@ -95,6 +95,8 @@ describe("catchUpPrompt", () => {
     expect(prompt).toContain("The record has no nodes yet.");
     expect(prompt).toContain("titles and text in Turkish");
     expect(prompt).toContain("(no written reply)");
+    expect(prompt).toContain("only options someone actually named in the conversation");
+    expect(prompt).toContain("A proposal the user has not answered is not a decision.");
     expect(prompt).toContain("…");
     expect(prompt).toContain('{"sessionId": "s1", "nodes": [...]');
   });
