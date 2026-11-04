@@ -21206,7 +21206,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-SGXDRKNY.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-KQ3BN2VC.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -23793,6 +23793,9 @@ function isStoredTurn(value) {
   const turn = value;
   return typeof turn.uuid === "string" && turn.uuid !== "" && typeof turn.at === "string" && typeof turn.text === "string" && Array.isArray(turn.replies) && turn.replies.every((reply) => typeof reply === "string") && turn.tools !== null && typeof turn.tools === "object";
 }
+function answerSize(turn) {
+  return turn.replies.reduce((sum, reply) => sum + reply.length, 0) + JSON.stringify(turn.tools).length;
+}
 async function readConversationStore(root, sessionId) {
   let text;
   try {
@@ -23819,16 +23822,28 @@ async function readConversationStore(root, sessionId) {
       order.push(value.uuid);
       continue;
     }
-    if (prev.hash === void 0 && value.hash !== void 0) byUuid.set(value.uuid, value);
+    const fuller = answerSize(value) > answerSize(prev) ? value : prev;
+    const hash2 = prev.hash ?? value.hash;
+    byUuid.set(value.uuid, {
+      ...prev,
+      ...hash2 === void 0 ? {} : { hash: hash2 },
+      replies: fuller.replies,
+      tools: fuller.tools
+    });
   }
   return order.map((uuid3) => byUuid.get(uuid3));
 }
 async function appendConversationTurns(root, sessionId, turns) {
-  const known = new Set((await readConversationStore(root, sessionId)).map((turn) => turn.uuid));
+  const stored = new Map(
+    (await readConversationStore(root, sessionId)).map((turn) => [turn.uuid, turn])
+  );
+  const seen = /* @__PURE__ */ new Set();
   const fresh = [];
   for (const turn of turns) {
-    if (turn.uuid === void 0 || known.has(turn.uuid)) continue;
-    known.add(turn.uuid);
+    if (turn.uuid === void 0 || seen.has(turn.uuid)) continue;
+    seen.add(turn.uuid);
+    const held = stored.get(turn.uuid);
+    if (held && answerSize(turn) <= answerSize(held)) continue;
     fresh.push({
       uuid: turn.uuid,
       ...turn.hash === void 0 ? {} : { hash: turn.hash },
@@ -23839,13 +23854,17 @@ async function appendConversationTurns(root, sessionId, turns) {
     });
   }
   if (fresh.length === 0) return 0;
-  const { value } = redactDeep(fresh);
+  const value = redactDeep(fresh).value.filter((turn) => {
+    const held = stored.get(turn.uuid);
+    return !held || answerSize(turn) > answerSize(held);
+  });
+  if (value.length === 0) return 0;
   const chunk = `${value.map((turn) => JSON.stringify(turn)).join("\n")}
 `;
   const file2 = projectPaths(root).conversation(sessionId);
   await mkdir4(dirname6(file2), { recursive: true });
   await appendFile(file2, gzipSync(Buffer.from(chunk, "utf8")));
-  return fresh.length;
+  return value.length;
 }
 async function appendConversationHashes(root, sessionId, hashes) {
   if (hashes.size === 0) return 0;
@@ -24517,9 +24536,8 @@ function embedViewModel(template, model) {
   if (!template.includes(EMPTY_DATA_ELEMENT)) {
     throw new Error(`the template has no empty <script id="${DATA_ELEMENT_ID}"> element`);
   }
-  const data = `<script id="${DATA_ELEMENT_ID}" type="application/json">${escapeForScript(
-    JSON.stringify(model)
-  )}</script>`;
+  const json2 = JSON.stringify(model, null, 1).replace(/\n +/g, "\n");
+  const data = `<script id="${DATA_ELEMENT_ID}" type="application/json">${escapeForScript(json2)}</script>`;
   return template.replace(EMPTY_DATA_ELEMENT, () => data);
 }
 
@@ -25578,7 +25596,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "0.31.0",
+  version: "0.31.1",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [

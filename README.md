@@ -8,11 +8,47 @@ Git remembers what changed. cogit remembers why.
 
 cogit records every message you send to an AI coding agent as a *thought commit*: what you
 asked, what came of it, and the message it answered. Your code commits point back to the
-thought behind them, so `git log` tells you what changed and cogit tells you why. It works with
-Claude Code today.
+thought behind them, so `cogit why` takes any line of code back to the reason it exists. It works
+with Claude Code today.
 
-It runs as a Claude Code plugin and hooks in at SessionStart, Stop and SessionEnd, so the
-record is written while you work, not reconstructed from the diff afterwards.
+Agent memory helps your agent remember. cogit helps you understand.
+
+It runs as a Claude Code plugin and works through Claude Code hooks, so the record is written
+while you work, not reconstructed from the diff afterwards.
+
+**[Click through a saved map](https://erensrtky.github.io/cogit/demo/)**: no install, no server.
+It's the page `cogit open` writes, built from sample data and read-only.
+
+## Why
+
+I started by copying code out of ChatGPT, then moved to browser tools, editor extensions and now
+terminal agents. Each step moved the code further from me, and I kept feeling something was
+slipping away. When you write code yourself, it sinks in bit by bit: you know why that table
+exists and why you wrote that class. When an agent writes it, that feeling goes away.
+
+The information isn't really gone. It sits in your messages, the agent's replies and your commits,
+just in separate places. cogit ties them together, so you can always walk back and see why
+something was done. It helps most when you juggle projects: I run 5-10 agents at once across 2-3
+of them, and a few minutes later I can lose track of what I did where.
+
+<img src="docs/images/why-abstraction.png" alt="A conceptual chart from machine code to software factories: abstraction keeps rising, while how much of the why you can still trace falls sharply once AI starts writing code. cogit keeps what falls away.">
+
+It's bigger than one person's memory: a reviewer sees what changed, not why.
+[More, with research and sources](docs/guide/why.md).
+
+cogit isn't:
+
+- **Agent memory** (OpenViking, Mem0): that helps your agent recall what you talked about.
+- **A token saver** (RTK, Headroom): that sends the model less.
+- **A code map** (graphify): that shows how a codebase fits together.
+- **An orchestrator** (Herdr, Conductor): that runs many agents at once.
+- **A planning framework** (BMAD, Spec Kit): that decides what to build next.
+- **An AI review bot** (CodeRabbit, Greptile): that comments on whether a diff looks right.
+
+It answers the one question they leave open: why is this code the way it is? I use several of
+them alongside it.
+
+## See it
 
 <img src="docs/images/map.png" alt="The map: sessions as a git graph, each with its messages, branches, commit chips and a left off here marker">
 
@@ -26,17 +62,13 @@ what the change does, and the diff.*
 
 <img src="docs/images/tasks.png" alt="The Tasks panel: suggested items with Accept and Dismiss, open items with Done, and a Done section">
 
-*Tasks — what your sessions left undone, drafted when a session closes. You accept, dismiss or
-close each one.*
+*Tasks — work that came up in a session and didn't get finished, caught when the session closes.
+You accept, dismiss or close each one.*
 
 <img src="docs/images/files.png" alt="The Files view: a changed file opened, listing the messages that touched it with each message's reason and the option it rejected">
 
 *A changed file opens its history: every message that touched it, and the reason behind each —
 including the option that was rejected.*
-
-**[Click through a saved map](https://erensrtky.github.io/cogit/demo/)** — no install, no server:
-the same page `cogit open` writes, built from sample data. Read-only, so the Tasks buttons are
-inert.
 
 ## What it does
 
@@ -50,25 +82,21 @@ inert.
 - **Intent, Shape, Code**: a message that landed commits shows why it happened, a small
   picture of what the change does (a diagram, a before/after or interface table, an example
   or plain steps), and the diff, in one place.
-- **Tasks**: when a session ends, a small model drafts a few user-level items from what it
-  left undone; you accept, dismiss or close them (`cogit captures`, and on the map).
+- **Tasks**: when a session ends, a small model catches the work that came up and didn't get
+  finished as a few user-level items; you accept, dismiss or close them (`cogit captures`, and
+  on the map).
 - **Pull request descriptions with the decisions**: `cogit pr` writes the goal, the
   decisions and the rejected options, never the raw chat.
 - **Teams share the record through git**: after a pull, your teammates' sessions are on the
   map too, with who ran them and what changed most.
-- **The agent remembers**: a new session starts where the last one left off, and before
-  editing a file the agent hears what was already tried and rejected there.
 - **Cheap by default**: a small side model records in the background; in our sessions it
   cost about 1–2% of a session's tokens.
-- **Private by default**: no server, no account. The raw conversation stays on your machine
-  and keys are redacted.
-
-## Why
-
-AI coding agents made writing code faster and moved the bottleneck to review: in a study of
-718 firms, they opened 23% more pull requests while review time rose 49% and finished work did
-not measurably grow. A reviewer sees what changed, not why; the why stays in a chat nobody else
-reads. cogit keeps it next to the code. [More, with sources](docs/guide/why.md).
+- **No server, no account**: it runs on your machine. Your chats are not committed. The record
+  (titles, decisions and reasons) is, so it travels with your branch; `cogit init` lets you keep
+  it local instead. Key and token patterns are redacted.
+- **The agent gets the context too**: a new session starts where the last one left off, and
+  before editing a file the agent hears what was already tried and rejected there. It works
+  alongside memory tools; it doesn't replace them.
 
 ## Install
 

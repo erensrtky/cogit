@@ -121,7 +121,7 @@ import {
   versionNotice,
   why,
   withLock
-} from "./chunk-XMQKZVCS.js";
+} from "./chunk-DJFQNOZT.js";
 
 // node_modules/commander/lib/error.js
 var CommanderError = class extends Error {
@@ -4194,8 +4194,7 @@ async function readTranscriptViews(sessions, transcripts, root, io) {
     const file = transcripts.get(session.sessionId);
     const recordsMessages = session.nodes.some((node) => node.kind === "message");
     const roots = [session.worktree?.path, root].filter((r) => Boolean(r));
-    const stored = await readConversationStore(root, session.sessionId);
-    const storedByUuid = new Map(stored.map((turn) => [turn.uuid, turn]));
+    let stored = await readConversationStore(root, session.sessionId);
     let transcript = null;
     if (file) {
       try {
@@ -4209,21 +4208,18 @@ async function readTranscriptViews(sessions, transcripts, root, io) {
     }
     const fromTranscript = transcript && transcript.length > 0 ? hashTurns(session.sessionId, transcript) : null;
     if (fromTranscript) {
-      const fresh = fromTranscript.filter(
-        (turn) => turn.uuid !== void 0 && !storedByUuid.has(turn.uuid)
-      );
       const hashes = new Map(
         fromTranscript.flatMap(
           (turn) => turn.uuid === void 0 ? [] : [[turn.uuid, turn.hash]]
         )
       );
       try {
-        if (fresh.length > 0)
-          await appendConversationTurns(
-            root,
-            session.sessionId,
-            fresh.map((turn) => agent3.displayTurn(turn, roots))
-          );
+        const appended = await appendConversationTurns(
+          root,
+          session.sessionId,
+          fromTranscript.map((turn) => agent3.displayTurn(turn, roots))
+        );
+        if (appended > 0) stored = await readConversationStore(root, session.sessionId);
         await appendConversationHashes(root, session.sessionId, hashes);
       } catch (err) {
         io.warn(
@@ -4239,6 +4235,7 @@ async function readTranscriptViews(sessions, transcripts, root, io) {
       nodes: applyEvents(upgraded.nodes, events)
     };
     prepared.push(effective);
+    const storedByUuid = new Map(stored.map((turn) => [turn.uuid, turn]));
     let turns;
     if (fromTranscript) {
       turns = fromTranscript.map((turn) => {
@@ -5826,6 +5823,8 @@ function rules(language, messageSummaries, recorder) {
     "- parent: an earlier message id, or null when the message starts a new thread; never a topic or phase node.",
     "- Back to an older thread: that message is the parent and the previous one goes in links (at most 5). Unsure: use the previous message.",
     '- When the message itself made a decision (the user asked for it, picked an option or approved a proposal): decidedBy ("user" or "agreed"), the reason in why, and the options not taken in alternatives [{"option": "...", "why": "..."}].',
+    "- alternatives lists only options someone actually named in the conversation before the decision. Never infer one from the decision, never list the current state as an option, and leave the field out when none was named. Its why says what the conversation said: no durations, sizes or reasons it does not contain. An option only postponed was not rejected.",
+    '- decidedBy "agreed" needs the user approving the proposal in this message. A proposal the user has not answered is not a decision.',
     `- The agent's work belongs inside the message node that caused it, never in nodes of its own: work (short items), agentDecisions ([{"title": "...", "why": "...", "alternatives": [...]}]) only for technical choices with a reason \u2014 never for proposals or work items \u2014 commits (short hashes) and files (a few paths).`,
     "- Write a branch summary ({title, asked, outcome, open}) on the first message of a branch when the branch ends.",
     `- Never send "at"; the CLI takes each message's time from the transcript.`,
