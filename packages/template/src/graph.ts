@@ -145,3 +145,31 @@ export function centreViewport(
   }
   return { zoom, y, x: canvas.width / 2 - point.x * zoom };
 }
+
+/** The band moves in steps this tall, so a pan re-renders only when it crosses one. */
+export const BAND_STEP = 400;
+
+/**
+ * The canvas rows worth drawing: what the viewport shows plus one screen above
+ * and below, rounded out to `BAND_STEP`. With 10,000 sessions open, drawing
+ * every one froze the page for seconds; only these are drawn, the rest wait
+ * off-screen. Null (draw everything) until the canvas has a height.
+ */
+export function visibleBand(
+  transform: readonly [number, number, number],
+  height: number,
+): [number, number] | null {
+  if (height <= 0) return null;
+  const [, y, zoom] = transform;
+  const top = -y / zoom;
+  const span = height / zoom;
+  return [
+    Math.floor((top - span) / BAND_STEP) * BAND_STEP,
+    Math.ceil((top + 2 * span) / BAND_STEP) * BAND_STEP,
+  ];
+}
+
+/** True when a block from `top`, `height` tall, reaches into the band. */
+export function inBand(top: number, height: number, band: [number, number] | null): boolean {
+  return band === null || (top + height >= band[0] && top <= band[1]);
+}

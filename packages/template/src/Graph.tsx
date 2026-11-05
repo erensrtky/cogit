@@ -5,7 +5,9 @@ import {
   type NodeTypes,
   ReactFlow,
   ReactFlowProvider,
+  type ReactFlowState,
   useReactFlow,
+  useStore,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -25,7 +27,7 @@ import { type FilesFocus, type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
 import { type GitLayout, layoutGitGraph, ROW_WIDTH } from "./gitLayout.js";
-import { centreViewport, headOf, type MapPoint } from "./graph.js";
+import { centreViewport, headOf, inBand, type MapPoint, visibleBand } from "./graph.js";
 import type { MapSearchState } from "./MapSearch.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
 import { filterOf, type PersonFilter, peopleOf, valueOf } from "./people.js";
@@ -158,27 +160,50 @@ function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
         onOpenCard={openSessionCard}
         onContinue={openContinue}
       />
-      {data.openings.map((opening) => {
-        const active = data.activeHit;
-        return (
-          <div
-            key={opening.session.sessionId}
-            className="session-open"
-            style={{ top: opening.top, left: opening.left }}
-          >
-            <SessionMessages
-              session={opening.session}
-              git={opening.git}
-              highlights={data.highlights.get(opening.session.sessionId)}
-              activeHitId={
-                active?.sessionId === opening.session.sessionId ? active.messageId : null
-              }
-            />
-          </div>
-        );
-      })}
+      <OpenSessions
+        openings={data.openings}
+        highlights={data.highlights}
+        activeHit={data.activeHit}
+      />
     </div>
   );
+}
+
+/** The viewport's band as a string, so the store re-renders only when it moves a step. */
+function bandKey(state: ReactFlowState): string {
+  const band = visibleBand(state.transform, state.height);
+  return band === null ? "all" : band.join(":");
+}
+
+/**
+ * The open sessions' messages, only those near the viewport. Its own component,
+ * so a pan re-renders these rows and never the session list above them.
+ */
+function OpenSessions({
+  openings,
+  highlights,
+  activeHit,
+}: Pick<ProjectData, "openings" | "highlights" | "activeHit">) {
+  const key = useStore(bandKey);
+  const band = key === "all" ? null : (key.split(":").map(Number) as [number, number]);
+  return openings
+    .filter((opening) => inBand(opening.top, opening.git.height, band))
+    .map((opening) => (
+      <div
+        key={opening.session.sessionId}
+        className="session-open"
+        style={{ top: opening.top, left: opening.left }}
+      >
+        <SessionMessages
+          session={opening.session}
+          git={opening.git}
+          highlights={highlights.get(opening.session.sessionId)}
+          activeHitId={
+            activeHit?.sessionId === opening.session.sessionId ? activeHit.messageId : null
+          }
+        />
+      </div>
+    ));
 }
 
 const nodeTypes: NodeTypes = {
@@ -399,11 +424,16 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   /** The open drill-down's message, if any. */
   const target = selection?.type === "node" ? selection : null;
 
+  const sessionsById = useMemo(
+    () => new Map(model.sessions.map((session) => [session.sessionId, session])),
+    [model],
+  );
+
   /** Message graph of every open session. */
   const messageGits = useMemo(() => {
     const out = new Map<string, GitLayout>();
     for (const sessionId of openIds) {
-      const session = findSession(model, sessionId);
+      const session = sessionsById.get(sessionId);
       if (!session) continue;
       let options = {
         unfolded,
@@ -440,7 +470,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     }
     return out;
   }, [
-    model,
+    sessionsById,
     openIds,
     unfolded,
     openAll,

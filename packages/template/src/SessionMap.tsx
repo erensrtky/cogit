@@ -178,6 +178,13 @@ export function SessionMap({
 }) {
   const { git } = graph;
   const segments = new Map(git.segments.map((segment) => [segment.id, segment]));
+  // Grouped once: filtering every row per segment was quadratic, seconds at 10,000 sessions.
+  const rowsBySegment = new Map<string, GitRow[]>();
+  for (const row of git.rows) {
+    const rows = rowsBySegment.get(row.segmentId);
+    if (rows === undefined) rowsBySegment.set(row.segmentId, [row]);
+    else rows.push(row);
+  }
   const people = peopleOf(model);
 
   const open: (row: GitRow) => void = (row) => {
@@ -195,7 +202,7 @@ export function SessionMap({
       >
         {git.segments.map((segment) => {
           const start = branchPath(segment, git.laneX);
-          const rows = git.rows.filter((row) => row.segmentId === segment.id);
+          const rows = rowsBySegment.get(segment.id) ?? [];
           const x = git.laneX[segment.lane] ?? 0;
           return (
             <g key={segment.id} stroke={color(segment.colorIndex)} fill="none">

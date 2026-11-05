@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { LineageViewModel, ViewNode } from "../../cli/src/view/model.js";
 import {
+  BAND_STEP,
   CENTRE_MARGIN,
   centreViewport,
   headOf,
+  inBand,
   messageNeighbors,
   nodeId,
   sessionId,
   toNodeDetail,
+  visibleBand,
 } from "../src/graph.js";
 
 const AT = "2026-10-21T10:00:00.000Z";
@@ -144,5 +147,28 @@ describe("centreViewport", () => {
 
   it("centres a bare point when the row span is unknown", () => {
     expect(centreViewport({ x: 100, y: 100 }, canvas, 0.5)).toEqual({ zoom: 0.5, x: 350, y: 150 });
+  });
+});
+
+describe("the band of open sessions worth drawing", () => {
+  it("covers the viewport plus a screen either side, in whole steps", () => {
+    // Viewport at canvas y 4000..4800 (zoom 1, 800 tall).
+    const band = visibleBand([0, -4000, 1], 800);
+    expect(band).toEqual([3200, 5600]);
+    expect((band?.[0] ?? 1) % BAND_STEP).toBe(0);
+    // Zoomed out to a half, the same screen shows twice the canvas.
+    expect(visibleBand([0, -4000, 0.5], 800)).toEqual([6400, 11200]);
+  });
+
+  it("draws everything until the canvas has a height", () => {
+    expect(visibleBand([0, 0, 1], 0)).toBeNull();
+    expect(inBand(99_999, 10, null)).toBe(true);
+  });
+
+  it("keeps a block that reaches into the band and drops one wholly outside", () => {
+    expect(inBand(3000, 300, [3200, 5600])).toBe(true);
+    expect(inBand(5600, 100, [3200, 5600])).toBe(true);
+    expect(inBand(2000, 300, [3200, 5600])).toBe(false);
+    expect(inBand(5601, 100, [3200, 5600])).toBe(false);
   });
 });
