@@ -42,8 +42,10 @@ pages, which also means the record cannot be read there: reading it takes cogit.
   `.git/config` and downloads the team's records, showing progress in a terminal. After that a
   plain `git pull` brings them, even when no code changed. Each new record adds a line to its
   output.
-- **Your own unsent work:** a pull never overwrites a session you have changed and not sent. A
-  `git clean -fdx` does not lose anything either: the refs hold a copy and cogit puts the files back.
+- **Your own unsent work:** a pull never overwrites a session of yours that you have changed and
+  not sent. A teammate's session follows its owner: a change you make to it here is replaced by
+  their next update, since only they can send it. A `git clean -fdx` does not lose anything
+  either: the refs hold a copy and cogit puts the files back.
 - **Only your own sessions go out:** a session is sent by the person it is stamped with.
 
 Records follow the repository, not the branch: a session stays on the map after its branch is
