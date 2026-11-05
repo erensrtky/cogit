@@ -478,13 +478,7 @@ export async function downloadRecords(
   if (remote === undefined) return false;
   const args = ["fetch", "--no-tags", "--no-write-fetch-head", remote, RECORD_REFSPEC];
   const result = showProgress
-    ? await new Promise<GitResult>((done) => {
-        const child = spawn("git", ["-C", root, ...args], { env, stdio: "inherit" });
-        const failed = (code: number): void =>
-          done({ code, stdout: Buffer.alloc(0), stderr: "the download failed" });
-        child.on("error", () => failed(1));
-        child.on("close", (code) => failed(code ?? 1));
-      })
+    ? await fetchWithProgress(root, [...args.slice(0, 1), "--progress", ...args.slice(1)], env)
     : await runGit(root, [...args.slice(0, 1), "--quiet", ...args.slice(1)], quietEnv(env));
   await updateState(root, (state) => {
     if (result.code === 0) {
@@ -494,6 +488,45 @@ export async function downloadRecords(
     return { ...state, downloadError: gitError(result.stderr) };
   });
   return result.code === 0;
+}
+
+/** One `* [new ref] a -> b` line per session, and the `From <url>` above them. */
+const REF_LINE = /^(From | .* -> )/;
+
+/**
+ * A fetch a person watches: git's progress meter goes to the terminal as it
+ * comes (its `\r` redraws included), but the one line per session ref is
+ * dropped, so a first download of 300 sessions does not print 300 lines. The
+ * text is also kept, so a failure can say why. Prompts (an SSH passphrase) use
+ * the terminal directly and are not affected.
+ */
+function fetchWithProgress(
+  root: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+): Promise<GitResult> {
+  return new Promise((done) => {
+    const child = spawn("git", ["-C", root, ...args], {
+      env,
+      stdio: ["inherit", "inherit", "pipe"],
+    });
+    const err: string[] = [];
+    let rest = "";
+    const show = (part: string): void => {
+      err.push(part);
+      if (!REF_LINE.test(part)) process.stderr.write(part);
+    };
+    child.stderr?.on("data", (chunk: Buffer) => {
+      const parts = (rest + chunk.toString("utf8")).split(/(?<=[\r\n])/);
+      rest = /[\r\n]$/.test(parts.at(-1) ?? "") ? "" : (parts.pop() ?? "");
+      for (const part of parts) show(part);
+    });
+    child.on("error", (error) => done({ code: 1, stdout: Buffer.alloc(0), stderr: error.message }));
+    child.on("close", (code) => {
+      if (rest !== "") show(rest);
+      done({ code: code ?? 1, stdout: Buffer.alloc(0), stderr: err.join("") });
+    });
+  });
 }
 
 /**

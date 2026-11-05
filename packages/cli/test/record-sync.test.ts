@@ -604,10 +604,31 @@ describe("the record on its own refs", () => {
   });
 
   it("shows git's own progress to a person, and says when it failed", async () => {
-    expect(await downloadRecords(alice, env, true)).toBe(true);
-    await git(alice, "remote", "set-url", "origin", join(dir, "nowhere.git"));
-    expect(await downloadRecords(alice, env, true)).toBe(false);
-    expect((await recordSyncStatus(alice, env)).downloaded).toBe(true);
+    await record(alice, "s1", "First", "alice@example.com");
+    await record(alice, "s2", "Second", "alice@example.com");
+    await queueRecords(alice, env);
+    await sendRecords(alice, env);
+    const bob = await cloneAs("bob");
+    const stderr = process.stderr.write;
+    const printed: string[] = [];
+    process.stderr.write = ((text: string) => {
+      printed.push(text);
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      expect(await downloadRecords(bob, env, true)).toBe(true);
+      await git(bob, "remote", "set-url", "origin", join(dir, "nowhere.git"));
+      expect(await downloadRecords(bob, env, true)).toBe(false);
+    } finally {
+      process.stderr.write = stderr;
+    }
+    expect(await refs(bob, "refs/cogit-remote")).toHaveLength(2);
+    // Git's progress and errors reach the person; the line per session ref does not.
+    expect(printed.join("")).not.toContain(" -> ");
+    expect(printed.join("")).toContain("does not appear to be a git repository");
+    const status = await recordSyncStatus(bob, env);
+    expect(status.downloaded).toBe(true);
+    expect(status.downloadError).toContain("fatal:");
   });
 
   it("warns instead of failing the command when the record cannot be updated", async () => {
