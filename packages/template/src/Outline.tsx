@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { kindLabel } from "./format.js";
 import { nodeId, sessionId } from "./graph.js";
@@ -168,6 +168,18 @@ export function Outline({
     });
   }, [activeId, model]);
 
+  // Bring the active row into view, a frame later so its ancestors have expanded.
+  // Only a new target scrolls: opening or closing another row never jumps the list.
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!activeId) return;
+    const timer = window.setTimeout(() => {
+      const row = list.current?.querySelector(".outline-item.is-active");
+      row?.scrollIntoView?.({ block: "nearest" });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeId]);
+
   const toggle = (id: string): void => {
     setExpanded((previous) => {
       const next = new Set(previous);
@@ -190,7 +202,7 @@ export function Outline({
           ×
         </button>
       </header>
-      <div className="outline-scroll">
+      <div className="outline-scroll" ref={list}>
         {model.sessions.length === 0 ? (
           <p className="empty">No sessions recorded yet.</p>
         ) : (

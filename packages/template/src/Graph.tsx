@@ -398,6 +398,15 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
           : { sessionId: activeHit.sessionId, messageId: activeHit.messageId },
     [hashHit?.sessionId, hashHit?.messageId, activeHit?.sessionId, activeHit?.messageId],
   );
+  // The outline follows the hit the search is on, like a click on the map.
+  useEffect(() => {
+    if (searchTarget === null) return;
+    setFocusedId(
+      searchTarget.messageId === null
+        ? `session:${searchTarget.sessionId}`
+        : `node:session:${searchTarget.sessionId}:${searchTarget.messageId}`,
+    );
+  }, [searchTarget]);
   const highlights = useMemo(() => hitMessageIds(search.hits), [search.hits]);
   const sessionHits = useMemo(
     () => new Set(search.hits.flatMap((hit) => (hit.messageId === null ? [hit.sessionId] : []))),
