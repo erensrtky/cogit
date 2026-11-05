@@ -16,6 +16,10 @@ where the reviewer cannot see it. The author forgets it too: three weeks later, 
 remembers why the code went one way and not the other, and the agent starts every session
 knowing nothing about the last one.
 
+At least one team already reviews this way: Anthropic's source control team still reviews every
+change to its system, but says it now examines "the *intent* of the change as opposed to reading
+every line of code."
+
 cogit keeps that intent in the record and hands it over:
 
 - the `Thought:` trailer links each code commit to the message behind it, and
@@ -33,3 +37,5 @@ context the last one ended with.
 - Chen & Stratton, [*Artificial Intelligence in the Firm: Bottlenecks in Software
   Production*](https://fion.ac/jellyfish.pdf) (working paper, 4 August 2026)
 - [InfoQ's report](https://www.infoq.com/news/2026/10/jellyfish-ai-productivity/)
+- Anthropic, [*Redesigning source control at
+  Anthropic*](https://www.anthropic.com/research/redesigning-source-control) (13 October 2026)
