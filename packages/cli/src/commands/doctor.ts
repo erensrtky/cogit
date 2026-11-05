@@ -5,10 +5,10 @@ import type { AgentAdapter } from "../agents/index.js";
 import { defaultAgent } from "../agents/index.js";
 import { compareVersions, versionNotice } from "../cli-version.js";
 import { cogitIgnored, findGitRoot, gitHooksDir, gitUserEmail, gitUserName } from "../git.js";
-import { BLOCK_START, GIT_HOOK_EVENTS, hookBlock } from "../git-hooks.js";
+import { BLOCK_START, GIT_HOOK_EVENTS, hookCommandLine, isShellHook } from "../git-hooks.js";
 import type { Io } from "../io.js";
 import { hashTurns, isRecorded, upgradeSessionIds } from "../messages.js";
-import { recordSyncStatus, trackedRecordFiles } from "../record-sync.js";
+import { cogitGitignoreChanged, recordSyncStatus, trackedRecordFiles } from "../record-sync.js";
 import type { Session } from "../schema/session.js";
 import { checkHealth } from "../server.js";
 import { applyEvents, readEvents } from "../store/events.js";
@@ -310,7 +310,15 @@ const CHECK_SPECS: CheckSpec[] = [
           id: "record",
           status: "warn",
           message: `git still tracks ${tracked} session file${tracked === 1 ? "" : "s"} an older version committed`,
-          fix: "git rm -r --cached .cogit/sessions, then commit",
+          fix: "git rm -r --cached .cogit/sessions && git add .cogit/.gitignore, then commit",
+        };
+      if (await cogitGitignoreChanged(ctx.root, ctx.env))
+        return {
+          id: "record",
+          status: "warn",
+          message:
+            "the new .cogit/.gitignore is not committed; teammates see .cogit/sessions/ in git status",
+          fix: "git add .cogit/.gitignore, then commit",
         };
       const sync = await recordSyncStatus(ctx.root, ctx.env);
       if (!sync.sharing)
@@ -497,13 +505,21 @@ async function hookProblems(ctx: DoctorContext): Promise<string[]> {
   const problems: string[] = [];
   for (const event of GIT_HOOK_EVENTS) {
     const text = await readFile(join(dir, event), "utf8").catch(() => undefined);
+    if (text !== undefined && !text.includes(BLOCK_START) && !isShellHook(text)) {
+      problems.push(`the ${event} hook is not a shell script, so cogit cannot add to it`);
+      continue;
+    }
     if (text === undefined || !text.includes(BLOCK_START)) {
       problems.push(`the ${event} hook is missing`);
       continue;
     }
     const block = /# >>> cogit[\s\S]*?# <<< cogit/.exec(text)?.[0] ?? "";
-    const command = hookBlock(event, ctx.root, null).split("\n")[2] ?? "";
-    if (!block.split("\n").includes(command)) problems.push(`the ${event} hook is outdated`);
+    // Below the user's lines, an early `exit` there would skip it.
+    const top = text.startsWith("#!") ? text.indexOf("\n") + 1 : 0;
+    const current =
+      block.split("\n").includes(hookCommandLine(event, ctx.root)) &&
+      text.slice(top, text.indexOf(BLOCK_START)).trim() === "";
+    if (!current) problems.push(`the ${event} hook is outdated`);
   }
   return problems;
 }

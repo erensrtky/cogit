@@ -35,7 +35,7 @@ pages, which also means the record cannot be read there: reading it takes cogit.
 
 - **Sending:** `git push` to `origin` (or your only remote) prints how many records will follow,
   and they go in the background once the push has landed. It never slows the push, never asks
-  for anything and never fails it. A rejected push sends nothing, and neither does a `--dry-run` with new commits; a `--dry-run` with nothing new to push still sends. What could not
+  for anything and never fails it. A rejected push sends nothing, and neither does `git push --dry-run`: cogit reads it from the running `git` on Linux and macOS. On Windows a `--dry-run` with nothing new to push still sends. What could not
   be sent stays queued, the next session start tries again, and `cogit doctor` tells you why.
   Pushing to any other remote, such as a deploy target, sends nothing.
 - **Receiving:** the first time cogit runs in a clone, it adds one fetch line to that clone's
@@ -65,10 +65,12 @@ delete them. If the repository cannot be reached, nothing is deleted.
 ### Coming from a version that committed the record
 
 Older versions committed `.cogit/sessions/`. After upgrading, stop tracking them once, in one
-clone, or they keep showing in `git status`:
+clone, or they keep showing in `git status`. The upgrade also rewrote `.cogit/.gitignore`; commit
+it in the same step, or teammates and new clones see `.cogit/sessions/` as untracked:
 
 ```bash
 git rm -r --cached .cogit/sessions
+git add .cogit/.gitignore
 git commit -m "chore: stop tracking the cogit record"
 ```
 
@@ -80,14 +82,18 @@ they had, so the repository's size does not shrink. `cogit doctor` reminds you u
 ## The git hooks
 
 `init` adds a block to three git hooks in your clone (and follows `core.hooksPath`, so Husky
-setups work). The block never fails a commit or a push.
+setups work). The block never fails a commit or a push. It sits right under the first line, so
+an early `exit` in your own lines cannot skip it, and your hook's exit status stays the hook's.
+A hook written in another language (Python, Node) is left alone, and `cogit doctor` says so.
 
 - **`prepare-commit-msg`** adds a `Thought: h<id>` trailer naming the message the commit came
   from: the newest message of the current session. It is skipped for merges and squashes, while
   a rebase or cherry-pick replays old commits, and when the last message is older than
-  `trailerMaxAgeHours` (6 hours), since such a commit is probably not about that message.
+  `trailerMaxAgeHours` (6 hours), since such a commit is probably not about that message. It
+  runs after your own lines, so a tool that rewrites the message (commitizen) keeps it.
 - **`post-commit`** starts the commit's Shape in the background.
-- **`pre-push`** sends the session records of a project that shares them.
+- **`pre-push`** sends the session records of a project that shares them. It reads the list of
+  pushed refs git gives the hook and hands it on to your own lines unchanged.
 
 ### Rebase and squash
 

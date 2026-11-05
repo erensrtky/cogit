@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- A git hook of your own that ended with `exit 0`, or read the push's input, no longer stops cogit: its block now sits at the top of the hook, hands git's input on to your lines, and adds the `Thought:` trailer after them. Existing hooks move on the next chat message; a Python or Node hook is left alone and `cogit doctor` says so.
+- `git push --dry-run` no longer sends the record (Linux and macOS).
+- After upgrading from a version that committed the record, `cogit doctor` asks you to commit the rewritten `.cogit/.gitignore` too; without it teammates and new clones saw `.cogit/sessions/` in `git status`.
 
 ## [1.0.0] - 2026-11-04
 ### Changed

@@ -3,6 +3,7 @@ import { chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { findGitRoot, gitHooksDir, resolveCommit } from "./git.js";
 import { spawnDetachedProcess } from "./hooks/run.js";
+import { pushIsDryRun } from "./push-command.js";
 import { countUnsentRecords } from "./record-sync.js";
 import { atomicWrite } from "./store/fs.js";
 import { captureDisabled, projectPaths } from "./store/paths.js";
@@ -34,30 +35,90 @@ export function currentCliPath(): string | undefined {
 }
 
 /**
- * The block `init` adds to a hook; `"$@"` passes git's arguments through. A
- * `cogit` on PATH wins; otherwise the CLI that installed the block runs under
- * `node`; with neither, the hook does nothing and the commit goes on.
+ * The block `init` adds to a hook, at the top so a user line that exits early
+ * (`exit 0`) can never skip it. A `cogit` on PATH wins; otherwise the CLI that
+ * installed the block runs under `node`; with neither, the hook does nothing and
+ * the commit goes on.
+ *
+ * - `pre-push` reads git's stdin itself and hands it back to the lines below,
+ *   so a user hook that reads it still gets it and cogit always sees the refs.
+ * - `prepare-commit-msg` runs at exit, after the user's lines: a tool that
+ *   rewrites the message file (commitizen) keeps the `Thought:` trailer, and the
+ *   user's exit status stays the hook's.
  */
 export function hookBlock(
   event: string,
   projectRoot: string,
   cliPath: string | null = currentCliPath() ?? null,
 ): string {
+  if (event === "pre-push") {
+    return [
+      BLOCK_START,
+      "cogit_stdin=$(cat)",
+      ...cogitCall(event, projectRoot, cliPath, `printf '%s' "$cogit_stdin" | `, ""),
+      'if [ -n "$cogit_stdin" ]; then exec <<COGIT_STDIN',
+      "$cogit_stdin",
+      "COGIT_STDIN",
+      "else exec </dev/null; fi",
+      BLOCK_END,
+    ].join("\n");
+  }
+  if (event === "prepare-commit-msg") {
+    return [
+      BLOCK_START,
+      "cogit_msg=${1-} cogit_source=${2-}",
+      "cogit_thought() {",
+      ...cogitCall(event, projectRoot, cliPath, "", "  "),
+      "}",
+      `trap 'cogit_status=$?; cogit_thought "$cogit_msg" "$cogit_source"; exit $cogit_status' EXIT`,
+      BLOCK_END,
+    ].join("\n");
+  }
+  return [BLOCK_START, ...cogitCall(event, projectRoot, cliPath, "", ""), BLOCK_END].join("\n");
+}
+
+/** The `cogit` / `node <cli>` branches that run one hook; `"$@"` passes git's arguments. */
+function cogitCall(
+  event: string,
+  projectRoot: string,
+  cliPath: string | null,
+  pipe: string,
+  indent: string,
+): string[] {
   const args = `hook ${event} --dir ${shellQuote(projectRoot)} "$@"`;
-  const lines = [
-    BLOCK_START,
-    "if command -v cogit >/dev/null 2>&1; then",
-    `  cogit ${args} || true`,
-  ];
+  const lines = ["if command -v cogit >/dev/null 2>&1; then", `  ${pipe}cogit ${args} || true`];
   if (cliPath !== null) {
     const cli = shellQuote(cliPath);
     lines.push(
       `elif command -v node >/dev/null 2>&1 && [ -f ${cli} ]; then`,
-      `  node ${cli} ${args} || true`,
+      `  ${pipe}node ${cli} ${args} || true`,
     );
   }
-  lines.push("fi", BLOCK_END);
-  return lines.join("\n");
+  lines.push("fi");
+  return lines.map((line) => `${indent}${line}`);
+}
+
+/**
+ * The line of a block that names the project and the hook command; doctor
+ * compares only this one, since the fallback CLI path differs between installs.
+ */
+export function hookCommandLine(event: string, projectRoot: string): string {
+  return (
+    hookBlock(event, projectRoot, null)
+      .split("\n")
+      .find((line) => line.includes("cogit hook ")) ?? ""
+  );
+}
+
+/**
+ * True when cogit can add its block: a new or empty file, one without a
+ * shebang, or a `sh`-family script. A Python or Node hook is left alone, since
+ * shell lines would break it; doctor reports it.
+ */
+export function isShellHook(text: string): boolean {
+  const first = text.split("\n", 1)[0] ?? "";
+  if (!first.startsWith("#!")) return true;
+  return /(^|[/\s])(sh|bash|dash|zsh|ksh|ash)(\s|$)/.test(first.slice(2).trim());
 }
 
 /** Single quotes for the shell, with the embedded single quote escaped. */
@@ -65,20 +126,28 @@ function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
-/** Replaces an existing cogit block, or appends one, keeping the file's own content. */
+/**
+ * Puts the cogit block right under the shebang, keeping the file's own content.
+ * An older block anywhere in the file (past versions appended it) moves up.
+ */
 export function withHookBlock(text: string, block: string): string {
-  const pattern = /# >>> cogit[\s\S]*?# <<< cogit/g;
-  if (pattern.test(text)) return text.replace(pattern, block);
+  const rest = text.includes(BLOCK_START) ? withoutHookBlock(text) : text;
   // An empty file still has to be runnable: git execs the hook directly.
-  if (text === "") return `#!/bin/sh\n\n${block}\n`;
-  const sep = text.endsWith("\n") ? "" : "\n";
-  return `${text}${sep}\n${block}\n`;
+  if (rest === "") return `#!/bin/sh\n${block}\n`;
+  if (!rest.startsWith("#!")) return `${block}\n${rest}`;
+  const cut = rest.indexOf("\n");
+  if (cut === -1) return `${rest}\n${block}\n`;
+  return `${rest.slice(0, cut + 1)}${block}\n${rest.slice(cut + 1)}`;
 }
 
-/** Removes the marked block and the blank separator `withHookBlock` added. */
+/**
+ * Removes the marked block, and the blank line older versions put before it
+ * when they appended it; the user's own blank lines stay.
+ */
 export function withoutHookBlock(text: string): string {
-  const next = text.replace(/# >>> cogit\n[\s\S]*?# <<< cogit\n?/, "");
-  return next.endsWith("\n\n") ? next.slice(0, -1) : next;
+  return text.replace(/(\n\n)?# >>> cogit\n[\s\S]*?# <<< cogit\n?/, (_all, gap) =>
+    gap === undefined ? "" : "\n",
+  );
 }
 
 /** True when what is left is only the shebang `installGitHook` wrote itself. */
@@ -103,8 +172,8 @@ export async function installGitHook(root: string, event: string): Promise<boole
     () => false,
   );
   const current = exists ? await readFile(file, "utf8") : "";
-  const block = hookBlock(event, root);
-  const next = exists ? withHookBlock(current, block) : `#!/bin/sh\n\n${block}\n`;
+  if (!isShellHook(current)) return false;
+  const next = withHookBlock(current, hookBlock(event, root));
   if (exists && next === current) return false;
   await atomicWrite(file, next);
   await chmod(file, 0o755);
@@ -206,8 +275,10 @@ async function sendWithPush(
   pushedRemote: string | undefined,
   pushedRefs: string,
   spawn: typeof spawnDetachedProcess,
+  dryRun: () => boolean,
 ): Promise<void> {
   if (captureDisabled(env)) return;
+  if (dryRun()) return;
   const lines = pushedRefs.split("\n").filter(Boolean);
   const going = lines
     .map((line) => line.split(" "))
@@ -268,9 +339,10 @@ export async function runGitHook(
   now: Date = new Date(),
   spawn: typeof spawnDetachedProcess = spawnDetachedProcess,
   pushedRefs: () => Promise<string> = async () => "",
+  dryRun: () => boolean = pushIsDryRun,
 ): Promise<void> {
   if (event === "pre-push") {
-    await sendWithPush(dir, env, args[0], await pushedRefs(), spawn);
+    await sendWithPush(dir, env, args[0], await pushedRefs(), spawn, dryRun);
     return;
   }
   if (event === "post-commit") {

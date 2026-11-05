@@ -512,7 +512,7 @@ describe("the thought behind a commit (Story 9.4)", () => {
         "pre-push",
       ]);
       expect(await readFile(preCommit, "utf8")).toBe(
-        `${userHook}\n${hookBlock("pre-push", root)}\n`,
+        `#!/bin/sh\n${hookBlock("pre-push", root)}\necho user-hook\n`,
       );
       expect(await readFile(join(root, ".git", "hooks", "prepare-commit-msg"), "utf8")).toContain(
         "cogit hook prepare-commit-msg",

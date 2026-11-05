@@ -257,6 +257,21 @@ describe("doctor", () => {
       `#!/bin/sh\n\n${hookBlock("prepare-commit-msg", root, "/elsewhere/cogit/dist/cli.js")}\n`,
     );
     expect((await check(root, "project")).status).toBe("ok");
+    // Below the user's lines (as older versions appended it), an `exit 0` skips it.
+    await writeFile(
+      join(root, ".git", "hooks", "prepare-commit-msg"),
+      `#!/bin/sh\nexit 0\n\n${hookBlock("prepare-commit-msg", root)}\n`,
+    );
+    expect((await check(root, "project")).message).toContain("prepare-commit-msg hook is outdated");
+    await writeFile(join(root, ".git", "hooks", "prepare-commit-msg"), "#!/usr/bin/env python3\n");
+    expect((await check(root, "project")).message).toContain(
+      "prepare-commit-msg hook is not a shell script",
+    );
+    await writeFile(
+      join(root, ".git", "hooks", "prepare-commit-msg"),
+      `#!/bin/sh\n${hookBlock("prepare-commit-msg", root)}\n`,
+    );
+    expect((await check(root, "project")).status).toBe("ok");
 
     await writeFile(join(root, ".cogit", "project.json"), "{ not json");
     const broken = await check(root, "project");

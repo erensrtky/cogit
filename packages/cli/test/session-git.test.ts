@@ -184,8 +184,8 @@ describe("ignore files and git hooks", () => {
     await chmod(file, 0o755);
     expect(await installGitHook(root, "pre-commit")).toBe(true);
     const text = await readFile(file, "utf8");
-    expect(text.startsWith("#!/bin/sh\necho user-hook\n")).toBe(true);
-    expect(text).toContain(hookBlock("pre-commit", root));
+    // Under the shebang, so an early `exit` in the user's lines cannot skip it.
+    expect(text).toBe(`#!/bin/sh\n${hookBlock("pre-commit", root)}\necho user-hook\n`);
     expect(await installGitHook(root, "pre-commit")).toBe(false);
   });
 

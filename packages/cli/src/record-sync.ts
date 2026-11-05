@@ -629,6 +629,20 @@ export async function trackedRecordFiles(root: string, env: NodeJS.ProcessEnv): 
   return result.stdout.toString("utf8").split("\n").filter(Boolean).length;
 }
 
+/**
+ * True when the committed `.cogit/.gitignore` is older than the one here (an
+ * upgrade rewrote it): until it is committed, teammates and new clones see
+ * `.cogit/sessions/` as untracked, and one `git add -A` commits the record again.
+ */
+export async function cogitGitignoreChanged(
+  root: string,
+  env: NodeJS.ProcessEnv,
+): Promise<boolean> {
+  const result = await runGit(root, ["status", "--porcelain", "--", ".cogit/.gitignore"], env);
+  const line = result.stdout.toString("utf8").split("\n")[0] ?? "";
+  return line !== "" && !line.startsWith("??");
+}
+
 export interface RecordSyncStatus {
   sharing: boolean;
   remote?: string;

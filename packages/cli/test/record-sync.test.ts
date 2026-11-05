@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { doctor } from "../src/commands/doctor.js";
 import { init } from "../src/commands/init.js";
 import { pruneCutoff, pruneRecords } from "../src/commands/prune.js";
+import { cogitGitignore } from "../src/git.js";
 import { installGitHooks, runGitHook } from "../src/git-hooks.js";
 import { runHook } from "../src/hooks/run.js";
 import { prepareRecords } from "../src/record-prepare.js";
@@ -361,6 +362,17 @@ describe("the record on its own refs", () => {
       await hook("origin", `(delete) ${zero} refs/heads/old ${sha}\n`);
       await hook("origin", "");
       await runGitHook("pre-push", alice, env, ["deploy", remote], new Date(T0), spawned);
+      // `git push --dry-run` sends nothing, even with new code in the push.
+      await runGitHook(
+        "pre-push",
+        alice,
+        env,
+        ["origin", remote],
+        new Date(T0),
+        spawned,
+        async () => `refs/heads/main ${sha} refs/heads/main ${zero}\n`,
+        () => true,
+      );
     } finally {
       process.stderr.write = stderr;
     }
@@ -547,6 +559,22 @@ describe("the record on its own refs", () => {
     const check = report.checks.find((item) => item.id === "record");
     expect(check?.status).toBe("warn");
     expect(check?.fix).toContain("git rm -r --cached .cogit/sessions");
+    expect(check?.fix).toContain("git add .cogit/.gitignore");
+
+    // Untracked, but the rewritten .cogit/.gitignore never reached the commit.
+    const ignore = join(alice, ".cogit", ".gitignore");
+    await git(alice, "rm", "-q", "--cached", projectPaths(alice).session("old"));
+    await writeFile(ignore, "*\n!.gitignore\n!project.json\n!sessions/\n");
+    await git(alice, "add", "-f", ignore);
+    await git(alice, "commit", "-qm", "chore: stop tracking");
+    await writeFile(ignore, cogitGitignore());
+    const pending = await doctor({ dir: alice, io: fakeIo(env), json: false } as never);
+    const stale = pending.checks.find((item) => item.id === "record");
+    expect(stale?.status).toBe("warn");
+    expect(stale?.fix).toBe("git add .cogit/.gitignore, then commit");
+    await git(alice, "commit", "-qam", "chore: new ignore rules");
+    const done = await doctor({ dir: alice, io: fakeIo(env), json: false } as never);
+    expect(done.checks.find((item) => item.id === "record")?.status).toBe("ok");
   });
 
   it("reports a failed send and a failed download in doctor", async () => {
