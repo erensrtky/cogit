@@ -63,4 +63,11 @@ describe("createProgram", () => {
       expect(help, command).toContain(`$ cogit ${command}`);
     }
   });
+
+  it("names only the git policies 1.0 accepts, share and ignore", () => {
+    const init = run(["init", "--help"]);
+    expect(init).toContain("--git share");
+    expect(init).not.toMatch(/--git commit/);
+    expect(run(["config", "git", "--help"])).not.toMatch(/\bcommit\b/);
+  });
 });

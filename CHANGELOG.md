@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The first download of a team's records shows git's progress meter without one line per session (300 sessions printed over 600 lines), and when it fails, `cogit doctor` shows git's reason instead of "the download failed".
 - After upgrading from a version that committed the record, `cogit doctor` asks you to commit the rewritten `.cogit/.gitignore` too; without it teammates and new clones saw `.cogit/sessions/` in `git status`.
 - A map with thousands of sessions no longer freezes on "Unfold all" and "Fold all": only the open sessions near the screen are drawn, and the session list no longer does quadratic work (10,000 sessions: 11 s down to 2 s).
+- `cogit init --help` and `cogit config git --help` named the removed `commit` policy; they now say `share` or `ignore`.
 
 ## [1.0.0] - 2026-11-04
 ### Changed

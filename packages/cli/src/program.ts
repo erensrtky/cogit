@@ -408,7 +408,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     )
     .option("--no-project-settings", "leave the project's .claude/settings.json unchanged")
     .option("-y, --yes", "accept defaults for every question")
-    .addHelpText("after", examples("cogit init", "cogit init ../my-app --git commit --yes"))
+    .addHelpText("after", examples("cogit init", "cogit init ../my-app --git share --yes"))
     .action(
       run(async (dir: string, opts: InitOptions & { yes?: boolean }) => {
         const { yes, ...rest } = opts;
@@ -480,7 +480,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .action(run(async (key: string, value: string) => configSet(key, value, makeIo(false))));
   config
     .command("git")
-    .description("show, or switch to commit or ignore, this project's session records (story 9.3)")
+    .description("show, or switch to share or ignore, this project's session records")
     .argument("[policy]", "share or ignore; without it, shows the current policy")
     .argument("[dir]", "project directory", ".")
     .action(
