@@ -34,6 +34,7 @@ import {
   attachThoughtTrailers,
   earliestSessionStart,
   parseThoughtTrailers,
+  readCommitAuthorEmail,
   readCommitThought,
   readThoughtTrailers,
 } from "../src/thought.js";
@@ -635,6 +636,27 @@ describe("the thought behind a commit (Story 9.4)", () => {
     await expect(show({ dir: root, ref: short, io, chat: false })).rejects.toThrow(
       `commit ${short} comes from thought ${thought}, which is not recorded yet`,
     );
+
+    // Someone else's commit: their thought may never reach this clone (a fork).
+    await git("config", "user.email", "me@example.com");
+    await git(
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "feat: theirs",
+      "--author",
+      "Bob <bob@example.com>",
+      "--trailer",
+      `Thought: ${thought}`,
+    );
+    const theirs = (await git("rev-parse", "--short", "HEAD")).trim();
+    expect(await readCommitAuthorEmail(root, theirs)).toBe("bob@example.com");
+    await expect(show({ dir: root, ref: theirs, io, chat: false })).rejects.toThrow(
+      "not in this clone's record: its author has not pushed it yet, or the commit came from a fork",
+    );
+    expect(await readCommitAuthorEmail(root, "nope")).toBeUndefined();
+    expect(await readCommitAuthorEmail(await noGitDir(), "HEAD")).toBeUndefined();
 
     // No trailer, an unknown ref or no repository: nothing to name.
     await git("commit", "-q", "--allow-empty", "-m", "chore: plain");

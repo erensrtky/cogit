@@ -1,4 +1,10 @@
-import { findGitRoot, projectFiles, readCommitFiles, readCommitSubjects } from "../git.js";
+import {
+  findGitRoot,
+  gitUserEmail,
+  projectFiles,
+  readCommitFiles,
+  readCommitSubjects,
+} from "../git.js";
 import { CliError, type Io } from "../io.js";
 import { readSessionMessages, type SessionMessage, upgradeSessionIds } from "../messages.js";
 import type { LineageNode, Session } from "../schema/session.js";
@@ -8,6 +14,7 @@ import { loadAllSessions, loadProject } from "../store/stores.js";
 import {
   attachThoughtTrailers,
   earliestSessionStart,
+  readCommitAuthorEmail,
   readCommitThought,
   readThoughtTrailers,
 } from "../thought.js";
@@ -546,10 +553,17 @@ export async function show(opts: ShowOptions): Promise<ShowModel> {
     const thought = COMMIT_REF.test(opts.ref)
       ? await readCommitThought(root, opts.ref, opts.io.env)
       : undefined;
-    if (thought !== undefined)
+    if (thought !== undefined) {
+      const author = await readCommitAuthorEmail(root, opts.ref, opts.io.env);
+      const me = await gitUserEmail(root, opts.io.env);
+      const others =
+        author !== undefined && me !== undefined && author.toLowerCase() !== me.toLowerCase();
       throw new CliError(
-        `commit ${opts.ref} comes from thought ${thought}, which is not recorded yet; it appears after the next record update`,
+        others
+          ? `commit ${opts.ref} comes from thought ${thought}, which is not in this clone's record: its author has not pushed it yet, or the commit came from a fork, whose record stays in the fork`
+          : `commit ${opts.ref} comes from thought ${thought}, which is not recorded yet; it appears after the next record update`,
       );
+    }
     throw new CliError(result.reason);
   }
   if (result.kind === "ambiguous") {

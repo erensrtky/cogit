@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { init } from "../src/commands/init.js";
 import { shortHash } from "../src/commands/log.js";
 import {
+  buildPrModel,
   copyToClipboard,
   formatPr,
   type PrModel,
@@ -432,10 +433,44 @@ describe("cogit pr (Story 10.1)", () => {
   });
 
   it("parses only well-formed commit lines", () => {
-    const line = ["a".repeat(40), "aaaaaaa", T0, "feat: a"].join("\0");
-    const emptyShort = ["b".repeat(40), "", T0, "feat: b"].join("\0");
-    expect(parsePrCommits(`not a commit\n${line}\n${emptyShort}`)).toEqual([
-      { full: "a".repeat(40), short: "aaaaaaa", at: T0, subject: "feat: a" },
+    const line = ["a".repeat(40), "aaaaaaa", T0, "a@example.com", "feat: a"].join("\0");
+    const emptyShort = ["b".repeat(40), "", T0, "", "feat: b"].join("\0");
+    const noEmail = ["c".repeat(40), "ccccccc", T0, "", "feat: c"].join("\0");
+    expect(parsePrCommits(`not a commit\n${line}\n${emptyShort}\n${noEmail}`)).toEqual([
+      {
+        full: "a".repeat(40),
+        short: "aaaaaaa",
+        at: T0,
+        subject: "feat: a",
+        authorEmail: "a@example.com",
+      },
+      { full: "c".repeat(40), short: "ccccccc", at: T0, subject: "feat: c" },
     ]);
+  });
+
+  it("tells a teammate's missing thought from one's own not yet recorded", () => {
+    const commit = (n: string, authorEmail: string) => ({
+      full: n.repeat(40),
+      short: n.repeat(7),
+      at: T0,
+      subject: `feat: ${n}`,
+      authorEmail,
+      thoughts: ["h123456789ab"],
+      files: [],
+    });
+    const model = buildPrModel({
+      base: { ref: "main", commit: "0".repeat(40) },
+      head: "f".repeat(40),
+      policy: "share",
+      userEmail: "Me@Example.com",
+      sessions: [],
+      commits: [commit("a", "me@example.com"), commit("b", "fork@example.com")],
+    });
+    expect(model.unlinked.map((entry) => entry.others)).toEqual([undefined, true]);
+    const text = renderPr(model, 1_000_000).text;
+    expect(text).toContain("`aaaaaaa` feat: a — thought `h123456789ab` not recorded yet");
+    expect(text).toContain(
+      "`bbbbbbb` feat: b — thought `h123456789ab` is not in this clone's record: its author has not pushed it yet, or it came from a fork",
+    );
   });
 });

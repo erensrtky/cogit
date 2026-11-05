@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { cogitIgnored, findGitRoot, readCommitFiles } from "../git.js";
+import { cogitIgnored, findGitRoot, gitUserEmail, readCommitFiles } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import { earliestSessionStart, readThoughtTrailers } from "../thought.js";
 import type { ViewNode } from "../view/model.js";
@@ -38,6 +38,8 @@ export interface PrCommit {
   short: string;
   at: string;
   subject: string;
+  /** The author's email, so a missing thought can be told apart: one's own, or someone else's. */
+  authorEmail?: string;
   /** The messages the commit names; a squash can name several. */
   thoughts?: string[];
   /** Repository-relative paths; empty when git no longer has the commit. */
@@ -51,6 +53,11 @@ export interface PrUnlinkedCommit {
   subject: string;
   /** Set when the trailer names a thought the record does not hold yet. */
   thought?: string;
+  /**
+   * True when someone else wrote the commit: their thought reaches this clone only
+   * once they push it, and never from a fork, whose record stays in the fork.
+   */
+  others?: boolean;
 }
 
 export interface PrGoal {
@@ -105,14 +112,20 @@ export interface PrModel {
   unlinked: PrUnlinkedCommit[];
 }
 
-/** `git log` for a branch, oldest first: `%H%x00%h%x00%cI%x00%s` per line. */
+/** `git log` for a branch, oldest first: `%H%x00%h%x00%cI%x00%ae%x00%s` per line. */
 export function parsePrCommits(stdout: string): Omit<PrCommit, "files" | "thought">[] {
   const out: Omit<PrCommit, "files" | "thought">[] = [];
   for (const line of stdout.split("\n")) {
-    const [full, short, at, subject] = line.split("\0");
+    const [full, short, at, authorEmail, subject] = line.split("\0");
     if (full === undefined || !/^[0-9a-f]{40}$/.test(full)) continue;
     if (short === undefined || short === "") continue;
-    out.push({ full, short, at: at ?? "", subject: subject ?? "" });
+    out.push({
+      full,
+      short,
+      at: at ?? "",
+      subject: subject ?? "",
+      ...(authorEmail ? { authorEmail } : {}),
+    });
   }
   return out;
 }
@@ -180,7 +193,7 @@ async function readPrCommits(
 ): Promise<Omit<PrCommit, "files" | "thought">[]> {
   const stdout = await git(
     root,
-    ["log", "--reverse", "--format=%H%x00%h%x00%cI%x00%s", `${base}..${head}`],
+    ["log", "--reverse", "--format=%H%x00%h%x00%cI%x00%ae%x00%s", `${base}..${head}`],
     env,
   );
   return parsePrCommits(stdout ?? "");
@@ -205,6 +218,8 @@ export interface BuildPrInput {
   commits: readonly PrCommit[];
   sessions: readonly EffectiveSession[];
   policy: "share" | "ignore";
+  /** The local git user's email; a commit by anyone else is someone else's. */
+  userEmail?: string;
 }
 
 /**
@@ -231,11 +246,16 @@ export function buildPrModel(input: BuildPrInput): PrModel {
     const known = ids.filter((id) => index.has(id));
     if (known.length === 0) {
       const named = ids[0];
+      const others =
+        commit.authorEmail !== undefined &&
+        input.userEmail !== undefined &&
+        commit.authorEmail.toLowerCase() !== input.userEmail.toLowerCase();
       unlinked.push({
         full: commit.full,
         short: commit.short,
         subject: commit.subject,
         ...(named === undefined ? {} : { thought: named }),
+        ...(named !== undefined && others ? { others: true } : {}),
       });
       continue;
     }
@@ -401,7 +421,12 @@ export function formatPr(model: PrModel, opts: PrFormatOptions): string {
   } else {
     for (const commit of model.unlinked) {
       const thought =
-        commit.thought === undefined ? "" : ` — thought \`${commit.thought}\` not recorded yet`;
+        commit.thought === undefined
+          ? ""
+          : commit.others === true
+            ? ` — thought \`${commit.thought}\` is not in this clone's record: its author has ` +
+              "not pushed it yet, or it came from a fork, whose record stays in the fork"
+            : ` — thought \`${commit.thought}\` not recorded yet`;
       lines.push(`- \`${commit.short}\` ${oneLine(commit.subject)}${thought}`);
     }
   }
@@ -528,6 +553,7 @@ export async function pr(opts: PrOptions): Promise<PrModel> {
   const base = await resolvePrBase(gitRoot, opts.base, env);
   const commits = await readPrCommits(gitRoot, base.commit, head, env);
   const sessions = await loadEffectiveSessions(root, opts.io);
+  const userEmail = await gitUserEmail(gitRoot, env);
   const trailers =
     commits.length === 0
       ? new Map<string, string[]>()
@@ -547,6 +573,7 @@ export async function pr(opts: PrOptions): Promise<PrModel> {
     base,
     head,
     policy: (await cogitIgnored(root)) ? "ignore" : "share",
+    ...(userEmail === undefined ? {} : { userEmail }),
     sessions,
     commits: commits.map((commit) => {
       const thoughts = trailers.get(commit.full);

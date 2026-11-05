@@ -222,6 +222,24 @@ export async function readThoughtTrailers(
   }
 }
 
+/** The author email of a commit, or undefined when git cannot read it. */
+export async function readCommitAuthorEmail(
+  root: string,
+  ref: string,
+  env?: NodeJS.ProcessEnv,
+): Promise<string | undefined> {
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === undefined) return undefined;
+  try {
+    const args = ["-C", gitRoot, "log", "-1", "--format=%ae", ref];
+    const { stdout } = await exec("git", args, env === undefined ? undefined : { env });
+    const email = String(stdout).trim();
+    return email === "" ? undefined : email;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * The one message a commit's final trailer block names, or undefined (no trailer,
  * no such commit). This is what the commit itself was made for; a squash's quoted
