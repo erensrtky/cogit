@@ -10,6 +10,7 @@ import { pruneCutoff, pruneRecords } from "../src/commands/prune.js";
 import { cogitGitignore } from "../src/git.js";
 import { installGitHooks, runGitHook } from "../src/git-hooks.js";
 import { runHook } from "../src/hooks/run.js";
+import { createProgram } from "../src/program.js";
 import { prepareRecords } from "../src/record-prepare.js";
 import {
   addRecordRefspec,
@@ -309,6 +310,23 @@ describe("the record on its own refs", () => {
     await prepareRecords(bob, env, () => {});
     expect(await title(bob, "s1")).toBe("First");
     expect((await recordSyncStatus(bob, env)).downloadError).toBeUndefined();
+  });
+
+  it("downloads on a person's cogit build, but not on the quiet build after a turn", async () => {
+    await record(alice, "s1", "First", "alice@example.com");
+    await push(alice);
+    const build = async (root: string, ...flags: string[]): Promise<void> => {
+      const program = createProgram(() => fakeIo(env));
+      program.exitOverride().configureOutput({ writeErr: () => {}, writeOut: () => {} });
+      await program.parseAsync(["build", root, ...flags], { from: "user" });
+    };
+    const quiet = await cloneAs("quiet");
+    await build(quiet, "--quiet");
+    expect(await title(quiet, "s1")).toBeUndefined();
+    const bob = await cloneAs("bob");
+    await build(bob);
+    expect(await title(bob, "s1")).toBe("First");
+    expect(await readFile(join(bob, ".cogit", "map.html"), "utf8")).toContain("First");
   });
 
   it("adds the refspec once, in this clone's config only", async () => {

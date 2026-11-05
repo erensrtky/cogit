@@ -453,7 +453,11 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .addHelpText("after", examples("cogit build", "cogit build ../my-app --quiet"))
     .action(
       run(async (dir: string, opts: { quiet?: boolean }) => {
-        await buildProject({ dir, io: makeIo(false), quiet: opts.quiet === true });
+        const io = makeIo(false);
+        // A person in a fresh clone gets the team's sessions, not an empty map; the
+        // quiet build after every turn stays local.
+        if (opts.quiet !== true) await readyToRead(dir, io);
+        await buildProject({ dir, io, quiet: opts.quiet === true });
       }),
     );
 
