@@ -103,9 +103,32 @@ function gitError(text: string): string {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line !== "");
-  // Git ends with advice; the reason is the line it marks as fatal.
-  const reason = lines.find((line) => line.startsWith("fatal:")) ?? lines.at(-1) ?? "git failed";
+  // Git ends with advice or a usage list; the reason is the line it marks as fatal
+  // or as an error.
+  const reason =
+    lines.find((line) => line.startsWith("fatal:")) ??
+    lines.find((line) => line.startsWith("error:")) ??
+    lines.at(-1) ??
+    "git failed";
   return reason.slice(0, 300);
+}
+
+/** `git version 2.39.3 (Apple Git-146)`, `2.45.1.windows.1`: the first two numbers. */
+export function parseGitVersion(text: string): [number, number] | undefined {
+  const match = /(\d+)\.(\d+)/.exec(text);
+  return match === null ? undefined : [Number(match[1]), Number(match[2])];
+}
+
+/** True when git is at least this version, or when its version cannot be read. */
+async function gitVersionAtLeast(
+  root: string,
+  env: NodeJS.ProcessEnv,
+  major: number,
+  minor: number,
+): Promise<boolean> {
+  const version = parseGitVersion((await runGit(root, ["version"], env)).stdout.toString("utf8"));
+  if (version === undefined) return true;
+  return version[0] > major || (version[0] === major && version[1] >= minor);
 }
 
 /** True when this project's record is shared: in a repository, and not kept private. */
@@ -476,7 +499,9 @@ export async function downloadRecords(
 ): Promise<boolean> {
   const remote = await syncRemote(root, env);
   if (remote === undefined) return false;
-  const args = ["fetch", "--no-tags", "--no-write-fetch-head", remote, RECORD_REFSPEC];
+  // Keeps FETCH_HEAD for the user's own fetches; git before 2.29 does not know the flag.
+  const fetchHead = (await gitVersionAtLeast(root, env, 2, 29)) ? ["--no-write-fetch-head"] : [];
+  const args = ["fetch", "--no-tags", ...fetchHead, remote, RECORD_REFSPEC];
   const result = showProgress
     ? await fetchWithProgress(root, [...args.slice(0, 1), "--progress", ...args.slice(1)], env)
     : await runGit(root, [...args.slice(0, 1), "--quiet", ...args.slice(1)], quietEnv(env));

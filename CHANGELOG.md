@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cogit pr` and `cogit show <sha>` no longer tell a reviewer that a teammate's thought is "not recorded yet" when it may never arrive: for someone else's commit they say it is not in this clone's record, because its author has not pushed it or it came from a fork.
 - `cogit build` in a fresh clone of a shared project downloads the team's sessions first, instead of writing an empty map.
 - The map's outline follows the search: it marks and scrolls to the hit you are on, and scrolls to a message you click on the map.
+- Git older than 2.29 can download the team's records again: cogit no longer passes it `--no-write-fetch-head`, and a failed download names git's error instead of a line of its usage text.
 
 ## [1.0.0] - 2026-11-04
 ### Changed
