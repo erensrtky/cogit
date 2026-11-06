@@ -2735,15 +2735,13 @@ time {
 .shape-preview-diagram {
   height: 240px;
   margin: 6px 0;
-  overflow: hidden;
+  overflow: auto;
 }
 
-/* A diagram drawn inside the preview is scaled down to the box, never cropped
-   mid-shape: Mermaid writes width="100%" and a max-width, so both are reset. */
+/* The preview shrinks a diagram to the box, but not below a legible size
+   (MermaidDiagram's fitPreview sets the size); a bigger one scrolls. */
 .shape-preview-diagram svg {
-  width: 100% !important;
-  max-width: none !important;
-  height: 100% !important;
+  max-width: none;
 }
 
 .shape-open {

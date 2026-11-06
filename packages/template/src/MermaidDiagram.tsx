@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import { type DiagramTheme, effectiveTheme, mermaidThemeVariables } from "./diagramTheme.js";
-import { clampPan, fitView, type PanView, type Size, zoomAt } from "./panZoom.js";
+import { clampPan, fitView, type PanView, previewSize, type Size, zoomAt } from "./panZoom.js";
 import { getTheme, subscribeTheme, type ThemeMode } from "./theme.js";
 
 /**
@@ -90,6 +90,24 @@ export function naturalSize(svg: SVGSVGElement): void {
   if (width === "") return;
   svg.style.width = width;
   svg.style.maxWidth = "none";
+}
+
+/**
+ * Sizes the panel preview's diagram from its own drawn size (the viewBox):
+ * shrunk to the box down to the legibility floor, then the box scrolls.
+ */
+export function fitPreview(svg: SVGSVGElement, box: HTMLElement): void {
+  const natural = svg.viewBox?.baseVal;
+  if (natural === undefined || natural.width <= 0 || natural.height <= 0) return;
+  const size = previewSize(
+    { width: box.clientWidth, height: box.clientHeight },
+    { width: natural.width, height: natural.height },
+  );
+  svg.style.maxWidth = "none";
+  svg.setAttribute("width", String(size.width));
+  svg.setAttribute("height", String(size.height));
+  svg.style.width = `${size.width}px`;
+  svg.style.height = `${size.height}px`;
 }
 
 /** How far an arrow key pans, in pixels. */
@@ -188,6 +206,7 @@ export function MermaidDiagram({
         host.current.innerHTML = svg;
         const drawn = host.current.querySelector("svg");
         if (!fit && drawn !== null) naturalSize(drawn);
+        if (fit && drawn !== null) fitPreview(drawn, host.current);
         if (interactive) refit();
       })
       .catch(() => {

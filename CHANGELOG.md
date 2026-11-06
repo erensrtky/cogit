@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cogit build` in a fresh clone of a shared project downloads the team's sessions first, instead of writing an empty map.
 - The map's outline follows the search: it marks and scrolls to the hit you are on, and scrolls to a message you click on the map.
 - Git older than 2.29 can download the team's records again: cogit no longer passes it `--no-write-fetch-head`, and a failed download names git's error instead of a line of its usage text.
+- A Shape diagram in the message panel keeps legible text: it shrinks to the panel's width but not below half size, and a tall or wide one scrolls inside its box instead of shrinking until the labels cannot be read.
 
 ## [1.0.0] - 2026-11-04
 ### Changed

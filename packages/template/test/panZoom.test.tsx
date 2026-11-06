@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { MermaidDiagram } from "../src/MermaidDiagram.js";
-import { clampPan, fitScale, fitView, zoomAt } from "../src/panZoom.js";
+import { clampPan, fitScale, fitView, previewSize, zoomAt } from "../src/panZoom.js";
 
 const box = { width: 800, height: 500 };
 
@@ -93,5 +93,18 @@ describe("MermaidDiagram controls", () => {
     );
     expect(html).toContain("shape-source");
     expect(html).not.toContain("Zoom in");
+  });
+});
+
+describe("previewSize", () => {
+  const panel = { width: 394, height: 238 };
+
+  it("keeps a tall diagram's text size and lets the box scroll down", () => {
+    expect(previewSize(panel, { width: 301, height: 811 })).toEqual({ width: 301, height: 811 });
+  });
+
+  it("shrinks a wide diagram to the box's width, but not below the floor", () => {
+    expect(previewSize(panel, { width: 788, height: 200 })).toEqual({ width: 394, height: 100 });
+    expect(previewSize(panel, { width: 2000, height: 300 })).toEqual({ width: 1000, height: 150 });
   });
 });

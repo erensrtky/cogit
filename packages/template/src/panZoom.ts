@@ -93,3 +93,14 @@ export function zoomAt(
   const ratio = scale / view.scale;
   return { scale, x: px - (px - view.x) * ratio, y: py - (py - view.y) * ratio };
 }
+
+/**
+ * The size the panel's preview draws a diagram at: shrunk to the box's width
+ * (never enlarged), and never below the legibility floor. A tall diagram keeps
+ * its text size and the box scrolls down, instead of shrinking to the box's
+ * height until the text is unreadable.
+ */
+export function previewSize(box: Size, natural: Size): Size {
+  const scale = fitScale({ width: box.width, height: Number.POSITIVE_INFINITY }, natural);
+  return { width: Math.round(natural.width * scale), height: Math.round(natural.height * scale) };
+}
