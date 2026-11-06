@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Shape diagram in the message panel keeps legible text: it shrinks to the panel's width but not below half size, and a tall or wide one scrolls inside its box instead of shrinking until the labels cannot be read.
 - A message is no longer lost from the record when the side model gets one of its fields wrong, or (in mixed mode) writes a field that belongs to the agent: only that field is left out, and the message keeps its title, summary and the rest.
 - A chat that commits into another repository no longer stamps that commit with a `Thought:` trailer the other repository can never resolve: the trailer is added only when the chat runs in the project being committed (or in that working tree).
+- The agent is told at session start that the `Thought:` trailer comes from cogit, so it stops warning you about a line it did not write.
 
 ## [1.0.0] - 2026-11-04
 ### Changed

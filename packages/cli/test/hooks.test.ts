@@ -205,6 +205,8 @@ describe("runHook", () => {
     };
     // No earlier session yet: only the "how to read it" line.
     expect(await context("startup")).toContain("cogit records this project's lineage");
+    // The agent must not take cogit's own trailer for something foreign in a commit.
+    expect(await context("startup")).toContain("trailer from cogit's git hook");
     expect(await context("resume")).toContain(`log -C "${root}"`);
     expect(await context("clear")).toContain("run show before answering");
   });

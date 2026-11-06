@@ -166,7 +166,9 @@ async function startupContext(ctx: HookContext): Promise<string> {
     `\`${command} search "<text>" -C "${ctx.root}"\`, and one message with ` +
     `\`${command} show <ref> -C "${ctx.root}"\` (a ref is a message hash, an h+hex prefix of ` +
     `six or more characters, or <session-id>:mN). When the user mentions a message hash or ` +
-    `another session's mN, run show before answering.`;
+    `another session's mN, run show before answering. Commits here get a ` +
+    `\`Thought: h…\` trailer from cogit's git hook, naming the message behind them; ` +
+    `it is expected, so leave it in.`;
 
   const sessions = await loadAllSessions(ctx.root, () => {});
   const previous = mostRecentOtherSession(sessions, ctx.sessionId);
