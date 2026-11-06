@@ -328,7 +328,7 @@ const CHECK_SPECS: CheckSpec[] = [
           id: "record",
           status: "warn",
           message: `${sync.pending} session record${sync.pending === 1 ? "" : "s"} could not be sent: ${sync.sendError}`,
-          fix: "check your access to the remote; the next session start tries again",
+          fix: "check your access to the remote; the next session start tries again. An SSH key with a passphrase needs ssh-agent (`ssh-add`), since a background send cannot ask for it; `cogit record-sync send` sends from this terminal",
         };
       if (sync.downloadError !== undefined && !sync.downloaded)
         return {

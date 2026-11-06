@@ -576,7 +576,9 @@ export async function countUnsentRecords(
 /**
  * Whether the remote now holds what the hook saw going out. `pre-push` runs before
  * the push, and also for `--dry-run` and for a push the remote goes on to reject;
- * git has no hook for "it worked", so this asks the remote.
+ * git has no hook for "it worked", so this asks the remote. `unreachable` means
+ * the background cannot ask at all: an SSH key with a passphrase and no agent
+ * fails every time, and asking again only piles up failed logins.
  */
 export async function pushLanded(
   root: string,
@@ -584,20 +586,21 @@ export async function pushLanded(
   ref: string,
   sha: string,
   wait: { intervalMs: number; timeoutMs: number } = { intervalMs: 3000, timeoutMs: 600_000 },
-): Promise<boolean> {
+): Promise<"landed" | "missing" | "unreachable"> {
   const remote = await syncRemote(root, env);
-  if (remote === undefined) return false;
+  if (remote === undefined) return "missing";
   const deadline = Date.now() + wait.timeoutMs;
   for (;;) {
     const seen = await runGit(root, ["ls-remote", remote, ref], quietEnv(env));
+    if (seen.code !== 0) return "unreachable";
     if (
       seen.stdout
         .toString("utf8")
         .split("\n")
         .some((line) => line.startsWith(`${sha}\t`))
     )
-      return true;
-    if (Date.now() >= deadline) return false;
+      return "landed";
+    if (Date.now() >= deadline) return "missing";
     await sleep(wait.intervalMs);
   }
 }
@@ -606,6 +609,9 @@ export async function pushLanded(
  * The background half of `git push`: once the code has landed (`after` names the
  * ref and hash the hook saw; a push with nothing to send has none), queues what the
  * remote does not have and sends it. A dry run or a rejected push queues nothing.
+ * A remote the background cannot reach still gets the queue: the send fails the
+ * same way, so the records wait with the reason `doctor` shows instead of being
+ * dropped without a word.
  */
 export async function sendAfterPush(
   root: string,
@@ -615,8 +621,14 @@ export async function sendAfterPush(
 ): Promise<number> {
   if (after !== undefined) {
     const split = after.lastIndexOf("=");
-    if (!(await pushLanded(root, env, after.slice(0, split), after.slice(split + 1), wait)))
-      return 0;
+    const landing = await pushLanded(
+      root,
+      env,
+      after.slice(0, split),
+      after.slice(split + 1),
+      wait,
+    );
+    if (landing === "missing") return 0;
   }
   await queueRecords(root, env);
   return sendRecords(root, env);

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - A `prepare-commit-msg` hook of your own that sets its own `trap ... EXIT` or ends with `exec` no longer drops the `Thought:` trailer: cogit now runs your lines as a child and adds the trailer once they finish. Existing hooks update on the next chat message.
+- With an SSH key that has a passphrase and no ssh-agent, the records that follow a push are no longer lost: the background send used to retry the remote every 3 seconds for 10 minutes (each a failed login) and then drop them. It now stops at the first failure and keeps them queued, and `cogit doctor` says to add the key to ssh-agent or run `cogit record-sync send` from a terminal.
 
 ## [1.1.0] - 2026-11-06
 ### Changed

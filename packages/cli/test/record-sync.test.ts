@@ -467,7 +467,21 @@ describe("the record on its own refs", () => {
     expect(await sendAfterPush(alice, env)).toBe(1);
 
     await git(alice, "remote", "remove", "origin");
-    expect(await pushLanded(alice, env, "refs/heads/main", head, quick)).toBe(false);
+    expect(await pushLanded(alice, env, "refs/heads/main", head, quick)).toBe("missing");
+  });
+
+  it("queues at once when the background cannot reach the remote, instead of polling", async () => {
+    await record(alice, "s1", "First", "alice@example.com");
+    const head = (await git(alice, "rev-parse", "HEAD")).trim();
+    // Like an SSH key with a passphrase and no agent: every ask fails.
+    await git(alice, "remote", "set-url", "origin", join(alice, "gone.git"));
+    const started = Date.now();
+    // The default wait (10 minutes) would hang the test if it kept polling.
+    expect(await sendAfterPush(alice, env, `refs/heads/main=${head}`)).toBe(0);
+    expect(Date.now() - started).toBeLessThan(10_000);
+    const status = await recordSyncStatus(alice, env);
+    expect(status.pending).toBe(1);
+    expect(status.sendError).toBeDefined();
   });
 
   describe("a project that used to commit its record", () => {
