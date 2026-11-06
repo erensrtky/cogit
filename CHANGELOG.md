@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- A session the side model left untitled takes its first thread's title (or its first message's) at session end, instead of showing only its id on the map and in `cogit log`; `cogit log` also stops printing such an id twice.
 
 ## [1.0.1] - 2026-11-06
 ### Fixed

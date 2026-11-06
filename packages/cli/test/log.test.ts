@@ -234,6 +234,16 @@ describe("cogit log and show", () => {
     await expect(log({ dir: root, io, session: "nope" })).rejects.toThrow(/no session matches/);
   });
 
+  it("names an untitled session by its id once", async () => {
+    const model = await log({ dir: root, io });
+    const untitled = {
+      ...model,
+      sessions: model.sessions.map((entry) => ({ ...entry, title: "" })),
+    };
+    const headings = formatLog(untitled).filter((line) => line.startsWith("## "));
+    expect(headings[0]).toMatch(/^## s2 · /);
+  });
+
   it("keeps a header for a session with no messages yet", async () => {
     const model = await log({ dir: root, io });
     const lines = formatLog(model);

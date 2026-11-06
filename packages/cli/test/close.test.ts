@@ -167,6 +167,8 @@ describe("closePayload", () => {
     );
     expect(payload).toEqual({
       sessionId: "s1",
+      // An untitled session takes its first thread's title.
+      title: "Work",
       leftOff: "Work done, detour open",
       nodes: [
         {
@@ -194,9 +196,15 @@ describe("closePayload", () => {
     );
     expect(payload.nodes).toEqual([{ id: "m1", kind: "message", title: "One", parent: "s0:h10" }]);
     expect(payload.status).toEqual({ goal: "g", done: [], pending: [], next: "n" });
+    // No thread to name it: the first message's title.
     expect(
       closePayload({ continues: "h10", status: { pending: "x" } }, turns, record, { status: true }),
-    ).toEqual({ sessionId: "s1", nodes: [] });
+    ).toEqual({ sessionId: "s1", title: "One", nodes: [] });
+    // A session that has a title keeps it.
+    expect(closePayload({}, turns, { ...record, title: "Named" }, { status: false })).toEqual({
+      sessionId: "s1",
+      nodes: [],
+    });
   });
 });
 

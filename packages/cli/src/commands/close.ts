@@ -253,6 +253,17 @@ export function closePayload(
   });
 
   const payload: Record<string, unknown> = { sessionId: record.sessionId, nodes: out };
+  // The last pass over a session: one still without a title would show its bare
+  // id everywhere, so it takes its first thread's title, else its first message's.
+  if (record.title.trim() === "") {
+    const first = order[0];
+    const node = first === undefined ? undefined : nodes.get(idOf.get(first) as string);
+    const fallback =
+      (first === undefined ? undefined : branches.get(first)?.title) ??
+      node?.branch?.title ??
+      node?.title;
+    if (fallback !== undefined && fallback.trim() !== "") payload.title = clip(fallback, 200);
+  }
   if (typeof answer.leftOff === "string" && answer.leftOff.trim() !== "")
     payload.leftOff = clip(answer.leftOff, 400);
   // A malformed status would fail the whole write; it is left out instead.

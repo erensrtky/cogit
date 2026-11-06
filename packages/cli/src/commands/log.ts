@@ -287,12 +287,13 @@ export function buildLog(sessions: EffectiveSession[], opts: LogOptions = {}): L
 }
 
 function sessionHeading(session: LogSession): string {
-  const title = session.title.trim() === "" ? session.sessionId : oneLine(session.title);
+  // An untitled session shows its id once, not as "id (id)".
+  const title =
+    session.title.trim() === ""
+      ? session.sessionId
+      : `${oneLine(session.title)} (${session.sessionId})`;
   const author = session.author === undefined ? "" : ` · by ${session.author}`;
-  return (
-    `## ${title} (${session.sessionId})${author} · ` +
-    `${stamp(session.startedAt)} → ${stamp(session.updatedAt)}`
-  );
+  return `## ${title}${author} · ` + `${stamp(session.startedAt)} → ${stamp(session.updatedAt)}`;
 }
 
 function branchLines(branch: LogBranch): string[] {
