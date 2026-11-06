@@ -269,7 +269,11 @@ naming the newest user message of the session that made the commit:
    `--continue` whose id moved, a session of another project), no trailer is
    added. cogit never falls back to `.cogit/HEAD` here: it may name the other
    session.
-3. When no session is named (a human commit in a terminal), `.cogit/HEAD` is
+3. When the named session runs in another directory (its transcript's `cwd` is
+   neither in this project nor in the working tree being committed), no trailer
+   is added: a session that commits into a neighbouring repository keeps its
+   record in its own project, so the link could never be followed from here.
+4. When no session is named (a human commit in a terminal), `.cogit/HEAD` is
    used when it is fresh (within `trailerMaxAgeHours`, default 6) and its
    transcript is readable.
 

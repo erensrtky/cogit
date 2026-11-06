@@ -144,6 +144,8 @@ export interface AgentAdapter {
   readConversation(file: string): Promise<ChatTurn[]>;
   /** Where a forked session came from; null for a session of its own. */
   readForkOrigin(file: string): Promise<ForkOrigin | null>;
+  /** The directory the session runs in, from its transcript; undefined when unknown. */
+  readSessionCwd(file: string): Promise<string | undefined>;
   /** Whether the transcript shows the agent reading a handoff file (Story 8.6). */
   readsHandoff(file: string): Promise<boolean>;
   /**

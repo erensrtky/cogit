@@ -261,6 +261,31 @@ export async function isHeadlessTranscript(file: string): Promise<boolean> {
 }
 
 /** Where a forked transcript came from; null for a session of its own. */
+/**
+ * The directory the session runs in: the `cwd` of its first line that has one.
+ * Undefined when the transcript has none in its first lines or cannot be read.
+ */
+export async function readSessionCwd(file: string): Promise<string | undefined> {
+  let stream: ReturnType<typeof createReadStream> | undefined;
+  try {
+    stream = createReadStream(file, { encoding: "utf8" });
+    const lines = createInterface({ input: stream, crlfDelay: Number.POSITIVE_INFINITY });
+    let read = 0;
+    for await (const text of lines) {
+      if (++read > 50) break;
+      try {
+        const cwd = (JSON.parse(text) as { cwd?: unknown }).cwd;
+        if (typeof cwd === "string" && cwd !== "") return cwd;
+      } catch {}
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  } finally {
+    stream?.destroy();
+  }
+}
+
 export async function readForkOrigin(file: string): Promise<ForkOrigin | null> {
   return forkOrigin(file, await readAllTurns(file), readTranscriptTurns, isMessageLine);
 }

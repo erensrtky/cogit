@@ -4,6 +4,7 @@ import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
+import { readSessionCwd } from "../src/agents/claude/transcripts.js";
 import { blame } from "../src/commands/blame.js";
 import { buildProject } from "../src/commands/build.js";
 import { configSet } from "../src/commands/config.js";
@@ -93,12 +94,13 @@ describe("the thought behind a commit (Story 9.4)", () => {
     await writeFile(paths.session("s1"), JSON.stringify(session(nodes)));
   };
 
-  const writeTranscript = async (id = "s1", text = "second"): Promise<string> => {
+  const writeTranscript = async (id = "s1", text = "second", cwd?: string): Promise<string> => {
     const file = join(dir, "claude", "projects", "proj", `${id}.jsonl`);
     await mkdir(dirname(file), { recursive: true });
     await writeFile(
       file,
       [
+        ...(cwd === undefined ? [] : [{ type: "system", cwd }]),
         // Uuids are unique per session; only a fork shares them (see fork.test.ts).
         { type: "user", uuid: `${id}-u1`, timestamp: T0, message: { content: "first" } },
         { type: "user", uuid: `${id}-u2`, timestamp: NEWEST_AT, message: { content: text } },
@@ -361,6 +363,39 @@ describe("the thought behind a commit (Story 9.4)", () => {
       const text = await readMessage(file);
       expect(text).toContain(`Thought: ${thoughtOf("other", "s2")}`);
       expect(text).not.toContain(thoughtOf());
+    });
+
+    it("adds nothing for a session that runs in another repository", async () => {
+      const commit = async (cwd: string): Promise<boolean> =>
+        addThoughtTrailer({
+          dir: root,
+          messageFile: await messageFile(),
+          source: "message",
+          env: { ...env, CLAUDE_CODE_SESSION_ID: "s4" },
+          now: NOW,
+        });
+      // The session's own project, or a folder inside it: the link resolves here.
+      await writeTranscript("s4", "here", join(root, "src"));
+      expect(await commit(join(root, "src"))).toBe(true);
+      // A session next door that commits into this repository: its record is elsewhere.
+      const elsewhere = join(dir, "other-project");
+      await mkdir(elsewhere, { recursive: true });
+      await writeTranscript("s4", "there", elsewhere);
+      expect(await commit(elsewhere)).toBe(false);
+      // The working tree git runs the hook in counts too (a worktree outside the project).
+      await writeTranscript("s4", "tree", process.cwd());
+      expect(await commit(process.cwd())).toBe(true);
+    });
+
+    it("reads a session's directory from its transcript, or nothing", async () => {
+      expect(await readSessionCwd(await writeTranscript("s5", "x", "/somewhere"))).toBe(
+        "/somewhere",
+      );
+      expect(await readSessionCwd(await writeTranscript("s6", "x"))).toBeUndefined();
+      expect(await readSessionCwd(join(dir, "missing.jsonl"))).toBeUndefined();
+      const junk = join(dir, "junk.jsonl");
+      await writeFile(junk, `not json\n${'{"a":1}\n'.repeat(60)}{"cwd":"/late"}\n`);
+      expect(await readSessionCwd(junk)).toBeUndefined();
     });
 
     it("works with no .cogit/HEAD at all (a headless claude -p run)", async () => {

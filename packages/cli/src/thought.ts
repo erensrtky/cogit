@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
-import { access } from "node:fs/promises";
-import { isAbsolute, resolve } from "node:path";
+import { access, realpath } from "node:fs/promises";
+import { isAbsolute, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { type AgentAdapter, defaultAgent } from "./agents/index.js";
 import { findGitRoot } from "./git.js";
@@ -71,6 +71,32 @@ function messagePath(file: string): string {
 }
 
 /** The newest user message of a transcript, as the trailer's value. */
+/**
+ * True when the session's directory is in this project or in the working tree
+ * the commit is made in: git runs the hook at that tree's top, which for a
+ * linked worktree outside the project is not under the project's root.
+ * Unknown counts as here, as before.
+ */
+async function sessionRunsIn(
+  agent: AgentAdapter,
+  transcript: string,
+  dir: string,
+): Promise<boolean> {
+  const cwd = await agent.readSessionCwd(transcript);
+  if (cwd === undefined) return true;
+  const session = await realOrSame(cwd);
+  for (const place of [dir, process.cwd()]) {
+    const root = await realOrSame((await findGitRoot(place)) ?? place);
+    const inside = relative(root, session);
+    if (inside === "" || (!inside.startsWith("..") && !isAbsolute(inside))) return true;
+  }
+  return false;
+}
+
+async function realOrSame(path: string): Promise<string> {
+  return realpath(path).catch(() => resolve(path));
+}
+
 async function newestThought(
   agent: AgentAdapter,
   transcript: string,
@@ -136,6 +162,10 @@ export async function addThoughtTrailer(opts: TrailerOptions): Promise<boolean> 
   if (named !== "") {
     const transcript = await agent.findTranscript(named, env);
     if (transcript === null) return false;
+    // A session working in another repository (a library next to its project)
+    // must not stamp its message here: that record lives in the other project,
+    // so the link could never be followed from this one.
+    if (!(await sessionRunsIn(agent, transcript, opts.dir))) return false;
     const value = await newestThought(agent, transcript, named);
     if (value === undefined) return false;
     await writeTrailer(opts.messageFile, value);
