@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- A `prepare-commit-msg` hook of your own that sets its own `trap ... EXIT` or ends with `exec` no longer drops the `Thought:` trailer: cogit now runs your lines as a child and adds the trailer once they finish. Existing hooks update on the next chat message.
 
 ## [1.1.0] - 2026-11-06
 ### Changed

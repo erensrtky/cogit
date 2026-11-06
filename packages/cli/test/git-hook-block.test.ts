@@ -114,6 +114,23 @@ describe("the cogit block in a user's hook", () => {
     expect(message).toContain("Thought: h123456");
   });
 
+  it("adds the Thought trailer past a user's own EXIT trap and a closing exec", async () => {
+    const trapped = join(dir, "trap.log");
+    await hook("prepare-commit-msg", `trap 'echo trap ran > "${trapped}"' EXIT\nexec true\n`);
+    await writeFile(join(root, "d.txt"), "d\n");
+    await git("add", "d.txt");
+    await git("commit", "-qm", "exec");
+    expect((await git("log", "-1", "--format=%B")).stdout).toContain("Thought: h123456");
+    await hook("prepare-commit-msg", `trap 'echo trap ran > "${trapped}"' EXIT\n`);
+    await writeFile(join(root, "e.txt"), "e\n");
+    await git("add", "e.txt");
+    await git("commit", "-qm", "trap");
+    expect((await git("log", "-1", "--format=%B")).stdout).toContain("Thought: h123456");
+    expect(await readFile(trapped, "utf8")).toBe("trap ran\n");
+    // One trailer per commit: the child run of the hook skips the block.
+    expect((await readFile(log, "utf8")).match(/prepare-commit-msg/g)).toHaveLength(2);
+  });
+
   it("keeps a failing prepare-commit-msg hook failing", async () => {
     await hook("prepare-commit-msg", "exit 3\n");
     await writeFile(join(root, "c.txt"), "c\n");

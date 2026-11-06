@@ -49,9 +49,11 @@ export function currentCliPath(): string | undefined {
  *
  * - `pre-push` reads git's stdin itself and hands it back to the lines below,
  *   so a user hook that reads it still gets it and cogit always sees the refs.
- * - `prepare-commit-msg` runs at exit, after the user's lines: a tool that
- *   rewrites the message file (commitizen) keeps the `Thought:` trailer, and the
- *   user's exit status stays the hook's.
+ * - `prepare-commit-msg` runs the same file again as a child, which skips the
+ *   block, and adds the trailer once the user's lines are done: a tool that
+ *   rewrites the message file (commitizen) keeps the `Thought:` trailer, a user
+ *   `trap ... EXIT` or a closing `exec` cannot drop it, and the user's exit
+ *   status stays the hook's.
  */
 export function hookBlock(
   event: string,
@@ -73,11 +75,14 @@ export function hookBlock(
   if (event === "prepare-commit-msg") {
     return [
       BLOCK_START,
-      "cogit_msg=${1-} cogit_source=${2-}",
-      "cogit_thought() {",
+      'if [ "${COGIT_HOOK_RUN-}" = "$0" ]; then',
+      "  unset COGIT_HOOK_RUN",
+      "else",
+      '  COGIT_HOOK_RUN=$0 "$0" "$@"',
+      "  cogit_status=$?",
       ...cogitCall(event, projectRoot, cliPath, "", "  "),
-      "}",
-      `trap 'cogit_status=$?; cogit_thought "$cogit_msg" "$cogit_source"; exit $cogit_status' EXIT`,
+      "  exit $cogit_status",
+      "fi",
       BLOCK_END,
     ].join("\n");
   }
