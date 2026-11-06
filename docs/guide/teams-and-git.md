@@ -87,6 +87,8 @@ they had, so the repository's size does not shrink. `cogit doctor` reminds you u
 setups work). The block never fails a commit or a push. It sits right under the first line, so
 an early `exit` in your own lines cannot skip it, and your hook's exit status stays the hook's.
 A hook written in another language (Python, Node) is left alone, and `cogit doctor` says so.
+Husky rewrites its hooks folder on every `npm install`; cogit puts its block back on your next
+chat message. After `cogit hooks uninstall` it does not, until `cogit hooks install`.
 
 - **`prepare-commit-msg`** adds a `Thought: h<id>` trailer naming the message the commit came
   from: the newest message of the current session. It is skipped for merges and squashes, while

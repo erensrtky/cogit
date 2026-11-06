@@ -1,6 +1,6 @@
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { findGitRoot, gitHooksDir, resolveCommit } from "./git.js";
 import { spawnDetachedProcess } from "./hooks/run.js";
 import { pushIsDryRun } from "./push-command.js";
@@ -199,6 +199,7 @@ export function isGitHookEvent(event: string): event is GitHookEvent {
 
 /** Installs the cogit block into every hook git would run; returns the events added. */
 export async function installGitHooks(root: string): Promise<GitHookEvent[]> {
+  await rm(projectPaths(root).hooksOff, { force: true });
   const installed: GitHookEvent[] = [];
   for (const event of GIT_HOOK_EVENTS) {
     if (await installGitHook(root, event)) installed.push(event);
@@ -218,8 +219,11 @@ export async function refreshGitHooks(root: string): Promise<GitHookEvent[]> {
   const refreshed: GitHookEvent[] = [];
   const hasBlock = async (event: string): Promise<boolean> =>
     ((await readFile(join(dir, event), "utf8").catch(() => undefined)) ?? "").includes(BLOCK_START);
-  // A hook this version added reaches a clone that already has cogit's others.
-  const installed = await hasBlock("prepare-commit-msg");
+  // Missing blocks come back unless the user took them out with `hooks uninstall`:
+  // Husky rewrites its hooks folder on every `npm install`, and a hook this version
+  // added must reach a clone that already has cogit's others.
+  const installed =
+    !existsSync(projectPaths(root).hooksOff) || (await hasBlock("prepare-commit-msg"));
   for (const event of GIT_HOOK_EVENTS) {
     if (!installed && !(await hasBlock(event))) continue;
     if (await installGitHook(root, event)) refreshed.push(event);
@@ -239,7 +243,14 @@ export async function uninstallGitHooks(root: string): Promise<GitHookEvent[]> {
   const dir = await gitHooksDir(gitRoot);
   if (dir === undefined) return [];
   await removeHookBlocks(dir, RETIRED_GIT_HOOK_EVENTS);
-  return removeHookBlocks(dir, GIT_HOOK_EVENTS);
+  const removed = await removeHookBlocks(dir, GIT_HOOK_EVENTS);
+  // Remembered, so the refresh on the next chat message does not put them back.
+  const paths = projectPaths(root);
+  if (existsSync(paths.project)) {
+    await mkdir(dirname(paths.hooksOff), { recursive: true });
+    await atomicWrite(paths.hooksOff, `${new Date().toISOString()}\n`);
+  }
+  return removed;
 }
 
 /** Takes cogit's block out of these hooks; returns the ones that had one. */

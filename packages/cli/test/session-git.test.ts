@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { join } from "node:path";
@@ -252,22 +253,32 @@ describe("ignore files and git hooks", () => {
     expect(stderr).toBe("");
   });
 
-  it("refreshes only the hooks that already carry a cogit block", async () => {
+  it("puts back blocks a tool wiped, but none after hooks uninstall", async () => {
     const hooks = join(root, ".git", "hooks");
     await writeFile(
       join(hooks, "post-commit"),
       "#!/bin/sh\n# >>> cogit\ncogit hook post-commit || true\n# <<< cogit\n",
     );
+    // Like Husky after `npm install`: the hooks are there, cogit's block is not.
     await writeFile(join(hooks, "prepare-commit-msg"), "#!/bin/sh\necho mine\n");
-    expect(await refreshGitHooks(root)).toEqual(["post-commit"]);
-    expect(await readFile(join(hooks, "post-commit"), "utf8")).toContain(
-      hookBlock("post-commit", root),
-    );
+    expect(await refreshGitHooks(root)).toEqual(["prepare-commit-msg", "post-commit", "pre-push"]);
     expect(await readFile(join(hooks, "prepare-commit-msg"), "utf8")).toBe(
-      "#!/bin/sh\necho mine\n",
+      `#!/bin/sh\n${hookBlock("prepare-commit-msg", root)}\necho mine\n`,
     );
     expect(await refreshGitHooks(root)).toEqual([]);
     expect(await refreshGitHooks(await noGitDir())).toEqual([]);
+
+    // The user took them out on purpose: the refresh leaves them out.
+    const io = fakeIo(env);
+    await hooksUninstall(root, io);
+    expect(existsSync(projectPaths(root).hooksOff)).toBe(true);
+    expect(await refreshGitHooks(root)).toEqual([]);
+    expect(await readFile(join(hooks, "prepare-commit-msg"), "utf8")).toBe(
+      "#!/bin/sh\necho mine\n",
+    );
+    // Installing again clears that, so a later wipe is mended again.
+    await hooksInstall(root, io);
+    expect(existsSync(projectPaths(root).hooksOff)).toBe(false);
   });
 
   it("adds pre-push to an installed clone and retires an old pre-commit block", async () => {

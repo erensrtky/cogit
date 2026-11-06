@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- With Husky, cogit's hook blocks no longer vanish for good after `npm install` (Husky rewrites `.husky/_`): the next chat message puts them back. `cogit hooks uninstall` is remembered, so blocks you removed on purpose stay out.
 - A session the side model left untitled takes its first thread's title (or its first message's) at session end, instead of showing only its id on the map and in `cogit log`; `cogit log` also stops printing such an id twice.
 
 ## [1.0.1] - 2026-11-06
