@@ -9,6 +9,7 @@ import {
   headlessEnv,
   resultText,
   withoutNulls,
+  writableAnswer,
 } from "../src/commands/backfill.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
@@ -331,5 +332,74 @@ describe("backfill --tail", () => {
     await rm(projectPaths(root).locks, { recursive: true, force: true });
     await writeFile(projectPaths(root).locks, "not a directory");
     await expect(backfillTail(root, "s1", fakeIo(env))).rejects.toThrow();
+  });
+});
+
+describe("writableAnswer", () => {
+  it("keeps a node whose only fault is an optional field, without that field", () => {
+    const { payload, dropped } = writableAnswer(
+      {
+        nodes: [
+          {
+            id: "m1",
+            kind: "message",
+            title: "Add the CSV parser",
+            summary: "Plain JavaScript, no library.",
+            work: ["x".repeat(400)],
+            alternatives: [{ why: "no option named" }],
+          },
+          { id: "m2", kind: "message", title: "" },
+        ],
+      },
+      "side",
+    );
+    expect(payload.nodes).toEqual([
+      {
+        id: "m1",
+        kind: "message",
+        title: "Add the CSV parser",
+        summary: "Plain JavaScript, no library.",
+      },
+    ]);
+    // Two bad fields of m1, and m2 whose title is missing.
+    expect(dropped).toBe(3);
+  });
+
+  it("leaves a branch summary to the agent in mixed mode", () => {
+    const branch = { title: "T", asked: "A", outcome: "O" };
+    const { payload, dropped } = writableAnswer(
+      { nodes: [{ id: "m1", kind: "message", title: "Start", branch }] },
+      "mixed",
+    );
+    // The summary stays the agent's; the message itself is still recorded.
+    expect(payload.nodes).toEqual([{ id: "m1", kind: "message", title: "Start" }]);
+    expect(dropped).toBe(1);
+  });
+
+  it("in mixed mode leaves out the agent's fields, not the message", () => {
+    const { payload, dropped } = writableAnswer(
+      {
+        status: { goal: "kept only for a sole owner" },
+        nodes: [
+          {
+            id: "m1",
+            kind: "message",
+            title: "Start the parser",
+            branch: { title: "Parser", asked: "a", outcome: "b" },
+            agentDecisions: [{ title: "Plain JS" }],
+          },
+        ],
+      },
+      "mixed",
+    );
+    expect(payload).toEqual({ nodes: [{ id: "m1", kind: "message", title: "Start the parser" }] });
+    expect(dropped).toBe(2);
+  });
+
+  it("still drops a node it cannot read at all", () => {
+    expect(writableAnswer({ nodes: ["not a node", null] }, "side")).toEqual({
+      payload: { nodes: [] },
+      dropped: 2,
+    });
   });
 });

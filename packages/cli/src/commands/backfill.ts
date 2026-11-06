@@ -289,13 +289,42 @@ export function writableAnswer(
   if (Array.isArray(out.nodes)) {
     const kept: unknown[] = [];
     for (const node of out.nodes) {
-      const fixed = summaryAsText(node);
-      if (ownsNode(fixed, soleOwner) && LineageNodeInput.safeParse(fixed).success) kept.push(fixed);
-      else dropped += 1;
+      const fixed = ownedFields(summaryAsText(node), soleOwner);
+      dropped += fixed.removed;
+      const salvaged = withoutBadFields(fixed.node);
+      if (salvaged === undefined) {
+        dropped += 1;
+        continue;
+      }
+      kept.push(salvaged.node);
+      dropped += salvaged.removed;
     }
     out.nodes = kept;
   }
   return { payload: out, dropped };
+}
+
+/** What a node cannot do without; a bad one here loses the node. */
+const REQUIRED_FIELDS = new Set(["id", "kind", "title"]);
+
+/**
+ * A node with its malformed optional fields taken out (a `work` item over the
+ * length limit, an alternative without an option): one bad field must not cost
+ * the message its whole record. Undefined when a required field is bad.
+ */
+function withoutBadFields(node: unknown): { node: unknown; removed: number } | undefined {
+  if (typeof node !== "object" || node === null) return undefined;
+  let current = { ...(node as Record<string, unknown>) };
+  let removed = 0;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const parsed = LineageNodeInput.safeParse(current);
+    if (parsed.success) return { node: current, removed };
+    const bad = new Set(parsed.error.issues.map((issue) => String(issue.path[0] ?? "")));
+    if ([...bad].some((key) => key === "" || REQUIRED_FIELDS.has(key))) return undefined;
+    current = Object.fromEntries(Object.entries(current).filter(([key]) => !bad.has(key)));
+    removed += bad.size;
+  }
+  return undefined;
 }
 
 /** Drops every null, so the schema's defaults fill the gaps. */
@@ -323,11 +352,15 @@ function summaryAsText(node: unknown): unknown {
   return typeof text === "string" ? { ...rest, summary: text } : rest;
 }
 
-/** In mixed mode the side model may not write a branch summary or the agent's decisions. */
-function ownsNode(node: unknown, soleOwner: boolean): boolean {
-  if (soleOwner || typeof node !== "object" || node === null) return true;
-  const n = node as Record<string, unknown>;
-  return n.branch === undefined && n.agentDecisions === undefined;
+/**
+ * In mixed mode the side model may not write a branch summary or the agent's
+ * decisions: those fields are left out, and the rest of the node is kept.
+ */
+function ownedFields(node: unknown, soleOwner: boolean): { node: unknown; removed: number } {
+  if (soleOwner || typeof node !== "object" || node === null) return { node, removed: 0 };
+  const { branch, agentDecisions, ...rest } = node as Record<string, unknown>;
+  const removed = (branch === undefined ? 0 : 1) + (agentDecisions === undefined ? 0 : 1);
+  return { node: removed === 0 ? node : rest, removed };
 }
 
 export async function backfillTail(
