@@ -413,6 +413,7 @@ describe("session show", () => {
 
   it("shows the language and a compact record without summaries", async () => {
     await init(root, { name: "p", retention: "keep", language: "tr" }, fakeIo(envFor(dir)));
+    await configSet("messageSummaries", "false", fakeIo(envFor(dir)));
     await sessionShow(root, "s1", io);
     expect(shown()).toEqual({
       initialized: true,
@@ -445,6 +446,11 @@ describe("session show", () => {
 
   it("reports the messageSummaries setting the agent writes by", async () => {
     await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    await sessionShow(root, "s1", io);
+    // On by default since 1.0.2.
+    expect(shown().messageSummaries).toBe(true);
+
+    await configSet("messageSummaries", "false", fakeIo(envFor(dir)));
     await sessionShow(root, "s1", io);
     expect(shown().messageSummaries).toBe(false);
 

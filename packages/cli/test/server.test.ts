@@ -412,10 +412,11 @@ describe("settings write", () => {
   it("accepts a valid write, stores it and refreshes the panel", async () => {
     const server = await start();
     const token = await panelToken(server);
-    const reply = await configWrite(server, token, { key: "messageSummaries", value: true });
+    // On by default: the write turns it off, so the change is real.
+    const reply = await configWrite(server, token, { key: "messageSummaries", value: false });
     expect(reply.status).toBe(200);
-    expect(JSON.parse(reply.body)).toEqual({ ok: true, key: "messageSummaries", value: true });
-    expect((await loadConfig(env)).messageSummaries).toBe(true);
+    expect(JSON.parse(reply.body)).toEqual({ ok: true, key: "messageSummaries", value: false });
+    expect((await loadConfig(env)).messageSummaries).toBe(false);
 
     const handoff = await configWrite(server, token, { key: "startupContext", value: false });
     expect(handoff.status).toBe(200);
@@ -426,10 +427,10 @@ describe("settings write", () => {
     let html = "";
     while (Date.now() < deadline) {
       html = await readFile(panel, "utf8");
-      if (html.includes('"messageSummaries":true')) break;
+      if (html.includes('"messageSummaries":false')) break;
       await delay(25);
     }
-    expect(html).toContain('"messageSummaries": true');
+    expect(html).toContain('"messageSummaries": false');
   });
 
   it("accepts the Story 9.3 settings and validates their values", async () => {
@@ -447,7 +448,7 @@ describe("settings write", () => {
     try {
       expect(await events.waitFor("retry: 1000")).toBe(true);
       const token = await panelToken(server);
-      const reply = await configWrite(server, token, { key: "messageSummaries", value: true });
+      const reply = await configWrite(server, token, { key: "messageSummaries", value: false });
       expect(reply.status).toBe(200);
       expect(await events.waitFor("event: change")).toBe(true);
     } finally {
@@ -511,7 +512,7 @@ describe("settings write", () => {
     expect(
       (await configWrite(server, token, { key: "messageSummaries", value: "true" })).status,
     ).toBe(400);
-    expect((await loadConfig(env)).messageSummaries).toBe(false);
+    expect((await loadConfig(env)).messageSummaries).toBe(true);
   });
 
   it("rejects a body that is valid JSON but not an object", async () => {
@@ -575,7 +576,7 @@ describe("settings read", () => {
       ok: true,
       settings: {
         recorder: "side",
-        messageSummaries: false,
+        messageSummaries: true,
         startupContext: true,
         recordHeadless: false,
         tryBeforeNotes: true,

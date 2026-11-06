@@ -49,8 +49,17 @@
       "maxLength": 64
     },
     "messageSummaries": {
-      "default": false,
+      "default": true,
       "type": "boolean"
+    },
+    "migrated": {
+      "maxItems": 50,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 60
+      }
     },
     "shapes": {
       "default": true,

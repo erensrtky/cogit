@@ -18,11 +18,11 @@ Economical (recommended): a small model records in the background every few turn
 
 ### One-line summary under each message
 
-`messageSummaries` · default `false`
+`messageSummaries` · default `true`
 
 **A sentence under each message title on the map.**
 
-A one-sentence summary under each message title, so a skim reads better. Off keeps the record shorter and cheaper. Branch summaries and the line on where a session left off are written either way.
+A one-sentence summary under each message title: what came of it. Without it, a message that only discussed or advised keeps nothing but its title. Off keeps the record shorter and cheaper. Branch summaries and the line on where a session left off are written either way.
 
 ### Record at session start
 

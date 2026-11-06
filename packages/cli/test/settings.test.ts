@@ -65,7 +65,7 @@ describe("settings model", () => {
     const settings = { ...DEFAULT_SETTINGS, language: "tr", updateEveryTurns: 8 };
     expect(editableSettings(settings)).toEqual({
       recorder: "side",
-      messageSummaries: false,
+      messageSummaries: true,
       startupContext: true,
       recordHeadless: false,
       tryBeforeNotes: true,

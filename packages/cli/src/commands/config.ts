@@ -19,10 +19,10 @@ import {
   updateRegistry,
 } from "../store/stores.js";
 
-export const CONFIG_KEYS = Object.keys(Config.shape).filter((k) => k !== "schema") as Exclude<
-  keyof Config,
-  "schema"
->[];
+/** Settings a user may read and set; `migrated` is cogit's own bookkeeping. */
+export const CONFIG_KEYS = Object.keys(Config.shape).filter(
+  (k) => k !== "schema" && k !== "migrated",
+) as Exclude<keyof Config, "schema" | "migrated">[];
 
 /** Keys `cogit config` lists; `catchUpModel` is only an accepted old alias (12.1). */
 export const LISTED_CONFIG_KEYS = CONFIG_KEYS.filter((k) => k !== "catchUpModel");

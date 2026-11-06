@@ -87,7 +87,7 @@ describe("buildPanel", () => {
         sideEveryTurns: 5,
         sessionEndCatchUp: true,
         sideModel: "haiku",
-        messageSummaries: false,
+        messageSummaries: true,
         startupContext: true,
         recordHeadless: false,
         tryBeforeNotes: true,

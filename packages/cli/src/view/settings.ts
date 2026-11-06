@@ -71,8 +71,9 @@ const EDITABLE: FieldSpec[] = [
     label: "One-line summary under each message",
     help: "A sentence under each message title on the map.",
     details:
-      "A one-sentence summary under each message title, so a skim reads better. Off keeps " +
-      "the record shorter and cheaper. Branch summaries and the line on where a session left " +
+      "A one-sentence summary under each message title: what came of it. Without it, a " +
+      "message that only discussed or advised keeps nothing but its title. Off keeps the " +
+      "record shorter and cheaper. Branch summaries and the line on where a session left " +
       "off are written either way.",
     kind: "boolean",
   },
@@ -272,7 +273,7 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   sideEveryTurns: 5,
   sessionEndCatchUp: true,
   sideModel: "haiku",
-  messageSummaries: false,
+  messageSummaries: true,
   startupContext: true,
   recordHeadless: false,
   tryBeforeNotes: true,

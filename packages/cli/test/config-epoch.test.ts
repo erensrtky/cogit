@@ -25,7 +25,10 @@ describe("config", () => {
     expect(io.lines).toContain("sideEveryTurns = 5");
     // The old name is an accepted alias, not a listed key (Story 12.1).
     expect(io.lines.some((line) => line.startsWith("catchUpModel"))).toBe(false);
-    expect(io.lines).toContain("messageSummaries = false");
+    expect(io.lines).toContain("messageSummaries = true");
+    // cogit's own bookkeeping is neither listed nor settable.
+    expect(io.lines.some((line) => line.startsWith("migrated"))).toBe(false);
+    await expect(configSet("migrated", "[]", io)).rejects.toThrow(/unknown key/);
     expect(io.lines).toContain("startupContext = true");
     // The old name reads as the new one (Story 12.1).
     await configGet("catchUpModel", io);
@@ -70,6 +73,20 @@ describe("config", () => {
     const stored = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
     expect(stored.sideModel).toBe("sonnet");
     expect(stored).not.toHaveProperty("catchUpModel");
+  });
+
+  it("turns message summaries on once for a config written before 1.0.2", async () => {
+    const file = globalPaths(env).config;
+    await mkdir(dirname(file), { recursive: true });
+    // Every older config stores the old default.
+    await writeFile(file, JSON.stringify({ schema: 1, messageSummaries: false }));
+    expect((await loadConfig(env)).messageSummaries).toBe(true);
+    // Turned off on purpose afterwards: it stays off, on every later read.
+    await configSet("messageSummaries", "false", fakeIo(env));
+    expect((await loadConfig(env)).messageSummaries).toBe(false);
+    const stored = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+    expect(stored.migrated).toEqual(["messageSummaries-on"]);
+    expect(stored.messageSummaries).toBe(false);
   });
 
   it("keeps an explicit new model name over the old key (Story 12.1)", async () => {

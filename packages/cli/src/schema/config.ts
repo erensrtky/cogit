@@ -31,10 +31,13 @@ export const Config = z.object({
    */
   catchUpModel: z.string().trim().min(1).max(64).optional(),
   /**
-   * Whether the agent writes a per-message `summary`. Off by default: the branch
-   * summary is the outer layer and the drill-down already shows the reply.
+   * Whether the record carries a per-message `summary`: what came of it. On by
+   * default since 1.0.2: without it a message that only discussed or advised
+   * kept nothing but its title, and the map and search lost what was said.
    */
-  messageSummaries: z.boolean().default(false),
+  messageSummaries: z.boolean().default(true),
+  /** One-time config changes already applied (see `migrateConfig`); never shown. */
+  migrated: z.array(z.string().min(1).max(60)).max(50).optional(),
   /**
    * Whether a message that landed commits gets a Shape (Story 13.6): a small
    * plain-language or diagram view of what the change does, written by whoever
@@ -118,11 +121,23 @@ export const DEFAULT_SIDE_MODEL = "haiku";
  * The old key is dropped, so the next write stores only the new name. An
  * explicit new name wins; the plain default yields to the old one.
  */
+/** The 1.0.2 change that turned per-message summaries on for existing configs. */
+export const SUMMARIES_ON = "messageSummaries-on";
+
 export function migrateConfig(config: Config): Config {
-  if (config.catchUpModel === undefined) return config;
-  const { catchUpModel, ...rest } = config;
-  return {
-    ...rest,
-    sideModel: config.sideModel === DEFAULT_SIDE_MODEL ? catchUpModel : config.sideModel,
-  };
+  let next = config;
+  if (next.catchUpModel !== undefined) {
+    const { catchUpModel, ...rest } = next;
+    next = {
+      ...rest,
+      sideModel: next.sideModel === DEFAULT_SIDE_MODEL ? catchUpModel : next.sideModel,
+    };
+  }
+  // Every config written before 1.0.2 stores the old default (off), so the new
+  // default would reach nobody: turn it on once. A user who turns it off again
+  // afterwards keeps it off, since the change is then marked as applied.
+  if (!(next.migrated ?? []).includes(SUMMARIES_ON)) {
+    next = { ...next, messageSummaries: true, migrated: [...(next.migrated ?? []), SUMMARIES_ON] };
+  }
+  return next;
 }
