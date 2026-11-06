@@ -208,9 +208,11 @@ var require_lib = __commonJS({
 });
 
 // src/git-hooks.ts
-import { realpathSync } from "fs";
-import { chmod, mkdir as mkdir6, readFile as readFile9, rm as rm4, stat as stat12 } from "fs/promises";
-import { join as join12 } from "path";
+import { execFile as execFile3 } from "child_process";
+import { existsSync as existsSync6, realpathSync } from "fs";
+import { chmod, mkdir as mkdir6, readFile as readFile9, realpath as realpath3, rm as rm4, stat as stat12 } from "fs/promises";
+import { dirname as dirname11, join as join12, resolve as resolve7 } from "path";
+import { promisify as promisify3 } from "util";
 
 // src/git.ts
 import { execFile } from "child_process";
@@ -5705,7 +5707,7 @@ var recursive = /* @__PURE__ */ new WeakMap();
 var NONE = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
-function isRecursive(inst, stack, resolve7) {
+function isRecursive(inst, stack, resolve8) {
   const cached2 = recursive.get(inst);
   if (cached2 !== void 0)
     return cached2 ? PROVEN : NONE;
@@ -5715,7 +5717,7 @@ function isRecursive(inst, stack, resolve7) {
   let result = NONE;
   const check2 = (child) => {
     if (result !== PROVEN && child?._zod) {
-      const answer = isRecursive(child, stack, resolve7);
+      const answer = isRecursive(child, stack, resolve8);
       if (answer > result)
         result = answer;
     }
@@ -5726,7 +5728,7 @@ function isRecursive(inst, stack, resolve7) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
       if (spread && !desc.enumerable)
         continue;
-      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve7) : NONE;
+      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve8) : NONE;
       if (child > answer)
         answer = child;
     }
@@ -5790,7 +5792,7 @@ function isRecursive(inst, stack, resolve7) {
       break;
     // `$ZodLazy` caches its inner on the def, so a resolved edge is followed exactly
     case "lazy": {
-      const inner = def._cachedInner ?? (resolve7 ? inst._zod.innerType : void 0);
+      const inner = def._cachedInner ?? (resolve8 ? inst._zod.innerType : void 0);
       merge2(inner ? isRecursive(inner, stack, false) : ASSUMED);
       break;
     }
@@ -21131,6 +21133,8 @@ function projectPaths(root) {
     detachedLog: join6(base, "state", "detached.log"),
     /** What the record refs last looked like, and what waits to be sent; local. */
     recordSync: join6(base, "state", "record-sync.json"),
+    /** Present after `cogit hooks uninstall`: the refresh then adds no block; local. */
+    hooksOff: join6(base, "state", "hooks-off"),
     /** Commits waiting for their message's record before a Shape; local. */
     shapeQueue: join6(base, "state", "shape-queue"),
     locks: join6(base, "locks"),
@@ -21220,7 +21224,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-44ZJFMDJ.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-JFP7CX4Q.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -21335,10 +21339,13 @@ var Config = external_exports.object({
    */
   catchUpModel: external_exports.string().trim().min(1).max(64).optional(),
   /**
-   * Whether the agent writes a per-message `summary`. Off by default: the branch
-   * summary is the outer layer and the drill-down already shows the reply.
+   * Whether the record carries a per-message `summary`: what came of it. On by
+   * default since 1.0.2: without it a message that only discussed or advised
+   * kept nothing but its title, and the map and search lost what was said.
    */
-  messageSummaries: external_exports.boolean().default(false),
+  messageSummaries: external_exports.boolean().default(true),
+  /** One-time config changes already applied (see `migrateConfig`); never shown. */
+  migrated: external_exports.array(external_exports.string().min(1).max(60)).max(50).optional(),
   /**
    * Whether a message that landed commits gets a Shape (Story 13.6): a small
    * plain-language or diagram view of what the change does, written by whoever
@@ -21408,13 +21415,20 @@ var Registry = external_exports.object({
   projects: external_exports.array(RegistryEntry).default([])
 });
 var DEFAULT_SIDE_MODEL = "haiku";
+var SUMMARIES_ON = "messageSummaries-on";
 function migrateConfig(config2) {
-  if (config2.catchUpModel === void 0) return config2;
-  const { catchUpModel, ...rest } = config2;
-  return {
-    ...rest,
-    sideModel: config2.sideModel === DEFAULT_SIDE_MODEL ? catchUpModel : config2.sideModel
-  };
+  let next = config2;
+  if (next.catchUpModel !== void 0) {
+    const { catchUpModel, ...rest } = next;
+    next = {
+      ...rest,
+      sideModel: next.sideModel === DEFAULT_SIDE_MODEL ? catchUpModel : next.sideModel
+    };
+  }
+  if (!(next.migrated ?? []).includes(SUMMARIES_ON)) {
+    next = { ...next, messageSummaries: true, migrated: [...next.migrated ?? [], SUMMARIES_ON] };
+  }
+  return next;
 }
 
 // src/schema/project.ts
@@ -22871,13 +22885,13 @@ import { AsyncResource as AsyncResource3 } from "async_hooks";
 
 // ../../node_modules/@inquirer/type/dist/utils.js
 function withResolver() {
-  let resolve7;
+  let resolve8;
   let reject;
   const promise2 = new Promise((res, rej) => {
-    resolve7 = res;
+    resolve8 = res;
     reject = rej;
   });
-  return { promise: promise2, resolve: resolve7, reject };
+  return { promise: promise2, resolve: resolve8, reject };
 }
 
 // ../../node_modules/@inquirer/core/dist/lib/create-prompt.js
@@ -23256,7 +23270,7 @@ function createPrompt(view) {
     });
     output2.mute();
     const screen = new ScreenManager(rl);
-    const { promise: promise2, resolve: resolve7, reject } = withResolver();
+    const { promise: promise2, resolve: resolve8, reject } = withResolver();
     return withHooks(rl, (cycle) => {
       const clearEffects = AsyncResource3.bind(() => effectScheduler.clearAll());
       const settlePrompt = (settle2) => {
@@ -23267,7 +23281,7 @@ function createPrompt(view) {
           reject(error62);
         }
       };
-      const resolvePrompt = (value) => settlePrompt(() => resolve7(value));
+      const resolvePrompt = (value) => settlePrompt(() => resolve8(value));
       const rejectPrompt = (error62) => settlePrompt(() => reject(error62));
       const promptPromise = Object.assign(promise2.finally(() => {
         cleanups.forEach((cleanup) => cleanup());
@@ -24914,9 +24928,9 @@ function buildLog(sessions, opts = {}) {
   return model;
 }
 function sessionHeading(session) {
-  const title = session.title.trim() === "" ? session.sessionId : oneLine3(session.title);
+  const title = session.title.trim() === "" ? session.sessionId : `${oneLine3(session.title)} (${session.sessionId})`;
   const author = session.author === void 0 ? "" : ` \xB7 by ${session.author}`;
-  return `## ${title} (${session.sessionId})${author} \xB7 ${stamp(session.startedAt)} \u2192 ${stamp(session.updatedAt)}`;
+  return `## ${title}${author} \xB7 ${stamp(session.startedAt)} \u2192 ${stamp(session.updatedAt)}`;
 }
 function branchLines(branch) {
   const count = `${branch.count} message${branch.count === 1 ? "" : "s"}`;
@@ -25551,7 +25565,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "1.0.1",
+  version: "1.1.0",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [
@@ -26599,6 +26613,8 @@ function readPs(pid) {
 }
 
 // src/git-hooks.ts
+var execFileAsync = promisify3(execFile3);
+var execGit = (args, opts) => execFileAsync("git", args, opts);
 var BLOCK_START = "# >>> cogit";
 var BLOCK_END = "# <<< cogit";
 function currentCliPath() {
@@ -26708,6 +26724,7 @@ function isGitHookEvent(event) {
   return GIT_HOOK_EVENTS.includes(event);
 }
 async function installGitHooks(root) {
+  await rm4(projectPaths(root).hooksOff, { force: true });
   const installed = [];
   for (const event of GIT_HOOK_EVENTS) {
     if (await installGitHook(root, event)) installed.push(event);
@@ -26721,7 +26738,7 @@ async function refreshGitHooks(root) {
   if (dir === void 0) return [];
   const refreshed = [];
   const hasBlock = async (event) => (await readFile9(join12(dir, event), "utf8").catch(() => void 0) ?? "").includes(BLOCK_START);
-  const installed = await hasBlock("prepare-commit-msg");
+  const installed = !existsSync6(projectPaths(root).hooksOff) || await hasBlock("prepare-commit-msg");
   for (const event of GIT_HOOK_EVENTS) {
     if (!installed && !await hasBlock(event)) continue;
     if (await installGitHook(root, event)) refreshed.push(event);
@@ -26735,7 +26752,14 @@ async function uninstallGitHooks(root) {
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return [];
   await removeHookBlocks(dir, RETIRED_GIT_HOOK_EVENTS);
-  return removeHookBlocks(dir, GIT_HOOK_EVENTS);
+  const removed = await removeHookBlocks(dir, GIT_HOOK_EVENTS);
+  const paths = projectPaths(root);
+  if (existsSync6(paths.project)) {
+    await mkdir6(dirname11(paths.hooksOff), { recursive: true });
+    await atomicWrite(paths.hooksOff, `${(/* @__PURE__ */ new Date()).toISOString()}
+`);
+  }
+  return removed;
 }
 async function removeHookBlocks(dir, events) {
   const removed = [];
@@ -26785,7 +26809,28 @@ async function queueShape(dir, env, spawn3) {
   if (cli2 === void 0) return;
   spawn3(cli2, ["shape", "--commit", commit, "-C", dir], env, projectPaths(dir).detachedLog);
 }
-async function runGitHook(event, dir, env = process.env, args = [], now = /* @__PURE__ */ new Date(), spawn3 = spawnDetachedProcess, pushedRefs = async () => "", dryRun = pushIsDryRun) {
+var GIT_REPO_ENV = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"];
+async function commonDir(cwd, env) {
+  try {
+    const { stdout } = await execGit(["rev-parse", "--git-common-dir"], { cwd, env });
+    const dir = resolve7(cwd, String(stdout).trim());
+    return await realpath3(dir).catch(() => dir);
+  } catch {
+    return void 0;
+  }
+}
+async function sameRepository(hookCwd, dir) {
+  const clean = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !GIT_REPO_ENV.includes(key))
+  );
+  const [here, project] = await Promise.all([
+    commonDir(hookCwd, process.env),
+    commonDir(dir, clean)
+  ]);
+  return here === void 0 || project === void 0 || here === project;
+}
+async function runGitHook(event, dir, env = process.env, args = [], now = /* @__PURE__ */ new Date(), spawn3 = spawnDetachedProcess, pushedRefs = async () => "", dryRun = pushIsDryRun, hookCwd) {
+  if (hookCwd !== void 0 && !await sameRepository(hookCwd, dir)) return;
   if (event === "pre-push") {
     await sendWithPush(dir, env, args[0], await pushedRefs(), spawn3, dryRun);
     return;
@@ -26938,6 +26983,7 @@ export {
   installGitHooks,
   refreshGitHooks,
   uninstallGitHooks,
+  sameRepository,
   runGitHook,
   takeMigrationWarnings,
   migrateProject,

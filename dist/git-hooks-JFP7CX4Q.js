@@ -14,10 +14,11 @@ import {
   isShellHook,
   refreshGitHooks,
   runGitHook,
+  sameRepository,
   uninstallGitHooks,
   withHookBlock,
   withoutHookBlock
-} from "./chunk-MHYHM4TC.js";
+} from "./chunk-CCJMIRJF.js";
 export {
   BLOCK_END,
   BLOCK_START,
@@ -31,6 +32,7 @@ export {
   isShellHook,
   refreshGitHooks,
   runGitHook,
+  sameRepository,
   uninstallGitHooks,
   withHookBlock,
   withoutHookBlock
