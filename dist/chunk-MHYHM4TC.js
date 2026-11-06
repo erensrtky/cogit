@@ -20762,7 +20762,7 @@ function displayTurn(turn, roots) {
     /<pasted_content[^>]*>([\s\S]*?)<\/pasted_content[^>]*>/g,
     "\n[Pasted]\n$1\n[/Pasted]\n"
   ).trim();
-  const relative7 = (file2) => {
+  const relative8 = (file2) => {
     for (const root of roots) if (file2.startsWith(`${root}/`)) return file2.slice(root.length + 1);
     return file2;
   };
@@ -20773,7 +20773,7 @@ function displayTurn(turn, roots) {
     // Steps and questions feed the recorder only; the map keeps the counts.
     tools: {
       commands: turn.tools.commands,
-      files: turn.tools.files.map(relative7),
+      files: turn.tools.files.map(relative8),
       other: turn.tools.other
     }
   };
@@ -20837,6 +20837,27 @@ async function isHeadlessTranscript(file2) {
     return false;
   } finally {
     lines.close();
+  }
+}
+async function readSessionCwd(file2) {
+  let stream;
+  try {
+    stream = createReadStream2(file2, { encoding: "utf8" });
+    const lines = createInterface2({ input: stream, crlfDelay: Number.POSITIVE_INFINITY });
+    let read = 0;
+    for await (const text of lines) {
+      if (++read > 50) break;
+      try {
+        const cwd = JSON.parse(text).cwd;
+        if (typeof cwd === "string" && cwd !== "") return cwd;
+      } catch {
+      }
+    }
+    return void 0;
+  } catch {
+    return void 0;
+  } finally {
+    stream?.destroy();
   }
 }
 async function readForkOrigin(file2) {
@@ -21031,6 +21052,7 @@ var claude = {
   collectTranscriptIds,
   readConversation,
   readForkOrigin,
+  readSessionCwd,
   readsHandoff,
   readLastTurn,
   countUserLines,
@@ -21198,7 +21220,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-2N5RF34K.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-44ZJFMDJ.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -21783,12 +21805,12 @@ var updateState = (root, id, fn, opts) => {
 };
 
 // src/hooks/pretooluse.ts
-import { isAbsolute as isAbsolute5, relative as relative5, resolve as resolve6, sep as sep5 } from "path";
+import { isAbsolute as isAbsolute5, relative as relative6, resolve as resolve6, sep as sep5 } from "path";
 
 // src/commands/why.ts
 import { existsSync as existsSync3 } from "fs";
 import { stat as stat9 } from "fs/promises";
-import { dirname as dirname8, isAbsolute as isAbsolute4, join as join10, relative as relative4, resolve as resolve5, sep as sep4 } from "path";
+import { dirname as dirname8, isAbsolute as isAbsolute4, join as join10, relative as relative5, resolve as resolve5, sep as sep4 } from "path";
 
 // ../../node_modules/@inquirer/core/dist/lib/key.js
 var keybindings = ["emacs", "vim"];
@@ -23701,13 +23723,13 @@ function exitOnClosedPipe(stream = process.stdout, exit = process.exit) {
 
 // src/commands/blame.ts
 import { stat as stat8 } from "fs/promises";
-import { isAbsolute as isAbsolute3, relative as relative3, resolve as resolve4, sep as sep3 } from "path";
+import { isAbsolute as isAbsolute3, relative as relative4, resolve as resolve4, sep as sep3 } from "path";
 import { pathToFileURL } from "url";
 
 // src/thought.ts
 import { execFile as execFile2 } from "child_process";
-import { access as access2 } from "fs/promises";
-import { isAbsolute as isAbsolute2, resolve as resolve3 } from "path";
+import { access as access2, realpath } from "fs/promises";
+import { isAbsolute as isAbsolute2, relative as relative3, resolve as resolve3 } from "path";
 import { promisify as promisify2 } from "util";
 
 // src/messages.ts
@@ -23988,6 +24010,20 @@ async function readable(path2) {
 function messagePath(file2) {
   return isAbsolute2(file2) ? file2 : resolve3(process.cwd(), file2);
 }
+async function sessionRunsIn(agent, transcript, dir) {
+  const cwd = await agent.readSessionCwd(transcript);
+  if (cwd === void 0) return true;
+  const session = await realOrSame(cwd);
+  for (const place of [dir, process.cwd()]) {
+    const root = await realOrSame(await findGitRoot(place) ?? place);
+    const inside = relative3(root, session);
+    if (inside === "" || !inside.startsWith("..") && !isAbsolute2(inside)) return true;
+  }
+  return false;
+}
+async function realOrSame(path2) {
+  return realpath(path2).catch(() => resolve3(path2));
+}
 async function newestThought(agent, transcript, sessionId) {
   const turns = await agent.readConversation(transcript);
   const newest = turns.at(-1);
@@ -24027,6 +24063,7 @@ async function addThoughtTrailer(opts) {
   if (named !== "") {
     const transcript2 = await agent.findTranscript(named, env);
     if (transcript2 === null) return false;
+    if (!await sessionRunsIn(agent, transcript2, opts.dir)) return false;
     const value2 = await newestThought(agent, transcript2, named);
     if (value2 === void 0) return false;
     await writeTrailer(opts.messageFile, value2);
@@ -24081,6 +24118,18 @@ async function readThoughtTrailers(root, opts = {}) {
     return parseThoughtTrailers(String(stdout));
   } catch {
     return /* @__PURE__ */ new Map();
+  }
+}
+async function readCommitAuthorEmail(root, ref, env) {
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === void 0) return void 0;
+  try {
+    const args = ["-C", gitRoot, "log", "-1", "--format=%ae", ref];
+    const { stdout } = await exec3("git", args, env === void 0 ? void 0 : { env });
+    const email3 = String(stdout).trim();
+    return email3 === "" ? void 0 : email3;
+  } catch {
+    return void 0;
   }
 }
 async function readCommitThought(root, ref, env) {
@@ -24518,7 +24567,7 @@ async function blame(opts) {
     throw new CliError(`${root} is not inside a git repository; blame needs one`);
   const { file: file2, line } = parseBlameTarget(opts.target);
   const absolute = resolve4(root, file2);
-  const path2 = relative3(gitRoot, absolute);
+  const path2 = relative4(gitRoot, absolute);
   if (path2 === "" || path2.startsWith("..") || isAbsolute3(path2))
     throw new CliError(`${file2} is outside ${gitRoot}`);
   const exists = await stat8(absolute).then(
@@ -25025,10 +25074,14 @@ async function show(opts) {
   if (result.kind === "invalid") throw new CliError(`invalid ref "${opts.ref}": ${result.reason}`);
   if (result.kind === "unknown") {
     const thought = COMMIT_REF.test(opts.ref) ? await readCommitThought(root, opts.ref, opts.io.env) : void 0;
-    if (thought !== void 0)
+    if (thought !== void 0) {
+      const author = await readCommitAuthorEmail(root, opts.ref, opts.io.env);
+      const me = await gitUserEmail(root, opts.io.env);
+      const others = author !== void 0 && me !== void 0 && author.toLowerCase() !== me.toLowerCase();
       throw new CliError(
-        `commit ${opts.ref} comes from thought ${thought}, which is not recorded yet; it appears after the next record update`
+        others ? `commit ${opts.ref} comes from thought ${thought}, which is not in this clone's record: its author has not pushed it yet, or the commit came from a fork, whose record stays in the fork` : `commit ${opts.ref} comes from thought ${thought}, which is not recorded yet; it appears after the next record update`
       );
+    }
     throw new CliError(result.reason);
   }
   if (result.kind === "ambiguous") {
@@ -25226,7 +25279,7 @@ function oneLine4(text) {
   return text.replace(/\s+/g, " ").trim();
 }
 function repositoryPath(gitRoot, root, file2) {
-  const rel = relative4(gitRoot, resolve5(root, file2));
+  const rel = relative5(gitRoot, resolve5(root, file2));
   if (rel === "" || rel.startsWith("..") || isAbsolute4(rel)) return void 0;
   return rel.split(sep4).join("/");
 }
@@ -25326,7 +25379,7 @@ async function why(opts) {
   let target = opts.file;
   if (opts.cwd !== void 0) {
     start = await nearestProjectDir(opts.cwd) ?? opts.cwd;
-    target = relative4(start, resolve5(opts.cwd, opts.file));
+    target = relative5(start, resolve5(opts.cwd, opts.file));
   }
   const parsed = parseBlameTarget(target);
   const file2 = parsed.file;
@@ -25433,7 +25486,7 @@ async function onPreToolUse(ctx) {
   const config2 = await loadConfig(ctx.env);
   if (!config2.tryBeforeNotes) return void 0;
   const absolute = isAbsolute5(filePath) ? filePath : resolve6(ctx.input.cwd ?? ctx.root, filePath);
-  const rel = relative5(ctx.root, absolute);
+  const rel = relative6(ctx.root, absolute);
   if (rel === "" || rel.startsWith("..") || isAbsolute5(rel)) return void 0;
   const key = rel.split(sep5).join("/");
   let firstLook = false;
@@ -25498,7 +25551,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "1.0.0",
+  version: "1.0.1",
   description: "Git remembers what changed. cogit remembers why.",
   license: "MIT",
   keywords: [
@@ -25550,7 +25603,7 @@ var package_default = {
 };
 
 // src/cli-version.ts
-import { readFile as readFile8, realpath, stat as stat10 } from "fs/promises";
+import { readFile as readFile8, realpath as realpath2, stat as stat10 } from "fs/promises";
 import { delimiter, dirname as dirname9, join as join11 } from "path";
 var PACKAGE = "@cogit/cli";
 async function installedCliVersion(env) {
@@ -25560,7 +25613,7 @@ async function installedCliVersion(env) {
     try {
       if (!(await stat10(bin)).isFile()) continue;
       const pkg = JSON.parse(
-        await readFile8(join11(dirname9(dirname9(await realpath(bin))), "package.json"), "utf8")
+        await readFile8(join11(dirname9(dirname9(await realpath2(bin))), "package.json"), "utf8")
       );
       if (pkg.name === PACKAGE && typeof pkg.version === "string") return pkg.version;
       return void 0;
@@ -25593,7 +25646,7 @@ import { spawn } from "child_process";
 import { createHash as createHash2 } from "crypto";
 import { existsSync as existsSync4 } from "fs";
 import { rm as rm3, stat as stat11 } from "fs/promises";
-import { relative as relative6, sep as sep6 } from "path";
+import { relative as relative7, sep as sep6 } from "path";
 import { setTimeout as sleep2 } from "timers/promises";
 var LOCAL = "refs/cogit";
 var TRACKING = "refs/cogit-remote";
@@ -25650,8 +25703,17 @@ function quietEnv(env) {
 }
 function gitError(text) {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "");
-  const reason = lines.find((line) => line.startsWith("fatal:")) ?? lines.at(-1) ?? "git failed";
+  const reason = lines.find((line) => line.startsWith("fatal:")) ?? lines.find((line) => line.startsWith("error:")) ?? lines.at(-1) ?? "git failed";
   return reason.slice(0, 300);
+}
+function parseGitVersion(text) {
+  const match = /(\d+)\.(\d+)/.exec(text);
+  return match === null ? void 0 : [Number(match[1]), Number(match[2])];
+}
+async function gitVersionAtLeast(root, env, major, minor) {
+  const version2 = parseGitVersion((await runGit(root, ["version"], env)).stdout.toString("utf8"));
+  if (version2 === void 0) return true;
+  return version2[0] > major || version2[0] === major && version2[1] >= minor;
 }
 async function isSharing(root) {
   if (!existsSync4(projectPaths(root).project)) return false;
@@ -25667,7 +25729,7 @@ async function syncRemote(root, env) {
 }
 async function sessionScope(root) {
   const gitRoot = await findGitRoot(root);
-  const prefix = gitRoot === void 0 ? "" : relative6(gitRoot, root).split(sep6).join("/");
+  const prefix = gitRoot === void 0 ? "" : relative7(gitRoot, root).split(sep6).join("/");
   if (prefix === "") return "sessions";
   return `projects/${createHash2("sha256").update(prefix).digest("hex").slice(0, 16)}/sessions`;
 }
@@ -25937,13 +25999,9 @@ async function addRecordRefspec(root, env) {
 async function downloadRecords(root, env, showProgress = false) {
   const remote = await syncRemote(root, env);
   if (remote === void 0) return false;
-  const args = ["fetch", "--no-tags", "--no-write-fetch-head", remote, RECORD_REFSPEC];
-  const result = showProgress ? await new Promise((done) => {
-    const child = spawn("git", ["-C", root, ...args], { env, stdio: "inherit" });
-    const failed = (code) => done({ code, stdout: Buffer.alloc(0), stderr: "the download failed" });
-    child.on("error", () => failed(1));
-    child.on("close", (code) => failed(code ?? 1));
-  }) : await runGit(root, [...args.slice(0, 1), "--quiet", ...args.slice(1)], quietEnv(env));
+  const fetchHead = await gitVersionAtLeast(root, env, 2, 29) ? ["--no-write-fetch-head"] : [];
+  const args = ["fetch", "--no-tags", ...fetchHead, remote, RECORD_REFSPEC];
+  const result = showProgress ? await fetchWithProgress(root, [...args.slice(0, 1), "--progress", ...args.slice(1)], env) : await runGit(root, [...args.slice(0, 1), "--quiet", ...args.slice(1)], quietEnv(env));
   await updateState2(root, (state) => {
     if (result.code === 0) {
       const { downloadError: _cleared, ...rest } = state;
@@ -25952,6 +26010,31 @@ async function downloadRecords(root, env, showProgress = false) {
     return { ...state, downloadError: gitError(result.stderr) };
   });
   return result.code === 0;
+}
+var REF_LINE = /^(From | .* -> )/;
+function fetchWithProgress(root, args, env) {
+  return new Promise((done) => {
+    const child = spawn("git", ["-C", root, ...args], {
+      env,
+      stdio: ["inherit", "inherit", "pipe"]
+    });
+    const err = [];
+    let rest = "";
+    const show2 = (part) => {
+      err.push(part);
+      if (!REF_LINE.test(part)) process.stderr.write(part);
+    };
+    child.stderr?.on("data", (chunk) => {
+      const parts = (rest + chunk.toString("utf8")).split(/(?<=[\r\n])/);
+      rest = /[\r\n]$/.test(parts.at(-1) ?? "") ? "" : parts.pop() ?? "";
+      for (const part of parts) show2(part);
+    });
+    child.on("error", (error62) => done({ code: 1, stdout: Buffer.alloc(0), stderr: error62.message }));
+    child.on("close", (code) => {
+      if (rest !== "") show2(rest);
+      done({ code: code ?? 1, stdout: Buffer.alloc(0), stderr: err.join("") });
+    });
+  });
 }
 async function countUnsentRecords(root, env, pushedRemote) {
   if (!await isSharing(root)) return 0;
@@ -26035,6 +26118,11 @@ async function sendRecords(root, env) {
 async function trackedRecordFiles(root, env) {
   const result = await runGit(root, ["ls-files", "--", ".cogit/sessions"], env);
   return result.stdout.toString("utf8").split("\n").filter(Boolean).length;
+}
+async function cogitGitignoreChanged(root, env) {
+  const result = await runGit(root, ["status", "--porcelain", "--", ".cogit/.gitignore"], env);
+  const line = result.stdout.toString("utf8").split("\n")[0] ?? "";
+  return line !== "" && !line.startsWith("??");
 }
 async function recordSyncStatus(root, env) {
   const sharing = await isSharing(root);
@@ -26240,7 +26328,7 @@ function clip(text, max) {
 }
 async function startupContext(ctx) {
   const command = cli(ctx);
-  const header = `cogit records this project's lineage (one node per user message, hanging from the message it reacts to, grouped in sessions with branch summaries). Read it with \`${command} log -C "${ctx.root}"\`, find where something was discussed with \`${command} search "<text>" -C "${ctx.root}"\`, and one message with \`${command} show <ref> -C "${ctx.root}"\` (a ref is a message hash, an h+hex prefix of six or more characters, or <session-id>:mN). When the user mentions a message hash or another session's mN, run show before answering.`;
+  const header = `cogit records this project's lineage (one node per user message, hanging from the message it reacts to, grouped in sessions with branch summaries). Read it with \`${command} log -C "${ctx.root}"\`, find where something was discussed with \`${command} search "<text>" -C "${ctx.root}"\`, and one message with \`${command} show <ref> -C "${ctx.root}"\` (a ref is a message hash, an h+hex prefix of six or more characters, or <session-id>:mN). When the user mentions a message hash or another session's mN, run show before answering. Commits here get a \`Thought: h\u2026\` trailer from cogit's git hook, naming the message behind them; it is expected, so leave it in.`;
   const sessions = await loadAllSessions(ctx.root, () => {
   });
   const previous = mostRecentOtherSession(sessions, ctx.sessionId);
@@ -26442,6 +26530,74 @@ async function runHook(event, stdin, env, now, debug, deps = {}) {
   }
 }
 
+// src/push-command.ts
+import { spawnSync } from "child_process";
+import { readFileSync } from "fs";
+import { basename as basename3 } from "path";
+var MAX_DEPTH2 = 6;
+function findPushArgs(startPid, read) {
+  let pid = startPid;
+  for (let depth = 0; depth < MAX_DEPTH2 && pid > 1; depth++) {
+    const info = read(pid);
+    if (info === void 0) return void 0;
+    const name = basename3(info.args[0] ?? "").replace(/\.exe$/i, "");
+    if (name === "git" && info.args.includes("push")) return info.args;
+    pid = info.ppid;
+  }
+  return void 0;
+}
+var VALUE_OPTIONS = /* @__PURE__ */ new Set(["--push-option", "--repo", "--receive-pack", "--exec"]);
+function isDryRun(args) {
+  const start = args.indexOf("push");
+  if (start === -1) return false;
+  for (let i = start + 1; i < args.length; i++) {
+    const arg = args[i] ?? "";
+    if (arg === "--") return false;
+    if (arg === "--dry-run") return true;
+    if (VALUE_OPTIONS.has(arg)) {
+      i++;
+      continue;
+    }
+    if (!/^-[^-]/.test(arg)) continue;
+    for (let c = 1; c < arg.length; c++) {
+      if (arg[c] === "n") return true;
+      if (arg[c] === "o") {
+        if (c === arg.length - 1) i++;
+        break;
+      }
+    }
+  }
+  return false;
+}
+function pushIsDryRun(read = (pid) => readProcess(pid)) {
+  const args = findPushArgs(process.ppid, read);
+  return args !== void 0 && isDryRun(args);
+}
+function readProcess(pid, platform = process.platform) {
+  if (platform === "linux") return readProc(pid);
+  if (platform === "darwin") return readPs(pid);
+  return void 0;
+}
+function readProc(pid) {
+  try {
+    const stat13 = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const ppid = Number(stat13.slice(stat13.lastIndexOf(")") + 2).split(" ")[1]);
+    const args = readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0").filter(Boolean);
+    return Number.isInteger(ppid) ? { ppid, args } : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function readPs(pid) {
+  const out = spawnSync("ps", ["-o", "ppid=,args=", "-p", String(pid)], {
+    encoding: "utf8",
+    timeout: 1e3
+  });
+  const match = /^(\d+)\s+([\s\S]*)$/.exec((out.stdout ?? "").trim());
+  if (out.status !== 0 || match === null) return void 0;
+  return { ppid: Number(match[1]), args: (match[2] ?? "").trim().split(/\s+/) };
+}
+
 // src/git-hooks.ts
 var BLOCK_START = "# >>> cogit";
 var BLOCK_END = "# <<< cogit";
@@ -26455,40 +26611,74 @@ function currentCliPath() {
   }
 }
 function hookBlock(event, projectRoot, cliPath = currentCliPath() ?? null) {
+  if (event === "pre-push") {
+    return [
+      BLOCK_START,
+      "cogit_stdin=$(cat)",
+      ...cogitCall(event, projectRoot, cliPath, `printf '%s' "$cogit_stdin" | `, ""),
+      'if [ -n "$cogit_stdin" ]; then exec <<COGIT_STDIN',
+      "$cogit_stdin",
+      "COGIT_STDIN",
+      "else exec </dev/null; fi",
+      BLOCK_END
+    ].join("\n");
+  }
+  if (event === "prepare-commit-msg") {
+    return [
+      BLOCK_START,
+      "cogit_msg=${1-} cogit_source=${2-}",
+      "cogit_thought() {",
+      ...cogitCall(event, projectRoot, cliPath, "", "  "),
+      "}",
+      `trap 'cogit_status=$?; cogit_thought "$cogit_msg" "$cogit_source"; exit $cogit_status' EXIT`,
+      BLOCK_END
+    ].join("\n");
+  }
+  return [BLOCK_START, ...cogitCall(event, projectRoot, cliPath, "", ""), BLOCK_END].join("\n");
+}
+function cogitCall(event, projectRoot, cliPath, pipe2, indent) {
   const args = `hook ${event} --dir ${shellQuote(projectRoot)} "$@"`;
-  const lines = [
-    BLOCK_START,
-    "if command -v cogit >/dev/null 2>&1; then",
-    `  cogit ${args} || true`
-  ];
+  const lines = ["if command -v cogit >/dev/null 2>&1; then", `  ${pipe2}cogit ${args} || true`];
   if (cliPath !== null) {
     const cli2 = shellQuote(cliPath);
     lines.push(
       `elif command -v node >/dev/null 2>&1 && [ -f ${cli2} ]; then`,
-      `  node ${cli2} ${args} || true`
+      `  ${pipe2}node ${cli2} ${args} || true`
     );
   }
-  lines.push("fi", BLOCK_END);
-  return lines.join("\n");
+  lines.push("fi");
+  return lines.map((line) => `${indent}${line}`);
+}
+function hookCommandLine(event, projectRoot) {
+  return hookBlock(event, projectRoot, null).split("\n").find((line) => line.includes("cogit hook ")) ?? "";
+}
+function isShellHook(text) {
+  const first = text.split("\n", 1)[0] ?? "";
+  if (!first.startsWith("#!")) return true;
+  return /(^|[/\s])(sh|bash|dash|zsh|ksh|ash)(\s|$)/.test(first.slice(2).trim());
 }
 function shellQuote(value) {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 function withHookBlock(text, block) {
-  const pattern = /# >>> cogit[\s\S]*?# <<< cogit/g;
-  if (pattern.test(text)) return text.replace(pattern, block);
-  if (text === "") return `#!/bin/sh
-
+  const rest = text.includes(BLOCK_START) ? withoutHookBlock(text) : text;
+  if (rest === "") return `#!/bin/sh
 ${block}
 `;
-  const sep7 = text.endsWith("\n") ? "" : "\n";
-  return `${text}${sep7}
+  if (!rest.startsWith("#!")) return `${block}
+${rest}`;
+  const cut = rest.indexOf("\n");
+  if (cut === -1) return `${rest}
 ${block}
 `;
+  return `${rest.slice(0, cut + 1)}${block}
+${rest.slice(cut + 1)}`;
 }
 function withoutHookBlock(text) {
-  const next = text.replace(/# >>> cogit\n[\s\S]*?# <<< cogit\n?/, "");
-  return next.endsWith("\n\n") ? next.slice(0, -1) : next;
+  return text.replace(
+    /(\n\n)?# >>> cogit\n[\s\S]*?# <<< cogit\n?/,
+    (_all, gap) => gap === void 0 ? "" : "\n"
+  );
 }
 function onlyGeneratedShebang(text) {
   return text.split("\n").every((line) => line.trim() === "" || line.trim() === "#!/bin/sh");
@@ -26505,11 +26695,8 @@ async function installGitHook(root, event) {
     () => false
   );
   const current = exists ? await readFile9(file2, "utf8") : "";
-  const block = hookBlock(event, root);
-  const next = exists ? withHookBlock(current, block) : `#!/bin/sh
-
-${block}
-`;
+  if (!isShellHook(current)) return false;
+  const next = withHookBlock(current, hookBlock(event, root));
   if (exists && next === current) return false;
   await atomicWrite(file2, next);
   await chmod(file2, 493);
@@ -26564,8 +26751,9 @@ async function removeHookBlocks(dir, events) {
   return removed;
 }
 var NO_OBJECT = /^0+$/;
-async function sendWithPush(dir, env, pushedRemote, pushedRefs, spawn3) {
+async function sendWithPush(dir, env, pushedRemote, pushedRefs, spawn3, dryRun) {
   if (captureDisabled(env)) return;
+  if (dryRun()) return;
   const lines = pushedRefs.split("\n").filter(Boolean);
   const going = lines.map((line) => line.split(" ")).find((part) => !NO_OBJECT.test(part[1] ?? "0"));
   if (lines.length > 0 && going === void 0) return;
@@ -26597,9 +26785,9 @@ async function queueShape(dir, env, spawn3) {
   if (cli2 === void 0) return;
   spawn3(cli2, ["shape", "--commit", commit, "-C", dir], env, projectPaths(dir).detachedLog);
 }
-async function runGitHook(event, dir, env = process.env, args = [], now = /* @__PURE__ */ new Date(), spawn3 = spawnDetachedProcess, pushedRefs = async () => "") {
+async function runGitHook(event, dir, env = process.env, args = [], now = /* @__PURE__ */ new Date(), spawn3 = spawnDetachedProcess, pushedRefs = async () => "", dryRun = pushIsDryRun) {
   if (event === "pre-push") {
-    await sendWithPush(dir, env, args[0], await pushedRefs(), spawn3);
+    await sendWithPush(dir, env, args[0], await pushedRefs(), spawn3, dryRun);
     return;
   }
   if (event === "post-commit") {
@@ -26730,6 +26918,7 @@ export {
   sendAfterPush,
   sendRecords,
   trackedRecordFiles,
+  cogitGitignoreChanged,
   recordSyncStatus,
   deleteRecords,
   prepareRecords,
@@ -26739,6 +26928,8 @@ export {
   BLOCK_END,
   currentCliPath,
   hookBlock,
+  hookCommandLine,
+  isShellHook,
   withHookBlock,
   withoutHookBlock,
   installGitHook,
