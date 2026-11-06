@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.1.0] - 2026-11-06
 ### Changed
 - Every message now gets a one-line summary of what came of it (`messageSummaries` is on by default, and turned on once for existing setups). Without it, a message that only discussed or advised kept nothing but its title, so the map and search lost what the agent said. Turn it off with `cogit config set messageSummaries false`; it then stays off.
 
