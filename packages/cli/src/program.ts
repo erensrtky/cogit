@@ -48,6 +48,8 @@ export interface ProgramDeps {
   server?: (env: NodeJS.ProcessEnv) => Promise<string | null>;
   /** Reads a hook's JSON input; tests pass it directly. */
   stdin?: () => Promise<string>;
+  /** Where a git hook runs; git starts it at the top of its repository. */
+  cwd?: () => string;
   /** Sets the process exit code; tests observe it. */
   exitCode?: (code: number) => void;
 }
@@ -680,6 +682,9 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
             new Date(io.now()),
             undefined,
             deps.stdin ?? readStdin,
+            undefined,
+            // Git runs a hook at the top of the repository it is working in.
+            deps.cwd?.() ?? process.cwd(),
           );
         } catch {
           // A hook must never block the commit or the session.

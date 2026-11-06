@@ -7,6 +7,8 @@ import {
   hookBlock,
   installGitHook,
   isShellHook,
+  runGitHook,
+  sameRepository,
   withHookBlock,
   withoutHookBlock,
 } from "../src/git-hooks.js";
@@ -19,7 +21,7 @@ import {
   readProcess,
   readPs,
 } from "../src/push-command.js";
-import { tempDir } from "./helpers.js";
+import { noGitDir, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
 
@@ -181,5 +183,72 @@ describe("telling a dry-run push apart", () => {
     // Under vitest no git push is running, so the push counts as real.
     expect(pushIsDryRun()).toBe(false);
     expect(pushIsDryRun(() => ({ ppid: 1, args: ["git", "push", "-n"] }))).toBe(true);
+  });
+});
+
+describe("a hooks folder shared by every repository", () => {
+  it("tells the project's repository and its worktrees from any other", async () => {
+    const dir = await tempDir();
+    const env = { ...process.env, GIT_CONFIG_NOSYSTEM: "1", HOME: dir };
+    const repo = async (name: string): Promise<string> => {
+      const path = join(dir, name);
+      await run("git", ["init", "-q", "-b", "main", path], { env });
+      await run(
+        "git",
+        [
+          "-C",
+          path,
+          "-c",
+          "user.name=A",
+          "-c",
+          "user.email=a@x.io",
+          "commit",
+          "-q",
+          "--allow-empty",
+          "-m",
+          "init",
+        ],
+        { env },
+      );
+      return path;
+    };
+    const project = await repo("project");
+    const other = await repo("other");
+    const tree = join(dir, "tree");
+    await run("git", ["-C", project, "worktree", "add", "-q", tree, "-b", "wt"], { env });
+
+    expect(await sameRepository(project, project)).toBe(true);
+    expect(await sameRepository(join(tree), project)).toBe(true);
+    expect(await sameRepository(other, project)).toBe(false);
+    // Outside any repository nothing is known: as before, the hook runs.
+    expect(await sameRepository(await noGitDir(), project)).toBe(true);
+
+    // Git's own variables in the hook must not make the project look like this repository.
+    const saved = process.env.GIT_DIR;
+    process.env.GIT_DIR = join(other, ".git");
+    try {
+      expect(await sameRepository(other, project)).toBe(false);
+    } finally {
+      if (saved === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = saved;
+    }
+
+    // A hook run from the other repository does nothing at all.
+    const started: string[][] = [];
+    const spawned = ((_cli: string, args: string[]) => {
+      started.push(args);
+    }) as never;
+    await runGitHook(
+      "pre-push",
+      project,
+      env,
+      ["origin", "x"],
+      new Date(),
+      spawned,
+      async () => `refs/heads/main ${"a".repeat(40)} refs/heads/main ${"0".repeat(40)}\n`,
+      () => false,
+      other,
+    );
+    expect(started).toEqual([]);
   });
 });

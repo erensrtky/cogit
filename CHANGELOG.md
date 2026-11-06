@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Every message now gets a one-line summary of what came of it (`messageSummaries` is on by default, and turned on once for existing setups). Without it, a message that only discussed or advised kept nothing but its title, so the map and search lost what the agent said. Turn it off with `cogit config set messageSummaries false`; it then stays off.
 
 ### Fixed
+- With a hooks folder shared by every repository (a global `core.hooksPath`), cogit's hooks no longer act in repositories that are not the project: a commit there no longer takes the project's `Thought:` trailer, and a push there no longer announces the project's records.
 - With Husky, cogit's hook blocks no longer vanish for good after `npm install` (Husky rewrites `.husky/_`): the next chat message puts them back. `cogit hooks uninstall` is remembered, so blocks you removed on purpose stay out.
 - A session the side model left untitled takes its first thread's title (or its first message's) at session end, instead of showing only its id on the map and in `cogit log`; `cogit log` also stops printing such an id twice.
 

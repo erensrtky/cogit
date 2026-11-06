@@ -446,15 +446,23 @@ describe("the thought behind a commit (Story 9.4)", () => {
       expect(await readMessage(file)).toContain(`Thought: ${thoughtOf()}`);
     });
 
-    it("runs through the CLI's prepare-commit-msg hook", async () => {
+    it("runs through the CLI's prepare-commit-msg hook, only in the project's repository", async () => {
       await writeHead();
-      const file = await messageFile();
-      const program = createProgram(() => io);
-      program.exitOverride().configureOutput({ writeOut: () => {}, writeErr: () => {} });
-      await program.parseAsync(["hook", "prepare-commit-msg", "--dir", root, file, "message"], {
-        from: "user",
-      });
-      expect(await readMessage(file)).toContain(`Thought: ${thoughtOf()}`);
+      const hook = async (cwd: string): Promise<string> => {
+        const file = await messageFile();
+        const program = createProgram(() => io, { cwd: () => cwd });
+        program.exitOverride().configureOutput({ writeOut: () => {}, writeErr: () => {} });
+        await program.parseAsync(["hook", "prepare-commit-msg", "--dir", root, file, "message"], {
+          from: "user",
+        });
+        return readMessage(file);
+      };
+      expect(await hook(root)).toContain(`Thought: ${thoughtOf()}`);
+      // A shared hooks folder runs the block in another repository: no trailer there.
+      const other = join(dir, "other");
+      await mkdir(other, { recursive: true });
+      await run("git", ["init", "-q", other]);
+      expect(await hook(other)).not.toContain("Thought:");
     });
   });
 

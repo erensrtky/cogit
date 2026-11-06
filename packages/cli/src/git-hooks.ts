@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
-import { chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { chmod, mkdir, readFile, realpath, rm, stat } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { promisify } from "node:util";
 import { findGitRoot, gitHooksDir, resolveCommit } from "./git.js";
 import { spawnDetachedProcess } from "./hooks/run.js";
 import { pushIsDryRun } from "./push-command.js";
@@ -8,6 +10,11 @@ import { countUnsentRecords } from "./record-sync.js";
 import { atomicWrite } from "./store/fs.js";
 import { captureDisabled, projectPaths } from "./store/paths.js";
 import { loadConfig } from "./store/stores.js";
+
+const execFileAsync = promisify(execFile);
+const execGit = (args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv }) =>
+  execFileAsync("git", args, opts);
+
 import { addThoughtTrailer } from "./thought.js";
 
 /**
@@ -336,6 +343,37 @@ async function queueShape(
   spawn(cli, ["shape", "--commit", commit, "-C", dir], env, projectPaths(dir).detachedLog);
 }
 
+/** Git's own variables in a hook; a lookup of another repository must not inherit them. */
+const GIT_REPO_ENV = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"];
+
+async function commonDir(cwd: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
+  try {
+    const { stdout } = await execGit(["rev-parse", "--git-common-dir"], { cwd, env });
+    const dir = resolve(cwd, String(stdout).trim());
+    return await realpath(dir).catch(() => dir);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * True when the hook runs in the project's repository (or one of its worktrees).
+ * A hooks folder shared by every repository (a global `core.hooksPath`) carries
+ * the block of the one project that installed it; in any other repository the
+ * block must do nothing, or a commit there takes that project's `Thought:`.
+ * Unknown counts as the same, as before.
+ */
+export async function sameRepository(hookCwd: string, dir: string): Promise<boolean> {
+  const clean = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !GIT_REPO_ENV.includes(key)),
+  );
+  const [here, project] = await Promise.all([
+    commonDir(hookCwd, process.env),
+    commonDir(dir, clean),
+  ]);
+  return here === undefined || project === undefined || here === project;
+}
+
 /**
  * Runs one git hook. A git hook that fails would block the user's commit, so the
  * CLI calls this inside its own silence: nothing here throws or prints. `args`
@@ -351,7 +389,9 @@ export async function runGitHook(
   spawn: typeof spawnDetachedProcess = spawnDetachedProcess,
   pushedRefs: () => Promise<string> = async () => "",
   dryRun: () => boolean = pushIsDryRun,
+  hookCwd?: string,
 ): Promise<void> {
+  if (hookCwd !== undefined && !(await sameRepository(hookCwd, dir))) return;
   if (event === "pre-push") {
     await sendWithPush(dir, env, args[0], await pushedRefs(), spawn, dryRun);
     return;
