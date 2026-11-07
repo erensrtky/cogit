@@ -3,7 +3,6 @@ import { dismissKey, timeSince } from "../../cli/src/view/inbox.js";
 import type { ViewInboxRow } from "../../cli/src/view/model.js";
 import { isLivePage, pageToken, saveDismiss } from "./data.js";
 import { formatTime } from "./format.js";
-import { ResumeButton } from "./ResumeButton.js";
 
 /**
  * The "your turn" inbox (Story 11.1): one row per session whose transcript ends
@@ -145,11 +144,6 @@ export function Inbox({
                 <a className="inbox-open" href={rowHref(row)}>
                   {row.messageId === undefined ? "Open the map →" : "Open at this message →"}
                 </a>
-                <ResumeButton
-                  projectPath={row.projectPath}
-                  sessionId={row.sessionId}
-                  available={row.transcriptAvailable}
-                />
               </div>
             </li>
           ))}

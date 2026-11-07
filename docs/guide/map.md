@@ -72,8 +72,9 @@ panel over the map.
 - the conversation turn itself: your message as written and the agent's written replies (tool
   output is left out). This comes from your machine only; see [Privacy](privacy.md).
 - previous and next message buttons, and two small buttons that copy a command for the
-  whole session: **Resume** (`cd '<project>' && claude --resume <session-id>`) reopens the
-  chat where it left off, and **Fork** adds `--fork-session`, so the chat goes on as a new
+  whole session to paste into a terminal (the page cannot start Claude Code itself):
+  **⧉ Resume** (`cd '<project>' && claude --resume <session-id>`) reopens the
+  chat where it left off, and **⧉ Fork** adds `--fork-session`, so the chat goes on as a new
   session with the same history and the original stays as it was. On the map the fork starts from
   the message it was forked at, like a session that continues another.
 
@@ -115,7 +116,7 @@ map's light and dark theme.
 Above the panel's project cards, and folded in a project map's head, the "Your turn" inbox
 lists the sessions waiting on you: the agent wrote last, or the record says it needs your
 answer. Each row shows the project, the session and the agent's last words, with a link
-straight to that message. The × hides a row until the agent writes in that session again.
+straight to that message; resuming starts from the map. The × hides a row until the agent writes in that session again.
 Sessions older than a day (`inboxMaxAgeDays`) leave the inbox; the map still has them.
 
 ## Files

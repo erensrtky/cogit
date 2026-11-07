@@ -6,13 +6,25 @@ type Action = "resume" | "fork";
 
 const LABELS: Record<Action, string> = { resume: "Resume", fork: "Fork" };
 
+/** Said to screen readers, where the copy sign is not seen. */
+const SPOKEN: Record<Action, string> = {
+  resume: "Copy the resume command",
+  fork: "Copy the fork command",
+};
+
+/**
+ * The copy sign in front of each label: the page cannot start Claude Code, it
+ * only copies the command, and a bare "Resume" read as if it would.
+ */
+const COPY_SIGN = "⧉";
+
 const HINTS: Record<Action, string> = {
   resume: "Copy the command that reopens this session where it left off",
   fork: "Copy the command that continues this session as a new one; the original stays as it is",
 };
 
 /**
- * The resume controls (Story 8.7, reused by the inbox in 11.1): Resume copies
+ * The resume controls of the map's panels (Story 8.7): Resume copies
  * `cd '<project>' && claude --resume <id>`, Fork the same with `--fork-session`.
  * Both act on the whole session, wherever they are shown. When the clipboard
  * fails over `file://`, the command is shown selected so Ctrl+C still works.
@@ -33,12 +45,17 @@ export function ResumeButton({
   if (!available) {
     return (
       <span className="resume-actions">
-        <button type="button" className="resume-button" disabled>
-          Resume
-        </button>
-        <button type="button" className="resume-button" disabled>
-          Fork
-        </button>
+        {(["resume", "fork"] as const).map((each) => (
+          <button
+            key={each}
+            type="button"
+            className="resume-button"
+            aria-label={SPOKEN[each]}
+            disabled
+          >
+            <span aria-hidden="true">{COPY_SIGN}</span> {LABELS[each]}
+          </button>
+        ))}
         <span className="muted resume-note">session no longer available</span>
       </span>
     );
@@ -60,9 +77,10 @@ export function ResumeButton({
           type="button"
           className="resume-button"
           title={`${HINTS[each]}: ${resumeCommand(projectPath, sessionId, each === "fork")}`}
+          aria-label={SPOKEN[each]}
           onClick={() => copy(each)}
         >
-          {LABELS[each]}
+          <span aria-hidden="true">{COPY_SIGN}</span> {LABELS[each]}
         </button>
       ))}
       {state === "copied" ? (

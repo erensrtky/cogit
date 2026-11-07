@@ -94,13 +94,15 @@ describe("Story 9.3 on the map", () => {
         }),
       );
     const live = render({ ...session, transcriptAvailable: true });
-    expect(live).toContain(">Resume</button>");
-    expect(live).toContain(">Fork</button>");
+    // The copy sign says the page copies a command; it cannot start Claude Code.
+    expect(live).toContain('<span aria-hidden="true">⧉</span> Resume</button>');
+    expect(live).toContain('<span aria-hidden="true">⧉</span> Fork</button>');
+    expect(live).toContain('aria-label="Copy the resume command"');
     expect(live).toContain("claude --resume s1 --fork-session");
     expect(live).not.toContain("disabled");
     const gone = render(session);
     expect(gone).toContain("session no longer available");
-    expect(gone.match(/class="resume-button" disabled/g)).toHaveLength(2);
+    expect(gone.match(/class="resume-button" aria-label="[^"]+" disabled/g)).toHaveLength(2);
   });
 });
 
