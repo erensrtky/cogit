@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.2.0] - 2026-11-07
 ### Added
 - `cogit pr --install-action` writes a GitHub Action (`.github/workflows/cogit.yml`) that posts the decisions behind each pull request's branch as one comment and updates it on every push; fork pull requests and branches with no recorded thought get no comment. The first `cogit pr` you run at a terminal mentions it once.
 
