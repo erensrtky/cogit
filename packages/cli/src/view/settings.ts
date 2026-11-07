@@ -56,7 +56,7 @@ const EDITABLE: FieldSpec[] = [
       "Economical (recommended): a small model records in the background every few turns and " +
       "closes each session with one pass that finds its threads, writes the branch summaries " +
       "and one line on where the session left off. The agent is never interrupted; it costs " +
-      "about a cent per session. Detailed: on top of that, the main agent records its own " +
+      "under 2 cents per 20 messages. Detailed: on top of that, the main agent records its own " +
       "decisions every 15 turns. It catches the agent's technical choices best and costs about " +
       "1–2% of a session. A third mode, where only the main agent records, is set with " +
       "`cogit config set recorder agent`.",

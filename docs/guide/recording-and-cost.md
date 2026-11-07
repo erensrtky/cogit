@@ -17,7 +17,7 @@ the agent wrote.
 
 | `recorder` | Panel | What happens | Cost in our sessions |
 |---|---|---|---|
-| `side` (default) | Economical | Only the side model records, every 5 turns (`sideEveryTurns`); the agent is never asked | about a cent per session |
+| `side` (default) | Economical | Only the side model records, every 5 turns (`sideEveryTurns`); the agent is never asked | under 2 cents per 20 messages |
 | `mixed` | Detailed | As above, and the agent checks in every 15 turns (`updateEveryTurns`) to add its decisions | about 1–2% of a session's tokens |
 | `agent` | (config only) | The agent records everything itself every `updateEveryTurns` turns | about 3–7%, more in short sessions |
 
@@ -30,6 +30,9 @@ where the session left off. Nothing in the chat waits for it.
 
 The side model runs with your own Claude Code login, like any `claude -p` run, so it uses
 your plan or API account. Haiku is about thirty times cheaper than the main model per token.
+In the default mode we measured 20 real messages at about 1.3 cents with message summaries
+off and about 1.6 cents with them on (the default); summaries add about a quarter to the side
+model's cost, not to the session's.
 In an A/B over three real sessions (109 messages) Haiku matched the main agent on message
 parents in 94% of cases and was good on titles and your decisions; it was weaker on the
 agent's own technical decisions and at splitting a session into threads. Telling it what the

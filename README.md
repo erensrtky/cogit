@@ -89,8 +89,8 @@ including the option that was rejected.*
   decisions and the rejected options, never the raw chat.
 - **Teams share the record through git**: after a pull, your teammates' sessions are on the
   map too, with who ran them and what changed most.
-- **Cheap by default**: a small side model records in the background; in our sessions it
-  cost about 1–2% of a session's tokens.
+- **Cheap by default**: a small side model records in the background; in our measurement it
+  cost under 2 cents per 20 messages.
 - **No server, no account**: it runs on your machine. Nothing leaves it unless you say so: `cogit
   init` asks whether to share the record (titles, decisions and reasons) with your team. If you
   do, `git push` sends it to your own repository, outside your branches, so it never shows up in
