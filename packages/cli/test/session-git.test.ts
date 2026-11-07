@@ -115,6 +115,32 @@ describe("the session HEAD and author (Story 9.3)", () => {
     expect(await sessionAuthor(root, noName)).toBe(userInfo().username);
   });
 
+  it("leaves out a commit this repository does not have", async () => {
+    // A hash pasted from another repository reads like this session's commit.
+    await makeProject();
+    const own = (await git("rev-parse", "--short=7", "HEAD")).trim();
+    const io = fakeIo(env);
+    await sessionWrite({ dir: root }, io, async () =>
+      JSON.stringify({
+        sessionId: "s1",
+        nodes: [
+          {
+            id: "h111111111111",
+            kind: "message",
+            title: "Commit it",
+            commits: [own, "5d05a88"],
+            shape: { tools: [], commits: [own, "5d05a88"] },
+          },
+        ],
+      }),
+    );
+    const saved = await loadSession(root, "s1");
+    const node = saved.found && saved.ok ? saved.data.nodes[0] : undefined;
+    expect(node?.commits).toEqual([own]);
+    expect(node?.shape?.commits).toEqual([own]);
+    expect(io.warnings.join("\n")).toContain("does not have: 5d05a88");
+  });
+
   it("writes stable project.json, one sorted key per line", () => {
     expect(projectJson({ schema: 1, name: "p" })).toBe('{\n  "name": "p",\n  "schema": 1\n}\n');
   });

@@ -5,7 +5,7 @@ import { type Author, sameAuthor, sessionIdentity, stampedIdentity } from "../au
 
 export { sessionAuthor } from "../author.js";
 
-import { commitBetween, findGitRoot } from "../git.js";
+import { commitBetween, findGitRoot, resolveCommit } from "../git.js";
 import { currentCliPath } from "../git-hooks.js";
 import { CliError, type Io } from "../io.js";
 import {
@@ -111,7 +111,7 @@ export async function sessionWrite(
   // The side model runs on this same transcript, so a message id it does not
   // know is made up; its node is dropped instead of stored beside the real one.
   const input = withForkParent(
-    nameMessages(stamped, messages, io, opts.by === "side"),
+    nameMessages(await withOwnCommits(root, stamped, io), messages, io, opts.by === "side"),
     messages,
     await forkParent(redacted.sessionId, io.env),
   );
@@ -180,6 +180,33 @@ export async function sessionWrite(
   // it; their Shape starts now, detached. Never a reason to fail the write.
   if (config.shapes && config.recorder !== "agent")
     await drainShapeQueue(root, saved, io.env, currentCliPath()).catch(() => 0);
+}
+
+/**
+ * Keeps only the commits this repository has. A hash pasted into the chat from
+ * another repository reads like one of this session's commits to the writer;
+ * outside a git repository nothing can be checked, so everything stays.
+ */
+async function withOwnCommits(root: string, input: SessionInput, io: Io): Promise<SessionInput> {
+  const named = new Set<string>();
+  for (const node of input.nodes ?? [])
+    for (const hash of [...(node.commits ?? []), ...(node.shape?.commits ?? [])]) named.add(hash);
+  if (named.size === 0 || (await findGitRoot(root)) === undefined) return input;
+  const foreign = new Set<string>();
+  for (const hash of named) if ((await resolveCommit(root, hash)) === undefined) foreign.add(hash);
+  if (foreign.size === 0) return input;
+  io.warn(`left out commit(s) this repository does not have: ${[...foreign].join(", ")}`);
+  const own = (hashes: string[]) => hashes.filter((hash) => !foreign.has(hash));
+  return {
+    ...input,
+    nodes: input.nodes?.map((node) => ({
+      ...node,
+      ...(node.commits === undefined ? {} : { commits: own(node.commits) }),
+      ...(node.shape === undefined
+        ? {}
+        : { shape: { ...node.shape, commits: own(node.shape.commits) } }),
+    })),
+  };
 }
 
 /**
