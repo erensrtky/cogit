@@ -36,7 +36,8 @@ pages, which also means the record cannot be read there: reading it takes cogit.
 - **Sending:** `git push` to `origin` (or your only remote) prints how many records will follow,
   and they go in the background once the push has landed. It never slows the push, never asks
   for anything and never fails it. A rejected push sends nothing, and neither does `git push --dry-run`: cogit reads it from the running `git` on Linux and macOS. On Windows a `--dry-run` with nothing new to push still sends. What could not
-  be sent stays queued, the next session start tries again, and `cogit doctor` tells you why.
+  be sent stays queued, the next session start tries again, and `cogit doctor` tells you why;
+  `cogit record-sync send` sends the queue right away.
   Pushing to any other remote, such as a deploy target, sends nothing.
 - **Receiving:** the first time cogit runs in a clone, it adds one fetch line to that clone's
   `.git/config` and downloads the team's records, showing progress in a terminal. After that a
