@@ -47,7 +47,7 @@ describe("plugin packaging", () => {
   it("carries the npm metadata a publish needs", async () => {
     const pkg = await read("../package.json");
     // Story 6.1: the registry page comes from these fields alone.
-    expect(pkg.description).toBe("Git remembers what changed. cogit remembers why.");
+    expect(pkg.description).toBe("Git for the intent behind agent-written code.");
     expect(pkg.license).toBe("MIT");
     expect(pkg.repository).toEqual({
       type: "git",

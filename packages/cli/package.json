@@ -1,7 +1,7 @@
 {
   "name": "@cogit/cli",
   "version": "1.1.0",
-  "description": "Git remembers what changed. cogit remembers why.",
+  "description": "Git for the intent behind agent-written code.",
   "license": "MIT",
   "keywords": [
     "git",
