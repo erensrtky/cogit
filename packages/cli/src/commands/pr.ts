@@ -155,9 +155,14 @@ async function revParse(
 }
 
 /**
- * The base of the review (Story 10.1): the upstream's merge base, else `main`,
- * else `master`; an explicit base wins. A branch with none of these is a user
- * error naming the command that fixes it.
+ * The base of the review (Story 10.1): where the branch will merge. An explicit
+ * base wins; then the upstream's merge base when the branch tracks another
+ * branch (`main`, or the branch it is stacked on); then the remote's default
+ * branch, `main` and `master`, remote copy first since a local one may lag.
+ * A branch pushed with `git push -u` tracks its own remote copy, which only
+ * says what is unpushed: taken as the base, it emptied the description right
+ * when the pull request is opened. None of these is a user error naming the
+ * command that fixes it.
  */
 export async function resolvePrBase(
   root: string,
@@ -169,15 +174,35 @@ export async function resolvePrBase(
     if (commit === undefined) throw new CliError(`unknown base "${requested}"`);
     return { ref: requested, commit };
   }
+  const branch = await git(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], env);
+  const tracked =
+    branch === undefined
+      ? undefined
+      : await git(root, ["config", "--get", `branch.${branch}.merge`], env);
+  const remote =
+    (branch === undefined
+      ? undefined
+      : await git(root, ["config", "--get", `branch.${branch}.remote`], env)) || "origin";
   const upstream = await revParse(root, "@{upstream}", env);
-  if (upstream !== undefined) {
+  if (upstream !== undefined && tracked !== `refs/heads/${branch}`) {
     const mergeBase = await git(root, ["merge-base", "HEAD", upstream], env);
     if (mergeBase !== undefined && /^[0-9a-f]{40}$/.test(mergeBase))
       return { ref: "@{upstream}", commit: mergeBase };
   }
-  for (const branch of ["main", "master"]) {
-    const commit = await revParse(root, `refs/heads/${branch}`, env);
-    if (commit !== undefined) return { ref: branch, commit };
+  const remoteHead = await git(root, ["rev-parse", "--abbrev-ref", `${remote}/HEAD`], env);
+  const candidates = [
+    ...(remoteHead !== undefined && remoteHead !== `${remote}/HEAD` ? [remoteHead] : []),
+    `${remote}/main`,
+    `${remote}/master`,
+    "main",
+    "master",
+  ];
+  for (const ref of candidates) {
+    const full = ref.startsWith(`${remote}/`) ? `refs/remotes/${ref}` : `refs/heads/${ref}`;
+    // The branch's own remote copy again, under a default-branch name.
+    if (full === `refs/remotes/${remote}/${branch}`) continue;
+    const commit = await revParse(root, full, env);
+    if (commit !== undefined) return { ref, commit };
   }
   throw new CliError(
     "cannot find a base: no upstream and neither main nor master; pass one, e.g. `cogit pr main`",

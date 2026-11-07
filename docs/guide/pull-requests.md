@@ -9,8 +9,11 @@ On the branch, before opening the pull request:
 cogit pr main --copy   # Markdown on stdout, also copied to the clipboard
 ```
 
-Without a base it uses the branch's upstream merge base, else `main`, else `master`. Paste the output into
-the pull request description on github.com, or with the GitHub CLI:
+Without a base it describes everything the branch adds to where it will merge: the branch it
+tracks when that is another branch (`main`, or the branch it is stacked on), else the remote's
+default branch, else `main`, else `master`. Pushing the branch, merging `main` into it or rebasing
+it does not change what it covers. Paste the output into the pull request description on
+github.com, or with the GitHub CLI:
 
 ```bash
 gh pr create --body "$(cogit pr)"

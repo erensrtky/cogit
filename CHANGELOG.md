@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- `cogit pr` keeps describing the whole branch after you push it: a branch pushed with `git push -u` tracks its own remote copy, and `cogit pr` took that as its base, so the description came out empty right when the pull request is opened, and after one more commit it held only that commit. The base is now where the branch will merge (the remote's default branch, or the branch it is stacked on).
 - The cost claims match what we measured: the default recording costs under 2 cents per 20 messages with message summaries on (the settings panel said "about a cent per session"), and the README no longer gives the default mode the 1–2% figure that belongs to Detailed.
 - A `prepare-commit-msg` hook of your own that sets its own `trap ... EXIT` or ends with `exec` no longer drops the `Thought:` trailer: cogit now runs your lines as a child and adds the trailer once they finish. Existing hooks update on the next chat message.
 - With an SSH key that has a passphrase and no ssh-agent, the records that follow a push are no longer lost: the background send used to retry the remote every 3 seconds for 10 minutes (each a failed login) and then drop them. It now stops at the first failure and keeps them queued, and `cogit doctor` says to add the key to ssh-agent (`ssh-add`), or for HTTPS to store your login (`gh auth login`).

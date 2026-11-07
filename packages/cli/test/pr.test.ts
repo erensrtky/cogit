@@ -258,6 +258,29 @@ describe("cogit pr (Story 10.1)", () => {
     expect(model.thoughts).toHaveLength(2);
   });
 
+  it("keeps describing the whole branch once it is pushed with -u", async () => {
+    // `git push -u origin master`: the branch now tracks its own remote copy.
+    const head = await git("rev-parse", "HEAD");
+    await git("remote", "add", "origin", join(dir, "remote.git"));
+    await git("update-ref", "refs/remotes/origin/master", head);
+    await git("config", "branch.master.remote", "origin");
+    await git("config", "branch.master.merge", "refs/heads/master");
+    expect((await resolvePrBase(root, undefined, env)).ref).toBe("main");
+    expect((await pr({ dir: root, io })).thoughts).toHaveLength(2);
+
+    // The remote's default branch wins over a local main that may lag behind.
+    const base = await git("rev-parse", "HEAD~5");
+    await git("update-ref", "refs/remotes/origin/main", base);
+    await git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+    await git("branch", "-f", "main", "HEAD~1");
+    expect(await resolvePrBase(root, undefined, env)).toEqual({ ref: "origin/main", commit: base });
+
+    // Once merged, a new branch from the default branch has nothing to describe yet.
+    await git("update-ref", "refs/remotes/origin/main", head);
+    await git("checkout", "-q", "-b", "next");
+    expect((await pr({ dir: root, io })).thoughts).toHaveLength(0);
+  });
+
   it("falls back to main, takes an explicit base, and reports an unknown one", async () => {
     expect((await resolvePrBase(root, undefined, env)).ref).toBe("main");
     const explicit = await pr({ dir: root, base: "HEAD~2", io });
