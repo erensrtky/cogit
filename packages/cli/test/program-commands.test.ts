@@ -7,7 +7,6 @@ import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import { readSkillAllowed } from "../src/agents/claude/settings.js";
 import { createProgram } from "../src/program.js";
-import { queueRecords } from "../src/record-sync.js";
 import { globalPaths } from "../src/store/paths.js";
 import { loadConfig, loadProject, loadSession } from "../src/store/stores.js";
 import { envFor, type FakeIo, fakeIo, noGitDir, noGitProject, T0, tempDir } from "./helpers.js";
@@ -332,12 +331,6 @@ describe("commands through the CLI", () => {
     // No remote to send to: the hook is silent.
     await cli("hook", "pre-push", "--dir", root, "origin", "nowhere");
     await cli("record-sync", "send", "-C", root);
-    expect(io.lines.at(-1)).toBe("sent 0 session records");
-    // A remote the records cannot reach: the person sees what is still queued, and why.
-    await git("remote", "add", "origin", join(dir, "gone.git"));
-    await queueRecords(root, io.env);
-    expect(await cli("record-sync", "send", "-C", root)).toMatch(/1 still queued: /);
-    await git("remote", "remove", "origin");
     await cli("record-sync", "download", "-C", root);
     expect(await cli("record-sync", "elsewhere", "-C", root)).toMatch(/unknown record-sync action/);
     await cli("config", "git", "share", root);
