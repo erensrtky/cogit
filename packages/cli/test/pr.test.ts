@@ -197,6 +197,53 @@ describe("cogit pr (Story 10.1)", () => {
     expect(model.sessions[0]?.updatedAt).toBe("2026-10-20T10:00:00.000Z");
   });
 
+  it("shows the decisions up the thread that led to a plain commit message", async () => {
+    const node = (id: string, parent: string | null, title: string, extra = {}) => ({
+      id,
+      parent,
+      kind: "message" as const,
+      title,
+      at: "2026-10-20T09:00:00.000Z",
+      ...extra,
+    });
+    const thread = {
+      ...session(),
+      nodes: [
+        node("h500000000001", null, "Pick the format", { why: "An older choice." }),
+        node("h500000000002", "h500000000001", "Ship the format", { commits: ["abc1234"] }),
+        node("h500000000003", "h500000000002", "One command, not a list", {
+          why: "Long lists go unread.",
+          alternatives: [{ option: "A step list", why: "Nobody reads it." }],
+        }),
+        node("h500000000004", "h500000000003", "Looks good"),
+        node("h500000000005", "h500000000004", "Commit it", { decidedBy: "user" }),
+      ],
+    };
+    await writeFile(projectPaths(root).session("s1"), JSON.stringify(thread));
+    await commit({ "readme.md": "usage\n" }, "docs: usage", "h500000000005");
+
+    const model = await pr({ dir: root, io });
+    const thought = model.thoughts.find((entry) => entry.id === "h500000000005");
+    // The approval says nothing; the earlier commit's message ends the walk.
+    expect(thought?.ledHere.map((step) => step.title)).toEqual(["One command, not a list"]);
+    const text = io.lines.join("\n");
+    expect(text).toContain("Led here:\n- m3 One command, not a list — Long lists go unread.");
+    expect(text).toContain("  - considered and rejected: A step list — Nobody reads it.");
+    expect(text).not.toContain("Pick the format");
+
+    // Without the earlier commit the walk ends before the root, the session's goal.
+    thread.nodes[1] = node("h500000000002", "h500000000001", "Talk about the format");
+    // A thought that weighed options itself needs no walk.
+    thread.nodes[4] = node("h500000000005", "h500000000004", "Commit it", {
+      alternatives: [{ option: "Wait", why: "Nothing to wait for." }],
+    });
+    await writeFile(projectPaths(root).session("s1"), JSON.stringify(thread));
+    await commit({ "other.md": "other\n" }, "docs: other", "h500000000003");
+    const again = await pr({ dir: root, io });
+    expect(again.thoughts.find((entry) => entry.id === "h500000000005")?.ledHere).toEqual([]);
+    expect(again.thoughts.find((entry) => entry.id === "h500000000003")?.ledHere).toEqual([]);
+  });
+
   it("groups the branch's commits by thought, in commit order", async () => {
     const model = await pr({ dir: root, io });
     expect(model.base.ref).toBe("main");
@@ -375,6 +422,7 @@ describe("cogit pr (Story 10.1)", () => {
           summary: "A summary that is dropped last.",
           alternatives: [],
           agentDecisions: [],
+          ledHere: [],
           commits: [
             {
               full: "2".repeat(40),

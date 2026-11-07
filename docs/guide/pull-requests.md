@@ -42,7 +42,9 @@ record, because the Action reads it from the remote. Delete the file to stop it.
 ## What it prints
 
 The goal, the sessions the work came from, each message with its decisions and rejected
-options, and its commits and files. For example:
+options, and its commits and files. When the message behind a commit is only "commit it",
+**Led here** lists the earlier messages of the same thread that decided something, back to
+the previous commit. For example:
 
 ```markdown
 ## Goal
@@ -59,6 +61,10 @@ Open a whole session with `cogit log --session <id>` or the map.
 - Why: A leaked refresh token should stop working as soon as it is used.
 - Decided by: agreed
 - considered and rejected: shorten the token lifetime — it logs people out too often
+
+Led here:
+- m21 Keep the old token valid for 30 seconds — two tabs refresh at the same time
+  - considered and rejected: a lock around refresh — it adds a round trip to every request
 
 Commits:
 - `a1b2c3d` feat(auth): rotate refresh tokens on use

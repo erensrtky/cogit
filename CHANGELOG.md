@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `cogit pr` shows a **Led here** list under a thought: the earlier messages of the same thread that decided something, back to the previous commit. A commit made on a plain "commit it" now carries the decision behind it, with the options that were rejected. `--json` has them as `ledHere`.
+
 ### Changed
 - The map's Resume and Fork buttons carry a copy sign (⧉ Resume, ⧉ Fork): they copy the command for a terminal and never start Claude Code, which a bare "Resume" seemed to promise. The "Your turn" inbox no longer shows them; its link opens the map at the message.
 

@@ -99,8 +99,27 @@ export interface PrThought {
     why: string;
     alternatives: { option: string; why: string }[];
   }[];
+  /**
+   * Earlier messages of the same thread that decided something before this one
+   * landed the commit, oldest first: the thought behind a commit is often a
+   * plain "commit it", and the reason sits a few messages up.
+   */
+  ledHere: PrLedHere[];
   commits: PrCommit[];
 }
+
+/** A decision or correction on the way to a thought; no conversation text. */
+export interface PrLedHere {
+  id: string;
+  shortId: string;
+  label: string;
+  title: string;
+  why?: string;
+  alternatives: { option: string; why: string }[];
+}
+
+/** How far up the thread `ledHere` looks. */
+const LED_HERE_DEPTH = 5;
 
 export interface PrModel {
   base: PrBase;
@@ -225,6 +244,41 @@ async function readPrCommits(
   return parsePrCommits(stdout ?? "");
 }
 
+/**
+ * Walks up the thread from a thought and keeps the messages that decided
+ * something. It stops at a message that landed an earlier commit (its reasons
+ * belong to that commit), at one that is a thought of this description itself,
+ * and before the thread's root, whose reason is the session's goal.
+ */
+function ledHereOf(
+  id: string,
+  entry: EffectiveSession,
+  thoughts: ReadonlyMap<string, PrThought>,
+): PrLedHere[] {
+  const byId = new Map(entry.messages.map((message) => [message.id, message]));
+  const found: PrLedHere[] = [];
+  let parent = byId.get(id)?.parent;
+  for (let step = 0; step < LED_HERE_DEPTH && parent != null; step++) {
+    const message = byId.get(parent);
+    if (message === undefined || thoughts.has(message.id) || message.parent == null) break;
+    if ((message.commits ?? []).length > 0) break;
+    const why = message.why?.trim() ?? "";
+    const alternatives = message.alternatives ?? [];
+    const decided = message.decidedBy === "user" || message.decidedBy === "agreed";
+    if (why !== "" || alternatives.length > 0 || decided)
+      found.unshift({
+        id: message.id,
+        shortId: shortHash(message.id),
+        label: message.label ?? message.id,
+        title: message.title,
+        ...(why === "" ? {} : { why }),
+        alternatives,
+      });
+    parent = message.parent;
+  }
+  return found;
+}
+
 function latestMessageAt(session: Session): string | undefined {
   let latest: string | undefined;
   for (const node of session.nodes) {
@@ -319,6 +373,7 @@ export function buildPrModel(input: BuildPrInput): PrModel {
             why: decision.why,
             alternatives: decision.alternatives ?? [],
           })),
+          ledHere: [],
           commits: [],
         };
         thoughts.set(id, thought);
@@ -366,6 +421,14 @@ export function buildPrModel(input: BuildPrInput): PrModel {
       thoughtCount: thoughtCounts.get(sessionId) ?? 0,
       commitCount: commitCounts.get(sessionId) ?? 0,
     });
+  }
+
+  for (const thought of thoughts.values()) {
+    const entry = entries.get(thought.sessionId);
+    // A thought that weighed options itself already says why; the walk is for a
+    // plain "commit it" whose reason sits further up.
+    if (entry !== undefined && thought.alternatives.length === 0)
+      thought.ledHere = ledHereOf(thought.id, entry, thoughts);
   }
 
   return {
@@ -443,6 +506,14 @@ export function formatPr(model: PrModel, opts: PrFormatOptions): string {
         lines.push("", oneLine(thought.summary));
       const decisions = decisionLines(thought);
       if (decisions.length > 0) lines.push("", ...decisions);
+      if (thought.ledHere.length > 0) {
+        lines.push("", "Led here:");
+        for (const step of thought.ledHere) {
+          const why = step.why === undefined ? "" : ` — ${oneLine(step.why)}`;
+          lines.push(`- ${step.label} ${oneLine(step.title)}${why}`);
+          for (const alt of step.alternatives) lines.push(alternativeLine(alt, "  "));
+        }
+      }
       lines.push("", "Commits:");
       for (const commit of thought.commits) {
         lines.push(`- \`${commit.short}\` ${oneLine(commit.subject)}`);
