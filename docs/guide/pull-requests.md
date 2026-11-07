@@ -16,6 +16,14 @@ the pull request description on github.com, or with the GitHub CLI:
 gh pr create --body "$(cogit pr)"
 ```
 
+The pull request is already open and more commits came in? Rewrite its description, or add the
+new one as a comment and leave the description as it is:
+
+```bash
+cogit pr | gh pr edit --body-file -      # replaces the description
+cogit pr | gh pr comment --body-file -   # adds a comment instead
+```
+
 ## What it prints
 
 The goal, the sessions the work came from, each message with its decisions and rejected
