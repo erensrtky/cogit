@@ -292,11 +292,21 @@ export async function readCommitThought(
   }
 }
 
-/** The earliest session start, so the trailer read stops at the record's horizon. */
+/**
+ * The earliest moment in the record, so the trailer read stops at its horizon.
+ * `startedAt` is the record's first write, which the session-end pass can make
+ * long after the commits it explains; a message's own time cannot come after a
+ * commit that names it, so the messages count too.
+ */
 export function earliestSessionStart(sessions: readonly Session[]): string | undefined {
   let earliest: string | undefined;
+  const consider = (at: string | undefined): void => {
+    if (at === undefined || Number.isNaN(Date.parse(at))) return;
+    if (earliest === undefined || Date.parse(at) < Date.parse(earliest)) earliest = at;
+  };
   for (const session of sessions) {
-    if (earliest === undefined || session.startedAt < earliest) earliest = session.startedAt;
+    consider(session.startedAt);
+    for (const node of session.nodes) consider(node.at);
   }
   return earliest;
 }

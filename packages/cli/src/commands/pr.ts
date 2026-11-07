@@ -2,6 +2,7 @@ import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { cogitIgnored, findGitRoot, gitUserEmail, readCommitFiles } from "../git.js";
 import { CliError, type Io } from "../io.js";
+import type { Session } from "../schema/session.js";
 import { earliestSessionStart, readThoughtTrailers } from "../thought.js";
 import type { ViewNode } from "../view/model.js";
 import {
@@ -224,6 +225,15 @@ async function readPrCommits(
   return parsePrCommits(stdout ?? "");
 }
 
+function latestMessageAt(session: Session): string | undefined {
+  let latest: string | undefined;
+  for (const node of session.nodes) {
+    if (node.at === undefined || Number.isNaN(Date.parse(node.at))) continue;
+    if (latest === undefined || Date.parse(node.at) > Date.parse(latest)) latest = node.at;
+  }
+  return latest;
+}
+
 function oneLine(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
@@ -348,8 +358,9 @@ export function buildPrModel(input: BuildPrInput): PrModel {
       sessionId,
       shortId: sessionId.slice(0, 8),
       title,
-      startedAt: session.startedAt,
-      updatedAt: session.updatedAt,
+      // The record can be written minutes after the talk; the messages date it.
+      startedAt: earliestSessionStart([session]) ?? session.startedAt,
+      updatedAt: latestMessageAt(session) ?? session.updatedAt,
       from: numbers.length === 0 ? "—" : `m${Math.min(...numbers)}`,
       to: numbers.length === 0 ? "—" : `m${Math.max(...numbers)}`,
       thoughtCount: thoughtCounts.get(sessionId) ?? 0,

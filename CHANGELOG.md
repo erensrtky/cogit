@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- A commit made before cogit first wrote the session's record (as with short sessions recorded only when they close) lost its thought: `cogit pr`, `cogit log`, `cogit blame` and the map read `Thought:` trailers only from the record's write time on, so `cogit pr` listed the commit with no thought and the PR Action stayed silent. They now read from the session's first message, and `cogit pr` dates sessions by their messages.
 - `cogit pr --install-action` in a clone where cogit was never set up now says to run `cogit init` first, instead of asking to share records the project does not have yet.
 
 ## [1.2.0] - 2026-11-07

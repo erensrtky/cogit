@@ -541,6 +541,24 @@ describe("the thought behind a commit (Story 9.4)", () => {
       expect(earliestSessionStart(sessions)).toBe(T0);
       expect(earliestSessionStart([])).toBeUndefined();
     });
+
+    it("starts the trailer read at the first message when the record was written later", () => {
+      // The session-end pass writes the record minutes after the commit it explains.
+      const late = { ...session([]), startedAt: "2026-10-21T10:20:00.000Z" };
+      late.nodes = [
+        {
+          id: "h111111111111",
+          parent: null,
+          kind: "message",
+          title: "A",
+          at: "2026-10-21T10:01:00.000Z",
+        },
+        { id: "h222222222222", parent: null, kind: "message", title: "B", at: "not a date" },
+        { id: "h333333333333", parent: null, kind: "message", title: "C" },
+      ] as Session["nodes"];
+      expect(earliestSessionStart([late])).toBe("2026-10-21T10:01:00.000Z");
+      expect(earliestSessionStart([late, session([])])).toBe(T0);
+    });
   });
 
   describe("hook installation", () => {

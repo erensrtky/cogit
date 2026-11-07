@@ -183,6 +183,20 @@ describe("cogit pr (Story 10.1)", () => {
     expect(model.unlinked.map((entry) => entry.subject)).not.toContain("feat: squash the branch");
   });
 
+  it("finds the thoughts when the record was written after the commits", async () => {
+    // The session-end pass writes the record minutes after the talk and its commits.
+    const late = {
+      ...session(),
+      startedAt: "2099-01-01T00:00:00.000Z",
+      updatedAt: "2099-01-01T00:05:00.000Z",
+    };
+    await writeFile(projectPaths(root).session("s1"), JSON.stringify(late));
+    const model = await pr({ dir: root, io });
+    expect(model.thoughts.map((thought) => thought.id)).toEqual([A, D]);
+    expect(model.sessions[0]?.startedAt).toBe("2026-10-20T09:00:00.000Z");
+    expect(model.sessions[0]?.updatedAt).toBe("2026-10-20T10:00:00.000Z");
+  });
+
   it("groups the branch's commits by thought, in commit order", async () => {
     const model = await pr({ dir: root, io });
     expect(model.base.ref).toBe("main");
