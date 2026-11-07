@@ -60,7 +60,7 @@ For every message that landed commits, a small representation of what the change
 
 `captures` · default `true`
 
-**A short list of what each session left undone, drafted by the side model.**
+**Work that came up in a session and didn't get finished, caught by the side model when the session closes.**
 
 When a session ends, the side model reads what its record left open and drafts at most three things a person would ask for, in the conversation's language. The list is yours: accept, dismiss or close each item. Sessions with nothing open cost no model call; the map's Tasks button appears only while something waits or is open. Off, nothing is drafted and the list already in the store is kept, not deleted.
 

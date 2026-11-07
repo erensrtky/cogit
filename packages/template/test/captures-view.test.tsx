@@ -55,7 +55,7 @@ describe("CapturesView", () => {
   it("shows the three sections with their buttons", () => {
     const html = render(items);
     expect(html).toContain("Tasks");
-    expect(html).toContain("What your sessions left undone — cogit drafts, you decide.");
+    expect(html).toContain("caught when each session closes. You decide what stays.");
     expect(html).toContain("Suggested");
     expect(html).toContain("Open");
     expect(html).toContain("Done (last 10)");

@@ -122,7 +122,7 @@ const EDITABLE: FieldSpec[] = [
   {
     key: "captures",
     label: "Tasks",
-    help: "A short list of what each session left undone, drafted by the side model.",
+    help: "Work that came up in a session and didn't get finished, caught by the side model when the session closes.",
     details:
       "When a session ends, the side model reads what its record left open and drafts at " +
       "most three things a person would ask for, in the conversation's language. The list " +

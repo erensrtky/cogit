@@ -180,12 +180,15 @@ export function CapturesView({
           ×
         </button>
       </header>
-      <p className="capture-note">What your sessions left undone — cogit drafts, you decide.</p>
+      <p className="capture-note">
+        Work that came up in your sessions and didn't get finished, caught when each session closes.
+        You decide what stays.
+      </p>
       {error === null ? null : <p className="muted capture-error">{error}</p>}
       <div className="outline-scroll">
         {empty ? (
           <p className="empty">
-            No tasks yet. When a session ends, cogit drafts what it left undone here.
+            No tasks yet. When a session ends, the work it left unfinished is caught here.
           </p>
         ) : (
           <>

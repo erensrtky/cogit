@@ -887,7 +887,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
               type="button"
               className="outline-button capture-button"
               aria-pressed={showCaptures}
-              title="Tasks: what your sessions left undone — cogit drafts, you decide"
+              title="Tasks: work your sessions didn't finish, caught when each session closes"
               onClick={() => {
                 setShowCaptures((value) => !value);
                 setShowFiles(false);
