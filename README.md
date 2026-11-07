@@ -148,6 +148,7 @@ cogit open .
 - [Privacy](docs/guide/privacy.md): what is recorded and what never leaves your machine
 - [Settings](docs/guide/settings.md): every setting, explained
 - [Troubleshooting](docs/guide/troubleshooting.md)
+- [FAQ](docs/guide/faq.md): questions people asked after the launch
 - [Why cogit](docs/guide/why.md): AI made code faster and review slower
 
 The record format is in [docs/format.md](docs/format.md).

@@ -14,6 +14,7 @@ part in detail.
 | [Privacy](privacy.md) | What is recorded, what never is, what leaves your machine |
 | [Settings](settings.md) | Every setting with a plain-language explanation |
 | [Troubleshooting](troubleshooting.md) | Nothing is recorded, the map looks old, the port is taken, and more |
+| [FAQ](faq.md) | Questions people asked after the launch: what it adds to git, how the record is written, teams, cost |
 | [Why cogit](why.md) | The review bottleneck AI coding created, with sources |
 
 The record format itself (the `.cogit/` layout, message ids, events, the trailer) is in
