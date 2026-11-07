@@ -21135,6 +21135,8 @@ function projectPaths(root) {
     recordSync: join6(base, "state", "record-sync.json"),
     /** Present after `cogit hooks uninstall`: the refresh then adds no block; local. */
     hooksOff: join6(base, "state", "hooks-off"),
+    /** Present once `cogit pr` has suggested the pull request Action; local. */
+    actionHint: join6(base, "state", "action-hint"),
     /** Commits waiting for their message's record before a Shape; local. */
     shapeQueue: join6(base, "state", "shape-queue"),
     locks: join6(base, "locks"),
@@ -21224,7 +21226,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-JFP7CX4Q.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-AW6CAPCO.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -25565,8 +25567,8 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "1.1.0",
-  description: "Git remembers what changed. cogit remembers why.",
+  version: "1.2.0",
+  description: "Git for the intent behind agent-written code.",
   license: "MIT",
   keywords: [
     "git",
@@ -26061,21 +26063,28 @@ async function countUnsentRecords(root, env, pushedRemote) {
 }
 async function pushLanded(root, env, ref, sha, wait = { intervalMs: 3e3, timeoutMs: 6e5 }) {
   const remote = await syncRemote(root, env);
-  if (remote === void 0) return false;
+  if (remote === void 0) return "missing";
   const deadline = Date.now() + wait.timeoutMs;
   for (; ; ) {
     const seen = await runGit(root, ["ls-remote", remote, ref], quietEnv(env));
+    if (seen.code !== 0) return "unreachable";
     if (seen.stdout.toString("utf8").split("\n").some((line) => line.startsWith(`${sha}	`)))
-      return true;
-    if (Date.now() >= deadline) return false;
+      return "landed";
+    if (Date.now() >= deadline) return "missing";
     await sleep2(wait.intervalMs);
   }
 }
 async function sendAfterPush(root, env, after, wait) {
   if (after !== void 0) {
     const split = after.lastIndexOf("=");
-    if (!await pushLanded(root, env, after.slice(0, split), after.slice(split + 1), wait))
-      return 0;
+    const landing = await pushLanded(
+      root,
+      env,
+      after.slice(0, split),
+      after.slice(split + 1),
+      wait
+    );
+    if (landing === "missing") return 0;
   }
   await queueRecords(root, env);
   return sendRecords(root, env);
@@ -26642,11 +26651,14 @@ function hookBlock(event, projectRoot, cliPath = currentCliPath() ?? null) {
   if (event === "prepare-commit-msg") {
     return [
       BLOCK_START,
-      "cogit_msg=${1-} cogit_source=${2-}",
-      "cogit_thought() {",
+      'if [ "${COGIT_HOOK_RUN-}" = "$0" ]; then',
+      "  unset COGIT_HOOK_RUN",
+      "else",
+      '  COGIT_HOOK_RUN=$0 "$0" "$@"',
+      "  cogit_status=$?",
       ...cogitCall(event, projectRoot, cliPath, "", "  "),
-      "}",
-      `trap 'cogit_status=$?; cogit_thought "$cogit_msg" "$cogit_source"; exit $cogit_status' EXIT`,
+      "  exit $cogit_status",
+      "fi",
       BLOCK_END
     ].join("\n");
   }

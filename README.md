@@ -2,7 +2,7 @@
 
 # cogit
 
-Git remembers what changed. cogit remembers why.
+**Git for the intent behind agent-written code.**
 
 <p align="center"><img src="docs/images/cogit-descartes.jpg" width="360" alt="René Descartes with git branches running through his hair"><br><i>Cogito, ergo commit.</i></p>
 
@@ -86,11 +86,12 @@ including the option that was rejected.*
   finished as a few user-level items; you accept, dismiss or close them (`cogit captures`, and
   on the map).
 - **Pull request descriptions with the decisions**: `cogit pr` writes the goal, the
-  decisions and the rejected options, never the raw chat.
+  decisions and the rejected options, never the raw chat. `cogit pr --install-action` adds a
+  GitHub Action that posts them on every pull request.
 - **Teams share the record through git**: after a pull, your teammates' sessions are on the
   map too, with who ran them and what changed most.
-- **Cheap by default**: a small side model records in the background; in our sessions it
-  cost about 1–2% of a session's tokens.
+- **Cheap by default**: a small side model records in the background; in our measurement it
+  cost under 2 cents per 20 messages.
 - **No server, no account**: it runs on your machine. Nothing leaves it unless you say so: `cogit
   init` asks whether to share the record (titles, decisions and reasons) with your team. If you
   do, `git push` sends it to your own repository, outside your branches, so it never shows up in
@@ -147,6 +148,7 @@ cogit open .
 - [Privacy](docs/guide/privacy.md): what is recorded and what never leaves your machine
 - [Settings](docs/guide/settings.md): every setting, explained
 - [Troubleshooting](docs/guide/troubleshooting.md)
+- [FAQ](docs/guide/faq.md): questions people asked after the launch
 - [Why cogit](docs/guide/why.md): AI made code faster and review slower
 
 The record format is in [docs/format.md](docs/format.md).
