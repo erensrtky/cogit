@@ -5,6 +5,7 @@ import { findGitRoot } from "../git.js";
 import { CliError, type Io } from "../io.js";
 import { isSharing } from "../record-sync.js";
 import { projectPaths } from "../store/paths.js";
+import { loadProject } from "../store/stores.js";
 
 /**
  * The GitHub Action `cogit pr --install-action` writes. On every pull request
@@ -68,6 +69,8 @@ const WORKFLOW_PATH = join(".github", "workflows", "cogit.yml");
 export async function installPrAction(root: string, io: Io): Promise<void> {
   const gitRoot = await findGitRoot(root);
   if (gitRoot === undefined) throw new CliError("not in a git repository");
+  if (!(await loadProject(root)).found)
+    throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
   if (!(await isSharing(root)))
     throw new CliError(
       "the Action reads the session records from the remote, but this project keeps them here; share them first with `cogit config git share`",

@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- `cogit pr --install-action` in a clone where cogit was never set up now says to run `cogit init` first, instead of asking to share records the project does not have yet.
 
 ## [1.2.0] - 2026-11-07
 ### Added

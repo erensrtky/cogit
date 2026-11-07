@@ -61,6 +61,11 @@ describe("the pull request Action", () => {
     await expect(installPrAction(root, io)).rejects.toThrow(/cogit config git share/);
   });
 
+  it("asks for `cogit init` in a clone that was never set up", async () => {
+    await run("git", ["-C", root, "init", "-q", "-b", "main"], { env });
+    await expect(installPrAction(root, io)).rejects.toThrow(/run `cogit init` first/);
+  });
+
   it("comments only on this repository's pull requests, once, and only with a thought", () => {
     expect(PR_ACTION_WORKFLOW).toContain(
       "if: github.event.pull_request.head.repo.full_name == github.repository",
