@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `cogit pr --install-action` writes a GitHub Action (`.github/workflows/cogit.yml`) that posts the decisions behind each pull request's branch as one comment and updates it on every push; fork pull requests and branches with no recorded thought get no comment. The first `cogit pr` you run at a terminal mentions it once.
+
 ### Fixed
 - `cogit pr` keeps describing the whole branch after you push it: a branch pushed with `git push -u` tracks its own remote copy, and `cogit pr` took that as its base, so the description came out empty right when the pull request is opened, and after one more commit it held only that commit. The base is now where the branch will merge (the remote's default branch, or the branch it is stacked on).
 - The cost claims match what we measured: the default recording costs under 2 cents per 20 messages with message summaries on (the settings panel said "about a cent per session"), and the README no longer gives the default mode the 1–2% figure that belongs to Detailed.

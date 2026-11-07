@@ -27,6 +27,18 @@ cogit pr | gh pr edit --body-file -      # replaces the description
 cogit pr | gh pr comment --body-file -   # adds a comment instead
 ```
 
+## On every pull request, without running anything
+
+```bash
+cogit pr --install-action
+```
+
+writes `.github/workflows/cogit.yml`. Commit and push it, and each pull request from this
+repository gets the decisions behind its branch as one comment, updated on every push. The
+description stays yours. A pull request from a fork gets no comment, since its record stays in
+the fork, and neither does a branch with no recorded thought. It needs a project that shares its
+record, because the Action reads it from the remote. Delete the file to stop it.
+
 ## What it prints
 
 The goal, the sessions the work came from, each message with its decisions and rejected

@@ -86,7 +86,8 @@ including the option that was rejected.*
   finished as a few user-level items; you accept, dismiss or close them (`cogit captures`, and
   on the map).
 - **Pull request descriptions with the decisions**: `cogit pr` writes the goal, the
-  decisions and the rejected options, never the raw chat.
+  decisions and the rejected options, never the raw chat. `cogit pr --install-action` adds a
+  GitHub Action that posts them on every pull request.
 - **Teams share the record through git**: after a pull, your teammates' sessions are on the
   map too, with who ran them and what changed most.
 - **Cheap by default**: a small side model records in the background; in our measurement it

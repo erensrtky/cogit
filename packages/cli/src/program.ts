@@ -22,6 +22,7 @@ import { formatShow, log, logFile, show } from "./commands/log.js";
 import { migrateIds } from "./commands/migrate.js";
 import { openPanel, openProject } from "./commands/open.js";
 import { pr } from "./commands/pr.js";
+import { installPrAction, prActionHint } from "./commands/pr-action.js";
 import { pruneRecords } from "./commands/prune.js";
 import { search } from "./commands/search.js";
 import { readStdin, sessionShow, sessionWrite } from "./commands/session.js";
@@ -52,6 +53,8 @@ export interface ProgramDeps {
   cwd?: () => string;
   /** Sets the process exit code; tests observe it. */
   exitCode?: (code: number) => void;
+  /** Whether a person reads stderr, for one-time tips; tests pass it. */
+  isTty?: () => boolean;
 }
 
 function retention(value: string): number | "keep" {
@@ -340,10 +343,14 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .command("pr")
     .description("print a review-ready description of a branch from the thoughts behind it")
     .helpGroup("Read:")
-    .argument("[base]", "base ref; default: the upstream's merge base, else main, else master")
+    .argument("[base]", "base ref; default: where the branch will merge (e.g. origin/main)")
     .option("-C, --dir <dir>", "project directory", ".")
     .option("--json", "print JSON instead of Markdown")
     .option("--copy", "also copy the Markdown to the clipboard")
+    .option(
+      "--install-action",
+      "add a GitHub Action that posts this on every pull request, and stop",
+    )
     .addHelpText(
       "after",
       "\nExamples:\n" +
@@ -355,8 +362,15 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     )
     .action(
       run(
-        async (base: string | undefined, opts: { dir: string; json?: boolean; copy?: boolean }) => {
+        async (
+          base: string | undefined,
+          opts: { dir: string; json?: boolean; copy?: boolean; installAction?: boolean },
+        ) => {
           const io = makeIo(false);
+          if (opts.installAction === true) {
+            await installPrAction((await resolveProjectRoot(opts.dir)).root, io);
+            return;
+          }
           await readyToRead(opts.dir, io);
           await pr({
             dir: opts.dir,
@@ -365,6 +379,11 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
             json: opts.json === true,
             copy: opts.copy === true,
           });
+          // A person at a terminal hears about the Action once; a pipe into gh never does.
+          if (opts.json !== true && (deps.isTty ?? (() => process.stderr.isTTY === true))()) {
+            const hint = await prActionHint((await resolveProjectRoot(opts.dir)).root);
+            if (hint !== undefined) process.stderr.write(`${hint}\n`);
+          }
         },
       ),
     );

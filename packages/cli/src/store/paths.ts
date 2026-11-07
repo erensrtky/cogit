@@ -44,6 +44,8 @@ export function projectPaths(root: string) {
     recordSync: join(base, "state", "record-sync.json"),
     /** Present after `cogit hooks uninstall`: the refresh then adds no block; local. */
     hooksOff: join(base, "state", "hooks-off"),
+    /** Present once `cogit pr` has suggested the pull request Action; local. */
+    actionHint: join(base, "state", "action-hint"),
     /** Commits waiting for their message's record before a Shape; local. */
     shapeQueue: join(base, "state", "shape-queue"),
     locks: join(base, "locks"),
