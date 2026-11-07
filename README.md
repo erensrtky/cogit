@@ -2,6 +2,8 @@
 
 # cogit
 
+**Git for the intent behind agent-written code.**
+
 Git remembers what changed. cogit remembers why.
 
 <p align="center"><img src="docs/images/cogit-descartes.jpg" width="360" alt="René Descartes with git branches running through his hair"><br><i>Cogito, ergo commit.</i></p>
