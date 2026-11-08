@@ -173,6 +173,62 @@ describe("session write", () => {
       expect(m1?.by?.agentDecisions).toBeUndefined();
     });
 
+    it("lists what the side model recorded since the agent last wrote", async () => {
+      let clock = Date.parse("2026-11-08T10:00:00.000Z");
+      io.now = () => new Date((clock += 60_000)).toISOString();
+      const show = async () => {
+        io.lines.length = 0;
+        await sessionShow(root, "s1", io);
+        return JSON.parse(io.lines.join("\n")).sideRecorded as { id: string }[];
+      };
+      await side({
+        sessionId: "s1",
+        nodes: [
+          {
+            id: "m1",
+            kind: "message",
+            parent: null,
+            title: "Fix the window",
+            agentDecisions: [{ title: "Read from the first message", why: "side reading" }],
+          },
+        ],
+      });
+      // Before the agent's first write, everything the side model recorded is listed.
+      expect(await show()).toEqual([
+        {
+          id: "m1",
+          title: "Fix the window",
+          agentDecisions: [{ title: "Read from the first message", why: "side reading" }],
+        },
+      ]);
+      // The agent writes (here: only the status); what came before is reviewed.
+      await write({ sessionId: "s1", status: { goal: "g", done: [], pending: [], next: "" } });
+      expect(await show()).toEqual([]);
+      // A message the side model records afterwards is the next one to review.
+      await side({
+        sessionId: "s1",
+        nodes: [{ id: "m2", kind: "message", parent: "m1", title: "Add the test" }],
+      });
+      expect((await show()).map((node) => node.id)).toEqual(["m2"]);
+      // The agent taking a node over (its title is the agent's now) ends its review.
+      await write({
+        sessionId: "s1",
+        nodes: [{ id: "m2", kind: "message", title: "Add the test" }],
+      });
+      expect(await show()).toEqual([]);
+    });
+
+    it("saves the agent's write even when the hook state cannot be written", async () => {
+      const { rm } = await import("node:fs/promises");
+      await rm(join(root, ".cogit", "state"), { recursive: true, force: true });
+      await writeFile(join(root, ".cogit", "state"), "not a directory");
+      await write({
+        sessionId: "s1",
+        nodes: [{ id: "m1", kind: "message", title: "Still saved" }],
+      });
+      expect((await node("m1"))?.title).toBe("Still saved");
+    });
+
     it("keeps the agent's Shape until the user asks for a new one by hand", async () => {
       const shape = (kind: string, text: string) => ({ tools: [{ kind, text }], commits: [] });
       await write({
@@ -465,6 +521,7 @@ describe("session show", () => {
       session: null,
       newMessages: null,
       lastMessages: [],
+      sideRecorded: [],
       inbox: join(root, ".cogit", "inbox", "s1.json"),
     });
 

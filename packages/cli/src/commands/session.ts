@@ -23,6 +23,7 @@ import { parseMessageRef, Slug } from "../schema/common.js";
 import type { SessionEvent } from "../schema/events.js";
 import { mergeSession } from "../schema/merge.js";
 import { MESSAGE_ID, type Session, SessionInput } from "../schema/session.js";
+import { HookState, STATE_SCHEMA } from "../schema/state.js";
 import { stampShape } from "../shape.js";
 import { drainShapeQueue } from "../shape-queue.js";
 import {
@@ -32,6 +33,7 @@ import {
   seedEvents,
   sideOwnedParents,
 } from "../store/events.js";
+import { readJson } from "../store/fs.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import {
@@ -41,6 +43,7 @@ import {
   loadProject,
   loadSession,
   updateSession,
+  updateState,
 } from "../store/stores.js";
 import { buildProject } from "./build.js";
 
@@ -166,6 +169,14 @@ export async function sessionWrite(
     return { ...stamped, ...stampedIdentity(stamped, identity) };
   });
   for (const w of warnings) io.warn(w);
+  // What the side model records after this is the agent's to review next time.
+  if ((opts.by ?? "agent") === "agent")
+    await updateState(
+      root,
+      saved.sessionId,
+      (cur) => ({ ...(cur ?? HookState.parse({ schema: STATE_SCHEMA })), agentWroteAt: io.now() }),
+      { timeoutMs: 1500 },
+    ).catch(() => undefined);
   if (opts.file && opts.consume) await rm(opts.file, { force: true });
   io.out(`Saved session ${saved.sessionId} (${saved.nodes.length} nodes)`);
 
@@ -493,6 +504,7 @@ export async function sessionShow(
     labels,
     opts.full === true ? Number.POSITIVE_INFINITY : LAST_MESSAGES,
   );
+  view.sideRecorded = sideRecorded(effective, labels, await agentWroteAt(root, sessionId));
   // A format change would otherwise look like "nothing written yet" forever.
   if (messages && messages.length === 0) {
     const file = await agent.findTranscript(sessionId, io.env);
@@ -504,6 +516,46 @@ export async function sessionShow(
   }
   view.inbox = projectPaths(given).inbox(sessionId);
   io.out(JSON.stringify(view, null, 2));
+}
+
+/** How many side-recorded messages one agent check reviews, newest kept. */
+const SIDE_REVIEW_MAX = 15;
+
+/** When the agent last wrote this session's record, from the machine-local hook state. */
+async function agentWroteAt(root: string, sessionId: string): Promise<string | null> {
+  const read = await readJson(projectPaths(root).state(sessionId)).catch(() => undefined);
+  if (!read?.found || !("value" in read)) return null;
+  const state = HookState.safeParse(read.value);
+  return state.success ? state.data.agentWroteAt : null;
+}
+
+/**
+ * The messages the side model recorded since the agent last wrote, with what it
+ * wrote about the agent's work: in Quality mode it records most messages before
+ * the agent's turn, so this is where the agent adds or corrects its decisions.
+ */
+function sideRecorded(
+  record: Session | null,
+  labels: ReadonlyMap<string, string>,
+  since: string | null,
+): Record<string, unknown>[] {
+  if (!record) return [];
+  const after = since === null ? Number.NEGATIVE_INFINITY : Date.parse(since);
+  const picked = record.nodes.filter((node) => {
+    if (node.kind !== "message" || node.by?.title !== "side") return false;
+    const touched = Date.parse(node.touchedAt ?? node.addedAt ?? "");
+    return Number.isNaN(touched) || touched > after;
+  });
+  return picked.slice(-SIDE_REVIEW_MAX).map((node) => {
+    const label = labels.get(node.id);
+    return {
+      id: node.id,
+      ...(label === undefined ? {} : { label }),
+      title: node.title,
+      ...(node.summary === undefined ? {} : { summary: node.summary }),
+      agentDecisions: (node.agentDecisions ?? []).map(({ title, why }) => ({ title, why })),
+    };
+  });
 }
 
 /**

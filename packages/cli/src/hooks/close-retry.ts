@@ -68,6 +68,7 @@ function emptyState(): HookState {
     turnsSinceUpdate: 0,
     recordUpdatedAt: null,
     turnsSinceSide: 0,
+    agentWroteAt: null,
     notedFiles: [],
   };
 }

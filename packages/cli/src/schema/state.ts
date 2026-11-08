@@ -18,6 +18,12 @@ export const HookState = z.object({
   /** Turns since the side model last recorded (Story 12.1). */
   turnsSinceSide: z.number().int().min(0).default(0),
   /**
+   * When the main agent last wrote the record. `session show` lists what the
+   * side model recorded since then, so the agent can add or correct its own
+   * decisions there; null until the agent's first write.
+   */
+  agentWroteAt: IsoDate.nullable().default(null),
+  /**
    * Project-relative files the PreToolUse hook has already told this session
    * about (Story 10.4): the "tried before" note is once per file per session,
    * and a file with nothing to say is remembered too, so every edit does not
