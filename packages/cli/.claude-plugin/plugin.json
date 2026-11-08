@@ -1,7 +1,7 @@
 {
   "name": "cogit",
   "displayName": "cogit",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Git for the intent behind agent-written code.",
   "author": {
     "name": "Eren Sertkaya"

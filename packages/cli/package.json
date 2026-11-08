@@ -1,6 +1,6 @@
 {
   "name": "@cogit/cli",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Git for the intent behind agent-written code.",
   "license": "MIT",
   "keywords": [
