@@ -10,11 +10,11 @@ or with `cogit config set <key> <value>`; `cogit config get` lists them all.
 
 ### Recording
 
-`recorder` · default `side`
+`recorder` · default `mixed`
 
 **How much of the chat goes into the record.**
 
-Economical (recommended): a small model records in the background every few turns and closes each session with one pass that finds its threads, writes the branch summaries and one line on where the session left off. The agent is never interrupted; it costs under 2 cents per 20 messages. Detailed: on top of that, the main agent records its own decisions every 15 turns. It catches the agent's technical choices best and costs about 1–2% of a session. A third mode, where only the main agent records, is set with `cogit config set recorder agent`.
+Quality (recommended): a small model records in the background every few turns, and every 15 turns the agent you are working with adds its own technical decisions: the approach it took in the code, what it tried and dropped, and why. Only that agent knows these. The small model reads the chat from the outside, so it misses what the agent noticed in the code without saying it in a reply. It costs about 1–2% of a session. Economical: only the small model records, so the agent is never interrupted and it costs under 2 cents per 20 messages; your messages, your decisions and the threads are recorded just as well, the agent's technical reasons less so. Both close each session with one pass that finds its threads, writes the branch summaries and one line on where the session left off. A third mode, where only the main agent records, is set with `cogit config set recorder agent`.
 
 ### One-line summary under each message
 

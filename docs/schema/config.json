@@ -23,7 +23,7 @@
       "type": "boolean"
     },
     "recorder": {
-      "default": "side",
+      "default": "mixed",
       "type": "string",
       "enum": [
         "agent",

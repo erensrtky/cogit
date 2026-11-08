@@ -11,6 +11,7 @@ import {
   withoutNulls,
   writableAnswer,
 } from "../src/commands/backfill.js";
+import { configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
 import { messageHash } from "../src/messages.js";
@@ -233,6 +234,8 @@ describe("backfill --tail", () => {
     });
     const env = await fakeClaude(printing(answer), dir);
     await initialized(env);
+    // Economical: the side model is the only writer, so it owns the status.
+    await configSet("recorder", "side", fakeIo(env));
     await transcript([typed("first", 1), typed("second", 2)]);
     await sessionWrite({ dir: root }, fakeIo(env), async () =>
       JSON.stringify({ sessionId: "s1", nodes: [{ id: "m1", kind: "message", title: "First" }] }),

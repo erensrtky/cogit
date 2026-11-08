@@ -273,7 +273,7 @@ function SettingsDialog({
                         {field.help}
                       </p>
                     </div>
-                    <span className="settings-value">{formatSetting(value)}</span>
+                    <span className="settings-value">{formatSetting(value, field.options)}</span>
                   </div>
                 );
               })}

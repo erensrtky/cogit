@@ -64,7 +64,7 @@ describe("settings model", () => {
   it("returns only the editable keys with their current values", () => {
     const settings = { ...DEFAULT_SETTINGS, language: "tr", updateEveryTurns: 8 };
     expect(editableSettings(settings)).toEqual({
-      recorder: "side",
+      recorder: "mixed",
       messageSummaries: true,
       startupContext: true,
       recordHeadless: false,
@@ -100,5 +100,9 @@ describe("settings model", () => {
     expect(formatSetting("auto")).toBe("auto");
     expect(formatSetting(5)).toBe("5");
     expect(formatSetting(undefined)).toBe("—");
+    // A choice reads by its label; a value outside the options stays as it is.
+    const options = [{ value: "mixed", label: "Quality (recommended)" }];
+    expect(formatSetting("mixed", options)).toBe("Quality (recommended)");
+    expect(formatSetting("agent", options)).toBe("agent");
   });
 });

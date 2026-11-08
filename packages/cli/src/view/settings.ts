@@ -53,17 +53,21 @@ const EDITABLE: FieldSpec[] = [
     label: "Recording",
     help: "How much of the chat goes into the record.",
     details:
-      "Economical (recommended): a small model records in the background every few turns and " +
-      "closes each session with one pass that finds its threads, writes the branch summaries " +
-      "and one line on where the session left off. The agent is never interrupted; it costs " +
-      "under 2 cents per 20 messages. Detailed: on top of that, the main agent records its own " +
-      "decisions every 15 turns. It catches the agent's technical choices best and costs about " +
-      "1–2% of a session. A third mode, where only the main agent records, is set with " +
+      "Quality (recommended): a small model records in the background every few turns, and " +
+      "every 15 turns the agent you are working with adds its own technical decisions: the " +
+      "approach it took in the code, what it tried and dropped, and why. Only that agent knows " +
+      "these. The small model reads the chat from the outside, so it misses what the agent " +
+      "noticed in the code without saying it in a reply. It costs about 1–2% of a session. " +
+      "Economical: only the small model records, so the agent is never interrupted and it costs " +
+      "under 2 cents per 20 messages; your messages, your decisions and the threads are " +
+      "recorded just as well, the agent's technical reasons less so. Both close each session " +
+      "with one pass that finds its threads, writes the branch summaries and one line on where " +
+      "the session left off. A third mode, where only the main agent records, is set with " +
       "`cogit config set recorder agent`.",
     kind: "select",
     options: [
-      { value: "side", label: "Economical (recommended)" },
-      { value: "mixed", label: "Detailed" },
+      { value: "mixed", label: "Quality (recommended)" },
+      { value: "side", label: "Economical" },
     ],
   },
   {
@@ -267,7 +271,7 @@ export function configHelpLines(): string[] {
  * the defaults from the config schema, overridden by what the build embedded.
  */
 export const DEFAULT_SETTINGS: PanelSettings = {
-  recorder: "side",
+  recorder: "mixed",
   language: "auto",
   updateEveryTurns: 15,
   sideEveryTurns: 5,
@@ -303,8 +307,13 @@ export function editableSettings(settings: PanelSettings): PanelEditableSettings
   };
 }
 
-/** How a read-only value reads in the modal. */
-export function formatSetting(value: PanelSettings[keyof PanelSettings] | undefined): string {
+/** How a read-only value reads in the modal: a choice by its label ("Quality"), not its key. */
+export function formatSetting(
+  value: PanelSettings[keyof PanelSettings] | undefined,
+  options?: readonly SettingOption[],
+): string {
+  const chosen = options?.find((option) => option.value === value);
+  if (chosen !== undefined) return chosen.label;
   if (Array.isArray(value)) return value.length > 0 ? value.join(", ") : "—";
   if (typeof value === "boolean") return value ? "yes" : "no";
   return value === undefined ? "—" : String(value);

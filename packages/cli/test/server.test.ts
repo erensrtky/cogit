@@ -575,7 +575,7 @@ describe("settings read", () => {
     expect(JSON.parse(reply.body)).toEqual({
       ok: true,
       settings: {
-        recorder: "side",
+        recorder: "mixed",
         messageSummaries: true,
         startupContext: true,
         recordHeadless: false,
@@ -595,7 +595,7 @@ describe("settings read", () => {
       [CONFIG_TOKEN_HEADER]: token,
     });
     expect(reply.status).toBe(200);
-    expect(JSON.parse(reply.body).settings.recorder).toBe("side");
+    expect(JSON.parse(reply.body).settings.recorder).toBe("mixed");
   });
 
   it("shows a value changed after the page was built", async () => {
