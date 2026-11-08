@@ -73,8 +73,9 @@ refreshes the git hooks.
 Open Claude Code in the project and work as usual. Nothing needs to be started by hand:
 
 - Every message you send becomes a node in the record, with the message it answered.
-- The record is written outside the chat by a small side model, and the agent itself checks in
-  every 15 turns to add its own decisions. See [Recording and cost](recording-and-cost.md).
+- The record is written outside the chat by a small side model, and when the session ends the
+  model it ran on reviews it once with the whole conversation in view. The agent is never
+  interrupted. See [Recording and cost](recording-and-cost.md).
 - When the session ends, whatever was left unrecorded is recorded.
 - Each code commit gets a `Thought:` trailer naming the message it came from.
 

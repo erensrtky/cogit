@@ -164,8 +164,9 @@ describe("runHook", () => {
   const initialized = async (everyTurns: number) => {
     await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(env));
     await configSet("updateEveryTurns", String(everyTurns), fakeIo(env));
-    // These tests drive the main agent's check-ins, which only Detailed mode asks for.
-    await configSet("recorder", "mixed", fakeIo(env));
+    // These tests drive the main agent's check-ins mid-chat, which only agent mode
+    // asks for now: Quality reviews at the session end instead.
+    await configSet("recorder", "agent", fakeIo(env));
   };
 
   it("offers setup before init on startup and resume, but not on clear", async () => {
@@ -512,6 +513,20 @@ describe("runHook", () => {
     expect(await sessionEnd()).toBeUndefined();
     expect(spawned).toEqual([
       ["/plugin/dist/cli.js", "backfill", "s1", "--tail", "--close", "-C", root],
+    ]);
+  });
+
+  it("asks for the Quality review at session end, and only in Quality mode", async () => {
+    await initialized(2);
+    await configSet("recorder", "mixed", fakeIo(env));
+    await transcript([typed("first", 1)]);
+    // Quality never stops the agent mid-chat any more.
+    expect(await stop()).toBeUndefined();
+    expect(await stop()).toBeUndefined();
+    expect(await sessionEnd()).toBeUndefined();
+    // The Stop turns rebuild the map; the session end starts the review.
+    expect(spawned.filter((args) => args[1] === "backfill")).toEqual([
+      ["/plugin/dist/cli.js", "backfill", "s1", "--tail", "--close", "--review", "-C", root],
     ]);
   });
 

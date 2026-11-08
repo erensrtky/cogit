@@ -6,7 +6,14 @@ import { parseMessageRef } from "../schema/common.js";
 import { BranchSummary, type Session, Status } from "../schema/session.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { loadConfig, loadSession } from "../store/stores.js";
-import { actionLines, agentRecord, resultText, runClaude } from "./backfill.js";
+import {
+  actionLines,
+  agentRecord,
+  resultText,
+  runClaude,
+  withoutNulls,
+  writableAnswer,
+} from "./backfill.js";
 import { type CandidateSession, candidateSessions, sessionWrite } from "./session.js";
 
 /**
@@ -283,7 +290,145 @@ export function statusIsEmpty(record: Session): boolean {
   return goal === "" && done.length === 0 && pending.length === 0 && next === "";
 }
 
-export async function closeSession(root: string, sessionId: string, io: Io): Promise<void> {
+/**
+ * The prompt for the Quality review at the session end. The run resumes the
+ * session itself, so the conversation, the agent's tool calls and their output
+ * are already in its context; the prompt only carries the record to check.
+ */
+export function reviewPrompt(
+  turns: ChatTurn[],
+  record: Session,
+  opts: { language: string; messageSummaries: boolean },
+): string {
+  const writing = opts.language === "auto" ? "the conversation's language" : opts.language;
+  const nodes = new Map(record.nodes.map((node) => [node.id, node]));
+  const listed = turns.flatMap((turn) => {
+    const node = nodes.get(turn.hash ?? turn.id);
+    if (!node) return [];
+    const fields = {
+      title: node.title,
+      ...(node.summary ? { summary: node.summary } : {}),
+      ...(node.decidedBy ? { decidedBy: node.decidedBy } : {}),
+      ...(node.why ? { why: node.why } : {}),
+      ...(node.alternatives?.length ? { alternatives: node.alternatives } : {}),
+      ...(node.agentDecisions?.length ? { agentDecisions: node.agentDecisions } : {}),
+      ...(node.work?.length ? { work: node.work } : {}),
+      ...(node.commits?.length ? { commits: node.commits } : {}),
+    };
+    return [`- ${node.id} (${turn.label ?? turn.id}): ${JSON.stringify(fields)}`];
+  });
+  return [
+    "This session has ended, and you are the agent that worked in it. cogit kept a record of it while you worked; most of it was written by a small model that read the chat from the outside and could not see what you noticed in the code. Check the record against what you actually did and decided, and return the corrections.",
+    "",
+    "For each message, fix or add:",
+    '- agentDecisions ([{"title": "...", "why": "...", "alternatives": [{"option": "...", "why": "..."}]}]): the technical choices you made with a reason — an approach you took in the code, a pitfall you found, what you tried and dropped. alternatives only lists options someone actually named before the choice, each as an object.',
+    "- work (short items), commits (short hashes in this repository) and files (a few paths), when they are missing or wrong.",
+    "- The user's own decision (decidedBy, why, alternatives) only when it is wrong.",
+    ...(opts.messageSummaries ? ["- summary, when it misses what came of the message."] : []),
+    "Then write the status as it stands now that the session has ended: goal (one sentence), done (outcomes), pending ([{text, needsUser}], the work still open, in the user's words) and next.",
+    "",
+    'Rules: send only the messages you change, each with its id exactly as listed, kind "message" and its title; never send parent, links or branch; never make up an id. Record decisions and reasons, never secrets, credentials, personal data, file contents or command output. Write in ' +
+      `${writing}; JSON keys stay in English.`,
+    "",
+    "The record:",
+    ...listed,
+    "",
+    `Return only one JSON object, no commentary and no code fences: {"sessionId": ${JSON.stringify(
+      record.sessionId,
+    )}, "nodes": [...], "status": {...}}`,
+  ].join("\n");
+}
+
+/** An option given as a bare string (a model's shortcut) becomes `{ option, why: "" }`. */
+function optionObjects(list: unknown): unknown {
+  if (!Array.isArray(list)) return list;
+  return list.map((item) => (typeof item === "string" ? { option: item, why: "" } : item));
+}
+
+function withOptionObjects(node: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...node };
+  if (out.alternatives !== undefined) out.alternatives = optionObjects(out.alternatives);
+  if (Array.isArray(out.agentDecisions))
+    out.agentDecisions = out.agentDecisions.map((decision) =>
+      typeof decision === "object" && decision !== null && "alternatives" in decision
+        ? {
+            ...(decision as Record<string, unknown>),
+            alternatives: optionObjects((decision as Record<string, unknown>).alternatives),
+          }
+        : decision,
+    );
+  return out;
+}
+
+/**
+ * Quality mode at the session end (story: close the short-session hole): the
+ * session's own model resumes the conversation headless, without persisting
+ * anything, and corrects the record as the agent that did the work. Its cache
+ * is still warm, so this costs about one more message. Never on a retry from a
+ * later session: by then the cache is cold, and the side model's pass is enough.
+ */
+async function reviewAtClose(root: string, sessionId: string, io: Io): Promise<void> {
+  const agent = defaultAgent();
+  const file = await agent.findTranscript(sessionId, io.env);
+  const loaded = await loadSession(root, sessionId);
+  if (!file || !loaded.found || !loaded.ok) return;
+  const model = await agent.readSessionModel(file);
+  if (model === undefined) {
+    io.warn(`no model found in the transcript of ${sessionId}; skipping the Quality review`);
+    return;
+  }
+  const turns = hashTurns(sessionId, await agent.readConversation(file));
+  const upgraded = upgradeSessionIds(loaded.data, turns);
+  const record: Session = {
+    ...upgraded,
+    nodes: applyEvents(upgraded.nodes, await readEvents(root, sessionId)),
+  };
+  const config = await loadConfig(io.env);
+  const prompt = reviewPrompt(turns, record, {
+    language: config.language,
+    messageSummaries: config.messageSummaries,
+  });
+  const cwd = (await agent.readSessionCwd(file)) ?? root;
+  const answer = withoutNulls(
+    agentRecord(resultText(await runClaude(prompt, model, io.env, { sessionId, cwd }))),
+  );
+  // The review corrects notes; the structure stays the side model's and the close pass's.
+  const nodes = Array.isArray(answer.nodes)
+    ? answer.nodes.map((node) => {
+        if (typeof node !== "object" || node === null) return node;
+        const { parent: _p, links: _l, branch: _b, ...rest } = node as Record<string, unknown>;
+        return withOptionObjects(rest);
+      })
+    : undefined;
+  // A field the schema refuses is dropped on its own, never the whole review.
+  const { payload, dropped } = writableAnswer(
+    {
+      ...(nodes === undefined ? {} : { nodes }),
+      ...(answer.status === undefined ? {} : { status: answer.status }),
+    },
+    "agent",
+  );
+  if (dropped > 0) io.warn(`dropped ${dropped} malformed field(s) from the Quality review`);
+  await sessionWrite({ dir: root }, io, async () => JSON.stringify({ ...payload, sessionId }));
+}
+
+export async function closeSession(
+  root: string,
+  sessionId: string,
+  io: Io,
+  opts: { review?: boolean } = {},
+): Promise<void> {
+  const reviewed =
+    opts.review === true && (await loadConfig(io.env)).recorder === "mixed"
+      ? await reviewAtClose(root, sessionId, io).then(
+          () => true,
+          (err: Error) => {
+            io.warn(`the Quality review did not finish: ${err.message}`);
+            return false;
+          },
+        )
+      : false;
+  if (reviewed) io.out(`reviewed ${sessionId} with the session's own model`);
   const agent = defaultAgent();
   const file = await agent.findTranscript(sessionId, io.env);
   const loaded = await loadSession(root, sessionId);

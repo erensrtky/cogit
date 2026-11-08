@@ -104,7 +104,9 @@ export async function onStop(ctx: HookContext): Promise<HookOutput | undefined> 
       const next = countTurn(cur, recordUpdatedAt, config.updateEveryTurns, {
         // In agent mode the side model runs only at session end (Story 12.1).
         ...(config.recorder === "agent" ? {} : { sideEveryTurns: config.sideEveryTurns }),
-        askAgent: config.recorder !== "side",
+        // Quality no longer stops the agent mid-chat: the session's own model
+        // reviews the record at the session end instead (sessionend.ts).
+        askAgent: config.recorder === "agent",
         ...(lastRecordedBy === undefined ? {} : { lastRecordedBy }),
       });
       request = next.request;

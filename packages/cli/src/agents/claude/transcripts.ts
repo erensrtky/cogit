@@ -439,6 +439,46 @@ function containsUserMessage(raw: string): boolean {
 }
 
 /**
+ * The model the session last answered with, read from the end of the
+ * transcript: the newest assistant line that names a real model (Claude Code
+ * writes `<synthetic>` for messages it made up itself). Undefined when none is
+ * found in the last few megabytes or the file cannot be read.
+ */
+export async function readSessionModel(file: string): Promise<string | undefined> {
+  let handle: Awaited<ReturnType<typeof open>> | undefined;
+  try {
+    handle = await open(file, "r");
+    const { size } = await handle.stat();
+    let end = size;
+    let carry = "";
+    while (end > 0 && size - end < 8 * LAST_TURN_TAIL_BYTES) {
+      const start = Math.max(0, end - LAST_TURN_TAIL_BYTES);
+      const text = (await readRange(handle, start, end)).toString("utf8") + carry;
+      const lines = text.split("\n");
+      // The first piece may be the tail of a line that starts in the older window.
+      carry = start > 0 ? (lines.shift() ?? "") : "";
+      for (let i = lines.length - 1; i >= 0; i--) {
+        try {
+          const line = JSON.parse(lines[i] ?? "") as {
+            type?: unknown;
+            message?: { model?: unknown };
+          };
+          const model = line.message?.model;
+          if (line.type === "assistant" && typeof model === "string" && !model.startsWith("<"))
+            return model;
+        } catch {}
+      }
+      end = start;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  } finally {
+    await handle?.close();
+  }
+}
+
+/**
  * Who spoke last, read from the end of the transcript (Story 11.1). The state is
  * the last user message plus the agent's last written reply after it: the agent
  * wrote last means it is the user's turn, the user wrote last means the agent is

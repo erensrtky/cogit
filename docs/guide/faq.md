@@ -46,8 +46,9 @@ cogit adds less; the part it always adds is the step from a message to the exact
 
 It's written while the session runs, from the live conversation. A small side model reads it
 every few turns and records each message's decisions and the options it turned down; in
-Quality mode (the default) the agent that made the decision adds its own account, and the side
-model never overwrites it. When a session ends, the side model reads the whole session once more to split
+Quality mode (the default) the model the session ran on reopens the whole conversation when it
+ends and corrects the record as the agent that made the decisions, and the side model never
+overwrites that. When a session ends, the side model reads the whole session once more to split
 it into threads and write summaries. That is still the real conversation, but read by a model
 that didn't do the work, so in Economical mode the agent's own technical reasons are its
 weakest part. A Shape is
@@ -134,8 +135,8 @@ us in an issue which agent you use.
 
 ### What does it cost?
 
-In the default Quality mode the agent adds its own decisions every 15 turns, about 1–2% of a
-session's tokens. Economical leaves the record to a small model through your own Claude Code
+In the default Quality mode the model your session ran on reviews the record once when the
+session ends, about one more message. Economical leaves the record to a small model through your own Claude Code
 login; in our measurement it cost under 2 cents per 20 messages. See
 [Recording and cost](recording-and-cost.md).
 

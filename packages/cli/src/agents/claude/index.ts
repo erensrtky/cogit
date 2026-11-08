@@ -29,6 +29,7 @@ import {
   readForkOrigin,
   readLastTurn,
   readSessionCwd,
+  readSessionModel,
   readsHandoff,
 } from "./transcripts.js";
 
@@ -55,6 +56,7 @@ export const claude: AgentAdapter = {
   readConversation,
   readForkOrigin,
   readSessionCwd,
+  readSessionModel,
   readsHandoff,
   readLastTurn,
   countUserLines,

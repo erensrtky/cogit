@@ -146,6 +146,8 @@ export interface AgentAdapter {
   readForkOrigin(file: string): Promise<ForkOrigin | null>;
   /** The directory the session runs in, from its transcript; undefined when unknown. */
   readSessionCwd(file: string): Promise<string | undefined>;
+  /** The model the session last answered with; undefined when unknown. */
+  readSessionModel(file: string): Promise<string | undefined>;
   /** Whether the transcript shows the agent reading a handoff file (Story 8.6). */
   readsHandoff(file: string): Promise<boolean>;
   /**

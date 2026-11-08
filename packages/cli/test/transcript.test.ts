@@ -8,6 +8,7 @@ import {
   findTranscript,
   messageText,
   readConversation,
+  readSessionModel,
   readsHandoff,
   readUserMessages,
 } from "../src/agents/claude/transcripts.js";
@@ -256,5 +257,24 @@ describe("excerpt", () => {
   it("cuts long text with an ellipsis", () => {
     expect(excerpt("x".repeat(400))).toHaveLength(300);
     expect(excerpt("x".repeat(400)).endsWith("…")).toBe(true);
+  });
+});
+
+describe("readSessionModel", () => {
+  it("finds the last real model, also behind a long tail, and nothing in a missing file", async () => {
+    const dir = await tempDir();
+    const file = join(dir, "s.jsonl");
+    const assistant = (model: string) =>
+      JSON.stringify({ type: "assistant", message: { role: "assistant", model } });
+    // The model line sits far before the last 256 KB, behind lines it must walk past.
+    const filler = JSON.stringify({ type: "user", message: { content: "x".repeat(1000) } });
+    await writeFile(
+      file,
+      `${[assistant("claude-a"), ...Array.from({ length: 400 }, () => filler), assistant("<synthetic>")].join("\n")}\n`,
+    );
+    expect(await readSessionModel(file)).toBe("claude-a");
+    await writeFile(file, `${filler}\n`);
+    expect(await readSessionModel(file)).toBeUndefined();
+    expect(await readSessionModel(join(dir, "missing.jsonl"))).toBeUndefined();
   });
 });

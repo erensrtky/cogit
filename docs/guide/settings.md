@@ -14,7 +14,7 @@ or with `cogit config set <key> <value>`; `cogit config get` lists them all.
 
 **How much of the chat goes into the record.**
 
-Quality (recommended): a small model records in the background every few turns, and every 15 turns the agent you are working with adds its own technical decisions: the approach it took in the code, what it tried and dropped, and why. Only that agent knows these. The small model reads the chat from the outside, so it misses what the agent noticed in the code without saying it in a reply. It costs about 1–2% of a session. Economical: only the small model records, so the agent is never interrupted and it costs under 2 cents per 20 messages; your messages, your decisions and the threads are recorded just as well, the agent's technical reasons less so. Both close each session with one pass that finds its threads, writes the branch summaries and one line on where the session left off. A third mode, where only the main agent records, is set with `cogit config set recorder agent`.
+In both modes a small model records in the background every few turns, from a short summary of each turn, and the agent is never interrupted. Quality (recommended): when the session ends, the model your session ran on reopens the whole conversation in the background, with every command it ran, file it read and what it noticed in the code, and corrects the record: its technical decisions, the work and where things stand. Its cache is still warm, so this costs about one more message. Economical: the small model also writes the end of the session, still from the summary: under 2 cents per 20 messages; your messages, your decisions and the threads are recorded just as well, the agent's technical reasons less so. Both close each session with one pass that finds its threads, writes the branch summaries and one line on where the session left off. If the session end is missed (the machine was shut down), the next session closes it with the small model. A third mode, where the agent records everything itself during the chat, is set with `cogit config set recorder agent`.
 
 ### One-line summary under each message
 
@@ -90,7 +90,7 @@ These are set up once, per project, or rarely touched, so the panel leaves them 
 
 **Ask the agent to record after this many turns.**
 
-How often the main agent is asked to update the record inside the chat. In mixed mode the side model records in between, so this can be rare (15 turns by default).
+How often the main agent is asked to update the record inside the chat, in agent mode (15 turns by default). Quality and Economical never ask it.
 
 ### Side model every N turns
 

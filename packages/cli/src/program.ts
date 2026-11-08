@@ -611,18 +611,30 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       "--close",
       "then run the session-end pass: threads, parents, branch summaries and where it left off",
     )
+    .option(
+      "--review",
+      "with --close in Quality mode, first let the session's own model review the record",
+    )
     .addHelpText(
       "after",
       examples("cogit backfill 9c32ab18 --tail", "cogit backfill 9c32ab18 --tail --close"),
     )
     .action(
-      run(async (sessionId: string, opts: { dir: string; tail?: boolean; close?: boolean }) => {
-        if (opts.tail !== true)
-          throw new CliError(
-            "backfill of past sessions is not available yet; run `cogit backfill <session-id> --tail`",
-          );
-        await backfillTail(opts.dir, sessionId, makeIo(false), { close: opts.close === true });
-      }),
+      run(
+        async (
+          sessionId: string,
+          opts: { dir: string; tail?: boolean; close?: boolean; review?: boolean },
+        ) => {
+          if (opts.tail !== true)
+            throw new CliError(
+              "backfill of past sessions is not available yet; run `cogit backfill <session-id> --tail`",
+            );
+          await backfillTail(opts.dir, sessionId, makeIo(false), {
+            close: opts.close === true,
+            review: opts.review === true,
+          });
+        },
+      ),
     );
 
   const session = program

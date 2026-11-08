@@ -86,7 +86,7 @@ describe("settings model", () => {
     }
     // The recording-mode explanation states the measured trade-off plainly.
     expect(text).toContain("under 2 cents per 20 messages");
-    expect(text).toContain("1–2%");
+    expect(text).toContain("costs about one more message");
     // The advanced recording keys left the panel but keep their help (0.21).
     expect(text).toContain("sideEveryTurns");
     expect(text).toContain("sideModel");

@@ -194,13 +194,20 @@ export const CLAUDE_TIMEOUT_MS = 5 * 60_000;
  * outlives the time limit rejects, so a hung run lands in the log instead of
  * waiting until the machine shuts down. `COGIT_CLAUDE_TIMEOUT_MS` overrides the limit.
  */
-export function runClaude(prompt: string, model: string, env: NodeJS.ProcessEnv): Promise<string> {
+export function runClaude(
+  prompt: string,
+  model: string,
+  env: NodeJS.ProcessEnv,
+  resume?: { sessionId: string; cwd: string },
+): Promise<string> {
   const limit = Number(env.COGIT_CLAUDE_TIMEOUT_MS) || CLAUDE_TIMEOUT_MS;
   return new Promise((resolve, reject) => {
     const child = spawn(
       claudeBin(),
       [
         "-p",
+        // A resumed run reads the whole conversation; nothing is written back to it.
+        ...(resume === undefined ? [] : ["--resume", resume.sessionId]),
         "--safe-mode",
         "--no-session-persistence",
         "--model",
@@ -208,7 +215,11 @@ export function runClaude(prompt: string, model: string, env: NodeJS.ProcessEnv)
         "--output-format",
         "json",
       ],
-      { env: headlessEnv(env), stdio: ["pipe", "pipe", "pipe"] },
+      {
+        env: headlessEnv(env),
+        stdio: ["pipe", "pipe", "pipe"],
+        ...(resume === undefined ? {} : { cwd: resume.cwd }),
+      },
     );
     let out = "";
     let err = "";
@@ -369,9 +380,10 @@ export async function backfillTail(
   dir: string,
   sessionId: string,
   io: Io,
-  opts: { close?: boolean } = {},
+  opts: { close?: boolean; review?: boolean } = {},
 ): Promise<void> {
   const { root } = await resolveProjectRoot(dir);
+  const close = { review: opts.review === true };
   const project = await loadProject(root);
   if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
   if (!project.ok) throw new CliError(project.error);
@@ -390,7 +402,7 @@ export async function backfillTail(
   }
   if (turns.length === 0) {
     io.out(`session ${sessionId} has nothing left to record`);
-    if (opts.close === true) await closeSession(root, sessionId, io);
+    if (opts.close === true) await closeSession(root, sessionId, io, close);
     return;
   }
 
@@ -417,7 +429,7 @@ export async function backfillTail(
     JSON.stringify({ ...payload, sessionId }),
   );
   // At the session end the closing pass reads the whole session once it is all recorded.
-  if (opts.close === true) await closeSession(root, sessionId, io);
+  if (opts.close === true) await closeSession(root, sessionId, io, close);
   // The session end wrote the last messages after the last code commit; auto
   // mode commits exactly those record files now (Story 9.3).
 }

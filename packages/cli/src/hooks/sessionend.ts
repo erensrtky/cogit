@@ -19,6 +19,9 @@ export async function onSessionEnd(ctx: HookContext): Promise<undefined> {
   if (!config.sessionEndCatchUp) return undefined;
   const messages = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
   if (!messages || messages.length === 0) return undefined;
-  ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "--close", "-C", ctx.root]);
+  // Quality: the session's own model reviews the record while its cache is warm.
+  // A retry from a later session (close-retry.ts) runs without it.
+  const review = config.recorder === "mixed" ? ["--review"] : [];
+  ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "--close", ...review, "-C", ctx.root]);
   return undefined;
 }

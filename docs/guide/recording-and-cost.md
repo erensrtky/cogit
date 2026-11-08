@@ -17,8 +17,8 @@ the agent wrote.
 
 | `recorder` | Panel | What happens | Cost in our sessions |
 |---|---|---|---|
-| `mixed` (default) | Quality | The side model records every 5 turns (`sideEveryTurns`), the agent's technical decisions included, and the agent checks in every 15 turns (`updateEveryTurns`) to add or correct its own | about 1–2% of a session's tokens |
-| `side` | Economical | Only the side model records, every 5 turns; the agent is never asked | under 2 cents per 20 messages |
+| `mixed` (default) | Quality | The side model records every 5 turns (`sideEveryTurns`). When the session ends, the model the session ran on reopens the whole conversation in the background and corrects the record | the side model, plus about one more message at the end |
+| `side` | Economical | Only the side model records, every 5 turns and at the end | under 2 cents per 20 messages |
 | `agent` | (config only) | The agent records everything itself every `updateEveryTurns` turns | about 3–7%, more in short sessions |
 
 When a session ends, the side model records whatever is still unrecorded and then closes the
@@ -40,9 +40,14 @@ agent's own technical decisions and at splitting a session into threads. Telling
 agent did in each turn (its steps, questions and edited files) fixed most of the first, and
 the session-end pass fixed the second. What it still cannot see is what the agent noticed in
 the code without saying it in a reply: a pitfall it found and wrote down only as a code
-comment, for example. That is why `mixed` (Quality) is the default: the agent that
-did the work adds its own account. Choose `side` (Economical) to spend the least and never
-interrupt the agent.
+comment, for example. That is why `mixed` (Quality) is the default. When the session ends,
+`claude --resume <session> -p` reopens it in the background with the model it ran on, with
+nothing written back to the transcript and no plugins or hooks loaded. That model sees the
+whole conversation, every command, file read and output included, and corrects the record as
+the agent that did the work: its technical decisions, the work and where things stand. Its
+prompt cache is still warm, so the review costs about one more message. A session end that is
+missed (the machine was shut down) is closed by the next session with the side model only,
+since the cache is cold by then. Choose `side` (Economical) to spend the least.
 
 To record less often, raise `sideEveryTurns` and `updateEveryTurns`. To spend nothing on
 recording during the session, use `recorder: side` and turn `sessionEndCatchUp` off; the

@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ChatTurn } from "../src/agents/types.js";
@@ -313,6 +313,177 @@ process.stdin.on("end", async () => {
     expect(await readFile(join(dir, "prompt.txt"), "utf8")).toContain(
       "Split the session into threads",
     );
+  });
+
+  it("lets the session's own model review the record before the close pass in Quality", async () => {
+    const bin = join(dir, "bin");
+    await mkdir(bin, { recursive: true });
+    const h = (m: number) =>
+      messageHash("s1", { at: `2026-10-23T10:0${m}:00.000Z`, text: `m ${m}` });
+    const review = JSON.stringify({
+      sessionId: "s1",
+      nodes: [
+        {
+          id: h(1),
+          kind: "message",
+          title: "T1",
+          parent: "never taken",
+          // A bare string option, as a real model once sent it, and a field the schema refuses.
+          agentDecisions: [
+            {
+              title: "Fix it in one place",
+              why: "four callers share it",
+              alternatives: ["Fix each caller"],
+            },
+          ],
+          files: "not a list",
+        },
+      ],
+      status: { goal: "g", done: ["d"], pending: [], next: "n" },
+    });
+    const close = JSON.stringify({
+      threads: [
+        { name: "Work", messages: "m1-m2", from: null, asked: "a", outcome: "o", open: "" },
+      ],
+      leftOff: "done",
+    });
+    // Each run logs its arguments and directory; a resumed run answers as the reviewer.
+    await writeFile(
+      join(bin, "claude"),
+      `#!/usr/bin/env node
+let input = "";
+process.stdin.on("data", (c) => { input += c; });
+process.stdin.on("end", async () => {
+  const fs = await import("node:fs");
+  const argv = process.argv.slice(2);
+  fs.appendFileSync(${JSON.stringify(join(dir, "runs.jsonl"))}, JSON.stringify({ argv, cwd: process.cwd() }) + "\\n");
+  const result = argv.includes("--resume") ? ${JSON.stringify(review)} : ${JSON.stringify(close)};
+  process.stdout.write(JSON.stringify({ result }));
+});
+`,
+    );
+    await chmod(join(bin, "claude"), 0o755);
+    const env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+    await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
+    const folder = join(envFor(dir).CLAUDE_CONFIG_DIR ?? "", "projects", "proj");
+    await mkdir(folder, { recursive: true });
+    const lines = [
+      {
+        type: "user",
+        cwd: root,
+        timestamp: "2026-10-23T10:01:00.000Z",
+        message: { role: "user", content: "m 1" },
+      },
+      { type: "assistant", message: { role: "assistant", model: "claude-test-1", content: [] } },
+      {
+        type: "user",
+        timestamp: "2026-10-23T10:02:00.000Z",
+        message: { role: "user", content: "m 2" },
+      },
+      { type: "assistant", message: { role: "assistant", model: "<synthetic>", content: [] } },
+    ];
+    await writeFile(
+      join(folder, "s1.jsonl"),
+      `${lines.map((l) => JSON.stringify(l)).join("\n")}\n`,
+    );
+    await sessionWrite({ dir: root, by: "side" }, fakeIo(env), async () =>
+      JSON.stringify({
+        sessionId: "s1",
+        nodes: [1, 2].map((m) => ({
+          id: `m${m}`,
+          kind: "message",
+          title: `T${m}`,
+          parent: m === 1 ? null : "m1",
+          agentDecisions: [{ title: "side guess", why: "outside" }],
+        })),
+      }),
+    );
+
+    const io = fakeIo(env);
+    await closeSession(root, "s1", io, { review: true });
+    const runs = (await readFile(join(dir, "runs.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { argv: string[]; cwd: string });
+    // First the review: the session itself, its own model, in its own directory.
+    expect(runs[0]?.argv).toEqual(
+      expect.arrayContaining(["--resume", "s1", "--model", "claude-test-1"]),
+    );
+    expect(runs[0]?.argv).toContain("--no-session-persistence");
+    expect(runs[0]?.cwd).toBe(root);
+    // Then the side model's close pass, as before.
+    expect(runs[1]?.argv).not.toContain("--resume");
+    expect(io.lines).toContain("reviewed s1 with the session's own model");
+
+    const loaded = await loadSession(root, "s1");
+    const saved = loaded.found && loaded.ok ? loaded.data : undefined;
+    const first = saved?.nodes.find((n) => n.id === h(1));
+    // The reviewer's decisions replace the side model's guess; the structure stays.
+    expect(first?.agentDecisions).toEqual([
+      {
+        title: "Fix it in one place",
+        why: "four callers share it",
+        alternatives: [{ option: "Fix each caller", why: "" }],
+      },
+    ]);
+    expect(io.warnings.join("\n")).toContain(
+      "dropped 1 malformed field(s) from the Quality review",
+    );
+    expect(first?.by?.agentDecisions).toBeUndefined();
+    expect(first?.parent).toBeNull();
+    expect(saved?.nodes.find((n) => n.id === h(2))?.agentDecisions?.[0]?.title).toBe("side guess");
+    expect(saved?.status).toMatchObject({ goal: "g", next: "n" });
+    expect(saved?.leftOff).toBe("done");
+
+    // A retry from a later session, or Economical, never resumes the session.
+    await rm(join(dir, "runs.jsonl"));
+    await closeSession(root, "s1", fakeIo(env));
+    const again = await readFile(join(dir, "runs.jsonl"), "utf8");
+    expect(again).not.toContain("--resume");
+  });
+
+  it("skips the review when the transcript names no model, and when it fails", async () => {
+    const bin = join(dir, "bin");
+    await mkdir(bin, { recursive: true });
+    await writeFile(
+      join(bin, "claude"),
+      `#!/usr/bin/env node
+process.stdin.resume();
+process.stdin.on("end", () => {
+  if (process.argv.includes("--resume")) { process.stderr.write("no"); process.exit(2); }
+  process.stdout.write(JSON.stringify({ result: JSON.stringify({ threads: [], leftOff: "x" }) }));
+});
+`,
+    );
+    await chmod(join(bin, "claude"), 0o755);
+    const env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+    await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
+    const folder = join(envFor(dir).CLAUDE_CONFIG_DIR ?? "", "projects", "proj");
+    await mkdir(folder, { recursive: true });
+    const user = {
+      type: "user",
+      timestamp: "2026-10-23T10:01:00.000Z",
+      message: { role: "user", content: "m 1" },
+    };
+    await writeFile(join(folder, "s1.jsonl"), `${JSON.stringify(user)}\n`);
+    await sessionWrite({ dir: root, by: "side" }, fakeIo(env), async () =>
+      JSON.stringify({ sessionId: "s1", nodes: [{ id: "m1", kind: "message", title: "T1" }] }),
+    );
+    const noModel = fakeIo(env);
+    await closeSession(root, "s1", noModel, { review: true });
+    expect(noModel.warnings.join("\n")).toContain("no model found in the transcript of s1");
+
+    const assistant = { type: "assistant", message: { role: "assistant", model: "claude-test-1" } };
+    await writeFile(
+      join(folder, "s1.jsonl"),
+      `${JSON.stringify(user)}\n${JSON.stringify(assistant)}\n`,
+    );
+    const failed = fakeIo(env);
+    await closeSession(root, "s1", failed, { review: true });
+    expect(failed.warnings.join("\n")).toContain("the Quality review did not finish");
+    // The close pass still ran.
+    const loaded = await loadSession(root, "s1");
+    expect(loaded.found && loaded.ok ? loaded.data.leftOff : undefined).toBe("x");
   });
 
   it("fills a status the agent never wrote, and keeps the one it did", async () => {
