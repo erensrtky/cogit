@@ -90,8 +90,11 @@ including the option that was rejected.*
   GitHub Action that posts them on every pull request.
 - **Teams share the record through git**: after a pull, your teammates' sessions are on the
   map too, with who ran them and what changed most.
-- **Cheap by default**: a small side model records in the background; in our measurement it
-  cost under 2 cents per 20 messages.
+- **The agent's own reasons, or the cheapest record**: a small model records in the
+  background and never interrupts the agent. By default, when a session ends, the model it ran
+  on reopens the whole conversation and corrects the record with what only it saw, for about
+  one more message. Economical leaves it all to the small model: under 2 cents per 20 messages
+  in our measurement.
 - **No server, no account**: it runs on your machine. Nothing leaves it unless you say so: `cogit
   init` asks whether to share the record (titles, decisions and reasons) with your team. If you
   do, `git push` sends it to your own repository, outside your branches, so it never shows up in

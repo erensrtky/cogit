@@ -20964,6 +20964,36 @@ function containsUserMessage(raw) {
   scanLastTurn(raw, probe);
   return probe.userSeen;
 }
+async function readSessionModel(file2) {
+  let handle;
+  try {
+    handle = await open3(file2, "r");
+    const { size } = await handle.stat();
+    let end = size;
+    let carry = "";
+    while (end > 0 && size - end < 8 * LAST_TURN_TAIL_BYTES) {
+      const start = Math.max(0, end - LAST_TURN_TAIL_BYTES);
+      const text = (await readRange(handle, start, end)).toString("utf8") + carry;
+      const lines = text.split("\n");
+      carry = start > 0 ? lines.shift() ?? "" : "";
+      for (let i = lines.length - 1; i >= 0; i--) {
+        try {
+          const line = JSON.parse(lines[i] ?? "");
+          const model = line.message?.model;
+          if (line.type === "assistant" && typeof model === "string" && !model.startsWith("<"))
+            return model;
+        } catch {
+        }
+      }
+      end = start;
+    }
+    return void 0;
+  } catch {
+    return void 0;
+  } finally {
+    await handle?.close();
+  }
+}
 async function readLastTurn(file2) {
   const handle = await open3(file2, "r");
   try {
@@ -21055,6 +21085,7 @@ var claude = {
   readConversation,
   readForkOrigin,
   readSessionCwd,
+  readSessionModel,
   readsHandoff,
   readLastTurn,
   countUserLines,
@@ -21226,7 +21257,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-AW6CAPCO.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-WQCZGAYX.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -21326,11 +21357,12 @@ var Config = external_exports.object({
   sessionEndCatchUp: external_exports.boolean().default(true),
   /**
    * Who writes the record (Story 12.1): the main agent (`agent`), both (`mixed`,
-   * "Detailed" in the panel: a side model often, the agent rarely), or only the
-   * side model (`side`, "Economical", the default since 0.21: the agent is never
-   * interrupted and the session-end pass writes the branches).
+   * "Quality" in the panel and the default: a side model often, and the session's
+   * own model once at session end with the technical reasons only it knows), or only the side model
+   * (`side`, "Economical": the agent is never interrupted, its reasons are read
+   * from the outside). The session-end pass writes the branches in both.
    */
-  recorder: external_exports.enum(["agent", "mixed", "side"]).default("side"),
+  recorder: external_exports.enum(["agent", "mixed", "side"]).default("mixed"),
   /** Model the side runs use: the headless catch-up and the periodic records. */
   sideModel: external_exports.string().trim().min(1).max(64).default("haiku"),
   /** How often the side model records, in turns (Story 12.1). */
@@ -21621,6 +21653,12 @@ var HookState = external_exports.object({
   recordUpdatedAt: IsoDate.nullable().default(null),
   /** Turns since the side model last recorded (Story 12.1). */
   turnsSinceSide: external_exports.number().int().min(0).default(0),
+  /**
+   * When the main agent last wrote the record. `session show` lists what the
+   * side model recorded since then, so the agent can add or correct its own
+   * decisions there; null until the agent's first write.
+   */
+  agentWroteAt: IsoDate.nullable().default(null),
   /**
    * Project-relative files the PreToolUse hook has already told this session
    * about (Story 10.4): the "tried before" note is once per file per session,
@@ -24162,8 +24200,13 @@ async function readCommitThought(root, ref, env) {
 }
 function earliestSessionStart(sessions) {
   let earliest;
+  const consider = (at) => {
+    if (at === void 0 || Number.isNaN(Date.parse(at))) return;
+    if (earliest === void 0 || Date.parse(at) < Date.parse(earliest)) earliest = at;
+  };
   for (const session of sessions) {
-    if (earliest === void 0 || session.startedAt < earliest) earliest = session.startedAt;
+    consider(session.startedAt);
+    for (const node2 of session.nodes) consider(node2.at);
   }
   return earliest;
 }
@@ -25529,6 +25572,7 @@ function emptyState() {
     turnsSinceUpdate: 0,
     recordUpdatedAt: null,
     turnsSinceSide: 0,
+    agentWroteAt: null,
     notedFiles: []
   };
 }
@@ -25560,14 +25604,15 @@ async function onSessionEnd(ctx) {
   if (!config2.sessionEndCatchUp) return void 0;
   const messages = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
   if (!messages || messages.length === 0) return void 0;
-  ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "--close", "-C", ctx.root]);
+  const review = config2.recorder === "mixed" ? ["--review"] : [];
+  ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "--close", ...review, "-C", ctx.root]);
   return void 0;
 }
 
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "1.2.0",
+  version: "1.2.1",
   description: "Git for the intent behind agent-written code.",
   license: "MIT",
   keywords: [
@@ -26271,6 +26316,7 @@ function emptyState2() {
     turnsSinceUpdate: 0,
     recordUpdatedAt: null,
     turnsSinceSide: 0,
+    agentWroteAt: null,
     notedFiles: []
   };
 }
@@ -26419,6 +26465,7 @@ function countTurn(state, recordUpdatedAt, everyTurns, opts = {}) {
     turnsSinceUpdate: 0,
     recordUpdatedAt,
     turnsSinceSide: 0,
+    agentWroteAt: null,
     notedFiles: []
   };
   const changed = cur.recordUpdatedAt !== recordUpdatedAt;
@@ -26462,7 +26509,9 @@ async function onStop(ctx) {
       const next = countTurn(cur, recordUpdatedAt, config2.updateEveryTurns, {
         // In agent mode the side model runs only at session end (Story 12.1).
         ...config2.recorder === "agent" ? {} : { sideEveryTurns: config2.sideEveryTurns },
-        askAgent: config2.recorder !== "side",
+        // Quality no longer stops the agent mid-chat: the session's own model
+        // reviews the record at the session end instead (sessionend.ts).
+        askAgent: config2.recorder === "agent",
         ...lastRecordedBy === void 0 ? {} : { lastRecordedBy }
       });
       request = next.request;
@@ -26922,6 +26971,8 @@ export {
   commitBetween,
   gitHooksDir,
   Config,
+  STATE_SCHEMA,
+  HookState,
   loadProject,
   updateProject,
   loadSession,
@@ -26932,6 +26983,7 @@ export {
   updateConfig,
   loadRegistry,
   updateRegistry,
+  updateState,
   readSessionHead,
   readThoughtTrailers,
   readCommitThought,

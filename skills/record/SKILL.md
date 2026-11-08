@@ -15,7 +15,8 @@ The current record (`cogit session show`):
 - `initialized: false`: reply exactly "cogit is not set up in this project yet; run
   `npx @cogit/cli init` here first." and stop.
 - `sessionError`: quote it and stop; never write over the record.
-- Nothing new or changed (`newMessages` empty): reply "cogit is up to date." and stop.
+- Nothing new or changed (`newMessages` and `sideRecorded` both empty): reply "cogit is up to
+  date." and stop.
 
 ## Look something up
 
@@ -63,6 +64,15 @@ transcript is unreadable: send only `status`.
 - Your work belongs to the message that caused it: `work`, `agentDecisions`
   (`{ "title", "why", "alternatives" }`), `commits` (short hashes), `files` (a few paths).
   Work spanning messages goes on the one it ended in; update an earlier node only to correct it.
+
+## What the side model recorded
+
+`sideRecorded` lists the messages a small background model recorded since you last wrote, with
+the decisions it put down as yours. It reads the chat from the outside; you did the work. For
+each one, add a technical decision of yours it missed (an approach you chose in the code, a
+pitfall you found, what you tried and dropped, and why) or correct one it got wrong, by
+resending that node with its `id`, `kind`, `title` and the full `agentDecisions`. Leave the
+others alone; never resend one only to confirm it.
 
 ## Parents
 
