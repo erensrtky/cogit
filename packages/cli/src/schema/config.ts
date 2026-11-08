@@ -16,8 +16,8 @@ export const Config = z.object({
   sessionEndCatchUp: z.boolean().default(true),
   /**
    * Who writes the record (Story 12.1): the main agent (`agent`), both (`mixed`,
-   * "Quality" in the panel and the default: a side model often, the agent every
-   * 15 turns with the technical reasons only it knows), or only the side model
+   * "Quality" in the panel and the default: a side model often, and the session's
+   * own model once at session end with the technical reasons only it knows), or only the side model
    * (`side`, "Economical": the agent is never interrupted, its reasons are read
    * from the outside). The session-end pass writes the branches in both.
    */
