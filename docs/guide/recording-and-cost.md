@@ -17,7 +17,7 @@ the agent wrote.
 
 | `recorder` | Panel | What happens | Cost in our sessions |
 |---|---|---|---|
-| `mixed` (default) | Quality | The side model records every 5 turns (`sideEveryTurns`), and the agent checks in every 15 turns (`updateEveryTurns`) to add its own technical decisions | about 1–2% of a session's tokens |
+| `mixed` (default) | Quality | The side model records every 5 turns (`sideEveryTurns`), the agent's technical decisions included, and the agent checks in every 15 turns (`updateEveryTurns`) to add or correct its own | about 1–2% of a session's tokens |
 | `side` | Economical | Only the side model records, every 5 turns; the agent is never asked | under 2 cents per 20 messages |
 | `agent` | (config only) | The agent records everything itself every `updateEveryTurns` turns | about 3–7%, more in short sessions |
 

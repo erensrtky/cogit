@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The map's Resume and Fork buttons carry a copy sign (⧉ Resume, ⧉ Fork): they copy the command for a terminal and never start Claude Code, which a bare "Resume" seemed to promise. The "Your turn" inbox no longer shows them; its link opens the map at the message.
 
 ### Fixed
+- In Quality (mixed) recording most messages got no agent decisions: the side model was told to leave them to the agent, but it records most messages before the agent's turn and the agent only sees the ones still unrecorded. The side model now writes the agent's technical decisions in every mode; the agent can still replace them, and a later side run never takes the agent's back.
 - A commit hash from another repository, pasted into the chat, could be recorded as one of the session's commits. `cogit session write` now keeps only commits this repository has and warns about the rest.
 - A commit made before cogit first wrote the session's record (as with short sessions recorded only when they close) lost its thought: `cogit pr`, `cogit log`, `cogit blame` and the map read `Thought:` trailers only from the record's write time on, so `cogit pr` listed the commit with no thought and the PR Action stayed silent. They now read from the session's first message, and `cogit pr` dates sessions by their messages.
 - `cogit pr --install-action` in a clone where cogit was never set up now says to run `cogit init` first, instead of asking to share records the project does not have yet.

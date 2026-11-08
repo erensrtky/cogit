@@ -140,10 +140,12 @@ describe("catchUpPrompt", () => {
     expect(prompt).toContain("decidedBy");
     // A closing pass once left a session untitled, so the map showed its bare id.
     expect(prompt).toContain("when the record's title is empty, send one");
-    // The periodic mixed run writes messages and user decisions only.
+    // The periodic mixed run writes messages, user decisions and the agent's
+    // technical decisions; the status and branch summaries stay the agent's.
     const mixed = catchUpPrompt([turn], undefined, "s1", "auto", false, "mixed");
     expect(mixed).toContain("periodic background run");
-    expect(mixed).toContain("Do not send status, branch summaries or agentDecisions");
+    expect(mixed).toContain("the agent's technical decisions (agentDecisions)");
+    expect(mixed).toContain("Do not send status or branch summaries");
     expect(mixed).toContain("and the session title when it is empty");
     const side = catchUpPrompt([turn], undefined, "s1", "auto", false, "side");
     expect(side).not.toContain("periodic background run");
@@ -379,7 +381,7 @@ describe("writableAnswer", () => {
     expect(dropped).toBe(1);
   });
 
-  it("in mixed mode leaves out the agent's fields, not the message", () => {
+  it("in mixed mode leaves out the status and branch summary, not the agent's decisions", () => {
     const { payload, dropped } = writableAnswer(
       {
         status: { goal: "kept only for a sole owner" },
@@ -395,8 +397,19 @@ describe("writableAnswer", () => {
       },
       "mixed",
     );
-    expect(payload).toEqual({ nodes: [{ id: "m1", kind: "message", title: "Start the parser" }] });
-    expect(dropped).toBe(2);
+    // The side model records most messages before the agent's turn, so the
+    // decisions it finds stay; the agent may replace them later.
+    expect(payload).toEqual({
+      nodes: [
+        {
+          id: "m1",
+          kind: "message",
+          title: "Start the parser",
+          agentDecisions: [{ title: "Plain JS" }],
+        },
+      ],
+    });
+    expect(dropped).toBe(1);
   });
 
   it("still drops a node it cannot read at all", () => {

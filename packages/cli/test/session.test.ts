@@ -132,6 +132,47 @@ describe("session write", () => {
       expect((await stored()).lastRecordedBy).toBe("side");
     });
 
+    it("lets the side model write the agent's decisions until the agent corrects them", async () => {
+      // Quality: the side model records the message first and finds a decision.
+      await side({
+        sessionId: "s1",
+        nodes: [
+          {
+            id: "m1",
+            kind: "message",
+            parent: null,
+            title: "Fix the window",
+            agentDecisions: [{ title: "Read from the first message", why: "side reading" }],
+          },
+        ],
+      });
+      expect(await node("m1")).toMatchObject({
+        agentDecisions: [{ title: "Read from the first message" }],
+        by: { agentDecisions: "side" },
+      });
+      // The agent knows better and replaces it.
+      const own = [{ title: "Fix it once in earliestSessionStart", why: "four callers share it" }];
+      await write({
+        sessionId: "s1",
+        nodes: [{ id: "m1", kind: "message", title: "Fix the window", agentDecisions: own }],
+      });
+      // A later side run never takes it back.
+      await side({
+        sessionId: "s1",
+        nodes: [
+          {
+            id: "m1",
+            kind: "message",
+            title: "Fix the window",
+            agentDecisions: [{ title: "Again", why: "side" }],
+          },
+        ],
+      });
+      const m1 = await node("m1");
+      expect(m1?.agentDecisions).toEqual(own);
+      expect(m1?.by?.agentDecisions).toBeUndefined();
+    });
+
     it("keeps the agent's Shape until the user asks for a new one by hand", async () => {
       const shape = (kind: string, text: string) => ({ tools: [{ kind, text }], commits: [] });
       await write({

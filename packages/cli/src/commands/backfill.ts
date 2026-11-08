@@ -90,7 +90,7 @@ function rules(language: string, messageSummaries: boolean, recorder: RecordMode
   ];
   if (recorder === "mixed") {
     lines.push(
-      "- This is a periodic background run: send only message nodes with their titles, parents and user decisions, and the session title when it is empty. Do not send status, branch summaries or agentDecisions; the main agent owns those.",
+      "- This is a periodic background run: send message nodes with their titles, parents, user decisions and the agent's technical decisions (agentDecisions), and the session title when it is empty. Do not send status or branch summaries; the main agent owns those, and it may correct the decisions you write.",
     );
   }
   return lines.join("\n");
@@ -353,14 +353,16 @@ function summaryAsText(node: unknown): unknown {
 }
 
 /**
- * In mixed mode the side model may not write a branch summary or the agent's
- * decisions: those fields are left out, and the rest of the node is kept.
+ * In mixed mode the side model may not write a branch summary: it is left out,
+ * and the rest of the node is kept. The agent's decisions it may write: the
+ * side model records most messages before the agent's turn comes, and the
+ * agent only sees the ones still unrecorded, so leaving them to the agent left
+ * most messages without any. The agent can still replace what it writes.
  */
 function ownedFields(node: unknown, soleOwner: boolean): { node: unknown; removed: number } {
   if (soleOwner || typeof node !== "object" || node === null) return { node, removed: 0 };
-  const { branch, agentDecisions, ...rest } = node as Record<string, unknown>;
-  const removed = (branch === undefined ? 0 : 1) + (agentDecisions === undefined ? 0 : 1);
-  return { node: removed === 0 ? node : rest, removed };
+  const { branch, ...rest } = node as Record<string, unknown>;
+  return branch === undefined ? { node, removed: 0 } : { node: rest, removed: 1 };
 }
 
 export async function backfillTail(
