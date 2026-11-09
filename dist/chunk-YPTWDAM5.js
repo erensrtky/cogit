@@ -21160,6 +21160,8 @@ function projectPaths(root) {
     mapView: join6(base, "state", "map.json"),
     /** The curated captured-work list (Story 15.1); local, never committed. */
     captures: join6(base, "state", "captures.json"),
+    /** What cogit's own headless runs cost, one line per run; local. */
+    spend: join6(base, "state", "spend.jsonl"),
     /** What the detached hook children (build, side run) printed; local, capped. */
     detachedLog: join6(base, "state", "detached.log"),
     /** What the record refs last looked like, and what waits to be sent; local. */
@@ -21168,6 +21170,8 @@ function projectPaths(root) {
     hooksOff: join6(base, "state", "hooks-off"),
     /** Present once `cogit pr` has suggested the pull request Action; local. */
     actionHint: join6(base, "state", "action-hint"),
+    /** The code graph engine's file links, cut down for hooks; rebuilt when the graph changes; local. */
+    graphIndex: join6(base, "state", "graph-index.json"),
     /** Commits waiting for their message's record before a Shape; local. */
     shapeQueue: join6(base, "state", "shape-queue"),
     locks: join6(base, "locks"),
@@ -21257,7 +21261,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-WQCZGAYX.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-LOFPKAAA.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -25612,7 +25616,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "1.2.1",
+  version: "1.3.0",
   description: "Git for the intent behind agent-written code.",
   license: "MIT",
   keywords: [
