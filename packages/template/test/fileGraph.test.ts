@@ -11,6 +11,7 @@ import {
   layoutFileGraph,
   SHARED_LINKS,
   thoughtGraph,
+  withCommits,
 } from "../src/fileGraph.js";
 
 function hit(messageId: string, sessionId = "s1"): ViewFileHit {
@@ -216,5 +217,48 @@ describe("the thoughts-only picture", () => {
     const first = layoutFileGraph(graph);
     expect(first).toEqual(layoutFileGraph(graph));
     for (const node of first) expect(Number.isFinite(node.x) && Number.isFinite(node.y)).toBe(true);
+  });
+});
+
+describe("the commits layer", () => {
+  const landed = (messageId: string, commits: string[]) => ({ ...hit(messageId), commits });
+  const recorded = [
+    file("src/a.ts", [landed("m1", ["aaaaaaa1234"]), landed("m2", [])]),
+    file("src/b.ts", [landed("m1", ["aaaaaaa1234", "bbbbbbb"])]),
+  ];
+  const full = buildFileGraph(recorded, [{ from: "src/a.ts", to: "src/b.ts" }], "src/a.ts");
+
+  it("knows which thoughts landed which commits, and which files they changed", () => {
+    const m1 = full.nodes.find((node) => node.id === "s1:m1");
+    expect(m1?.commits).toEqual(["aaaaaaa", "bbbbbbb"]);
+    expect(full.nodes.find((node) => node.id === "s1:m2")?.commits).toBeUndefined();
+    expect(full.nodes.find((node) => node.id === "src/b.ts")?.commits).toEqual([
+      "aaaaaaa",
+      "bbbbbbb",
+    ]);
+  });
+
+  it("adds a square per commit, tied to its thought and the files it changed", () => {
+    const graph = withCommits(full);
+    expect(graph.nodes.filter((node) => node.kind === "commit").map((node) => node.id)).toEqual([
+      "commit:aaaaaaa",
+      "commit:bbbbbbb",
+    ]);
+    expect(graph.edges.filter((edge) => edge.kind === "landed")).toEqual([
+      { from: "s1:m1", to: "commit:aaaaaaa", kind: "landed" },
+      { from: "s1:m1", to: "commit:bbbbbbb", kind: "landed" },
+    ]);
+    expect(graph.edges.filter((edge) => edge.kind === "changed")).toEqual([
+      { from: "commit:aaaaaaa", to: "src/a.ts", kind: "changed" },
+      { from: "commit:aaaaaaa", to: "src/b.ts", kind: "changed" },
+      { from: "commit:bbbbbbb", to: "src/b.ts", kind: "changed" },
+    ]);
+    // Without the files drawn there is nothing for a commit to point at but its thought.
+    const thoughts = withCommits(thoughtGraph(full, "src/a.ts"));
+    expect(thoughts.edges.some((edge) => edge.kind === "changed")).toBe(false);
+    // Laid out beside their thought, the same every time.
+    const nodes = layoutFileGraph(graph);
+    expect(nodes).toEqual(layoutFileGraph(graph));
+    for (const node of nodes) expect(Number.isFinite(node.x) && Number.isFinite(node.y)).toBe(true);
   });
 });

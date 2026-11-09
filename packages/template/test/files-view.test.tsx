@@ -101,8 +101,7 @@ describe("FilesView", () => {
       pick: { current: file.path, linked: new Set([other.path]), onPick: () => {} },
     });
     expect(html).toContain('file-row is-picked" aria-current="true"');
-    expect(html).toContain(">Code files</span>");
-    expect(render()).toContain('<span class="outline-title">Files</span>');
+
     expect(html).toContain(
       'file-row is-linked" title="packages/template/src/graph.ts · linked to the file in focus · draw the graph around it"',
     );

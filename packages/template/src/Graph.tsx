@@ -976,7 +976,17 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
             />
           ) : showFiles ? (
             <FilesView
-              files={layout === "graph" ? graphList : model.files}
+              files={
+                // Code files in both views; a file a card asked about stays reachable.
+                layout === "git" &&
+                filesFocus !== null &&
+                !graphList.some((file) => file.path === filesFocus.path)
+                  ? [
+                      ...graphList,
+                      ...(model.files ?? []).filter((file) => file.path === filesFocus.path),
+                    ]
+                  : graphList
+              }
               pick={
                 layout === "graph"
                   ? { current: graphCurrent, linked: graphLinked, onPick: setGraphFocus }

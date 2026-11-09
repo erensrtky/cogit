@@ -121,8 +121,10 @@ Sessions older than a day (`inboxMaxAgeDays`) leave the inbox; the map still has
 
 ## Files
 
-The Files view lists every file a recorded message touched, most recently first, with a
-count. Opening a file lists the messages that changed it; opening one of those jumps to it on
+The Files view lists every code file a recorded message touched, most recently first, with a
+count. Documents, config, lockfiles and build folders are left out, by the code graph when the
+project has one and by name when it does not (see the Graph view below); `cogit log --file`
+still answers for any path, and a file a message's card opens is shown either way. Opening a file lists the messages that changed it; opening one of those jumps to it on
 the map. In the terminal: `cogit log --file <path>` and `cogit why <path>`.
 
 ## Graph view
@@ -138,12 +140,16 @@ gather in the middle. Each thought keeps its three strongest links. **Show files
 too: the focus in the middle, its linked files around it with their imports, and each thought
 tied to the files it touched.
 
+A ringed thought landed a commit. **Show commits** draws each commit as a square tied to the
+thought that landed it and, with the files drawn, to the files it changed; clicking one opens
+that thought's card.
+
 Switching to the Graph view opens the **Files** panel, which picks the file there: a row
 moves the graph to that file and opens its history; the file in focus is highlighted and the
 files linked to it are marked. Type to filter. With the files drawn, clicking one works too. The list holds code only: the files the code
 graph has as code, so documents, config, lockfiles and anything `.gitignore` keeps out of the
 graph stay out. Without a graph it leaves out config, lockfiles, dotfiles and dependency or
-build folders by name. A changed file in a message's card
+build folders by name. The git view's Files list is the same. A changed file in a message's card
 moves there too. Clicking a thought opens its card, the same one the git view opens, and
 lights the thoughts or files it is linked to. Drag to move, the wheel to zoom, a double click
 to fit. A linked file brings its six newest thoughts; the focus file brings all of its own.

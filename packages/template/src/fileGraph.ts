@@ -10,7 +10,7 @@ import type { ViewFile, ViewFileHit, ViewFileLink } from "../../cli/src/view/mod
 /** Messages shown per linked file; the focus file shows all of its own. */
 export const LINKED_MESSAGES = 6;
 
-export type GraphNodeKind = "file" | "message";
+export type GraphNodeKind = "file" | "message" | "commit";
 
 export interface GraphNode {
   /** A file's path, or `sessionId:messageId` for a message. */
@@ -25,6 +25,11 @@ export interface GraphNode {
   count?: number;
   /** Messages: the hit it came from. */
   hit?: ViewFileHit;
+  /**
+   * Messages: the commits they landed on the shown files; files: the commits
+   * of the shown messages that changed them. Short hashes.
+   */
+  commits?: string[];
   /** Messages: touched the focus file itself. */
   direct?: boolean;
 }
@@ -34,9 +39,10 @@ export interface GraphEdge {
   to: string;
   /**
    * `import` between two files, `touch` from a message to a file, `share`
-   * between two messages that touched the same files.
+   * between two messages that touched the same files, `landed` from a message
+   * to a commit it made, `changed` from a commit to a file it changed.
    */
-  kind: "import" | "touch" | "share";
+  kind: "import" | "touch" | "share" | "landed" | "changed";
   /** `share`: how many files the two messages have in common. */
   weight?: number;
 }
@@ -149,16 +155,53 @@ export function buildFileGraph(
       edges.push({ from: id, to: path, kind: "touch" });
     }
   }
-  // A message also links to every shown file it touched, even past a file's limit.
+  // A message also links to every shown file it touched, even past a file's
+  // limit, and both sides learn the commits that joined them.
+  const fileNode = new Map(nodes.map((node) => [node.id, node]));
+  const add = (node: GraphNode, hashes: readonly string[]) => {
+    if (hashes.length > 0) node.commits = [...new Set([...(node.commits ?? []), ...hashes])];
+  };
   for (const path of shown)
     for (const hit of byPath.get(path)?.hits ?? []) {
       const id = messageId(hit);
-      if (!messages.has(id)) continue;
-      if (path === focus) (messages.get(id) as GraphNode).direct = true;
+      const message = messages.get(id);
+      if (message === undefined) continue;
+      if (path === focus) message.direct = true;
       if (!edges.some((edge) => edge.from === id && edge.to === path))
         edges.push({ from: id, to: path, kind: "touch" });
+      const short = hit.commits.map((hash) => hash.slice(0, 7));
+      add(message, short);
+      add(fileNode.get(path) as GraphNode, short);
     }
   return { nodes: [...nodes, ...messages.values()], edges, hidden };
+}
+
+/**
+ * The commits layer: one square per commit the shown thoughts landed, tied to
+ * the thought that made it and, when the files are drawn, to the files it
+ * changed among them.
+ */
+export function withCommits(graph: FileGraph): FileGraph {
+  const commits = new Map<string, GraphNode>();
+  const edges: GraphEdge[] = [];
+  const files = graph.nodes.filter((node) => node.kind === "file");
+  for (const node of graph.nodes) {
+    if (node.kind !== "message") continue;
+    for (const hash of node.commits ?? []) {
+      const id = `commit:${hash}`;
+      if (!commits.has(id)) {
+        commits.set(id, { id, kind: "commit", x: 0, y: 0, r: 4.5, commits: [hash] });
+        for (const file of files)
+          if (file.commits?.includes(hash)) edges.push({ from: id, to: file.id, kind: "changed" });
+      }
+      edges.push({ from: node.id, to: id, kind: "landed" });
+    }
+  }
+  return {
+    nodes: [...graph.nodes, ...commits.values()],
+    edges: [...graph.edges, ...edges],
+    hidden: graph.hidden,
+  };
 }
 
 /** The strongest links each thought keeps in the thoughts-only picture. */
@@ -205,11 +248,13 @@ export function thoughtGraph(graph: FileGraph, focus: string): FileGraph {
 }
 
 const ITERATIONS = 300;
-const CHARGE = { file: 1400, message: 90 } as const;
+const CHARGE = { file: 1400, message: 90, commit: 40 } as const;
 const LINK = {
   import: { distance: 200, strength: 0.4 },
   touch: { distance: 60, strength: 0.35 },
   share: { distance: 70, strength: 0.15 },
+  landed: { distance: 26, strength: 0.6 },
+  changed: { distance: 90, strength: 0.05 },
 } as const;
 
 /**
@@ -242,6 +287,16 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
     node.x = cx + Math.cos(angle) * radius;
     node.y = cy + Math.sin(angle) * radius;
   });
+  // A commit starts beside the thought that landed it.
+  for (const edge of graph.edges) {
+    if (edge.kind !== "landed") continue;
+    const message = nodes[index.get(edge.from) as number];
+    const commit = nodes[index.get(edge.to) as number];
+    if (message === undefined || commit === undefined || commit.x !== 0 || commit.y !== 0) continue;
+    const angle = (index.get(edge.to) as number) * 2.399963;
+    commit.x = message.x + Math.cos(angle) * 20;
+    commit.y = message.y + Math.sin(angle) * 20;
+  }
 
   // Thoughts alone carry a title under each dot, so they keep more room.
   const thoughtsOnly = !nodes.some((node) => node.kind === "file");

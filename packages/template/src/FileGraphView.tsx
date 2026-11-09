@@ -8,6 +8,7 @@ import {
   graphFiles,
   layoutFileGraph,
   thoughtGraph,
+  withCommits,
 } from "./fileGraph.js";
 import {
   clampPan,
@@ -61,15 +62,17 @@ export function FileGraphView({
     focus !== null && list.some((file) => file.path === focus) ? focus : defaultFocus(list, links);
   // Thoughts only by default; the Files switch draws the files and their imports too.
   const [showFiles, setShowFiles] = useState(filesAtStart);
+  // The commits layer: a square per commit, tied to the thought that landed it.
+  const [showCommits, setShowCommits] = useState(false);
   const full = useMemo(
     () => (current === undefined ? null : buildFileGraph(list, links, current)),
     [list, links, current],
   );
-  const graph = useMemo(
-    () =>
-      full === null || current === undefined || showFiles ? full : thoughtGraph(full, current),
-    [full, current, showFiles],
-  );
+  const graph = useMemo(() => {
+    if (full === null || current === undefined) return null;
+    const base = showFiles ? full : thoughtGraph(full, current);
+    return showCommits ? withCommits(base) : base;
+  }, [full, current, showFiles, showCommits]);
   const nodes = useMemo(() => (graph === null ? [] : layoutFileGraph(graph)), [graph]);
   const bounds = useMemo(() => graphBounds(nodes), [nodes]);
   const at = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
@@ -154,6 +157,10 @@ export function FileGraphView({
       if (edge.from === activeId) lit.add(edge.to);
       if (edge.kind === "share" && edge.to === activeId) lit.add(edge.from);
     }
+    // The files a lit commit changed light up with it.
+    for (const edge of graph.edges) {
+      if (edge.kind === "changed" && lit.has(edge.from)) lit.add(edge.to);
+    }
   }
   const fileNodes = (full?.nodes ?? []).filter((node) => node.kind === "file");
   const linkedFiles = fileNodes.length - 1;
@@ -161,7 +168,12 @@ export function FileGraphView({
   const click = (node: GraphNode) => {
     if (dragged.current) return;
     if (node.kind === "file") onFocus(node.id);
-    else if (node.hit !== undefined)
+    else if (node.kind === "commit") {
+      // A commit opens the thought that landed it.
+      const from = graph.edges.find((edge) => edge.kind === "landed" && edge.to === node.id);
+      const hit = from === undefined ? undefined : at.get(from.from)?.hit;
+      if (hit !== undefined) onSelect({ sessionId: hit.sessionId, messageId: hit.messageId });
+    } else if (node.hit !== undefined)
       onSelect({ sessionId: node.hit.sessionId, messageId: node.hit.messageId });
   };
 
@@ -179,6 +191,17 @@ export function FileGraphView({
               onChange={(event) => setShowFiles(event.target.checked)}
             />
             Show files
+          </label>
+          <label
+            className="file-graph-show"
+            title="Draw the commits the thoughts landed, each tied to its thought"
+          >
+            <input
+              type="checkbox"
+              checked={showCommits}
+              onChange={(event) => setShowCommits(event.target.checked)}
+            />
+            Show commits
           </label>
           <span className="file-graph-focus">{current}</span>
           <span className="file-graph-meta">
@@ -213,7 +236,9 @@ export function FileGraphView({
                     edge.kind === "import" && (edge.from === current || edge.to === current);
                   const on =
                     activeId !== null &&
-                    (edge.from === activeId || (edge.kind === "share" && edge.to === activeId));
+                    (edge.from === activeId ||
+                      (edge.kind === "share" && edge.to === activeId) ||
+                      (edge.kind === "changed" && lit.has(edge.from)));
                   const direct = edge.kind === "touch" && edge.to === current;
                   return (
                     <line
@@ -249,10 +274,38 @@ export function FileGraphView({
                         ? `${node.id} · ${node.count} message${node.count === 1 ? "" : "s"}${
                             node.role === "focus" ? "" : ` · ${node.role}`
                           }`
-                        : `${node.hit?.title ?? ""}\n${node.hit?.sessionTitle ?? ""} · ${node.hit?.label ?? ""}`}
+                        : node.kind === "commit"
+                          ? `commit ${node.commits?.[0] ?? ""}`
+                          : `${node.hit?.title ?? ""}\n${node.hit?.sessionTitle ?? ""} · ${node.hit?.label ?? ""}${
+                              node.commits?.length ? `\ncommits: ${node.commits.join(" ")}` : ""
+                            }`}
                     </title>
-                    <circle cx={node.x} cy={node.y} r={node.r} />
-                    {node.kind === "file" ? (
+                    {node.kind === "commit" ? (
+                      <rect
+                        x={node.x - node.r}
+                        y={node.y - node.r}
+                        width={node.r * 2}
+                        height={node.r * 2}
+                      />
+                    ) : (
+                      <circle cx={node.x} cy={node.y} r={node.r} />
+                    )}
+                    {node.kind === "message" && node.commits?.length ? (
+                      // A ring: this thought landed code.
+                      <circle className="fg-ring" cx={node.x} cy={node.y} r={node.r + 3} />
+                    ) : null}
+                    {node.kind === "commit" ? (
+                      lit.has(node.id) ? (
+                        <text
+                          className="fg-label"
+                          x={node.x}
+                          y={node.y + node.r + 11}
+                          textAnchor="middle"
+                        >
+                          {node.commits?.[0]}
+                        </text>
+                      ) : null
+                    ) : node.kind === "file" ? (
                       <text x={node.x} y={node.y - node.r - 6} textAnchor="middle">
                         {shortName(node.id)}
                       </text>
@@ -287,6 +340,10 @@ export function FileGraphView({
                   <i className="lg-import" />
                   imports
                 </span>
+                <span>
+                  <i className="lg-landed" />
+                  landed a commit
+                </span>
                 <span>click a file to move there · drag · wheel to zoom</span>
               </>
             ) : (
@@ -302,6 +359,10 @@ export function FileGraphView({
                 <span>
                   <i className="lg-import" />
                   shared files (thicker = more)
+                </span>
+                <span>
+                  <i className="lg-landed" />
+                  landed a commit
                 </span>
                 <span>drag · wheel to zoom</span>
               </>

@@ -76,6 +76,17 @@ describe("the Graph view", () => {
     expect(render({ filesAtStart: true })).not.toContain('class="fg-label"');
   });
 
+  it("rings the thoughts that landed a commit", () => {
+    const withCommit: ViewFile[] = [
+      { path: "src/thought.ts", count: 1, hits: [{ ...hit("m1"), commits: ["abc1234"] }] },
+    ];
+    const html = render({ files: withCommit, links: undefined });
+    expect(html).toContain('class="fg-ring"');
+    expect(html).toContain("commits: abc1234");
+    expect(html).toContain('<input type="checkbox"/>Show commits');
+    expect(render()).not.toContain('class="fg-ring"');
+  });
+
   it("says when there is no code graph, and when nothing was recorded", () => {
     expect(render({ links: undefined, focus: "src/git.ts" })).toContain(
       "1 message; no code graph, so no linked files",

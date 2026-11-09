@@ -105,16 +105,12 @@ export function FilesView({
   return (
     <nav className="outline files-view" aria-label="File history">
       <header className="outline-head">
-        {pick === undefined ? (
-          <span className="outline-title">Files</span>
-        ) : (
-          <span
-            className="outline-title"
-            title="Only the files the code graph has as code; the git view's Files list every recorded file"
-          >
-            Code files
-          </span>
-        )}
+        <span
+          className="outline-title"
+          title="Code files only: documents, config, lockfiles and build folders are left out"
+        >
+          Files
+        </span>
         <span className="outline-badge">{every.length}</span>
         <button type="button" className="drilldown-close" aria-label="Hide files" onClick={onClose}>
           ×
