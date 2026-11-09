@@ -55,6 +55,7 @@ describe("the code graph engine", () => {
   it("keeps file-to-file import links inside the project", () => {
     const index = indexGraph(root, graphOf(root));
     expect(index.builtAt).toBe("abc1234");
+    expect(index.code).toEqual(["src/log.ts", "src/pr.ts", "src/thought.ts"]);
     expect(index.links).toEqual({
       "src/log.ts": { imports: ["src/thought.ts"], importedBy: ["src/pr.ts"] },
       "src/pr.ts": { imports: ["src/log.ts", "src/thought.ts"], importedBy: [] },
@@ -84,18 +85,31 @@ describe("the code graph engine", () => {
     expect(await graphify.related(root, "src/log.ts")).toBeUndefined();
   });
 
-  it("lists the import links among the files the map asks about", async () => {
-    expect(await graphify.links(root, ["src/pr.ts"])).toBeUndefined();
-    await writeGraph(graphOf(root));
-    expect(await graphify.links(root, ["src/pr.ts", "src/log.ts", "src/thought.ts"])).toEqual([
-      { from: "src/pr.ts", to: "src/log.ts" },
-      { from: "src/pr.ts", to: "src/thought.ts" },
-      { from: "src/log.ts", to: "src/thought.ts" },
-    ]);
-    // A file the map does not list is left out at both ends.
-    expect(await graphify.links(root, ["src/pr.ts", "src/log.ts", "README.md"])).toEqual([
-      { from: "src/pr.ts", to: "src/log.ts" },
-    ]);
+  it("tells the map which recorded files are code, and the imports among them", async () => {
+    expect(await graphify.codeLinks(root, ["src/pr.ts"])).toBeUndefined();
+    await writeGraph({
+      ...graphOf(root),
+      nodes: [
+        ...graphOf(root).nodes,
+        { id: "readme", source_file: "README.md", file_type: "document" },
+      ],
+    });
+    expect(await graphify.codeLinks(root, ["src/pr.ts", "src/log.ts", "src/thought.ts"])).toEqual({
+      files: ["src/pr.ts", "src/log.ts", "src/thought.ts"],
+      links: [
+        { from: "src/pr.ts", to: "src/log.ts" },
+        { from: "src/pr.ts", to: "src/thought.ts" },
+        { from: "src/log.ts", to: "src/thought.ts" },
+      ],
+    });
+    // A document, a file the graph does not have (config, a lockfile) and a
+    // file the map does not ask about are all left out.
+    expect(
+      await graphify.codeLinks(root, ["src/pr.ts", "src/log.ts", "README.md", "package.json"]),
+    ).toEqual({
+      files: ["src/pr.ts", "src/log.ts"],
+      links: [{ from: "src/pr.ts", to: "src/log.ts" }],
+    });
   });
 
   it("reports whether the engine is installed and the project has a graph", async () => {

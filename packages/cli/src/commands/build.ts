@@ -383,11 +383,14 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       // its commits, so a message the agent listed no paths for still lands.
       built.files = buildFileHistory(modelSessions(built), commits.files);
       // The Graph view links those files by their imports when there is a code graph.
-      const fileLinks = await defaultGraphEngine().links(
+      const code = await defaultGraphEngine().codeLinks(
         root,
         built.files.map((file) => file.path),
       );
-      if (fileLinks !== undefined) built.fileLinks = fileLinks;
+      if (code !== undefined) {
+        built.codeFiles = code.files;
+        built.fileLinks = code.links;
+      }
       // Story 15.1: the curated captured-work list, from the local store the
       // distiller and the CLI write. A corrupt or missing file is an empty list.
       built.captures = (await readCaptures(root, io.warn)).items;

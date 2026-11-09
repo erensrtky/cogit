@@ -5,6 +5,7 @@ import {
   defaultFocus,
   type GraphNode,
   graphBounds,
+  graphFiles,
   layoutFileGraph,
   thoughtGraph,
 } from "./fileGraph.js";
@@ -23,9 +24,12 @@ export interface GraphTarget {
 }
 
 const shortName = (path: string): string => path.split("/").pop() ?? path;
+/** A thought's title under its dot, short enough to leave room for its neighbours. */
+const clip = (title: string): string => (title.length > 24 ? `${title.slice(0, 23)}…` : title);
 
 export function FileGraphView({
   files,
+  codeFiles,
   links,
   focus,
   active,
@@ -34,6 +38,8 @@ export function FileGraphView({
   filesAtStart = false,
 }: {
   files: readonly ViewFile[] | undefined;
+  /** The recorded files the code graph has as code; undefined without a graph. */
+  codeFiles?: readonly string[] | undefined;
   links: readonly ViewFileLink[] | undefined;
   focus: string | null;
   active: GraphTarget | null;
@@ -42,7 +48,7 @@ export function FileGraphView({
   /** Open with the files drawn; the view opens on the thoughts alone otherwise. */
   filesAtStart?: boolean;
 }) {
-  const list = files ?? [];
+  const list = useMemo(() => graphFiles(files ?? [], codeFiles), [files, codeFiles]);
   const current =
     focus !== null && list.some((file) => file.path === focus) ? focus : defaultFocus(list, links);
   // Thoughts only by default; the Files switch draws the files and their imports too.
@@ -196,19 +202,24 @@ export function FileGraphView({
       </nav>
       <div className="file-graph-main">
         <div className="file-graph-bar">
-          <button
-            type="button"
-            className="outline-button file-graph-toggle"
-            aria-pressed={showFiles}
-            title={
-              showFiles
-                ? "Hide the files: only the thoughts, linked by the files they share"
-                : "Show the files and which imports which"
-            }
-            onClick={() => setShowFiles((value) => !value)}
-          >
-            Files
-          </button>
+          <span className="view-switch file-graph-mode" role="group" aria-label="Show">
+            <button
+              type="button"
+              aria-pressed={!showFiles}
+              title="Only the thoughts, linked when they touched the same files"
+              onClick={() => setShowFiles(false)}
+            >
+              Thoughts
+            </button>
+            <button
+              type="button"
+              aria-pressed={showFiles}
+              title="The thoughts with the files they touched and which file imports which"
+              onClick={() => setShowFiles(true)}
+            >
+              Thoughts + files
+            </button>
+          </span>
           <span className="file-graph-focus">{current}</span>
           <span className="file-graph-meta">
             {links === undefined
@@ -284,6 +295,16 @@ export function FileGraphView({
                     {node.kind === "file" ? (
                       <text x={node.x} y={node.y - node.r - 6} textAnchor="middle">
                         {shortName(node.id)}
+                      </text>
+                    ) : !showFiles || lit.has(node.id) ? (
+                      // Thoughts carry their title; with the files drawn, only the lit ones.
+                      <text
+                        className="fg-label"
+                        x={node.x}
+                        y={node.y + node.r + 11}
+                        textAnchor="middle"
+                      >
+                        {clip(node.hit?.title ?? "")}
                       </text>
                     ) : null}
                   </g>

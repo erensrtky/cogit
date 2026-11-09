@@ -21,6 +21,12 @@ export interface FileLink {
   to: string;
 }
 
+/** The code files among those asked about, and the imports between them. */
+export interface CodeLinks {
+  files: string[];
+  links: FileLink[];
+}
+
 /** What an engine can say about a project, for `init` and `doctor`. */
 export interface GraphStatus {
   /** The engine's command is on PATH. */
@@ -46,8 +52,9 @@ export interface GraphEngine {
    */
   related(root: string, file: string): Promise<RelatedFile[] | undefined>;
   /**
-   * The import links among `files` (`from` imports `to`), for the map's Graph
-   * view, or undefined when there is no graph to ask. Never throws.
+   * For the map's Graph view: which of `files` the graph has as code, and the
+   * import links among those (`from` imports `to`); undefined when there is no
+   * graph to ask. Never throws.
    */
-  links(root: string, files: readonly string[]): Promise<FileLink[] | undefined>;
+  codeLinks(root: string, files: readonly string[]): Promise<CodeLinks | undefined>;
 }

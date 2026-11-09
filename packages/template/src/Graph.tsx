@@ -973,6 +973,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
             {layout === "graph" ? (
               <FileGraphView
                 files={model.files}
+                codeFiles={model.codeFiles}
                 links={model.fileLinks}
                 focus={graphFocus}
                 active={

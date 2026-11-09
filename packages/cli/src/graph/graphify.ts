@@ -3,7 +3,7 @@ import { access, readFile, stat } from "node:fs/promises";
 import { delimiter, isAbsolute, join, relative, sep } from "node:path";
 import { atomicWriteJson, readJson } from "../store/fs.js";
 import { projectPaths } from "../store/paths.js";
-import type { FileLink, GraphEngine, GraphStatus, RelatedFile } from "./types.js";
+import type { CodeLinks, FileLink, GraphEngine, GraphStatus, RelatedFile } from "./types.js";
 
 /**
  * graphify (https://github.com/safishamsi/graphify) writes the graph to
@@ -13,7 +13,7 @@ import type { FileLink, GraphEngine, GraphStatus, RelatedFile } from "./types.js
  */
 const GRAPH = join("graphify-out", "graph.json");
 const LINK_RELATIONS = new Set(["imports", "imports_from"]);
-const INDEX_SCHEMA = 1;
+const INDEX_SCHEMA = 2;
 
 /** Per file: what it imports and what imports it, project-relative. */
 interface GraphIndex {
@@ -22,11 +22,13 @@ interface GraphIndex {
   mtimeMs: number;
   size: number;
   builtAt?: string;
+  /** Every project file the graph has code from: what the Graph view shows. */
+  code: string[];
   links: Record<string, { imports: string[]; importedBy: string[] }>;
 }
 
 interface RawGraph {
-  nodes?: { id?: unknown; source_file?: unknown }[];
+  nodes?: { id?: unknown; source_file?: unknown; file_type?: unknown }[];
   links?: { source?: unknown; target?: unknown; relation?: unknown }[];
   built_at_commit?: unknown;
 }
@@ -41,10 +43,15 @@ function projectFile(root: string, path: string): string | undefined {
 /** Cuts graphify's graph down to file-to-file import links. */
 export function indexGraph(root: string, raw: RawGraph): Omit<GraphIndex, "mtimeMs" | "size"> {
   const fileOf = new Map<string, string>();
+  const code = new Set<string>();
   for (const node of raw.nodes ?? []) {
     if (typeof node.id !== "string" || typeof node.source_file !== "string") continue;
     const file = projectFile(root, node.source_file);
-    if (file !== undefined) fileOf.set(node.id, file);
+    if (file === undefined) continue;
+    fileOf.set(node.id, file);
+    // graphify marks documents (README, CHANGELOG) apart from code; config,
+    // lockfiles and ignored folders never get a node at all.
+    if (node.file_type === undefined || node.file_type === "code") code.add(file);
   }
   const imports = new Map<string, Set<string>>();
   const importedBy = new Map<string, Set<string>>();
@@ -70,6 +77,7 @@ export function indexGraph(root: string, raw: RawGraph): Omit<GraphIndex, "mtime
   return {
     schema: INDEX_SCHEMA,
     ...(typeof raw.built_at_commit === "string" ? { builtAt: raw.built_at_commit } : {}),
+    code: [...code].sort(),
     links,
   };
 }
@@ -148,13 +156,16 @@ export const graphify: GraphEngine = {
     ];
   },
 
-  async links(root: string, files: readonly string[]): Promise<FileLink[] | undefined> {
+  async codeLinks(root: string, files: readonly string[]): Promise<CodeLinks | undefined> {
     const index = await loadIndex(root);
     if (index === undefined) return undefined;
-    const wanted = new Set(files);
-    const out: FileLink[] = [];
-    for (const from of files)
-      for (const to of index.links[from]?.imports ?? []) if (wanted.has(to)) out.push({ from, to });
-    return out;
+    const code = new Set(index.code);
+    const known = files.filter((file) => code.has(file));
+    const wanted = new Set(known);
+    const links: FileLink[] = [];
+    for (const from of known)
+      for (const to of index.links[from]?.imports ?? [])
+        if (wanted.has(to)) links.push({ from, to });
+    return { files: known, links };
   },
 };

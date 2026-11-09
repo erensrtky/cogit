@@ -54,6 +54,34 @@ export function isTestPath(path: string): boolean {
 }
 
 /**
+ * Without a code graph to say which files are code, the files a project
+ * rarely decides anything in, by name: lockfiles, config, dotfiles, version
+ * and licence files, and dependency or build folders.
+ */
+export function isNoiseFile(path: string): boolean {
+  const name = path.split("/").pop() ?? path;
+  return (
+    /(^|\/)(node_modules|dist|build|out|coverage|vendor)\//.test(path) ||
+    path.split("/").some((part) => part.startsWith(".")) ||
+    /\.(json|jsonc|ya?ml|toml|ini|lock|env|cfg|conf)$/i.test(name) ||
+    /^(VERSION|LICEN[CS]E(\..*)?|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/i.test(name)
+  );
+}
+
+/**
+ * The files the Graph view offers: the ones the code graph has as code, or,
+ * without a graph, every file that is not noise by name.
+ */
+export function graphFiles(
+  files: readonly ViewFile[],
+  codeFiles: readonly string[] | undefined,
+): ViewFile[] {
+  if (codeFiles === undefined) return files.filter((file) => !isNoiseFile(file.path));
+  const code = new Set(codeFiles);
+  return files.filter((file) => code.has(file.path));
+}
+
+/**
  * Where the Graph view opens: the most discussed file the code graph links to
  * another, else the most discussed file, so it starts on a picture with
  * neighbours rather than on whatever was touched last.
@@ -215,6 +243,11 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
     node.y = cy + Math.sin(angle) * radius;
   });
 
+  // Thoughts alone carry a title under each dot, so they keep more room.
+  const thoughtsOnly = !nodes.some((node) => node.kind === "file");
+  const room = thoughtsOnly
+    ? { charge: 4, distance: 1.7, gap: 22 }
+    : { charge: 1, distance: 1, gap: 3 };
   const springs: { a: number; b: number; distance: number; strength: number }[] = [];
   for (const edge of graph.edges) {
     const a = index.get(edge.from);
@@ -223,7 +256,7 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
     const link = LINK[edge.kind];
     // A thought pair sharing more files pulls harder.
     const strength = Math.min(0.6, link.strength * (edge.weight ?? 1));
-    springs.push({ a, b, distance: link.distance, strength });
+    springs.push({ a, b, distance: link.distance * room.distance, strength });
   }
   const fixed = (node: (typeof nodes)[number]) => node.role === "focus";
   // Without the focus file in the picture, its thoughts gather in the middle.
@@ -238,7 +271,7 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
         const dx = b.x - a.x || 0.01;
         const dy = b.y - a.y || 0.01;
         const d2 = Math.max(dx * dx + dy * dy, 25);
-        const push = (alpha * Math.sqrt(CHARGE[a.kind] * CHARGE[b.kind])) / d2;
+        const push = (alpha * room.charge * Math.sqrt(CHARGE[a.kind] * CHARGE[b.kind])) / d2;
         a.vx -= dx * push;
         a.vy -= dy * push;
         b.vx += dx * push;
@@ -278,7 +311,7 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
         const dx = b.x - a.x || 0.01;
         const dy = b.y - a.y || 0.01;
         const d = Math.sqrt(dx * dx + dy * dy);
-        const gap = a.r + b.r + 3 - d;
+        const gap = a.r + b.r + room.gap - d;
         if (gap <= 0) continue;
         const share = fixed(a) ? [0, 1] : fixed(b) ? [1, 0] : [0.5, 0.5];
         a.x -= (dx / d) * gap * (share[0] as number);
@@ -300,7 +333,7 @@ export function graphBounds(nodes: readonly GraphNode[]): {
   if (nodes.length === 0) return { minX: 0, minY: 0, width: 1, height: 1 };
   const pad = 40;
   const xs = nodes.flatMap((node) => [node.x - node.r, node.x + node.r]);
-  const ys = nodes.flatMap((node) => [node.y - node.r - 18, node.y + node.r]);
+  const ys = nodes.flatMap((node) => [node.y - node.r - 18, node.y + node.r + 14]);
   const minX = Math.min(...xs) - pad;
   const minY = Math.min(...ys) - pad;
   return {

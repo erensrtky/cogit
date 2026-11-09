@@ -334,6 +334,12 @@ export interface LineageViewModel {
    */
   fileLinks?: ViewFileLink[];
   /**
+   * The recorded files the code graph has as code: what the Graph view lists.
+   * Absent when the project has no graph; the view then leaves out config,
+   * lockfiles and build folders by name.
+   */
+  codeFiles?: string[];
+  /**
    * Patches embedded at build time, by commit and then by file ("" for the
    * whole commit), so a saved map can show a diff without the local server.
    * A page built without them keeps saying the server is needed.

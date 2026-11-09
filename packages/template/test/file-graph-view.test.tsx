@@ -68,6 +68,21 @@ describe("the Graph view", () => {
     expect(html).toContain("is-on");
   });
 
+  it("lists only the files the code graph has as code", () => {
+    const html = render({ codeFiles: ["src/thought.ts"] });
+    expect(html).toContain("src/</span>thought.ts");
+    expect(html).not.toContain("src/</span>git.ts");
+  });
+
+  it("titles each thought under its dot, and switches between the two pictures", () => {
+    const html = render();
+    expect(html).toContain('class="fg-label"');
+    expect(html).toContain(">Message m1</text>");
+    expect(html).toContain('aria-pressed="true" title="Only the thoughts');
+    // With the files drawn, a thought is titled only when lit.
+    expect(render({ filesAtStart: true })).not.toContain('class="fg-label"');
+  });
+
   it("says when there is no code graph, and when nothing was recorded", () => {
     expect(render({ links: undefined, focus: "src/git.ts" })).toContain(
       "1 message; no code graph, so no linked files",

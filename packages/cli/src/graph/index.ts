@@ -14,4 +14,11 @@ export function defaultGraphEngine(): GraphEngine {
   return graphify;
 }
 
-export type { FileLink, GraphEngine, GraphRelation, GraphStatus, RelatedFile } from "./types.js";
+export type {
+  CodeLinks,
+  FileLink,
+  GraphEngine,
+  GraphRelation,
+  GraphStatus,
+  RelatedFile,
+} from "./types.js";

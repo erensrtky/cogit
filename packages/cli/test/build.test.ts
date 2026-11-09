@@ -572,6 +572,7 @@ describe("cogit build", () => {
     );
     // No code graph: no links, and the Graph view says so.
     expect(model).not.toHaveProperty("fileLinks");
+    expect(model).not.toHaveProperty("codeFiles");
   });
 
   it("links the recorded files by their imports when the project has a code graph", async () => {
@@ -608,6 +609,7 @@ describe("cogit build", () => {
     const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
 
     expect(model.fileLinks).toEqual([{ from: "src/a.ts", to: "src/b.ts" }]);
+    expect(model.codeFiles).toEqual(["src/a.ts", "src/b.ts"]);
   });
 
   it("embeds the current settings in the map for the file:// modal", async () => {

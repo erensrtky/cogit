@@ -4,6 +4,8 @@ import {
   buildFileGraph,
   defaultFocus,
   graphBounds,
+  graphFiles,
+  isNoiseFile,
   isTestPath,
   LINKED_MESSAGES,
   layoutFileGraph,
@@ -108,6 +110,40 @@ describe("the Graph view's model", () => {
   });
 });
 
+describe("which files the Graph view offers", () => {
+  const recorded = [
+    file("src/a.ts", [hit("m1")]),
+    file("package.json", [hit("m2")]),
+    file("CHANGELOG.md", [hit("m3")]),
+  ];
+
+  it("keeps only the files the code graph has as code", () => {
+    expect(graphFiles(recorded, ["src/a.ts"]).map((f) => f.path)).toEqual(["src/a.ts"]);
+  });
+
+  it("leaves out config, lockfiles, dotfiles and build folders by name without a graph", () => {
+    for (const path of [
+      "package.json",
+      "pnpm-lock.yaml",
+      "yarn.lock",
+      "tsconfig.json",
+      ".github/workflows/ci.yml",
+      ".env",
+      "node_modules/x/index.js",
+      "packages/cli/dist/cli.js",
+      "VERSION",
+      "LICENSE",
+    ])
+      expect(isNoiseFile(path), path).toBe(true);
+    for (const path of ["src/a.ts", "CHANGELOG.md", "scripts/build.mjs"])
+      expect(isNoiseFile(path), path).toBe(false);
+    expect(graphFiles(recorded, undefined).map((f) => f.path)).toEqual([
+      "src/a.ts",
+      "CHANGELOG.md",
+    ]);
+  });
+});
+
 describe("the Graph view's layout", () => {
   const graph = buildFileGraph(files, links, "src/thought.ts");
 
@@ -138,7 +174,7 @@ describe("the Graph view's layout", () => {
   it("measures the drawing with room for the labels", () => {
     expect(graphBounds([])).toEqual({ minX: 0, minY: 0, width: 1, height: 1 });
     const box = graphBounds([{ id: "a", kind: "file", x: 0, y: 0, r: 10 }]);
-    expect(box).toEqual({ minX: -50, minY: -68, width: 100, height: 118 });
+    expect(box).toEqual({ minX: -50, minY: -68, width: 100, height: 132 });
   });
 });
 

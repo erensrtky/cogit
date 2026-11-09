@@ -1369,8 +1369,19 @@ body:has(.map-shell.is-expanded) {
   stroke-opacity: 0.45;
 }
 
-.file-graph-toggle {
-  padding: 2px 10px;
+.file-graph-mode button {
+  padding: 3px 10px;
+}
+
+.fg-node text.fg-label {
+  fill: var(--muted);
+  font-family: inherit;
+  font-size: 10px;
+}
+
+.fg-node.is-on text.fg-label,
+.fg-node.is-direct text.fg-label {
+  fill: var(--text);
 }
 
 .file-graph-legend .lg-import {
