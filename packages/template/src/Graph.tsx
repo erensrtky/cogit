@@ -23,6 +23,7 @@ import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js"
 import { hitMessageIds, hitSessionIds } from "../../cli/src/view/search.js";
 import { CapturesView, captureCounts, capturesButtonVisible } from "./CapturesView.js";
 import { loadMapView, pageToken, saveOpenSessions, saveRowWidth } from "./data.js";
+import { FileGraphView } from "./FileGraphView.js";
 import { type FilesFocus, type FilesTarget, FilesView } from "./FilesView.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
@@ -363,6 +364,9 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   const [showOutline, setShowOutline] = useState(true);
   // The files and outline views share the left column; only one shows.
   const [showFiles, setShowFiles] = useState(false);
+  // The Graph view (file and import links) instead of the git view, and its focus file.
+  const [layout, setLayout] = useState<"git" | "graph">("git");
+  const [graphFocus, setGraphFocus] = useState<string | null>(null);
   // The file a message's card asked the history of; the Files view opens on it.
   const [filesFocus, setFilesFocus] = useState<FilesFocus | null>(null);
   const [showCaptures, setShowCaptures] = useState(false);
@@ -688,12 +692,20 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
 
   // A changed file in a message's card opens that file's history in the Files
   // view: every message that touched it, the map's side of `cogit why <path>`.
-  const openFileHistory = useCallback((path: string) => {
-    setShowFiles(true);
-    setShowOutline(false);
-    setShowCaptures(false);
-    setFilesFocus((current) => ({ path, key: (current?.key ?? 0) + 1 }));
-  }, []);
+  // In the Graph view it moves the graph's focus to that file instead.
+  const openFileHistory = useCallback(
+    (path: string) => {
+      if (layout === "graph") {
+        setGraphFocus(path);
+        return;
+      }
+      setShowFiles(true);
+      setShowOutline(false);
+      setShowCaptures(false);
+      setFilesFocus((current) => ({ path, key: (current?.key ?? 0) + 1 }));
+    },
+    [layout],
+  );
   // A file row (8.15) opens its message exactly like a dot click, and the view
   // moves to it once the session's layout is in place.
   const [fileJumps, setFileJumps] = useState(0);
@@ -799,7 +811,25 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
               sessionGraph.git.rows.length === 1 ? "" : "s"
             }`}
           </span>
-          {leftOff ? (
+          <span className="view-switch" role="group" aria-label="View">
+            <button
+              type="button"
+              aria-pressed={layout === "git"}
+              title="Sessions and messages in time, like a git graph"
+              onClick={() => setLayout("git")}
+            >
+              Git view
+            </button>
+            <button
+              type="button"
+              aria-pressed={layout === "graph"}
+              title="One file, the files it imports or is imported by, and the messages that touched them"
+              onClick={() => setLayout("graph")}
+            >
+              Graph view
+            </button>
+          </span>
+          {leftOff && layout === "git" ? (
             <button
               type="button"
               className="outline-button"
@@ -813,28 +843,30 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
               ↧ Left off here
             </button>
           ) : null}
-          <button
-            type="button"
-            className="outline-button"
-            aria-pressed={openAll}
-            title={
-              openAll
-                ? "Close every session and fold long branches again"
-                : "Open every session and every folded branch"
-            }
-            onClick={() => {
-              // "All" means the whole map: every session opens (or closes), not
-              // only the folded branches of the sessions already open.
-              setOpenIds(openAll ? new Set() : new Set(sessionGraph.sessions.keys()));
-              setSearchOpened(new Set());
-              if (openAll) setFits((value) => value + 1);
-              setOpenAll((value) => !value);
-              setUnfolded(new Set());
-            }}
-          >
-            {openAll ? "Fold all" : "Unfold all"}
-          </button>
-          {personOptions.length > 0 ? (
+          {layout === "git" ? (
+            <button
+              type="button"
+              className="outline-button"
+              aria-pressed={openAll}
+              title={
+                openAll
+                  ? "Close every session and fold long branches again"
+                  : "Open every session and every folded branch"
+              }
+              onClick={() => {
+                // "All" means the whole map: every session opens (or closes), not
+                // only the folded branches of the sessions already open.
+                setOpenIds(openAll ? new Set() : new Set(sessionGraph.sessions.keys()));
+                setSearchOpened(new Set());
+                if (openAll) setFits((value) => value + 1);
+                setOpenAll((value) => !value);
+                setUnfolded(new Set());
+              }}
+            >
+              {openAll ? "Fold all" : "Unfold all"}
+            </button>
+          ) : null}
+          {personOptions.length > 0 && layout === "git" ? (
             <select
               className="person-filter"
               aria-label="Whose sessions"
@@ -929,7 +961,20 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
             />
           ) : null}
           <div className="graph-canvas">
-            {sessionGraph.git.rows.length === 0 ? (
+            {layout === "graph" ? (
+              <FileGraphView
+                files={model.files}
+                links={model.fileLinks}
+                focus={graphFocus}
+                active={
+                  selection?.type === "node"
+                    ? { sessionId: selection.sessionId, messageId: selection.nodeId }
+                    : null
+                }
+                onFocus={setGraphFocus}
+                onSelect={(target) => openNode(target.sessionId, target.messageId)}
+              />
+            ) : sessionGraph.git.rows.length === 0 ? (
               <p className="graph-status empty">
                 {model.recordDownloadFailed === true
                   ? "Your team's session records could not be downloaded. Check your connection and run cogit open again."

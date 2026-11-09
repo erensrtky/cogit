@@ -570,6 +570,44 @@ describe("cogit build", () => {
     expect((embedded(await readFile(paths().html, "utf8")) as { files?: unknown }).files).toEqual(
       model.files,
     );
+    // No code graph: no links, and the Graph view says so.
+    expect(model).not.toHaveProperty("fileLinks");
+  });
+
+  it("links the recorded files by their imports when the project has a code graph", async () => {
+    await saveSession(
+      "s1",
+      session({
+        sessionId: "s1",
+        title: "one",
+        startedAt: "2026-01-02T00:00:00.000Z",
+        nodes: [
+          node("h1", "message", "Touch both", null, {
+            at: "2026-01-02T01:00:00.000Z",
+            files: ["src/a.ts", "src/b.ts"],
+          }),
+        ],
+      }),
+    );
+    await mkdir(join(root, "graphify-out"), { recursive: true });
+    await writeFile(
+      join(root, "graphify-out", "graph.json"),
+      JSON.stringify({
+        nodes: [
+          { id: "a", source_file: "src/a.ts" },
+          { id: "b", source_file: "src/b.ts" },
+          { id: "c", source_file: "src/unrecorded.ts" },
+        ],
+        links: [
+          { source: "a", target: "b", relation: "imports" },
+          { source: "a", target: "c", relation: "imports" },
+        ],
+      }),
+    );
+
+    const model = await buildProject({ dir: root, io, templateHtml: TEMPLATE, quiet: true });
+
+    expect(model.fileLinks).toEqual([{ from: "src/a.ts", to: "src/b.ts" }]);
   });
 
   it("embeds the current settings in the map for the file:// modal", async () => {

@@ -428,6 +428,8 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       "enable the plugin for this project and stop sessions that start without it",
     )
     .option("--no-project-settings", "leave the project's .claude/settings.json unchanged")
+    .option("--graph", "build the code graph when graphify is installed and there is none")
+    .option("--no-graph", "do not build the code graph")
     .option("-y, --yes", "accept defaults for every question")
     .addHelpText("after", examples("cogit init", "cogit init ../my-app --git share --yes"))
     .action(

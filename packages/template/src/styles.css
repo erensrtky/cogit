@@ -1086,6 +1086,200 @@ body:has(.map-shell.is-expanded) {
   width: 330px;
 }
 
+/* Git view / Graph view switch in the map toolbar. */
+.view-switch {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.view-switch button {
+  padding: 5px 12px;
+  color: var(--muted);
+  background: var(--raised);
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.view-switch button + button {
+  border-left: 1px solid var(--line);
+}
+
+.view-switch button:hover {
+  color: var(--text);
+}
+
+.view-switch button[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--active);
+}
+
+/* The Graph view: one file, its import neighbours and their messages. */
+.file-graph {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 420px;
+}
+
+.file-graph-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.file-graph-pick {
+  max-width: 100%;
+  padding: 4px 8px;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+}
+
+.file-graph-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.file-graph-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+
+.file-graph-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.fg-edge {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.fg-edge.fg-import {
+  stroke: var(--muted);
+  stroke-opacity: 0.18;
+  stroke-width: 1.5;
+}
+
+.fg-edge.fg-import.is-core {
+  stroke-opacity: 0.75;
+}
+
+.fg-edge.fg-touch.is-direct {
+  stroke: var(--accent);
+  stroke-opacity: 0.45;
+}
+
+.fg-edge.is-on {
+  stroke: var(--accent);
+  stroke-opacity: 1;
+  stroke-width: 2;
+}
+
+.fg-node {
+  cursor: pointer;
+}
+
+.fg-node:focus {
+  outline: none;
+}
+
+.fg-file circle {
+  fill: var(--raised);
+  stroke: var(--muted);
+  stroke-width: 1.2;
+}
+
+.fg-file.is-focus circle {
+  fill: var(--active);
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.fg-message circle {
+  fill: var(--muted);
+  stroke: var(--row-bg);
+  stroke-width: 1;
+}
+
+.fg-message.is-direct circle {
+  fill: var(--accent);
+}
+
+.fg-node:hover circle,
+.fg-node:focus-visible circle,
+.fg-node.is-on circle {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.fg-node.is-faded {
+  opacity: 0.3;
+}
+
+.fg-node text {
+  fill: var(--text);
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  paint-order: stroke;
+  stroke: var(--row-bg);
+  stroke-width: 3px;
+  pointer-events: none;
+}
+
+.file-graph-legend {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.file-graph-legend i {
+  display: inline-block;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.file-graph-legend .lg-file {
+  width: 11px;
+  height: 11px;
+  background: var(--raised);
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+}
+
+.file-graph-legend .lg-message {
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.file-graph-legend .lg-import {
+  width: 16px;
+  border-top: 1.5px solid var(--muted);
+}
+
 .file-row .file-path {
   font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 12px;

@@ -1,0 +1,63 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import type { ViewFile, ViewFileLink } from "../../cli/src/view/model.js";
+import { FileGraphView } from "../src/FileGraphView.js";
+
+const hit = (messageId: string) => ({
+  sessionId: "s1",
+  sessionTitle: "Session one",
+  messageId,
+  label: messageId,
+  title: `Message ${messageId}`,
+  commits: [],
+});
+
+const files: ViewFile[] = [
+  { path: "src/thought.ts", count: 2, hits: [hit("m1"), hit("m2")] },
+  { path: "src/git.ts", count: 1, hits: [hit("m2")] },
+];
+const links: ViewFileLink[] = [{ from: "src/thought.ts", to: "src/git.ts" }];
+
+const render = (props: Partial<Parameters<typeof FileGraphView>[0]> = {}) =>
+  renderToStaticMarkup(
+    createElement(FileGraphView, {
+      files,
+      links,
+      focus: null,
+      active: null,
+      onFocus: () => {},
+      onSelect: () => {},
+      ...props,
+    }),
+  );
+
+describe("the Graph view", () => {
+  it("draws the focus file, its linked files and their messages", () => {
+    const html = render();
+    expect(html).toContain('aria-label="Graph of src/thought.ts"');
+    expect(html).toContain("1 linked file · 2 messages");
+    expect(html).toContain(
+      '<option value="src/thought.ts" selected="">src/thought.ts (2)</option>',
+    );
+    expect(html.match(/class="fg-node fg-file/g)).toHaveLength(2);
+    expect(html.match(/class="fg-node fg-message/g)).toHaveLength(2);
+    expect(html).toContain("fg-edge fg-import is-core");
+    expect(html).toContain(">git.ts</text>");
+  });
+
+  it("lights the open message and the files it touched, fading the rest", () => {
+    const html = render({ active: { sessionId: "s1", messageId: "m1" } });
+    expect(html).toContain("fg-node fg-message is-direct is-on");
+    expect(html).toContain("fg-node fg-file is-focus is-on");
+    expect(html).toContain("fg-node fg-file is-faded");
+    expect(html).toContain("is-on");
+  });
+
+  it("says when there is no code graph, and when nothing was recorded", () => {
+    expect(render({ links: undefined, focus: "src/git.ts" })).toContain(
+      "1 message; no code graph, so no linked files",
+    );
+    expect(render({ files: undefined })).toContain("No recorded message touched a file yet.");
+  });
+});

@@ -11,6 +11,7 @@ import {
   readCommitSubjects,
   refreshCogitGitignore,
 } from "../git.js";
+import { defaultGraphEngine } from "../graph/index.js";
 import { CliError, type Io } from "../io.js";
 import {
   hashTurns,
@@ -381,6 +382,12 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       // The files view (8.15) unions each message's own files with the files of
       // its commits, so a message the agent listed no paths for still lands.
       built.files = buildFileHistory(modelSessions(built), commits.files);
+      // The Graph view links those files by their imports when there is a code graph.
+      const fileLinks = await defaultGraphEngine().links(
+        root,
+        built.files.map((file) => file.path),
+      );
+      if (fileLinks !== undefined) built.fileLinks = fileLinks;
       // Story 15.1: the curated captured-work list, from the local store the
       // distiller and the CLI write. A corrupt or missing file is an empty list.
       built.captures = (await readCaptures(root, io.warn)).items;

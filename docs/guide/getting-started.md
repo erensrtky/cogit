@@ -44,8 +44,8 @@ cd your-project
 cogit init
 ```
 
-`init` asks at most two questions; the rest have sensible defaults, and every one has a flag
-so `cogit init --yes` runs without asking.
+`init` asks at most two questions (a third only to build a code graph, below); the rest have
+sensible defaults, and every one has a flag so `cogit init --yes` runs without asking.
 
 | Question | Default | Flag |
 |---|---|---|
@@ -64,6 +64,17 @@ that started without it), and sets the summary language to the conversation's.
 `--yes` leaves Claude Code's settings unchanged.
 
 `init` backs up `~/.claude/settings.json` before the first change and prints what it changed.
+
+A code graph is optional. With one, the map's **Graph view** links the files your sessions
+touched by which file imports which. cogit reads the graph
+[graphify](https://github.com/safishamsi/graphify) writes and never installs or refreshes it:
+
+- graphify installed and the project has a graph: `init` says it found it.
+- graphify installed, no graph yet: `init` offers to build one (`graphify update .`, no model
+  calls; default no, `--graph` / `--no-graph`).
+- graphify not installed: `init` prints one line on how to add it.
+
+Keep the graph fresh your way, by hand or with `graphify hook install`.
 
 Running `init` again in a set-up project changes nothing except what you pass as flags, and
 refreshes the git hooks.

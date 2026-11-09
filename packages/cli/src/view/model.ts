@@ -328,6 +328,12 @@ export interface LineageViewModel {
    */
   files?: ViewFile[];
   /**
+   * Which of those files imports which (`from` imports `to`), read from the
+   * project's code graph at build time for the Graph view. Absent when the
+   * project has no graph.
+   */
+  fileLinks?: ViewFileLink[];
+  /**
    * Patches embedded at build time, by commit and then by file ("" for the
    * whole commit), so a saved map can show a diff without the local server.
    * A page built without them keeps saying the server is needed.
@@ -403,6 +409,12 @@ export interface ViewFileHit {
   /** The branch the message sits in, when a branch summary starts at or before it. */
   branch?: string;
   commits: string[];
+}
+
+/** One recorded file importing another, both project-relative. */
+export interface ViewFileLink {
+  from: string;
+  to: string;
 }
 
 /** A file recorded messages touched, most recently touched first. */

@@ -1,6 +1,7 @@
+import { execFile } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { basename, resolve } from "node:path";
-import { styleText } from "node:util";
+import { promisify, styleText } from "node:util";
 import { defaultAgent } from "../agents/index.js";
 import { sessionIdentity } from "../author.js";
 import {
@@ -12,6 +13,7 @@ import {
   refreshCogitGitignore,
 } from "../git.js";
 import { installGitHooks } from "../git-hooks.js";
+import { defaultGraphEngine } from "../graph/index.js";
 import { CliError, type Io } from "../io.js";
 import { addRecordRefspec } from "../record-sync.js";
 import { readJson } from "../store/fs.js";
@@ -37,6 +39,50 @@ export interface InitOptions {
   allowSkill?: boolean;
   /** Enable the plugin and the guard in the project's shared settings; undefined asks. */
   projectSettings?: boolean;
+  /** Build the code graph when the engine is installed but the project has none; undefined asks. */
+  graph?: boolean;
+}
+
+const exec = promisify(execFile);
+
+/**
+ * The code graph is optional: with one, the map's Graph view links files by
+ * their imports. cogit
+ * never installs the engine and never refreshes the graph; it only offers to
+ * build one where the engine is there and the project has none.
+ */
+async function askGraph(io: Io, root: string, opts: InitOptions): Promise<void> {
+  const engine = defaultGraphEngine();
+  const status = await engine.status(root, io.env).catch(() => undefined);
+  if (status === undefined) return;
+  const command = engine.buildCommand.join(" ");
+  if (status.graph) {
+    io.out(`Found a ${engine.name} graph: the map's Graph view links files by their imports.`);
+    return;
+  }
+  if (!status.installed) {
+    io.out(
+      `Optional: with ${engine.name} (\`${engine.installCommand}\`, then \`${command}\`), ` +
+        "the map's Graph view also links files by their imports.",
+    );
+    return;
+  }
+  const build =
+    opts.graph ??
+    (await io.prompt.confirm(
+      `Build this project's code graph with ${engine.name} now (\`${command}\`, no model calls)?`,
+      false,
+    ));
+  if (!build) return;
+  const [bin, ...args] = engine.buildCommand as [string, ...string[]];
+  const built = await bestEffort(io, `could not build the ${engine.name} graph`, () =>
+    exec(bin, args, { cwd: root, env: io.env, maxBuffer: 64 * 1024 * 1024 }),
+  );
+  if (built)
+    io.out(
+      `Built the ${engine.name} graph. cogit reads it as it is; keep it fresh your way ` +
+        `(by hand, or \`${engine.name} hook install\`).`,
+    );
 }
 
 /** Below this, init offers to raise Claude Code's transcript retention. */
@@ -251,6 +297,7 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
   await mkdir(projectPaths(root).sessions, { recursive: true });
   await applyGitPolicy(io, root, policy);
   await register(io, root, name);
+  await askGraph(io, root, opts);
 
   if (policy === "share") {
     io.out("Session records will be sent with `git push` to whoever can read this repository.");

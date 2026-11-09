@@ -46,6 +46,8 @@ export function projectPaths(root: string) {
     hooksOff: join(base, "state", "hooks-off"),
     /** Present once `cogit pr` has suggested the pull request Action; local. */
     actionHint: join(base, "state", "action-hint"),
+    /** The code graph engine's file links, cut down for hooks; rebuilt when the graph changes; local. */
+    graphIndex: join(base, "state", "graph-index.json"),
     /** Commits waiting for their message's record before a Shape; local. */
     shapeQueue: join(base, "state", "shape-queue"),
     locks: join(base, "locks"),
