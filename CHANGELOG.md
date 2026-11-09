@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- A "Your turn" row closed with × came back when the page was reloaded: the server stored the dismissal but kept serving the page built before it until the next recording. It now rebuilds the project's map and the start page before it answers.
+
 ## [1.3.1] - 2026-11-09
 ### Changed
 - The **Home** view moved from the map to the start page `cogit open` shows, above "Your turn", and adds up every project: messages and thought commits per day, the decisions and the options turned down, what cogit itself cost, the most discussed files (with their project; a click opens that project's map on the file) and a year of thought commits. Each map build saves its project's numbers in `.cogit/state/overview.json` for it. The map is back to the git and Graph views.

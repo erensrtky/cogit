@@ -744,6 +744,15 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
       respond(res, 500, "could not write the inbox state");
       return;
     }
+    // The pages carry the inbox baked in: rebuild this project's map (and with
+    // it the panel) before answering, so a reload never brings the row back.
+    rebuildQueue = rebuildQueue.then(() =>
+      buildProject({ dir: root, io: buildIo, quiet: true }).then(
+        () => {},
+        () => {},
+      ),
+    );
+    await rebuildQueue;
     res.writeHead(200, {
       "content-type": "application/json",
       "cache-control": "no-store",

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import {
   type ClientRequest,
@@ -921,6 +922,17 @@ describe("inbox dismiss endpoint (Story 11.1)", () => {
     expect(reply.status).toBe(200);
     expect(JSON.parse(reply.body)).toEqual({ ok: true, sessionId: SESSION, at: AT });
     expect([...(await readInboxDismissed(root))]).toEqual([[SESSION, AT]]);
+  });
+
+  it("rebuilds the pages before answering, so a reload shows the row gone", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    await rm(globalPaths(env).panel, { force: true });
+    await rm(projectPaths(root).html, { force: true });
+    const reply = await dismissWrite(server, token, { dir: root, sessionId: SESSION, at: AT });
+    expect(reply.status).toBe(200);
+    expect(existsSync(projectPaths(root).html)).toBe(true);
+    expect(existsSync(globalPaths(env).panel)).toBe(true);
   });
 
   it("refuses a foreign project, a bad payload, a bad token and a bad body", async () => {
