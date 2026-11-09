@@ -50,6 +50,7 @@ export function FileGraphView({
   const at = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
   const viewport = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState("");
   const [view, setView] = useState<PanView>({ x: 0, y: 0, scale: 1 });
   const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
   // The click that ends a drag is not a node click.
@@ -136,111 +137,140 @@ export function FileGraphView({
       onSelect({ sessionId: node.hit.sessionId, messageId: node.hit.messageId });
   };
 
+  const needle = query.trim().toLowerCase();
+  const picks = [...list]
+    .filter((file) => needle === "" || file.path.toLowerCase().includes(needle))
+    .sort((a, b) => b.count - a.count || a.path.localeCompare(b.path));
+  const roleOf = new Map(nodes.map((node) => [node.id, node.role]));
+
   return (
     <div className="file-graph">
-      <div className="file-graph-bar">
-        <select
-          className="file-graph-pick"
-          aria-label="File in focus"
-          value={current}
-          onChange={(event) => onFocus(event.target.value)}
-        >
-          {[...list]
-            .sort((a, b) => b.count - a.count || a.path.localeCompare(b.path))
-            .map((file) => (
-              <option key={file.path} value={file.path}>
-                {`${file.path} (${file.count})`}
-              </option>
-            ))}
-        </select>
-        <span className="file-graph-meta">
-          {links === undefined
-            ? `${messages} message${messages === 1 ? "" : "s"}; no code graph, so no linked files`
-            : `${linkedFiles} linked file${linkedFiles === 1 ? "" : "s"} · ${messages} message${messages === 1 ? "" : "s"}${
-                graph.hidden > 0 ? ` · ${graph.hidden} older on linked files not shown` : ""
-              }`}
-        </span>
-      </div>
-      <div
-        ref={viewport}
-        className="file-graph-viewport"
-        role="presentation"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onDoubleClick={() => {
-          const size = box();
-          if (size !== null) setView(fitView(size, content));
-        }}
-      >
-        <svg className="file-graph-svg" role="img" aria-label={`Graph of ${current}`}>
-          <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
-            <g transform={`translate(${-bounds.minX} ${-bounds.minY})`}>
-              {graph.edges.map((edge) => {
-                const a = at.get(edge.from);
-                const b = at.get(edge.to);
-                if (a === undefined || b === undefined) return null;
-                const core =
-                  edge.kind === "import" && (edge.from === current || edge.to === current);
-                const on = activeId !== null && edge.from === activeId;
-                const direct = edge.kind === "touch" && edge.to === current;
-                return (
-                  <line
-                    key={`${edge.from}>${edge.to}`}
-                    className={`fg-edge fg-${edge.kind}${core ? " is-core" : ""}${direct ? " is-direct" : ""}${on ? " is-on" : ""}`}
-                    x1={a.x}
-                    y1={a.y}
-                    x2={b.x}
-                    y2={b.y}
-                  />
-                );
-              })}
-              {nodes.map((node) => (
-                <g
-                  key={node.id}
-                  className={`fg-node fg-${node.kind}${node.role === "focus" ? " is-focus" : ""}${
-                    node.direct ? " is-direct" : ""
-                  }${lit.has(node.id) ? " is-on" : ""}${activeId !== null && !lit.has(node.id) ? " is-faded" : ""}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => click(node)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") click(node);
-                  }}
+      <nav className="file-graph-files" aria-label="Files">
+        <input
+          type="search"
+          className="file-graph-search"
+          placeholder="Find a file"
+          aria-label="Find a file"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <ul>
+          {picks.map((file) => {
+            const role = roleOf.get(file.path);
+            const slash = file.path.lastIndexOf("/");
+            return (
+              <li key={file.path}>
+                <button
+                  type="button"
+                  className={`file-graph-file${role === "focus" ? " is-focus" : role ? " is-linked" : ""}`}
+                  aria-current={role === "focus" ? "true" : undefined}
+                  title={role && role !== "focus" ? `${file.path} · ${role}` : file.path}
+                  onClick={() => onFocus(file.path)}
                 >
-                  <title>
-                    {node.kind === "file"
-                      ? `${node.id} · ${node.count} message${node.count === 1 ? "" : "s"}${
-                          node.role === "focus" ? "" : ` · ${node.role}`
-                        }`
-                      : `${node.hit?.title ?? ""}\n${node.hit?.sessionTitle ?? ""} · ${node.hit?.label ?? ""}`}
-                  </title>
-                  <circle cx={node.x} cy={node.y} r={node.r} />
-                  {node.kind === "file" ? (
-                    <text x={node.x} y={node.y - node.r - 6} textAnchor="middle">
-                      {shortName(node.id)}
-                    </text>
-                  ) : null}
-                </g>
-              ))}
+                  <span className="file-graph-path">
+                    <span className="file-graph-dir">{file.path.slice(0, slash + 1)}</span>
+                    {file.path.slice(slash + 1)}
+                  </span>
+                  <span className="file-graph-count">{file.count}</span>
+                </button>
+              </li>
+            );
+          })}
+          {picks.length === 0 ? <li className="file-graph-none">No file matches.</li> : null}
+        </ul>
+      </nav>
+      <div className="file-graph-main">
+        <div className="file-graph-bar">
+          <span className="file-graph-focus">{current}</span>
+          <span className="file-graph-meta">
+            {links === undefined
+              ? `${messages} message${messages === 1 ? "" : "s"}; no code graph, so no linked files`
+              : `${linkedFiles} linked file${linkedFiles === 1 ? "" : "s"} · ${messages} message${messages === 1 ? "" : "s"}${
+                  graph.hidden > 0 ? ` · ${graph.hidden} older on linked files not shown` : ""
+                }`}
+          </span>
+        </div>
+        <div
+          ref={viewport}
+          className="file-graph-viewport"
+          role="presentation"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onDoubleClick={() => {
+            const size = box();
+            if (size !== null) setView(fitView(size, content));
+          }}
+        >
+          <svg className="file-graph-svg" role="img" aria-label={`Graph of ${current}`}>
+            <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
+              <g transform={`translate(${-bounds.minX} ${-bounds.minY})`}>
+                {graph.edges.map((edge) => {
+                  const a = at.get(edge.from);
+                  const b = at.get(edge.to);
+                  if (a === undefined || b === undefined) return null;
+                  const core =
+                    edge.kind === "import" && (edge.from === current || edge.to === current);
+                  const on = activeId !== null && edge.from === activeId;
+                  const direct = edge.kind === "touch" && edge.to === current;
+                  return (
+                    <line
+                      key={`${edge.from}>${edge.to}`}
+                      className={`fg-edge fg-${edge.kind}${core ? " is-core" : ""}${direct ? " is-direct" : ""}${on ? " is-on" : ""}`}
+                      x1={a.x}
+                      y1={a.y}
+                      x2={b.x}
+                      y2={b.y}
+                    />
+                  );
+                })}
+                {nodes.map((node) => (
+                  <g
+                    key={node.id}
+                    className={`fg-node fg-${node.kind}${node.role === "focus" ? " is-focus" : ""}${
+                      node.direct ? " is-direct" : ""
+                    }${lit.has(node.id) ? " is-on" : ""}${activeId !== null && !lit.has(node.id) ? " is-faded" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => click(node)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") click(node);
+                    }}
+                  >
+                    <title>
+                      {node.kind === "file"
+                        ? `${node.id} · ${node.count} message${node.count === 1 ? "" : "s"}${
+                            node.role === "focus" ? "" : ` · ${node.role}`
+                          }`
+                        : `${node.hit?.title ?? ""}\n${node.hit?.sessionTitle ?? ""} · ${node.hit?.label ?? ""}`}
+                    </title>
+                    <circle cx={node.x} cy={node.y} r={node.r} />
+                    {node.kind === "file" ? (
+                      <text x={node.x} y={node.y - node.r - 6} textAnchor="middle">
+                        {shortName(node.id)}
+                      </text>
+                    ) : null}
+                  </g>
+                ))}
+              </g>
             </g>
-          </g>
-        </svg>
-        <div className="file-graph-legend">
-          <span>
-            <i className="lg-file" />
-            file (size = messages)
-          </span>
-          <span>
-            <i className="lg-message" />
-            message
-          </span>
-          <span>
-            <i className="lg-import" />
-            imports
-          </span>
-          <span>click a file to move there · drag · wheel to zoom</span>
+          </svg>
+          <div className="file-graph-legend">
+            <span>
+              <i className="lg-file" />
+              file (size = messages)
+            </span>
+            <span>
+              <i className="lg-message" />
+              message
+            </span>
+            <span>
+              <i className="lg-import" />
+              imports
+            </span>
+            <span>click a file to move there · drag · wheel to zoom</span>
+          </div>
         </div>
       </div>
     </div>

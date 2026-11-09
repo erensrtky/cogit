@@ -829,11 +829,18 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
               Graph view
             </button>
           </span>
-          {leftOff && layout === "git" ? (
+          {/* Git-only controls stay in place in the Graph view, disabled, so the
+              buttons after them never move under the pointer. */}
+          {leftOff ? (
             <button
               type="button"
               className="outline-button"
-              title="Open the newest session and go to its newest message"
+              disabled={layout === "graph"}
+              title={
+                layout === "graph"
+                  ? "Only in the git view"
+                  : "Open the newest session and go to its newest message"
+              }
               onClick={() => {
                 ensureOpen(leftOff.sessionId);
                 setJumps((value) => value + 1);
@@ -843,32 +850,34 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
               ↧ Left off here
             </button>
           ) : null}
-          {layout === "git" ? (
-            <button
-              type="button"
-              className="outline-button"
-              aria-pressed={openAll}
-              title={
-                openAll
+          <button
+            type="button"
+            className="outline-button"
+            aria-pressed={openAll}
+            disabled={layout === "graph"}
+            title={
+              layout === "graph"
+                ? "Only in the git view"
+                : openAll
                   ? "Close every session and fold long branches again"
                   : "Open every session and every folded branch"
-              }
-              onClick={() => {
-                // "All" means the whole map: every session opens (or closes), not
-                // only the folded branches of the sessions already open.
-                setOpenIds(openAll ? new Set() : new Set(sessionGraph.sessions.keys()));
-                setSearchOpened(new Set());
-                if (openAll) setFits((value) => value + 1);
-                setOpenAll((value) => !value);
-                setUnfolded(new Set());
-              }}
-            >
-              {openAll ? "Fold all" : "Unfold all"}
-            </button>
-          ) : null}
-          {personOptions.length > 0 && layout === "git" ? (
+            }
+            onClick={() => {
+              // "All" means the whole map: every session opens (or closes), not
+              // only the folded branches of the sessions already open.
+              setOpenIds(openAll ? new Set() : new Set(sessionGraph.sessions.keys()));
+              setSearchOpened(new Set());
+              if (openAll) setFits((value) => value + 1);
+              setOpenAll((value) => !value);
+              setUnfolded(new Set());
+            }}
+          >
+            {openAll ? "Fold all" : "Unfold all"}
+          </button>
+          {personOptions.length > 0 ? (
             <select
               className="person-filter"
+              disabled={layout === "graph"}
               aria-label="Whose sessions"
               title="Fade the other people's sessions; the lines between them stay"
               value={valueOf(person)}

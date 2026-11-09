@@ -37,9 +37,10 @@ describe("the Graph view", () => {
     const html = render();
     expect(html).toContain('aria-label="Graph of src/thought.ts"');
     expect(html).toContain("1 linked file · 2 messages");
-    expect(html).toContain(
-      '<option value="src/thought.ts" selected="">src/thought.ts (2)</option>',
-    );
+    // The file list: the focus marked current, its neighbour marked linked.
+    expect(html).toContain('class="file-graph-file is-focus" aria-current="true"');
+    expect(html).toContain('class="file-graph-file is-linked" title="src/git.ts · imports"');
+    expect(html).toContain('<span class="file-graph-count">2</span>');
     expect(html.match(/class="fg-node fg-file/g)).toHaveLength(2);
     expect(html.match(/class="fg-node fg-message/g)).toHaveLength(2);
     expect(html).toContain("fg-edge fg-import is-core");
