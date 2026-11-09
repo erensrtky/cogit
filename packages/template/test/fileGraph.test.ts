@@ -3,14 +3,16 @@ import type { ViewFile, ViewFileHit, ViewFileLink } from "../../cli/src/view/mod
 import {
   branchKey,
   buildFileGraph,
-  defaultFocus,
+  buildProjectGraph,
   graphBounds,
   graphFiles,
   isNoiseFile,
   isTestPath,
   LINKED_MESSAGES,
   layoutFileGraph,
+  NO_BRANCH,
   onionGraph,
+  PROJECT_FILES,
   withCommits,
 } from "../src/fileGraph.js";
 
@@ -96,19 +98,6 @@ describe("the Graph view's model", () => {
     expect(graph.hidden).toBe(3);
     expect(graph.nodes.filter((node) => node.kind === "message")).toHaveLength(1 + LINKED_MESSAGES);
   });
-
-  it("opens on the most discussed linked source file", () => {
-    // thought.ts and git.ts both have two messages: a tie goes by path.
-    expect(defaultFocus(files, links)).toBe("src/git.ts");
-    // A test file never opens the view, however discussed.
-    const busyTest = file("test/thought.test.ts", [hit("a"), hit("b"), hit("c")]);
-    expect(defaultFocus([...files.slice(0, 4), busyTest], links)).toBe("src/git.ts");
-    // Without a graph: the most discussed file.
-    expect(
-      defaultFocus([file("x.ts", [hit("a")]), file("y.ts", [hit("b"), hit("c")])], undefined),
-    ).toBe("y.ts");
-    expect(defaultFocus([], undefined)).toBeUndefined();
-  });
 });
 
 describe("which files the Graph view offers", () => {
@@ -180,7 +169,7 @@ describe("the Graph view's layout", () => {
 });
 
 describe("the onion: sessions, branches, messages", () => {
-  const closed = { sessions: new Set<string>(), branches: new Set<string>() };
+  const closed = {};
   const inSession = (messageId: string, sessionId: string, branch?: string): ViewFileHit => ({
     ...hit(messageId, sessionId),
     sessionTitle: `Session ${sessionId}`,
@@ -204,9 +193,10 @@ describe("the onion: sessions, branches, messages", () => {
       ["session:s2", "session", "Session s2", ["s2:m2", "s2:m4"]],
     ]);
     expect(graph.nodes.every((node) => node.direct)).toBe(true);
-    // Both touched side.ts and other.ts: one link, weight two.
+    // Both touched side.ts and other.ts, each touched by both of the two
+    // sessions: ln(3/2) apiece.
     expect(graph.edges).toEqual([
-      { from: "session:s1", to: "session:s2", kind: "share", weight: 2 },
+      { from: "session:s1", to: "session:s2", kind: "share", weight: 0.81 },
     ]);
   });
 
@@ -214,11 +204,11 @@ describe("the onion: sessions, branches, messages", () => {
     const branches = onionGraph(
       full,
       "src/focus.ts",
-      { sessions: new Set(["s1"]), branches: new Set() },
+      { peeled: { sessions: new Set(["s1"]), branches: new Set() } },
       false,
     );
     const hub = branches.nodes.find((node) => node.id === "session:s1");
-    expect(hub).toMatchObject({ open: true, r: 5 });
+    expect(hub).toMatchObject({ open: true, r: 5, tone: 0 });
     expect(
       branches.nodes.filter((node) => node.kind === "branch").map((node) => node.label),
     ).toEqual(["Alpha", "Beta"]);
@@ -232,7 +222,7 @@ describe("the onion: sessions, branches, messages", () => {
     const messages = onionGraph(
       full,
       "src/focus.ts",
-      { sessions: new Set(["s1"]), branches: new Set([key]) },
+      { peeled: { sessions: new Set(["s1"]), branches: new Set([key]) } },
       false,
     );
     expect(messages.nodes.map((node) => node.id)).toEqual([
@@ -247,7 +237,7 @@ describe("the onion: sessions, branches, messages", () => {
     const s2 = onionGraph(
       full,
       "src/focus.ts",
-      { sessions: new Set(["s2"]), branches: new Set() },
+      { peeled: { sessions: new Set(["s2"]), branches: new Set() } },
       false,
     );
     expect(s2.nodes.find((node) => node.id === "branch:s2|")?.label).toBe("Before any branch");
@@ -285,7 +275,7 @@ describe("the onion: sessions, branches, messages", () => {
     const graph = onionGraph(
       full,
       "src/focus.ts",
-      { sessions: new Set(["s1", "s2"]), branches: new Set(["s1|Alpha"]) },
+      { peeled: { sessions: new Set(["s1", "s2"]), branches: new Set(["s1|Alpha"]) } },
       false,
     );
     const first = layoutFileGraph(graph);
@@ -293,6 +283,83 @@ describe("the onion: sessions, branches, messages", () => {
     for (const node of first) expect(Number.isFinite(node.x) && Number.isFinite(node.y)).toBe(true);
     const spots = new Set(first.map((node) => `${Math.round(node.x)},${Math.round(node.y)}`));
     expect(spots.size).toBe(first.length);
+  });
+});
+
+describe("going inside the onion, and the whole project", () => {
+  const inSession = (messageId: string, sessionId: string, branch?: string): ViewFileHit => ({
+    ...hit(messageId, sessionId),
+    sessionTitle: `Session ${sessionId}`,
+    ...(branch === undefined ? {} : { branch }),
+  });
+  const recorded = [
+    file("src/a.ts", [inSession("m1", "s1", "Alpha"), inSession("m2", "s1", "Beta")]),
+    file("src/b.ts", [inSession("m2", "s1", "Beta"), inSession("m3", "s2")]),
+    file("src/rare.ts", [inSession("m1", "s1", "Alpha"), inSession("m4", "s3")]),
+  ];
+  const project = buildProjectGraph(recorded, [{ from: "src/a.ts", to: "src/b.ts" }]);
+
+  it("draws every code file's messages with no file in focus", () => {
+    expect(project.nodes.filter((node) => node.kind === "file").map((node) => node.id)).toEqual([
+      "src/a.ts",
+      "src/b.ts",
+      "src/rare.ts",
+    ]);
+    expect(project.nodes.filter((node) => node.kind === "message")).toHaveLength(4);
+    expect(project.edges.filter((edge) => edge.kind === "import")).toHaveLength(1);
+    const graph = onionGraph(project, undefined, {}, false);
+    expect(graph.nodes.map((node) => node.id)).toEqual(["session:s1", "session:s2", "session:s3"]);
+    expect(graph.nodes.some((node) => node.direct)).toBe(false);
+  });
+
+  it("goes inside a session to its branches, each in its own colour", () => {
+    const graph = onionGraph(project, undefined, { inside: { session: "s1" } }, false);
+    expect(graph.nodes.map((node) => [node.id, node.label, node.tone])).toEqual([
+      ["branch:s1|Alpha", "Alpha", 0],
+      ["branch:s1|Beta", "Beta", 1],
+    ]);
+    expect(graph.edges.some((edge) => edge.kind === "part")).toBe(false);
+  });
+
+  it("goes inside a branch to its messages, in the branch's colour", () => {
+    const graph = onionGraph(
+      project,
+      undefined,
+      { inside: { session: "s1", branch: "s1|Beta" } },
+      false,
+    );
+    expect(graph.nodes.map((node) => [node.id, node.tone])).toEqual([["s1:m2", 1]]);
+  });
+
+  it("names messages before any branch, and leaves folded sessions uncoloured", () => {
+    const inside = onionGraph(project, undefined, { inside: { session: "s2" } }, false);
+    expect(inside.nodes[0]?.label).toBe(NO_BRANCH);
+    const folded = onionGraph(project, undefined, {}, false);
+    expect(folded.nodes.every((node) => node.tone === undefined)).toBe(true);
+  });
+
+  it("links through a rare file more strongly than through a common one", () => {
+    const common = file("src/common.ts", [
+      inSession("x1", "x"),
+      inSession("y1", "y"),
+      inSession("z1", "z"),
+    ]);
+    const rare = file("src/rare.ts", [inSession("x2", "x"), inSession("y2", "y")]);
+    const graph = onionGraph(buildProjectGraph([common, rare], []), undefined, {}, false);
+    const weight = (a: string, b: string) =>
+      graph.edges.find((edge) => edge.from === `session:${a}` && edge.to === `session:${b}`)
+        ?.weight;
+    // common.ts: ln(4/3) = 0.29; rare.ts adds ln(4/2) = 0.69.
+    expect(weight("x", "y")).toBe(0.98);
+    expect(weight("x", "z")).toBe(0.29);
+  });
+
+  it("draws only the most discussed files of the whole project", () => {
+    const many = Array.from({ length: PROJECT_FILES + 5 }, (_, i) =>
+      file(`src/f${String(i).padStart(2, "0")}.ts`, [inSession(`m${i}`, "s1")]),
+    );
+    const graph = onionGraph(buildProjectGraph(many, []), undefined, {}, true);
+    expect(graph.nodes.filter((node) => node.kind === "file")).toHaveLength(PROJECT_FILES);
   });
 });
 
@@ -330,9 +397,7 @@ describe("the commits layer", () => {
       { from: "commit:bbbbbbb", to: "src/b.ts", kind: "changed" },
     ]);
     // Without the files drawn there is nothing for a commit to point at but its thought.
-    const thoughts = withCommits(
-      onionGraph(full, "src/a.ts", { sessions: new Set(), branches: new Set() }, false),
-    );
+    const thoughts = withCommits(onionGraph(full, "src/a.ts", {}, false));
     expect(thoughts.edges.some((edge) => edge.kind === "changed")).toBe(false);
     // Laid out beside their thought, the same every time.
     const nodes = layoutFileGraph(graph);

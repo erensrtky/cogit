@@ -25,7 +25,7 @@ import { CapturesView, captureCounts, capturesButtonVisible } from "./CapturesVi
 import { loadMapView, pageToken, saveOpenSessions, saveRowWidth } from "./data.js";
 import { FileGraphView } from "./FileGraphView.js";
 import { type FilesFocus, type FilesTarget, FilesView } from "./FilesView.js";
-import { defaultFocus, graphFiles } from "./fileGraph.js";
+import { graphFiles } from "./fileGraph.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
 import { type GitLayout, layoutGitGraph, ROW_WIDTH } from "./gitLayout.js";
@@ -374,10 +374,11 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     () => graphFiles(model.files ?? [], model.codeFiles),
     [model.files, model.codeFiles],
   );
+  // No file picked: the whole project.
   const graphCurrent =
     graphFocus !== null && graphList.some((file) => file.path === graphFocus)
       ? graphFocus
-      : defaultFocus(graphList, model.fileLinks);
+      : undefined;
   const graphLinked = useMemo(
     () =>
       new Set(

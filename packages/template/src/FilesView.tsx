@@ -44,9 +44,11 @@ function reasonOf(
  * and which are linked to it.
  */
 export interface FilesPick {
+  /** The file in focus; undefined is the whole project. */
   current: string | undefined;
   linked: ReadonlySet<string>;
-  onPick: (path: string) => void;
+  /** A file to focus on, or null for the whole project. */
+  onPick: (path: string | null) => void;
 }
 
 export function FilesView({
@@ -135,6 +137,22 @@ export function FilesView({
           <p className="empty">No file matches.</p>
         ) : (
           <ul className="outline-list">
+            {pick === undefined ? null : (
+              <li>
+                <div className="outline-row">
+                  <button
+                    type="button"
+                    className={`outline-item file-row file-row-all${pick.current === undefined ? " is-picked" : ""}`}
+                    aria-current={pick.current === undefined ? "true" : undefined}
+                    title="Draw the graph for the whole project"
+                    onClick={() => pick.onPick(null)}
+                  >
+                    <span className="label">All files</span>
+                    <span className="outline-count">{every.length}</span>
+                  </button>
+                </div>
+              </li>
+            )}
             {all.map((file) => {
               const open = openPath === file.path;
               const picked = pick?.current === file.path;

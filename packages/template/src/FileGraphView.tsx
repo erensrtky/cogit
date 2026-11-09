@@ -1,16 +1,20 @@
 import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewFile, ViewFileLink } from "../../cli/src/view/model.js";
 import {
+  branchKey,
   buildFileGraph,
-  defaultFocus,
+  buildProjectGraph,
   type GraphNode,
   graphBounds,
   graphFiles,
   layoutFileGraph,
+  NO_BRANCH,
+  type OnionView,
   onionGraph,
   type Peeled,
   withCommits,
 } from "./fileGraph.js";
+import { LANE_COLORS } from "./gitLayout.js";
 import {
   clampPan,
   fitView,
@@ -22,10 +26,10 @@ import {
 } from "./panZoom.js";
 
 /**
- * The Graph view: one file in focus, the recorded files it imports or is
- * imported by around it, and the messages that touched them. A file click moves
- * the focus there; a message click opens the same drill-down a dot click on the
- * git view gives. Without a code graph it shows the focus file's messages only.
+ * The Graph view: the work recorded on the project's code, peeled like an
+ * onion from sessions to branches to messages. With a file in focus it narrows
+ * to the work on that file and the files it imports or is imported by. A
+ * message click opens the same drill-down a dot click on the git view gives.
  */
 
 export interface GraphTarget {
@@ -47,6 +51,7 @@ export function FileGraphView({
   onSelect,
   filesAtStart = false,
   peeledAtStart,
+  insideAtStart,
 }: {
   files: readonly ViewFile[] | undefined;
   /** The recorded files the code graph has as code; undefined without a graph. */
@@ -58,16 +63,21 @@ export function FileGraphView({
   onSelect: (target: GraphTarget) => void;
   /** Open with the files drawn; the view opens on the sessions alone otherwise. */
   filesAtStart?: boolean;
-  /** Sessions and branches open from the start (tests, a link to a message). */
+  /** Opened in place from the start, with these sessions and branches open (tests). */
   peeledAtStart?: { sessions?: readonly string[]; branches?: readonly string[] };
+  /** Inside this session, or one of its branches, from the start (tests). */
+  insideAtStart?: OnionView["inside"];
 }) {
   const list = useMemo(() => graphFiles(files ?? [], codeFiles), [files, codeFiles]);
-  const current =
-    focus !== null && list.some((file) => file.path === focus) ? focus : defaultFocus(list, links);
+  // No file in focus: the whole project.
+  const current = focus !== null && list.some((file) => file.path === focus) ? focus : undefined;
   // The files layer: the files the shown parts touched and which imports which.
   const [showFiles, setShowFiles] = useState(filesAtStart);
-  // Peeled like an onion: sessions first, a click opens one into its branches,
-  // a branch into its messages, and a click on an opened hub folds it again.
+  // Peeled like an onion: sessions first, a click goes inside one (its
+  // branches), then inside a branch (its messages); the trail or Esc goes back.
+  const [inside, setInside] = useState<OnionView["inside"]>(insideAtStart);
+  // The other way: open in place, with an opened hub that folds on a click.
+  const [inPlace, setInPlace] = useState(peeledAtStart !== undefined);
   const [peeled, setPeeled] = useState<Peeled>(() => ({
     sessions: new Set(peeledAtStart?.sessions ?? []),
     branches: new Set(peeledAtStart?.branches ?? []),
@@ -75,14 +85,32 @@ export function FileGraphView({
   // The commits layer: a square per commit, tied to the thought that landed it.
   const [showCommits, setShowCommits] = useState(false);
   const full = useMemo(
-    () => (current === undefined ? null : buildFileGraph(list, links, current)),
+    () =>
+      list.length === 0
+        ? null
+        : current === undefined
+          ? buildProjectGraph(list, links)
+          : buildFileGraph(list, links, current),
     [list, links, current],
   );
   const graph = useMemo(() => {
-    if (full === null || current === undefined) return null;
-    const base = onionGraph(full, current, peeled, showFiles);
+    if (full === null) return null;
+    const base = onionGraph(full, current, inPlace ? { peeled } : { inside }, showFiles);
     return showCommits ? withCommits(base) : base;
-  }, [full, current, peeled, showFiles, showCommits]);
+  }, [full, current, inPlace, inside, peeled, showFiles, showCommits]);
+  // A new file in focus starts from the outside again.
+  useEffect(() => {
+    setInside(undefined);
+  }, [current]);
+  // Esc steps back out one layer.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || inPlace) return;
+      setInside((now) => (now?.branch !== undefined ? { session: now.session } : undefined));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [inPlace]);
   const nodes = useMemo(() => (graph === null ? [] : layoutFileGraph(graph)), [graph]);
   const bounds = useMemo(() => graphBounds(nodes), [nodes]);
   const at = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
@@ -152,7 +180,7 @@ export function FileGraphView({
     drag.current = null;
   };
 
-  if (current === undefined || graph === null)
+  if (graph === null)
     return (
       <div className="file-graph">
         <p className="graph-status empty">No recorded message touched a file yet.</p>
@@ -178,11 +206,20 @@ export function FileGraphView({
     }
   }
   const fileNodes = (full?.nodes ?? []).filter((node) => node.kind === "file");
-  const linkedFiles = fileNodes.length - 1;
+  const linkedFiles = current === undefined ? fileNodes.length : fileNodes.length - 1;
   const messages = (full?.nodes.length ?? 0) - fileNodes.length;
   const sessions = new Set(
     (full?.nodes ?? []).flatMap((node) => (node.hit === undefined ? [] : [node.hit.sessionId])),
   ).size;
+  // The trail's names: a session's title, or a branch's within it.
+  const titleOf = (session: string, branch: string | undefined): string => {
+    const hit = (full?.nodes ?? []).find(
+      (node) =>
+        node.hit?.sessionId === session && (branch === undefined || branchKey(node.hit) === branch),
+    )?.hit;
+    if (branch === undefined) return hit?.sessionTitle ?? session;
+    return hit?.branch ?? NO_BRANCH;
+  };
   const toggle = (kind: "sessions" | "branches", key: string) =>
     setPeeled((now) => {
       const next = new Set(now[kind]);
@@ -193,9 +230,15 @@ export function FileGraphView({
   const click = (node: GraphNode) => {
     if (dragged.current) return;
     if (node.kind === "file") onFocus(node.id);
-    else if (node.kind === "session") toggle("sessions", node.id.slice("session:".length));
-    else if (node.kind === "branch") toggle("branches", node.id.slice("branch:".length));
-    else if (node.kind === "commit") {
+    else if (node.kind === "session") {
+      const session = node.id.slice("session:".length);
+      if (inPlace) toggle("sessions", session);
+      else setInside({ session });
+    } else if (node.kind === "branch") {
+      const key = node.id.slice("branch:".length);
+      if (inPlace) toggle("branches", key);
+      else setInside({ session: key.slice(0, key.indexOf("|")), branch: key });
+    } else if (node.kind === "commit") {
       // A commit opens the message that landed it, even from inside a folded layer.
       const hash = node.commits?.[0];
       const landed = (full?.nodes ?? []).find(
@@ -233,15 +276,62 @@ export function FileGraphView({
             />
             Show commits
           </label>
-          <span className="file-graph-focus">{current}</span>
+          <label
+            className="file-graph-show"
+            title="Open sessions and branches where they are, keeping the others around them"
+          >
+            <input
+              type="checkbox"
+              checked={inPlace}
+              onChange={(event) => setInPlace(event.target.checked)}
+            />
+            Open in place
+          </label>
+          <span className="file-graph-focus">{current ?? "Whole project"}</span>
           <span className="file-graph-meta">
-            {links === undefined
-              ? `${sessions} session${sessions === 1 ? "" : "s"} · ${messages} message${messages === 1 ? "" : "s"}; no code graph, so no linked files`
-              : `${linkedFiles} linked file${linkedFiles === 1 ? "" : "s"} · ${sessions} session${sessions === 1 ? "" : "s"} · ${messages} message${messages === 1 ? "" : "s"}${
-                  graph.hidden > 0 ? ` · ${graph.hidden} older on linked files not shown` : ""
-                }`}
+            {current === undefined
+              ? `${linkedFiles} code file${linkedFiles === 1 ? "" : "s"} · ${sessions} session${sessions === 1 ? "" : "s"} · ${messages} message${messages === 1 ? "" : "s"}`
+              : links === undefined
+                ? `${sessions} session${sessions === 1 ? "" : "s"} · ${messages} message${messages === 1 ? "" : "s"}; no code graph, so no linked files`
+                : `${linkedFiles} linked file${linkedFiles === 1 ? "" : "s"} · ${sessions} session${sessions === 1 ? "" : "s"} · ${messages} message${messages === 1 ? "" : "s"}${
+                    graph.hidden > 0 ? ` · ${graph.hidden} older on linked files not shown` : ""
+                  }`}
           </span>
         </div>
+        {!inPlace ? (
+          <nav className="file-graph-trail" aria-label="Where you are">
+            <button
+              type="button"
+              aria-current={inside === undefined ? "true" : undefined}
+              onClick={() => setInside(undefined)}
+            >
+              All sessions
+            </button>
+            {inside === undefined ? null : (
+              <>
+                <span aria-hidden="true">›</span>
+                <button
+                  type="button"
+                  aria-current={inside.branch === undefined ? "true" : undefined}
+                  onClick={() => setInside({ session: inside.session })}
+                >
+                  {titleOf(inside.session, undefined)}
+                </button>
+              </>
+            )}
+            {inside?.branch === undefined ? null : (
+              <>
+                <span aria-hidden="true">›</span>
+                <button type="button" aria-current="true">
+                  {titleOf(inside.session, inside.branch)}
+                </button>
+              </>
+            )}
+            {inside === undefined ? null : (
+              <span className="file-graph-hint">Esc to step back</span>
+            )}
+          </nav>
+        ) : null}
         <div
           ref={viewport}
           className="file-graph-viewport"
@@ -255,7 +345,11 @@ export function FileGraphView({
             if (size !== null) setView(fitView(size, content, PAN_PAD, MIN_SCALE));
           }}
         >
-          <svg className="file-graph-svg" role="img" aria-label={`Graph of ${current}`}>
+          <svg
+            className="file-graph-svg"
+            role="img"
+            aria-label={`Graph of ${current ?? "the whole project"}`}
+          >
             <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
               <g transform={`translate(${-bounds.minX} ${-bounds.minY})`}>
                 {graph.edges.map((edge) => {
@@ -324,7 +418,17 @@ export function FileGraphView({
                         height={node.r * 2}
                       />
                     ) : (
-                      <circle cx={node.x} cy={node.y} r={node.r} />
+                      <circle
+                        cx={node.x}
+                        cy={node.y}
+                        r={node.r}
+                        // A session opened in place, or a branch inside one, keeps its lane colour.
+                        style={
+                          node.tone === undefined
+                            ? undefined
+                            : { fill: `var(--l${node.tone % LANE_COLORS})` }
+                        }
+                      />
                     )}
                     {node.kind !== "file" &&
                     node.kind !== "commit" &&
@@ -387,10 +491,12 @@ export function FileGraphView({
               <i className="lg-message lg-muted" />
               message
             </span>
-            <span>
-              <i className="lg-message" />
-              touched {shortName(current)}
-            </span>
+            {current === undefined ? null : (
+              <span>
+                <i className="lg-focus" />
+                touched {shortName(current)}
+              </span>
+            )}
             <span>
               <i className="lg-landed" />
               landed a commit
@@ -413,7 +519,10 @@ export function FileGraphView({
               </span>
             )}
             <span>
-              click a session or branch to open it, its hub to fold it · drag · wheel to zoom
+              {inPlace
+                ? "click a session or branch to open it, its hub to fold it"
+                : "click a session or branch to go inside"}{" "}
+              · drag · wheel to zoom
             </span>
           </div>
         </div>

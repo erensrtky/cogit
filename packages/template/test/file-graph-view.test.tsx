@@ -24,7 +24,7 @@ const render = (props: Partial<Parameters<typeof FileGraphView>[0]> = {}) =>
     createElement(FileGraphView, {
       files,
       links,
-      focus: null,
+      focus: "src/thought.ts",
       active: null,
       onFocus: () => {},
       onSelect: () => {},
@@ -102,6 +102,27 @@ describe("the Graph view", () => {
     expect(html).toContain("commits: abc1234");
     expect(html).toContain('<input type="checkbox"/>Show commits');
     expect(render()).not.toContain('class="fg-ring"');
+  });
+
+  it("opens on the whole project when no file is in focus", () => {
+    const html = render({ focus: null });
+    expect(html).toContain("Whole project");
+    expect(html).toContain("2 code files · 1 session · 2 messages");
+    expect(html).toContain('aria-label="Graph of the whole project"');
+    expect(html).not.toContain("is-direct");
+  });
+
+  it("shows where you are inside the onion, and how to step back", () => {
+    const top = render();
+    expect(top).toContain('<button type="button" aria-current="true">All sessions</button>');
+    expect(top).not.toContain("Esc to step back");
+    const inBranch = render({ insideAtStart: { session: "s1", branch: "s1|" } });
+    expect(inBranch).toContain(">Session one</button>");
+    expect(inBranch).toContain('aria-current="true">Before any branch</button>');
+    expect(inBranch).toContain("Esc to step back");
+    expect(inBranch.match(/class="fg-node fg-message/g)).toHaveLength(2);
+    // Opened in place there is no trail.
+    expect(render({ peeledAtStart: { sessions: ["s1"] } })).not.toContain("file-graph-trail");
   });
 
   it("says when there is no code graph, and when nothing was recorded", () => {

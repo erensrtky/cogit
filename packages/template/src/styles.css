@@ -1225,8 +1225,10 @@ body:has(.map-shell.is-expanded) {
   stroke-width: 1;
 }
 
+/* Touched the file in focus: a thick accent outline, so it survives a lane colour. */
 .fg-message.is-direct circle {
-  fill: var(--accent);
+  stroke: var(--accent);
+  stroke-width: 2.5;
 }
 
 .fg-node:hover circle,
@@ -1252,8 +1254,8 @@ body:has(.map-shell.is-expanded) {
 
 .fg-session.is-direct circle,
 .fg-branch.is-direct circle {
-  fill: var(--active);
   stroke: var(--accent);
+  stroke-width: 3;
 }
 
 .fg-node.is-open circle {
@@ -1276,6 +1278,50 @@ body:has(.map-shell.is-expanded) {
 .fg-node text.fg-label-branch {
   fill: var(--text);
   font-size: 11px;
+}
+
+.file-graph-legend .lg-focus {
+  width: 10px;
+  height: 10px;
+  border: 2.5px solid var(--accent);
+  border-radius: 50%;
+}
+
+/* Where you are in the onion: All sessions › a session › a branch. */
+.file-graph-trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.file-graph-trail button {
+  padding: 2px 6px;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.file-graph-trail button:hover {
+  background: var(--hover);
+}
+
+.file-graph-trail button[aria-current="true"] {
+  color: var(--text);
+  font-weight: 600;
+  cursor: default;
+}
+
+.file-graph-hint {
+  margin-left: auto;
+  font-size: 12px;
 }
 
 .file-graph-legend .lg-session {

@@ -129,36 +129,37 @@ the map. In the terminal: `cogit log --file <path>` and `cogit why <path>`.
 
 ## Graph view
 
-**Git view** draws sessions and messages in time. **Graph view** draws them around one file:
-the work that touched it and the recorded files it imports or is imported by. It answers
-"what shaped this file and its neighbours" instead of "what happened when".
+**Git view** draws sessions and messages in time. **Graph view** draws the work recorded on
+the project's code as a picture of what touched what, peeled like an onion.
 
-It is peeled like an onion. It opens on the **sessions** that touched those files, each titled
-under its circle. Click a session to open it into its **branches**, and a branch into its
-**messages**; the opened session or branch stays as a small hub its parts hang from, and a
-click on the hub folds it again. Clicking a message opens its card, the same one the git view
-opens; if the card's message sits in a folded session or branch, that one lights up.
+It opens on the whole project's **sessions**, each titled under its circle. Click a session
+to go inside it: only its **branches** are left, each in its own lane colour. Click a branch
+to go inside that too: its **messages**, in the branch's colour. The trail above the picture
+(`All sessions › a session › a branch`) or **Esc** steps back out. Clicking a message opens
+its card, the same one the git view opens; if that message sits in a session or branch you
+are not inside, that one lights up. **Open in place** opens sessions and branches where they
+are instead, keeping the others around them: an opened one stays as a small hub in its own
+colour, its parts hang from it, and a click on the hub folds it again.
 
-At every layer two parts are linked when they touched the same files, thicker for more. The
-file in focus is left out of that count, since everything on it would link to everything
-else; what touched it is drawn in the accent colour and gathers in the middle. Each part
-keeps its three strongest links. **Show files** draws the files too: the focus, its linked
-files with their imports, and which part touched which.
+Two parts are linked when they touched the same code files, thicker for more. A file counts
+for less the more parts touched it, so a file everything touches links nothing and a rare one
+links strongly; each part keeps its three strongest links.
+
+Pick a file in the **Files** panel, which opens with the Graph view, to narrow the picture to
+the work on that file and the recorded files it imports or is imported by; **All files** at
+the top of the list goes back to the whole project. With a file in focus, what touched it has
+a thick accent outline and gathers in the middle, and the focus file itself does not count
+for links. **Show files** draws the files too: the focus and its linked files with their
+imports and which part touched which, or for the whole project its 25 most discussed files.
 
 A ringed part landed a commit. **Show commits** draws each commit as a square tied to what
 landed it and, with the files drawn, to the files it changed; clicking one opens the message
 that made it.
 
-Switching to the Graph view opens the **Files** panel, which picks the file there: a row
-moves the graph to that file and opens its history; the file in focus is highlighted and the
-files linked to it are marked. Type to filter. With the files drawn, clicking one works too. The list holds code only: the files the code
-graph has as code, so documents, config, lockfiles and anything `.gitignore` keeps out of the
-graph stay out. Without a graph it leaves out config, lockfiles, dotfiles and dependency or
-build folders by name. The git view's Files list is the same. A changed file in a message's card
-moves there too. Clicking a thought opens its card, the same one the git view opens, and
-lights the thoughts or files it is linked to. Drag to move, the wheel to zoom, a double click
-to fit. A linked file brings its six newest thoughts; the focus file brings all of its own.
-Test files show only when one is in focus.
+The Files list holds code only: the files the code graph has as code, so documents, config,
+lockfiles and anything `.gitignore` keeps out of the graph stay out. Without a graph it leaves
+out config, lockfiles, dotfiles and dependency or build folders by name. The git view's Files
+list is the same.
 
 The import links come from a code graph: cogit reads the one
 [graphify](https://github.com/safishamsi/graphify) writes (`graphify update .`), and never

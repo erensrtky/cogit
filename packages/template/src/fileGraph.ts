@@ -30,6 +30,11 @@ export interface GraphNode {
    * of the shown messages that changed them. Short hashes.
    */
   commits?: string[];
+  /**
+   * Sessions, branches and messages: a colour from the map's lane palette, so
+   * the parts of one opened session (or one branch, inside a session) match.
+   */
+  tone?: number;
   /** Sessions and branches: their title, drawn under the dot. */
   label?: string;
   /** Sessions and branches: the messages inside, as message node ids. */
@@ -92,23 +97,6 @@ export function graphFiles(
   if (codeFiles === undefined) return files.filter((file) => !isNoiseFile(file.path));
   const code = new Set(codeFiles);
   return files.filter((file) => code.has(file.path));
-}
-
-/**
- * Where the Graph view opens: the most discussed file the code graph links to
- * another, else the most discussed file, so it starts on a picture with
- * neighbours rather than on whatever was touched last.
- */
-export function defaultFocus(
-  files: readonly ViewFile[],
-  links: readonly ViewFileLink[] | undefined,
-): string | undefined {
-  const linked = new Set((links ?? []).flatMap((link) => [link.from, link.to]));
-  const rank = (pool: readonly ViewFile[]) =>
-    [...pool].sort((a, b) => b.count - a.count || a.path.localeCompare(b.path))[0]?.path;
-  return (
-    rank(files.filter((file) => linked.has(file.path) && !isTestPath(file.path))) ?? rank(files)
-  );
 }
 
 const messageId = (hit: ViewFileHit): string => `${hit.sessionId}:${hit.messageId}`;
@@ -183,6 +171,46 @@ export function buildFileGraph(
   return { nodes: [...nodes, ...messages.values()], edges, hidden };
 }
 
+/** Files the whole-project picture draws when the files are shown: the most discussed. */
+export const PROJECT_FILES = 25;
+
+/**
+ * The whole project, with no file in focus: every message that touched one of
+ * `files` (code files), tied to the files it touched, and the import links
+ * among them. The onion then starts from all the sessions.
+ */
+export function buildProjectGraph(
+  files: readonly ViewFile[],
+  links: readonly ViewFileLink[] | undefined,
+): FileGraph {
+  const nodes: GraphNode[] = files.map((file) => ({
+    id: file.path,
+    kind: "file",
+    x: 0,
+    y: 0,
+    r: 8 + Math.sqrt(file.count) * 3.5,
+    count: file.count,
+  }));
+  const fileNode = new Map(nodes.map((node) => [node.id, node]));
+  const edges: GraphEdge[] = (links ?? [])
+    .filter((link) => fileNode.has(link.from) && fileNode.has(link.to))
+    .map((link) => ({ from: link.from, to: link.to, kind: "import" as const }));
+  const messages = new Map<string, GraphNode>();
+  for (const file of files)
+    for (const hit of file.hits) {
+      const id = messageId(hit);
+      const message = messages.get(id) ?? { id, kind: "message", x: 0, y: 0, r: 5, hit };
+      messages.set(id, message);
+      edges.push({ from: id, to: file.path, kind: "touch" });
+      const short = hit.commits.map((hash) => hash.slice(0, 7));
+      if (short.length === 0) continue;
+      message.commits = [...new Set([...(message.commits ?? []), ...short])];
+      const node = fileNode.get(file.path) as GraphNode;
+      node.commits = [...new Set([...(node.commits ?? []), ...short])];
+    }
+  return { nodes: [...nodes, ...messages.values()], edges, hidden: 0 };
+}
+
 /**
  * The commits layer: one square per commit the shown thoughts landed, tied to
  * the thought that made it and, when the files are drawn, to the files it
@@ -214,10 +242,20 @@ export function withCommits(graph: FileGraph): FileGraph {
 /** The strongest links each session, branch or message keeps. */
 export const SHARED_LINKS = 3;
 
-/** Which sessions and branches are peeled open, by session id and {@link branchKey}. */
+/** Which sessions and branches are peeled open in place, by session id and {@link branchKey}. */
 export interface Peeled {
   sessions: ReadonlySet<string>;
   branches: ReadonlySet<string>;
+}
+
+/**
+ * How the onion is shown: from inside one session (its branches) or one
+ * branch (its messages), the rest hidden; or, opened in place, everything at
+ * once with the `peeled` sessions and branches open as hubs.
+ */
+export interface OnionView {
+  inside?: { session: string; branch?: string } | undefined;
+  peeled?: Peeled | undefined;
 }
 
 /** A branch's key: its session and its title (messages before any branch share ""). */
@@ -225,99 +263,160 @@ export function branchKey(hit: ViewFileHit): string {
   return `${hit.sessionId}|${hit.branch ?? ""}`;
 }
 
+/** The name a branch-less group of messages goes by. */
+export const NO_BRANCH = "Before any branch";
+
 /**
- * The picture as layers, peeled like an onion: the sessions that touched the
- * focus file and its linked files; an opened session shows its branches, an
- * opened branch its messages. An opened layer stays as a small hub its parts
- * hang from, so a click on it folds it again. Two shown parts are linked when
- * they touched the same files, weighted by how many; the focus file is left
- * out of that count, since everything on it would link to everything else,
- * and each keeps its {@link SHARED_LINKS} strongest links. With `withFiles`
- * the files, their imports and which part touched which are drawn too.
+ * The picture as layers, peeled like an onion. It starts from the sessions;
+ * inside one it shows that session's branches, inside a branch its messages,
+ * and the rest is hidden. Opened in place instead, an opened session or branch
+ * stays as a small hub its parts hang from, so a click on it folds it again.
+ *
+ * Two shown parts are linked when they touched the same files. A file counts
+ * for less the more parts touched it (`ln((n + 1) / parts touching it)`), so a
+ * file everything touches links nothing and a rare one links strongly; the
+ * focus file never counts. Each part keeps its {@link SHARED_LINKS} strongest
+ * links. With `withFiles` the files, their imports and which part touched
+ * which are drawn instead: the focus and its linked files, or with no focus
+ * the {@link PROJECT_FILES} most discussed.
  */
 export function onionGraph(
   full: FileGraph,
-  focus: string,
-  peeled: Peeled,
+  focus: string | undefined,
+  view: OnionView,
   withFiles: boolean,
 ): FileGraph {
-  const messages = full.nodes.filter((node) => node.kind === "message");
+  const peeled = view.peeled ?? { sessions: new Set<string>(), branches: new Set<string>() };
+  const all = full.nodes.filter((node) => node.kind === "message");
+  // Branch colours follow the order branches appear in, inside or out.
+  const branchTone = new Map<string, number>();
+  const sessionBranches = new Map<string, string[]>();
+  for (const message of all) {
+    if (message.hit === undefined) continue;
+    const key = branchKey(message.hit);
+    const list = sessionBranches.get(message.hit.sessionId) ?? [];
+    if (!list.includes(key)) {
+      branchTone.set(key, list.length);
+      sessionBranches.set(message.hit.sessionId, [...list, key]);
+    }
+  }
+  const inside = view.inside;
+  const messages = all.filter(
+    (message) =>
+      inside === undefined ||
+      (message.hit?.sessionId === inside.session &&
+        (inside.branch === undefined || branchKey(message.hit) === inside.branch)),
+  );
   const touched = new Map<string, Set<string>>();
   for (const edge of full.edges)
     if (edge.kind === "touch")
       touched.set(edge.from, (touched.get(edge.from) ?? new Set()).add(edge.to));
 
-  const nodes: GraphNode[] = [];
+  const hubs: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const parts: GraphNode[] = [];
+  const toned = (node: GraphNode, tone: number | undefined): GraphNode =>
+    tone === undefined ? node : { ...node, tone };
   const unit = (
     id: string,
     kind: "session" | "branch",
     label: string,
     members: GraphNode[],
+    tone: number | undefined,
   ): GraphNode => {
     const commits = [...new Set(members.flatMap((member) => member.commits ?? []))];
-    return {
-      id,
-      kind,
-      x: 0,
-      y: 0,
-      r: (kind === "session" ? 8 : 7) + Math.sqrt(members.length) * 2.5,
-      label,
-      members: members.map((member) => member.id),
-      direct: members.some((member) => member.direct),
-      ...(commits.length > 0 ? { commits } : {}),
-    };
+    return toned(
+      {
+        id,
+        kind,
+        x: 0,
+        y: 0,
+        r: (kind === "session" ? 8 : 7) + Math.sqrt(members.length) * 2.5,
+        label,
+        members: members.map((member) => member.id),
+        direct: members.some((member) => member.direct),
+        ...(commits.length > 0 ? { commits } : {}),
+      },
+      tone,
+    );
   };
   const hub = (node: GraphNode): GraphNode => ({ ...node, r: 5, open: true });
+  const message = (node: GraphNode, tone: number | undefined): GraphNode =>
+    toned({ ...node, r: node.direct ? 7 : 6 }, tone);
 
   const bySession = new Map<string, GraphNode[]>();
-  for (const message of messages) {
-    const sessionId = message.hit?.sessionId ?? "";
-    bySession.set(sessionId, [...(bySession.get(sessionId) ?? []), message]);
+  for (const node of messages) {
+    const sessionId = node.hit?.sessionId ?? "";
+    bySession.set(sessionId, [...(bySession.get(sessionId) ?? []), node]);
   }
+  let opened = 0;
   for (const [sessionId, inSession] of bySession) {
     const title = inSession[0]?.hit?.sessionTitle ?? sessionId;
-    const session = unit(`session:${sessionId}`, "session", title, inSession);
-    if (!peeled.sessions.has(sessionId)) {
-      parts.push(session);
+    const byBranch = new Map<string, GraphNode[]>();
+    for (const node of inSession) {
+      const key = node.hit === undefined ? "" : branchKey(node.hit);
+      byBranch.set(key, [...(byBranch.get(key) ?? []), node]);
+    }
+    const branchName = (list: GraphNode[]) => list[0]?.hit?.branch ?? NO_BRANCH;
+    if (inside?.branch !== undefined) {
+      // Inside a branch: its messages, in the branch's colour.
+      for (const node of inSession) parts.push(message(node, branchTone.get(inside.branch)));
       continue;
     }
-    nodes.push(hub(session));
-    const byBranch = new Map<string, GraphNode[]>();
-    for (const message of inSession) {
-      const key = message.hit === undefined ? "" : branchKey(message.hit);
-      byBranch.set(key, [...(byBranch.get(key) ?? []), message]);
+    if (inside !== undefined) {
+      // Inside a session: its branches, each in its own colour.
+      for (const [key, inBranch] of byBranch)
+        parts.push(
+          unit(`branch:${key}`, "branch", branchName(inBranch), inBranch, branchTone.get(key)),
+        );
+      continue;
     }
+    if (!peeled.sessions.has(sessionId)) {
+      parts.push(unit(`session:${sessionId}`, "session", title, inSession, undefined));
+      continue;
+    }
+    // Opened in place: the session keeps a colour its parts share.
+    const tone = opened;
+    opened += 1;
+    const session = unit(`session:${sessionId}`, "session", title, inSession, tone);
+    hubs.push(hub(session));
     for (const [key, inBranch] of byBranch) {
-      const name = inBranch[0]?.hit?.branch ?? "Before any branch";
-      const branch = unit(`branch:${key}`, "branch", name, inBranch);
+      const branch = unit(`branch:${key}`, "branch", branchName(inBranch), inBranch, tone);
       edges.push({ from: session.id, to: branch.id, kind: "part" });
       if (!peeled.branches.has(key)) {
         parts.push(branch);
         continue;
       }
-      nodes.push(hub(branch));
-      for (const message of inBranch) {
-        parts.push({ ...message, r: message.direct ? 7 : 6 });
-        edges.push({ from: branch.id, to: message.id, kind: "part" });
+      hubs.push(hub(branch));
+      for (const node of inBranch) {
+        parts.push(message(node, tone));
+        edges.push({ from: branch.id, to: node.id, kind: "part" });
       }
     }
   }
 
   // What each shown part touched: its own files, or its messages' files.
-  const filesOf = (node: GraphNode): Set<string> =>
-    new Set((node.members ?? [node.id]).flatMap((id) => [...(touched.get(id) ?? [])]));
-  const reach = new Map(parts.map((node) => [node.id, filesOf(node)]));
+  const reach = new Map(
+    parts.map((node) => [
+      node.id,
+      new Set((node.members ?? [node.id]).flatMap((id) => [...(touched.get(id) ?? [])])),
+    ]),
+  );
+  const spread = new Map<string, number>();
+  for (const files of reach.values())
+    for (const file of files) spread.set(file, (spread.get(file) ?? 0) + 1);
+  const rarity = (file: string) => Math.log((parts.length + 1) / (spread.get(file) ?? 1));
   const best = new Map<string, { other: string; weight: number }[]>();
   for (let i = 0; i < parts.length; i += 1)
     for (let j = i + 1; j < parts.length; j += 1) {
       const a = (parts[i] as GraphNode).id;
       const b = (parts[j] as GraphNode).id;
-      const mine = reach.get(a) as Set<string>;
       const theirs = reach.get(b) as Set<string>;
-      const weight = [...mine].filter((file) => file !== focus && theirs.has(file)).length;
-      if (weight === 0) continue;
+      let weight = 0;
+      for (const file of reach.get(a) as Set<string>)
+        if (file !== focus && theirs.has(file)) weight += rarity(file);
+      if (weight <= 0) continue;
+      weight = Math.round(weight * 100) / 100;
       best.set(a, [...(best.get(a) ?? []), { other: b, weight }]);
       best.set(b, [...(best.get(b) ?? []), { other: a, weight }]);
     }
@@ -330,17 +429,25 @@ export function onionGraph(
       kept.set(`${from}|${to}`, { from, to, kind: "share", weight });
     }
 
-  const fileNodes = withFiles ? full.nodes.filter((node) => node.kind === "file") : [];
-  const fileEdges: GraphEdge[] = [];
-  if (withFiles) {
-    for (const edge of full.edges) if (edge.kind === "import") fileEdges.push(edge);
-    for (const part of parts)
-      for (const file of reach.get(part.id) ?? [])
-        fileEdges.push({ from: part.id, to: file, kind: "touch" });
-  }
+  if (!withFiles)
+    return { nodes: [...hubs, ...parts], edges: [...edges, ...kept.values()], hidden: full.hidden };
+  const fileNodes = full.nodes.filter((node) => node.kind === "file");
+  const shownFiles =
+    focus === undefined
+      ? [...fileNodes]
+          .sort((a, b) => (b.count ?? 0) - (a.count ?? 0) || a.id.localeCompare(b.id))
+          .slice(0, PROJECT_FILES)
+      : fileNodes;
+  const drawn = new Set(shownFiles.map((node) => node.id));
+  const fileEdges: GraphEdge[] = full.edges.filter(
+    (edge) => edge.kind === "import" && drawn.has(edge.from) && drawn.has(edge.to),
+  );
+  for (const part of parts)
+    for (const file of reach.get(part.id) ?? [])
+      if (drawn.has(file)) fileEdges.push({ from: part.id, to: file, kind: "touch" });
   return {
-    nodes: [...fileNodes, ...nodes, ...parts],
-    edges: [...fileEdges, ...edges, ...(withFiles ? [] : kept.values())],
+    nodes: [...shownFiles, ...hubs, ...parts],
+    edges: [...fileEdges, ...edges],
     hidden: full.hidden,
   };
 }
