@@ -12,6 +12,7 @@ import { type CopyState, copyText } from "./clipboard.js";
 import { parseSubject, splitPath, typeColour } from "./codeRefs.js";
 import { DiffView } from "./DiffView.js";
 import { hasEmbeddedDiff, isLivePage, pageToken } from "./data.js";
+import { NO_BRANCH, relatedBranches } from "./fileGraph.js";
 import { formatTime, kindLabel } from "./format.js";
 import { layoutGitGraph } from "./gitLayout.js";
 import {
@@ -371,6 +372,69 @@ function MessageNav({
   );
 }
 
+/**
+ * Other branches, in any session, that worked on the same rare code files as
+ * this message: where the same part of the code was decided before or since.
+ */
+function RelatedSection({
+  model,
+  node,
+  onNavigate,
+}: {
+  model: LineageViewModel;
+  node: NodeDetail;
+  onNavigate: ((target: OutlineTarget) => void) | undefined;
+}) {
+  const related = relatedBranches(model.files ?? [], model.codeFiles, node.sessionId, node.nodeId);
+  if (related.length === 0) return null;
+  return (
+    <details className="fold related">
+      <summary>
+        Related <span className="count">{related.length}</span>
+      </summary>
+      <ul className="related-list">
+        {related.map((entry) => {
+          const name = (
+            <>
+              <strong>{entry.branch ?? NO_BRANCH}</strong>
+              {entry.sessionId === node.sessionId ? null : (
+                <span className="muted"> · {entry.sessionTitle}</span>
+              )}
+            </>
+          );
+          return (
+            <li key={`${entry.sessionId}|${entry.branch ?? ""}`}>
+              {onNavigate ? (
+                <button
+                  type="button"
+                  className="related-link"
+                  title={entry.hit.title}
+                  onClick={() =>
+                    onNavigate({
+                      sessionId: entry.sessionId,
+                      focusId: messageKey(sessionKey(entry.sessionId), entry.hit.messageId),
+                      selection: {
+                        type: "node",
+                        sessionId: entry.sessionId,
+                        nodeId: entry.hit.messageId,
+                      },
+                    })
+                  }
+                >
+                  {name}
+                </button>
+              ) : (
+                name
+              )}
+              <div className="related-files">{entry.files.slice(0, 3).join(", ")}</div>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+}
+
 function NodeDetails({
   model,
   node,
@@ -525,6 +589,9 @@ function NodeDetails({
             })}
           </ul>
         </section>
+      ) : null}
+      {node.kind === "message" ? (
+        <RelatedSection model={model} node={node} onNavigate={onNavigate} />
       ) : null}
       {!live &&
       (node.commits?.length || node.files?.length) &&

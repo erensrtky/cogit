@@ -648,3 +648,84 @@ export function graphBounds(nodes: readonly GraphNode[]): {
     height: Math.max(...ys) + pad - minY,
   };
 }
+
+/** The most other branches a message's card names as related. */
+export const RELATED_BRANCHES = 3;
+
+/** Another branch that worked on the same rare code files as a message. */
+export interface RelatedBranch {
+  sessionId: string;
+  sessionTitle: string;
+  /** The branch's title; undefined for messages before any branch. */
+  branch: string | undefined;
+  /** The shared files, rarest first. */
+  files: string[];
+  weight: number;
+  /** The branch's message that touched most of them, newest on a tie. */
+  hit: ViewFileHit;
+}
+
+/**
+ * The other branches, in any session, that touched the same code files as one
+ * message, strongest first. A file weighs as in {@link onionGraph}, counted
+ * over branches: `ln((branches + 1) / branches touching it)`, so a file every
+ * branch touches relates almost nothing. Keeps {@link RELATED_BRANCHES}.
+ */
+export function relatedBranches(
+  files: readonly ViewFile[],
+  codeFiles: readonly string[] | undefined,
+  sessionId: string,
+  messageId: string,
+): RelatedBranch[] {
+  const code = graphFiles(files, codeFiles);
+  const own = code.filter((file) =>
+    file.hits.some((hit) => hit.sessionId === sessionId && hit.messageId === messageId),
+  );
+  const ownHit = own[0]?.hits.find(
+    (hit) => hit.sessionId === sessionId && hit.messageId === messageId,
+  );
+  if (ownHit === undefined) return [];
+  const ownBranch = branchKey(ownHit);
+  const touching = new Map(
+    code.map((file) => [file.path, new Set(file.hits.map((hit) => branchKey(hit)))]),
+  );
+  const branches = new Set([...touching.values()].flatMap((keys) => [...keys]));
+  const rarity = (path: string) => Math.log((branches.size + 1) / (touching.get(path)?.size ?? 1));
+  type Found = { files: string[]; weight: number; hits: Map<string, ViewFileHit[]> };
+  const found = new Map<string, Found>();
+  for (const file of own)
+    for (const hit of file.hits) {
+      const key = branchKey(hit);
+      if (key === ownBranch) continue;
+      const entry: Found = found.get(key) ?? { files: [], weight: 0, hits: new Map() };
+      if (!entry.files.includes(file.path)) {
+        entry.files.push(file.path);
+        entry.weight += rarity(file.path);
+      }
+      entry.hits.set(hit.messageId, [...(entry.hits.get(hit.messageId) ?? []), hit]);
+      found.set(key, entry);
+    }
+  const byNewest = (a: ViewFileHit, b: ViewFileHit) => (b.at ?? "").localeCompare(a.at ?? "");
+  return [...found.values()]
+    .filter((entry) => entry.weight > 0)
+    .map((entry) => {
+      const hit = [...entry.hits.values()]
+        .sort((a, b) => b.length - a.length || byNewest(a[0] as ViewFileHit, b[0] as ViewFileHit))
+        .map((list) => list[0] as ViewFileHit)[0] as ViewFileHit;
+      return {
+        sessionId: hit.sessionId,
+        sessionTitle: hit.sessionTitle,
+        branch: hit.branch,
+        files: [...entry.files].sort((a, b) => rarity(b) - rarity(a) || a.localeCompare(b)),
+        weight: Math.round(entry.weight * 100) / 100,
+        hit,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.weight - a.weight ||
+        byNewest(a.hit, b.hit) ||
+        `${a.sessionId}|${a.branch ?? ""}`.localeCompare(`${b.sessionId}|${b.branch ?? ""}`),
+    )
+    .slice(0, RELATED_BRANCHES);
+}

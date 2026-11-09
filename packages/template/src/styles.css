@@ -1964,8 +1964,40 @@ body:has(.map-shell.is-expanded) {
   margin-top: 4px;
 }
 
+/* Other branches that worked on the same rare files as a message. */
+.related-list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.related-list li + li {
+  margin-top: 6px;
+}
+
+.related-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.related-link:hover strong {
+  text-decoration: underline;
+}
+
+.related-files {
+  color: var(--muted);
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
+
 /* Commits and changed files of a message. */
-h3 .count {
+h3 .count,
+summary .count {
   margin-left: 4px;
   padding: 0 6px;
   color: var(--muted);

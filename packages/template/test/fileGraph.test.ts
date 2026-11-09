@@ -13,6 +13,8 @@ import {
   NO_BRANCH,
   onionGraph,
   PROJECT_FILES,
+  RELATED_BRANCHES,
+  relatedBranches,
   withCommits,
 } from "../src/fileGraph.js";
 
@@ -453,5 +455,64 @@ describe("the layout under load", () => {
     const median = [...nearest].sort((a, b) => a - b)[Math.floor(nearest.length / 2)] as number;
     const alone = nearest[nodes.findIndex((node) => node.id === "session:z")] as number;
     expect(alone).toBeLessThan(median * 4);
+  });
+});
+
+describe("relatedBranches", () => {
+  const at = (h: ViewFileHit, branch: string | undefined, time: string): ViewFileHit => ({
+    ...h,
+    ...(branch === undefined ? {} : { branch }),
+    at: time,
+  });
+  const me = at(hit("m1", "s1"), "Build", "2026-01-01");
+  const rareOther = at(hit("m7", "s2"), "Fix", "2026-01-03");
+  const rareOtherOlder = at(hit("m6", "s2"), "Fix", "2026-01-02");
+  const common = (id: string, session: string) => at(hit(id, session), "Common", "2026-01-01");
+  const project: ViewFile[] = [
+    file("src/rare.ts", [me, rareOther, rareOtherOlder]),
+    file("src/everywhere.ts", [me, rareOther, common("m2", "s3"), common("m3", "s4")]),
+    file("src/other.ts", [rareOther, common("m4", "s5")]),
+    file("package.json", [me, common("m5", "s3")]),
+    file("src/mine.ts", [me, at(hit("m8", "s1"), "Build", "2026-01-01")]),
+  ];
+
+  it("names other branches by the rare files they share, strongest first", () => {
+    const related = relatedBranches(project, undefined, "s1", "m1");
+    expect(related.map((entry) => [entry.sessionId, entry.branch])).toEqual([
+      ["s2", "Fix"],
+      ["s3", "Common"],
+      ["s4", "Common"],
+    ]);
+    expect(related[0]?.files).toEqual(["src/rare.ts", "src/everywhere.ts"]);
+    // Both s2 messages touched one shared file; the newer one is the way in.
+    expect(related[0]?.hit.messageId).toBe("m7");
+    // Noise files and the message's own branch relate nothing.
+    expect(related.some((entry) => entry.files.includes("package.json"))).toBe(false);
+    expect(related.some((entry) => entry.sessionId === "s1")).toBe(false);
+  });
+
+  it("goes in at the message that touched most of the shared files", () => {
+    const deep = at(hit("m9", "s2"), "Fix", "2026-01-01");
+    const withDeep: ViewFile[] = [
+      file("src/a.ts", [me, deep, rareOther]),
+      file("src/b.ts", [me, deep]),
+    ];
+    expect(relatedBranches(withDeep, undefined, "s1", "m1")[0]?.hit.messageId).toBe("m9");
+  });
+
+  it("follows the code graph's files and is empty for a message with none", () => {
+    expect(relatedBranches(project, ["src/mine.ts"], "s1", "m1")).toEqual([]);
+    expect(relatedBranches(project, undefined, "s9", "m1")).toEqual([]);
+  });
+
+  it("keeps the strongest few", () => {
+    const many: ViewFile[] = [
+      file("src/x.ts", [
+        me,
+        ...Array.from({ length: 6 }, (_, i) => at(hit(`n${i}`, `t${i}`), "B", "2026-01-01")),
+      ]),
+      file("src/pad.ts", [at(hit("p", "pad"), "Pad", "2026-01-01")]),
+    ];
+    expect(relatedBranches(many, undefined, "s1", "m1")).toHaveLength(RELATED_BRANCHES);
   });
 });
