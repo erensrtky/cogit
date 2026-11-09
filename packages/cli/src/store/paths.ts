@@ -38,6 +38,8 @@ export function projectPaths(root: string) {
     mapView: join(base, "state", "map.json"),
     /** The curated captured-work list (Story 15.1); local, never committed. */
     captures: join(base, "state", "captures.json"),
+    /** What cogit's own headless runs cost, one line per run; local. */
+    spend: join(base, "state", "spend.jsonl"),
     /** What the detached hook children (build, side run) printed; local, capped. */
     detachedLog: join(base, "state", "detached.log"),
     /** What the record refs last looked like, and what waits to be sent; local. */

@@ -179,7 +179,12 @@ export async function distillSessionInput(
     .map((item): ExistingCapture => ({ id: item.id, text: item.text }));
   const prompt = distillPrompt(input, existing, config.language);
   const answer = parseDistillAnswer(
-    resultText(await runClaude(prompt, config.sideModel, opts.io.env)),
+    resultText(
+      await runClaude(prompt, config.sideModel, opts.io.env, undefined, {
+        root,
+        kind: "captures",
+      }),
+    ),
   );
   const items = answer.items;
   const known = new Set(existing.map((item) => item.id));

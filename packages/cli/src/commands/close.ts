@@ -390,7 +390,11 @@ async function reviewAtClose(root: string, sessionId: string, io: Io): Promise<v
   });
   const cwd = (await agent.readSessionCwd(file)) ?? root;
   const answer = withoutNulls(
-    agentRecord(resultText(await runClaude(prompt, model, io.env, { sessionId, cwd }))),
+    agentRecord(
+      resultText(
+        await runClaude(prompt, model, io.env, { sessionId, cwd }, { root, kind: "review" }),
+      ),
+    ),
   );
   // The review corrects notes; the structure stays the side model's and the close pass's.
   const nodes = Array.isArray(answer.nodes)
@@ -463,7 +467,11 @@ export async function closeSession(
     candidates,
     status,
   });
-  const answer = agentRecord(resultText(await runClaude(prompt, config.sideModel, io.env)));
+  const answer = agentRecord(
+    resultText(
+      await runClaude(prompt, config.sideModel, io.env, undefined, { root, kind: "side" }),
+    ),
+  );
   const payload = closePayload(answer, closing, record, { status });
   await sessionWrite({ dir: root, by: "side" }, io, async () => JSON.stringify(payload));
   // Story 15.1: one more side call distils what the session left open. It reads

@@ -7,6 +7,7 @@ import { applyEvents, readEvents } from "../store/events.js";
 import { LockBusyError, withLock } from "../store/lock.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
+import { recordSpend } from "../store/spend.js";
 import { loadConfig, loadProject, loadSession } from "../store/stores.js";
 import { closeSession } from "./close.js";
 import { sessionWrite } from "./session.js";
@@ -190,7 +191,8 @@ export const CLAUDE_TIMEOUT_MS = 5 * 60_000;
 
 /**
  * Runs the agent once, headless and without session persistence, with the prompt
- * on stdin. Resolves with stdout; a missing binary, a failed run or one that
+ * on stdin. Resolves with stdout, after noting what the run cost when `spend`
+ * names the project; a missing binary, a failed run or one that
  * outlives the time limit rejects, so a hung run lands in the log instead of
  * waiting until the machine shuts down. `COGIT_CLAUDE_TIMEOUT_MS` overrides the limit.
  */
@@ -199,6 +201,7 @@ export function runClaude(
   model: string,
   env: NodeJS.ProcessEnv,
   resume?: { sessionId: string; cwd: string },
+  spend?: { root: string; kind: string },
 ): Promise<string> {
   const limit = Number(env.COGIT_CLAUDE_TIMEOUT_MS) || CLAUDE_TIMEOUT_MS;
   return new Promise((resolve, reject) => {
@@ -244,8 +247,11 @@ export function runClaude(
       clearTimeout(timer);
       if (timedOut)
         reject(new CliError(`claude did not answer within ${Math.round(limit / 1000)} s`));
-      else if (code === 0) resolve(out);
-      else reject(new CliError(`claude exited with ${code}: ${err.trim() || "no output"}`));
+      else if (code === 0) {
+        // What the run cost, for the map's home; never in the way of the answer.
+        if (spend === undefined) resolve(out);
+        else void recordSpend(spend.root, spend.kind, model, out).then(() => resolve(out));
+      } else reject(new CliError(`claude exited with ${code}: ${err.trim() || "no output"}`));
     });
     child.stdin.end(prompt);
   });
@@ -417,7 +423,10 @@ export async function backfillTail(
     config.messageSummaries,
     config.recorder,
   );
-  const stdout = await runClaude(prompt, config.sideModel, io.env);
+  const stdout = await runClaude(prompt, config.sideModel, io.env, undefined, {
+    root,
+    kind: "side",
+  });
   const { payload, dropped } = writableAnswer(
     withoutNulls(agentRecord(resultText(stdout))),
     config.recorder,

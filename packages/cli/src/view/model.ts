@@ -372,6 +372,24 @@ export interface LineageViewModel {
    * build time. Absent on pages built before it.
    */
   captures?: ViewCapture[];
+  /**
+   * What cogit's own headless runs cost on this machine, read from
+   * `.cogit/state/spend.jsonl` at build time for the map's home. Absent when
+   * nothing was recorded yet.
+   */
+  spend?: ViewSpend;
+}
+
+/** cogit's own spend: the totals of its headless runs (side model, review, Shapes). */
+export interface ViewSpend {
+  runs: number;
+  usd: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** The first run counted. */
+  since?: string;
 }
 
 /**

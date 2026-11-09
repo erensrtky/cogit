@@ -309,7 +309,10 @@ async function shapeNode(
     diffTruncated: patches.truncated,
     language: config.language,
   });
-  const stdout = await runClaude(prompt, config.sideModel, io.env);
+  const stdout = await runClaude(prompt, config.sideModel, io.env, undefined, {
+    root,
+    kind: "shape",
+  });
   const answer = parseShapeAnswer(resultText(stdout)) ?? { tools: [], commits: [] };
   if (sessionId === undefined) {
     io.out(JSON.stringify({ tools: validateShapeTools(answer.tools) }, null, 2));

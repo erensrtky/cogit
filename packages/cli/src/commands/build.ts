@@ -37,6 +37,7 @@ import { withLock } from "../store/lock.js";
 import { readMapView } from "../store/map-view.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
+import { readSpend } from "../store/spend.js";
 import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
 import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
 import { attachChanges } from "../view/change.js";
@@ -394,6 +395,9 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       // Story 15.1: the curated captured-work list, from the local store the
       // distiller and the CLI write. A corrupt or missing file is an empty list.
       built.captures = (await readCaptures(root, io.warn)).items;
+      // What cogit's own runs cost here, for the map's home.
+      const spend = await readSpend(root);
+      if (spend !== undefined) built.spend = spend;
       // The skill already avoids secrets; this is the safety net before rendering.
       const redacted = redactDeep(built);
       if (redacted.count > 0)
