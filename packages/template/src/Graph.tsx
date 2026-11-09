@@ -30,6 +30,7 @@ import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
 import { type GitLayout, layoutGitGraph, ROW_WIDTH } from "./gitLayout.js";
 import { centreViewport, headOf, inBand, type MapPoint, visibleBand } from "./graph.js";
+import { Home } from "./Home.js";
 import type { MapSearchState } from "./MapSearch.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
 import { filterOf, type PersonFilter, peopleOf, valueOf } from "./people.js";
@@ -396,7 +397,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   // The files and outline views share the left column; only one shows.
   const [showFiles, setShowFiles] = useState(memory.panel === "files");
   // The Graph view (file and import links) instead of the git view, and its focus file.
-  const [layout, setLayout] = useState<"git" | "graph">(memory.layout ?? "git");
+  const [layout, setLayout] = useState<"home" | "git" | "graph">(memory.layout ?? "git");
   const [graphFocus, setGraphFocus] = useState<string | null>(memory.graphFocus ?? null);
   // The Graph view's files (code only) and the one it is drawn around; the
   // Files panel picks it there, marking the files linked to it.
@@ -883,6 +884,14 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
           <span className="view-switch" role="group" aria-label="View">
             <button
               type="button"
+              aria-pressed={layout === "home"}
+              title="The project at a glance: talk and commits by day, decisions, cogit's own cost"
+              onClick={() => setLayout("home")}
+            >
+              Home
+            </button>
+            <button
+              type="button"
               aria-pressed={layout === "git"}
               title="Sessions and messages in time, like a git graph"
               onClick={() => setLayout("git")}
@@ -910,9 +919,9 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
             <button
               type="button"
               className="outline-button"
-              disabled={layout === "graph"}
+              disabled={layout !== "git"}
               title={
-                layout === "graph"
+                layout !== "git"
                   ? "Only in the git view"
                   : "Open the newest session and go to its newest message"
               }
@@ -929,9 +938,9 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
             type="button"
             className="outline-button"
             aria-pressed={openAll}
-            disabled={layout === "graph"}
+            disabled={layout !== "git"}
             title={
-              layout === "graph"
+              layout !== "git"
                 ? "Only in the git view"
                 : openAll
                   ? "Close every session and fold long branches again"
@@ -952,7 +961,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
           {personOptions.length > 0 ? (
             <select
               className="person-filter"
-              disabled={layout === "graph"}
+              disabled={layout !== "git"}
               aria-label="Whose sessions"
               title="Fade the other people's sessions; the lines between them stay"
               value={valueOf(person)}
@@ -1064,7 +1073,22 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
             />
           ) : null}
           <div className="graph-canvas">
-            {layout === "graph" ? (
+            {layout === "home" ? (
+              <Home
+                model={model}
+                onOpenMessage={(sessionId, messageId) => {
+                  setLayout("git");
+                  selectFromFiles({ sessionId, messageId });
+                }}
+                onOpenFile={(path) => {
+                  setLayout("git");
+                  setGraphFocus(path);
+                  setShowFiles(true);
+                  setShowOutline(false);
+                  setShowCaptures(false);
+                }}
+              />
+            ) : layout === "graph" ? (
               <FileGraphView
                 files={model.files}
                 codeFiles={model.codeFiles}

@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - In the git view, picking a file in the **Files** panel fades the sessions and messages that did not touch it, while the panel is open; **All files** clears it. The picked file is the same one the Graph view is drawn around, so switching views keeps it.
 
+- The map has a **Home** view beside the git and Graph views: the project at a glance. On top, messages and thought commits per day; in the middle the decisions recorded (and how many the agent took on its own, without asking), the options turned down, what cogit itself cost, and the five most discussed files (a click opens the git view on that file); below, a year of thought commits a square a day, like a GitHub profile, where a square opens that day's first one.
+- cogit notes what its own background runs cost (recording, the closing review, Shapes, captured work): the cost and tokens Claude Code reports for each run go to `.cogit/state/spend.jsonl`, local to the machine and never shared. The map's Home adds them up.
+
 ### Changed
 - The map's **Files** list shows code files only, in both views: documents, config, lockfiles and build folders are left out (by the code graph when there is one, by name otherwise), and it has a search box. `cogit log --file` still answers for any path.
 
