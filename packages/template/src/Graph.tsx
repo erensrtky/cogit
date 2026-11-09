@@ -40,6 +40,7 @@ import { usePageWheel } from "./scroll.js";
 import { applySearchHits, storedOpen } from "./searchOpen.js";
 import { layoutSessionGraph, openAtLoad, type SessionGraph } from "./sessionLayout.js";
 import { useTheme } from "./ThemeButton.js";
+import { readViewMemory, rememberView } from "./viewMemory.js";
 
 /**
  * The project map (Story 8.7). The sessions are a git graph, one dot each;
@@ -362,12 +363,17 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     [model.project.path],
   );
   const [openAll, setOpenAll] = useState(false);
-  const [showOutline, setShowOutline] = useState(true);
+  // How the viewer left this project's map: the view, the side panel, the
+  // Graph view's file (viewMemory.ts); a refresh comes back to it.
+  const [memory] = useState(() => readViewMemory(model.project.path));
+  const [showOutline, setShowOutline] = useState(
+    memory.panel === undefined || memory.panel === "outline",
+  );
   // The files and outline views share the left column; only one shows.
-  const [showFiles, setShowFiles] = useState(false);
+  const [showFiles, setShowFiles] = useState(memory.panel === "files");
   // The Graph view (file and import links) instead of the git view, and its focus file.
-  const [layout, setLayout] = useState<"git" | "graph">("git");
-  const [graphFocus, setGraphFocus] = useState<string | null>(null);
+  const [layout, setLayout] = useState<"git" | "graph">(memory.layout ?? "git");
+  const [graphFocus, setGraphFocus] = useState<string | null>(memory.graphFocus ?? null);
   // The Graph view's files (code only) and the one it is drawn around; the
   // Files panel picks it there, marking the files linked to it.
   const graphList = useMemo(
@@ -390,7 +396,14 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   );
   // The file a message's card asked the history of; the Files view opens on it.
   const [filesFocus, setFilesFocus] = useState<FilesFocus | null>(null);
-  const [showCaptures, setShowCaptures] = useState(false);
+  const [showCaptures, setShowCaptures] = useState(memory.panel === "tasks");
+  useEffect(() => {
+    rememberView(model.project.path, {
+      layout,
+      graphFocus,
+      panel: showOutline ? "outline" : showFiles ? "files" : showCaptures ? "tasks" : "none",
+    });
+  }, [model.project.path, layout, graphFocus, showOutline, showFiles, showCaptures]);
   const [person, setPerson] = useState<PersonFilter>(null);
   const people = useMemo(() => peopleOf(model), [model]);
   const personOptions = useMemo(() => people.options(), [people]);
@@ -1017,6 +1030,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
                 files={model.files}
                 codeFiles={model.codeFiles}
                 links={model.fileLinks}
+                memoryKey={model.project.path}
                 focus={graphCurrent ?? null}
                 active={
                   selection?.type === "node"

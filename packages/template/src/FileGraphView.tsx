@@ -24,6 +24,7 @@ import {
   type Size,
   zoomAt,
 } from "./panZoom.js";
+import { readViewMemory, rememberView } from "./viewMemory.js";
 
 /**
  * The Graph view: the work recorded on the project's code, peeled like an
@@ -49,9 +50,10 @@ export function FileGraphView({
   active,
   onFocus,
   onSelect,
-  filesAtStart = false,
+  filesAtStart,
   peeledAtStart,
   insideAtStart,
+  memoryKey,
 }: {
   files: readonly ViewFile[] | undefined;
   /** The recorded files the code graph has as code; undefined without a graph. */
@@ -67,23 +69,40 @@ export function FileGraphView({
   peeledAtStart?: { sessions?: readonly string[]; branches?: readonly string[] };
   /** Inside this session, or one of its branches, from the start (tests). */
   insideAtStart?: OnionView["inside"];
+  /** The project's path: the view remembers its layers and place under it (viewMemory.ts). */
+  memoryKey?: string;
 }) {
   const list = useMemo(() => graphFiles(files ?? [], codeFiles), [files, codeFiles]);
   // No file in focus: the whole project.
   const current = focus !== null && list.some((file) => file.path === focus) ? focus : undefined;
+  // Where the viewer left this view (viewMemory.ts), unless the caller says.
+  const [memory] = useState(() => (memoryKey === undefined ? {} : readViewMemory(memoryKey)));
   // The files layer: the files the shown parts touched and which imports which.
-  const [showFiles, setShowFiles] = useState(filesAtStart);
+  const [showFiles, setShowFiles] = useState(filesAtStart ?? memory.showFiles ?? false);
   // Peeled like an onion: sessions first, a click goes inside one (its
   // branches), then inside a branch (its messages); the trail or Esc goes back.
-  const [inside, setInside] = useState<OnionView["inside"]>(insideAtStart);
+  const [inside, setInside] = useState<OnionView["inside"]>(
+    insideAtStart ?? memory.inside ?? undefined,
+  );
   // The other way: open in place, with an opened hub that folds on a click.
-  const [inPlace, setInPlace] = useState(peeledAtStart !== undefined);
+  const [inPlace, setInPlace] = useState(peeledAtStart !== undefined || (memory.inPlace ?? false));
   const [peeled, setPeeled] = useState<Peeled>(() => ({
-    sessions: new Set(peeledAtStart?.sessions ?? []),
-    branches: new Set(peeledAtStart?.branches ?? []),
+    sessions: new Set(peeledAtStart?.sessions ?? memory.peeledSessions ?? []),
+    branches: new Set(peeledAtStart?.branches ?? memory.peeledBranches ?? []),
   }));
   // The commits layer: a square per commit, tied to the thought that landed it.
-  const [showCommits, setShowCommits] = useState(false);
+  const [showCommits, setShowCommits] = useState(memory.showCommits ?? false);
+  useEffect(() => {
+    if (memoryKey === undefined) return;
+    rememberView(memoryKey, {
+      showFiles,
+      showCommits,
+      inPlace,
+      inside: inside ?? null,
+      peeledSessions: [...peeled.sessions],
+      peeledBranches: [...peeled.branches],
+    });
+  }, [memoryKey, showFiles, showCommits, inPlace, inside, peeled]);
   const full = useMemo(
     () =>
       list.length === 0
@@ -93,13 +112,30 @@ export function FileGraphView({
           : buildFileGraph(list, links, current),
     [list, links, current],
   );
+  // A remembered place whose session is gone from the picture falls back to the outside.
+  const here = useMemo(
+    () =>
+      inside !== undefined &&
+      (full?.nodes ?? []).some(
+        (node) =>
+          node.hit?.sessionId === inside.session &&
+          (inside.branch === undefined || branchKey(node.hit) === inside.branch),
+      )
+        ? inside
+        : undefined,
+    [full, inside],
+  );
   const graph = useMemo(() => {
     if (full === null) return null;
-    const base = onionGraph(full, current, inPlace ? { peeled } : { inside }, showFiles);
+    const base = onionGraph(full, current, inPlace ? { peeled } : { inside: here }, showFiles);
     return showCommits ? withCommits(base) : base;
-  }, [full, current, inPlace, inside, peeled, showFiles, showCommits]);
-  // A new file in focus starts from the outside again.
+  }, [full, current, inPlace, here, peeled, showFiles, showCommits]);
+  // A new file in focus starts from the outside again; the first render keeps
+  // the place it was restored to.
+  const shownFor = useRef(current);
   useEffect(() => {
+    if (shownFor.current === current) return;
+    shownFor.current = current;
     setInside(undefined);
   }, [current]);
   // Esc steps back out one layer.
@@ -277,7 +313,7 @@ export function FileGraphView({
             Show commits
           </label>
           {/* Only on the outermost layer: inside a session or branch it has nothing to open. */}
-          {inside === undefined ? (
+          {here === undefined ? (
             <label
               className="file-graph-show"
               title="Open sessions and branches where they are, keeping the others around them"
@@ -305,34 +341,32 @@ export function FileGraphView({
           <nav className="file-graph-trail" aria-label="Where you are">
             <button
               type="button"
-              aria-current={inside === undefined ? "true" : undefined}
+              aria-current={here === undefined ? "true" : undefined}
               onClick={() => setInside(undefined)}
             >
               All sessions
             </button>
-            {inside === undefined ? null : (
+            {here === undefined ? null : (
               <>
                 <span aria-hidden="true">›</span>
                 <button
                   type="button"
-                  aria-current={inside.branch === undefined ? "true" : undefined}
-                  onClick={() => setInside({ session: inside.session })}
+                  aria-current={here.branch === undefined ? "true" : undefined}
+                  onClick={() => setInside({ session: here.session })}
                 >
-                  {titleOf(inside.session, undefined)}
+                  {titleOf(here.session, undefined)}
                 </button>
               </>
             )}
-            {inside?.branch === undefined ? null : (
+            {here?.branch === undefined ? null : (
               <>
                 <span aria-hidden="true">›</span>
                 <button type="button" aria-current="true">
-                  {titleOf(inside.session, inside.branch)}
+                  {titleOf(here.session, here.branch)}
                 </button>
               </>
             )}
-            {inside === undefined ? null : (
-              <span className="file-graph-hint">Esc to step back</span>
-            )}
+            {here === undefined ? null : <span className="file-graph-hint">Esc to step back</span>}
           </nav>
         ) : null}
         <div

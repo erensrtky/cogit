@@ -161,6 +161,10 @@ lockfiles and anything `.gitignore` keeps out of the graph stay out. Without a g
 out config, lockfiles, dotfiles and dependency or build folders by name. The git view's Files
 list is the same.
 
+The map remembers, per project and per browser, how you left it: the git or Graph view,
+the side panel, the file in focus, the layers you turned on and where you were in the onion.
+A refresh or a switch between the views comes back to it.
+
 The import links come from a code graph: cogit reads the one
 [graphify](https://github.com/safishamsi/graphify) writes (`graphify update .`), and never
 builds or refreshes it itself. Without one the view shows the focus file and its messages
