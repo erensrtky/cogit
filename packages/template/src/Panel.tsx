@@ -3,6 +3,7 @@ import { Brand } from "./Brand.js";
 import { isLivePage } from "./data.js";
 import { formatTime } from "./format.js";
 import { Inbox } from "./Inbox.js";
+import { Overview } from "./Overview.js";
 import { SettingsButton } from "./SettingsModal.js";
 import { ThemeButton } from "./ThemeButton.js";
 
@@ -39,6 +40,9 @@ export function Panel({ model }: { model: PanelViewModel }) {
           </div>
         </div>
       </header>
+
+      {/* Every project at a glance: talk and commits by day, decisions, cost, files. */}
+      {model.overview === undefined ? null : <Overview overview={model.overview} />}
 
       {/* Story 11.1: sessions waiting on the user, across every project. */}
       <Inbox rows={model.inbox ?? []} />

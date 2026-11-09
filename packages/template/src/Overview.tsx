@@ -1,89 +1,74 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { LineageViewModel, ViewSpend } from "../../cli/src/view/model.js";
-import {
-  calendarWeeks,
-  type DayCount,
-  dailyActivity,
-  decisionCounts,
-  messageCount,
-  shade,
-  topFiles,
-} from "./dashboard.js";
+import type { PanelOverview, ViewSpend } from "../../cli/src/view/model.js";
+import { calendarWeeks, type DayCount, dayOf, fillDays, shade } from "./dashboard.js";
+import { isLivePage } from "./data.js";
 
 /**
- * The map's home: the project at a glance. Talk and the code it led to day by
- * day on top, the decisions, the options turned down, what cogit itself cost
- * and the most discussed files in the middle, and a calendar of thought
- * commits below.
+ * The top of the start page: every project at a glance. Talk and the code it
+ * led to day by day, then the decisions, the options turned down, what cogit
+ * itself cost and the most discussed files, then a year of thought commits.
  */
-export function Home({
-  model,
+export function Overview({
+  overview,
   today = new Date(),
-  onOpenMessage,
-  onOpenFile,
 }: {
-  model: LineageViewModel;
+  overview: PanelOverview;
   today?: Date;
-  /** Opens a message on the git view. */
-  onOpenMessage: (sessionId: string, messageId: string) => void;
-  /** Opens the git view filtered to a file. */
-  onOpenFile: (path: string) => void;
 }) {
-  const activity = useMemo(() => dailyActivity(model.sessions, today), [model.sessions, today]);
-  const decisions = useMemo(() => decisionCounts(model.sessions), [model.sessions]);
-  const files = useMemo(
-    () => topFiles(model.files, model.codeFiles),
-    [model.files, model.codeFiles],
-  );
-  if (activity.length === 0)
-    return (
-      <p className="graph-status empty">
-        No sessions recorded yet. They appear here as you work with Claude Code.
-      </p>
-    );
+  const activity = useMemo(() => fillDays(overview.days, today), [overview.days, today]);
   return (
-    <div className="home">
-      <ActivityChart activity={activity} />
+    <section className="home" aria-label="All projects at a glance">
+      {activity.length === 0 ? null : <ActivityChart activity={activity} />}
       <div className="home-tiles">
         <section className="home-tile">
           <h3>Decisions</h3>
-          <p className="home-number">{formatCount(decisions.decisions)}</p>
+          <p className="home-number">{formatCount(overview.decisions)}</p>
           <p className="home-note">
-            {formatCount(decisions.byAgent)} taken by the agent on its own, without asking
+            {formatCount(overview.byAgent)} taken by the agent on its own, without asking
           </p>
         </section>
         <section className="home-tile">
           <h3>Options turned down</h3>
-          <p className="home-number">{formatCount(decisions.rejected)}</p>
+          <p className="home-number">{formatCount(overview.rejected)}</p>
           <p className="home-note">Considered and rejected, with the reason kept</p>
         </section>
-        <SpendTile spend={model.spend} model={model} />
+        <SpendTile spend={overview.spend} days={overview.days} />
         <section className="home-tile home-files">
           <h3>Most discussed files</h3>
-          {files.length === 0 ? (
+          {overview.files.length === 0 ? (
             <p className="home-note">No files recorded yet.</p>
           ) : (
             <ol>
-              {files.map((file) => (
-                <li key={file.path}>
-                  <button
-                    type="button"
+              {overview.files.map((file) => (
+                <li key={`${file.projectPath}|${file.path}`}>
+                  <a
                     className="home-file"
-                    title={`${file.path} · show the work on it in the git view`}
-                    onClick={() => onOpenFile(file.path)}
+                    href={mapLink(file.projectPath, file.mapUrl, { f: file.path })}
+                    title={`${file.path} · open ${file.projectName}'s map on it`}
                   >
-                    <span className="home-file-path">{file.path}</span>
+                    <span className="home-file-path">
+                      <span className="home-file-project">{file.projectName}</span> {file.path}
+                    </span>
                     <span className="home-file-count">{file.count}</span>
-                  </button>
+                  </a>
                 </li>
               ))}
             </ol>
           )}
         </section>
       </div>
-      <Calendar activity={activity} today={today} onOpen={onOpenMessage} />
-    </div>
+      {activity.length === 0 ? null : <Calendar activity={activity} today={today} />}
+    </section>
   );
+}
+
+/** A project's map: a page of the local server when live, its `file://` copy otherwise. */
+function mapLink(projectPath: string, mapUrl: string, hash: Record<string, string>): string {
+  const base =
+    typeof document !== "undefined" && isLivePage()
+      ? `/map?dir=${encodeURIComponent(projectPath)}`
+      : mapUrl;
+  return `${base}#${new URLSearchParams(hash).toString()}`;
 }
 
 const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
@@ -96,33 +81,23 @@ function formatUsd(value: number): string {
   return value < 0.01 && value > 0 ? "< $0.01" : `$${value.toFixed(2)}`;
 }
 
-/** What cogit's own background runs cost on this machine, and per message since the first. */
-function SpendTile({ spend, model }: { spend: ViewSpend | undefined; model: LineageViewModel }) {
+/** What cogit's own background runs cost, and per message since the first one. */
+function SpendTile({ spend, days }: { spend: ViewSpend | undefined; days: readonly DayCount[] }) {
   if (spend === undefined)
     return (
       <section className="home-tile">
         <h3>cogit's own cost</h3>
         <p className="home-number home-number-quiet">Not measured yet</p>
         <p className="home-note">
-          Each background run cogit makes (recording, review, Shapes) notes its cost from now on.
+          Each background run cogit makes (recording, review, Shapes) notes its cost from 1.3.0 on.
         </p>
       </section>
     );
   const tokens =
     spend.inputTokens + spend.outputTokens + spend.cacheReadTokens + spend.cacheWriteTokens;
   const since = spend.since === undefined ? undefined : new Date(spend.since);
-  const messages =
-    since === undefined
-      ? messageCount(model.sessions)
-      : model.sessions.reduce(
-          (sum, session) =>
-            sum +
-            session.messages.filter(
-              (node) =>
-                node.kind === "message" && node.at !== undefined && new Date(node.at) >= since,
-            ).length,
-          0,
-        );
+  const from = since === undefined ? "" : dayOf(since);
+  const messages = days.reduce((sum, day) => (day.day >= from ? sum + day.messages : sum), 0);
   return (
     <section className="home-tile">
       <h3>cogit's own cost</h3>
@@ -266,6 +241,10 @@ function formatDay(day: string): string {
 
 const WEEKDAYS = ["", "Mon", "", "Wed", "", "Fri", ""];
 
+function dayTitle(day: DayCount): string {
+  return `${formatDay(day.day)}: ${day.commits} thought commit${day.commits === 1 ? "" : "s"}, ${day.messages} message${day.messages === 1 ? "" : "s"}`;
+}
+
 /** The month a week column starts, shown above it when it differs from the week before. */
 function monthLabel(
   week: readonly (DayCount | null)[],
@@ -280,15 +259,7 @@ function monthLabel(
 }
 
 /** A year of thought commits, a square a day like a GitHub profile; a square opens that day's first. */
-function Calendar({
-  activity,
-  today,
-  onOpen,
-}: {
-  activity: readonly DayCount[];
-  today: Date;
-  onOpen: (sessionId: string, messageId: string) => void;
-}) {
+function Calendar({ activity, today }: { activity: readonly DayCount[]; today: Date }) {
   const weeks = useMemo(() => calendarWeeks(activity, today), [activity, today]);
   const days = weeks.flat().filter((day): day is DayCount => day !== null);
   const busiest = Math.max(0, ...days.map((day) => day.commits));
@@ -320,18 +291,22 @@ function Calendar({
               {week.map((day, index) =>
                 day === null ? (
                   <span key={index} className="home-day is-future" />
-                ) : (
-                  <button
+                ) : day.first === undefined ? (
+                  <span
                     key={day.day}
-                    type="button"
-                    tabIndex={day.first === undefined ? -1 : 0}
                     className={`home-day shade-${shade(day.commits, busiest)}`}
-                    title={`${formatDay(day.day)}: ${day.commits} thought commit${day.commits === 1 ? "" : "s"}, ${day.messages} message${day.messages === 1 ? "" : "s"}`}
-                    aria-label={`${formatDay(day.day)}: ${day.commits} thought commits`}
-                    disabled={day.first === undefined}
-                    onClick={() => {
-                      if (day.first !== undefined) onOpen(day.first.sessionId, day.first.messageId);
-                    }}
+                    title={dayTitle(day)}
+                  />
+                ) : (
+                  <a
+                    key={day.day}
+                    className={`home-day shade-${shade(day.commits, busiest)}`}
+                    title={dayTitle(day)}
+                    aria-label={dayTitle(day)}
+                    href={mapLink(day.first.projectPath, day.first.mapUrl, {
+                      s: day.first.sessionId,
+                      m: day.first.messageId,
+                    })}
                   />
                 ),
               )}

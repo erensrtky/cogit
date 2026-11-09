@@ -7,7 +7,7 @@
  */
 
 export interface ViewMemory {
-  layout?: "home" | "git" | "graph";
+  layout?: "git" | "graph" | "home";
   panel?: "outline" | "files" | "tasks" | "none";
   graphFocus?: string | null;
   showFiles?: boolean;
@@ -49,4 +49,15 @@ export function rememberView(dir: string, patch: ViewMemory): void {
   } catch {
     // Full or blocked storage: the page works, it only forgets.
   }
+}
+
+/**
+ * A link to the map at a file (`#f=<path>`, from the start page's most
+ * discussed files) opens the git view with the Files panel on that file, over
+ * whatever was remembered.
+ */
+export function withLinkedFile(memory: ViewMemory, hash: string): ViewMemory {
+  const file = new URLSearchParams(hash.replace(/^#/, "")).get("f");
+  if (file === null || file === "") return memory;
+  return { ...memory, layout: "git", panel: "files", graphFocus: file };
 }

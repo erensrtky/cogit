@@ -3507,15 +3507,12 @@ time {
   font-size: 12px;
 }
 
-/* The map's home: the project at a glance. */
+/* The start page's overview of every project, above "Your turn". */
 .home {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  box-sizing: border-box;
-  height: 100%;
-  padding: 16px max(16px, calc((100% - 1100px) / 2));
-  overflow-y: auto;
+  margin: 0 0 24px;
 }
 
 .home h3 {
@@ -3683,6 +3680,7 @@ time {
 
 .home-file {
   display: flex;
+  text-decoration: none;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
@@ -3706,6 +3704,12 @@ time {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.home-file-project {
+  margin-right: 4px;
+  font-family: inherit;
+  color: var(--muted);
 }
 
 .home-file-count {
@@ -3756,12 +3760,8 @@ time {
   background: var(--chip-bg);
 }
 
-button.home-day:not(:disabled) {
-  cursor: pointer;
-}
-
-button.home-day:focus-visible,
-button.home-day:not(:disabled):hover {
+a.home-day:focus-visible,
+a.home-day:hover {
   outline: 2px solid var(--text);
   outline-offset: 1px;
 }
@@ -3797,10 +3797,6 @@ button.home-day:not(:disabled):hover {
 }
 
 @media (max-width: 640px) {
-  .home {
-    padding: 8px;
-  }
-
   .home-files {
     grid-column: auto;
   }

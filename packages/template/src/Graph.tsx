@@ -30,7 +30,6 @@ import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
 import { type GitLayout, layoutGitGraph, ROW_WIDTH } from "./gitLayout.js";
 import { centreViewport, headOf, inBand, type MapPoint, visibleBand } from "./graph.js";
-import { Home } from "./Home.js";
 import type { MapSearchState } from "./MapSearch.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
 import { filterOf, type PersonFilter, peopleOf, valueOf } from "./people.js";
@@ -41,7 +40,7 @@ import { usePageWheel } from "./scroll.js";
 import { applySearchHits, storedOpen } from "./searchOpen.js";
 import { layoutSessionGraph, openAtLoad, type SessionGraph } from "./sessionLayout.js";
 import { useTheme } from "./ThemeButton.js";
-import { readViewMemory, rememberView } from "./viewMemory.js";
+import { readViewMemory, rememberView, withLinkedFile } from "./viewMemory.js";
 
 /**
  * The project map (Story 8.7). The sessions are a git graph, one dot each;
@@ -390,14 +389,22 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   const [openAll, setOpenAll] = useState(false);
   // How the viewer left this project's map: the view, the side panel, the
   // Graph view's file (viewMemory.ts); a refresh comes back to it.
-  const [memory] = useState(() => readViewMemory(model.project.path));
+  const [memory] = useState(() =>
+    withLinkedFile(
+      readViewMemory(model.project.path),
+      typeof window === "undefined" ? "" : window.location.hash,
+    ),
+  );
   const [showOutline, setShowOutline] = useState(
     memory.panel === undefined || memory.panel === "outline",
   );
   // The files and outline views share the left column; only one shows.
   const [showFiles, setShowFiles] = useState(memory.panel === "files");
   // The Graph view (file and import links) instead of the git view, and its focus file.
-  const [layout, setLayout] = useState<"home" | "git" | "graph">(memory.layout ?? "git");
+  // A map left on the old Home view opens on the git view.
+  const [layout, setLayout] = useState<"git" | "graph">(
+    memory.layout === "graph" ? "graph" : "git",
+  );
   const [graphFocus, setGraphFocus] = useState<string | null>(memory.graphFocus ?? null);
   // The Graph view's files (code only) and the one it is drawn around; the
   // Files panel picks it there, marking the files linked to it.
@@ -884,14 +891,6 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
           <span className="view-switch" role="group" aria-label="View">
             <button
               type="button"
-              aria-pressed={layout === "home"}
-              title="The project at a glance: talk and commits by day, decisions, cogit's own cost"
-              onClick={() => setLayout("home")}
-            >
-              Home
-            </button>
-            <button
-              type="button"
               aria-pressed={layout === "git"}
               title="Sessions and messages in time, like a git graph"
               onClick={() => setLayout("git")}
@@ -1073,22 +1072,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
             />
           ) : null}
           <div className="graph-canvas">
-            {layout === "home" ? (
-              <Home
-                model={model}
-                onOpenMessage={(sessionId, messageId) => {
-                  setLayout("git");
-                  selectFromFiles({ sessionId, messageId });
-                }}
-                onOpenFile={(path) => {
-                  setLayout("git");
-                  setGraphFocus(path);
-                  setShowFiles(true);
-                  setShowOutline(false);
-                  setShowCaptures(false);
-                }}
-              />
-            ) : layout === "graph" ? (
+            {layout === "graph" ? (
               <FileGraphView
                 files={model.files}
                 codeFiles={model.codeFiles}

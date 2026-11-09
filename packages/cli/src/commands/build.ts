@@ -37,16 +37,17 @@ import { withLock } from "../store/lock.js";
 import { readMapView } from "../store/map-view.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
-import { readSpend } from "../store/spend.js";
 import { loadAllSessions, loadConfig, loadProject } from "../store/stores.js";
 import { attachThoughtTrailers, earliestSessionStart, readThoughtTrailers } from "../thought.js";
 import { attachChanges } from "../view/change.js";
 import { buildFileHistory, modelSessions } from "../view/files.js";
 import { buildViewModel, embedViewModel, markBuiltBy } from "../view/lineage.js";
 import type { LineageViewModel, ViewChatTurn, ViewPendingMessage } from "../view/model.js";
+import { projectOverview, writeProjectOverview } from "../view/overview.js";
 import {
   buildPanel,
   collectInboxForProject,
+  collectOverview,
   collectRegistryData,
   type PanelData,
   panelSettings,
@@ -395,13 +396,13 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       // Story 15.1: the curated captured-work list, from the local store the
       // distiller and the CLI write. A corrupt or missing file is an empty list.
       built.captures = (await readCaptures(root, io.warn)).items;
-      // What cogit's own runs cost here, for the map's home.
-      const spend = await readSpend(root);
-      if (spend !== undefined) built.spend = spend;
       // The skill already avoids secrets; this is the safety net before rendering.
       const redacted = redactDeep(built);
       if (redacted.count > 0)
         io.warn(`redacted ${redacted.count} secret-looking value(s) in the map`);
+
+      // The start page's share of this project, from the same model the map shows.
+      await writeProjectOverview(root, projectOverview(redacted.value));
 
       const template = opts.templateHtml ?? TEMPLATE_HTML;
       await atomicWrite(
@@ -417,11 +418,16 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
   // The panel is derived state: a read-only home or a broken registry warning
   // must never turn a successful map build into a failure.
   try {
+    // The numbers were read before this build saved this project's; read them again.
+    const overview = await collectOverview(panelData.projects);
     await buildPanel({
       env: io.env,
       io,
       templateHtml: opts.templateHtml ?? TEMPLATE_HTML,
-      data: panelData,
+      data:
+        overview === undefined
+          ? { projects: panelData.projects, inbox: panelData.inbox }
+          : { ...panelData, overview },
     });
   } catch (err) {
     io.warn(`could not build panel.html: ${(err as Error).message}`);

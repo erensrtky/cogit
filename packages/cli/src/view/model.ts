@@ -372,11 +372,54 @@ export interface LineageViewModel {
    * build time. Absent on pages built before it.
    */
   captures?: ViewCapture[];
-  /**
-   * What cogit's own headless runs cost on this machine, read from
-   * `.cogit/state/spend.jsonl` at build time for the map's home. Absent when
-   * nothing was recorded yet.
-   */
+}
+
+/** One day's work: messages recorded and thought commits (commits a message led to). */
+export interface OverviewDay {
+  /** Local date, `YYYY-MM-DD`. */
+  day: string;
+  messages: number;
+  commits: number;
+  /** The day's first message that led to a commit. */
+  first?: { sessionId: string; messageId: string };
+}
+
+/**
+ * One project's numbers for the start page, written to
+ * `.cogit/state/overview.json` with each map build so the panel reads them
+ * without rebuilding every project.
+ */
+export interface ProjectOverview {
+  generatedAt: string;
+  /** Days with at least one message, oldest first. */
+  days: OverviewDay[];
+  /** Messages with a why or rejected options, plus every decision the agent took on its own. */
+  decisions: number;
+  /** Decisions the agent took on its own, without asking. */
+  byAgent: number;
+  /** Options considered and turned down. */
+  rejected: number;
+  /** The most discussed code files, most first. */
+  files: { path: string; count: number }[];
+}
+
+/** The start page's numbers: every project added up. */
+export interface PanelOverview {
+  /** Days with at least one message in any project, oldest first. */
+  days: (Omit<OverviewDay, "first"> & {
+    first?: { projectPath: string; mapUrl: string; sessionId: string; messageId: string };
+  })[];
+  decisions: number;
+  byAgent: number;
+  rejected: number;
+  files: {
+    projectName: string;
+    projectPath: string;
+    mapUrl: string;
+    path: string;
+    count: number;
+  }[];
+  /** cogit's own spend in every project; absent when none was recorded. */
   spend?: ViewSpend;
 }
 
@@ -524,6 +567,8 @@ export interface PanelViewModel {
    * pages built before it.
    */
   inbox?: ViewInboxRow[];
+  /** Every project's numbers added up, for the top of the page. Absent when no map was built yet. */
+  overview?: PanelOverview;
 }
 
 /** Either page the template can render; the embedded data decides which. */

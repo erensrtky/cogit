@@ -1,91 +1,48 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { LineageViewModel, ViewNode, ViewSession } from "../../cli/src/view/model.js";
-import {
-  calendarWeeks,
-  dailyActivity,
-  dayOf,
-  decisionCounts,
-  messageCount,
-  nextDay,
-  shade,
-  topFiles,
-} from "../src/dashboard.js";
-import { Home } from "../src/Home.js";
+import type { PanelOverview, PanelViewModel } from "../../cli/src/view/model.js";
+import { calendarWeeks, dayOf, fillDays, nextDay, shade } from "../src/dashboard.js";
+import { Overview } from "../src/Overview.js";
+import { Panel } from "../src/Panel.js";
 
-const message = (id: string, at: string, extra: Partial<ViewNode> = {}): ViewNode => ({
-  id,
-  kind: "message",
-  title: `Message ${id}`,
-  at,
-  ...extra,
-});
-
-const session = (sessionId: string, messages: ViewNode[]): ViewSession =>
-  ({ sessionId, title: sessionId, messages }) as unknown as ViewSession;
-
-// Local noon, so the day never moves with the time zone.
-const at = (day: number) => new Date(2026, 10, day, 12).toISOString();
 const today = new Date(2026, 10, 5, 18);
+const first = {
+  projectPath: "/p",
+  mapUrl: "file:///p/.cogit/map.html",
+  sessionId: "s1",
+  messageId: "ha",
+};
 
-const sessions = [
-  session("s1", [
-    message("a", at(2), {
-      commits: ["c1", "c2"],
-      why: "Because",
-      alternatives: [{ option: "X", why: "no" }],
-    }),
-    message("b", at(2)),
-    { id: "p", kind: "phase", title: "Phase" } as ViewNode,
-  ]),
-  session("s2", [
-    // The same commit again is not a second thought commit.
-    message("c", at(4), {
-      commits: ["c2", "c3"],
-      agentDecisions: [
-        { title: "Kept it small", why: "simpler", alternatives: [{ option: "Y", why: "big" }] },
-        { title: "Named it", why: "clear" },
-      ],
-    }),
-  ]),
-];
+const overview: PanelOverview = {
+  days: [
+    { day: "2026-11-02", messages: 2, commits: 2, first },
+    { day: "2026-11-04", messages: 1, commits: 1 },
+  ],
+  decisions: 3,
+  byAgent: 2,
+  rejected: 2,
+  files: [
+    { projectName: "p", projectPath: "/p", mapUrl: first.mapUrl, path: "src/a.ts", count: 2 },
+  ],
+};
 
-describe("dashboard numbers", () => {
-  it("counts messages and thought commits per day, quiet days included", () => {
-    const days = dailyActivity(sessions, today);
-    expect(days.map((day) => [day.day, day.messages, day.commits])).toEqual([
-      ["2026-11-02", 2, 2],
-      ["2026-11-03", 0, 0],
-      ["2026-11-04", 1, 1],
-      ["2026-11-05", 0, 0],
+describe("dashboard days", () => {
+  it("fills the quiet days up to today", () => {
+    expect(fillDays(overview.days, today).map((day) => [day.day, day.commits])).toEqual([
+      ["2026-11-02", 2],
+      ["2026-11-03", 0],
+      ["2026-11-04", 1],
+      ["2026-11-05", 0],
     ]);
-    expect(days[0]?.first).toEqual({ sessionId: "s1", messageId: "a" });
-    expect(days[1]?.first).toBeUndefined();
-    expect(dailyActivity([], today)).toEqual([]);
-  });
-
-  it("counts decisions the way cogit why lists them", () => {
-    expect(decisionCounts(sessions)).toEqual({ decisions: 3, byAgent: 2, rejected: 2 });
-    expect(messageCount(sessions)).toBe(3);
-  });
-
-  it("orders the most discussed code files", () => {
-    const files = [
-      { path: "src/a.ts", count: 2, hits: [] },
-      { path: "src/b.ts", count: 5, hits: [] },
-      { path: "package.json", count: 9, hits: [] },
-    ];
-    expect(topFiles(files, undefined).map((file) => file.path)).toEqual(["src/b.ts", "src/a.ts"]);
-    expect(topFiles(undefined, undefined)).toEqual([]);
+    expect(fillDays([], today)).toEqual([]);
   });
 
   it("lays a year out in Sunday-first weeks ending today", () => {
-    const weeks = calendarWeeks(dailyActivity(sessions, today), today);
+    const weeks = calendarWeeks(fillDays(overview.days, today), today);
     expect(weeks).toHaveLength(53);
-    const last = weeks.at(-1) ?? [];
     // 5 November 2026 is a Thursday: Sunday to Thursday shown, the rest still to come.
-    expect(last.map((day) => day?.day ?? null)).toEqual([
+    expect((weeks.at(-1) ?? []).map((day) => day?.day ?? null)).toEqual([
       "2026-11-01",
       "2026-11-02",
       "2026-11-03",
@@ -94,7 +51,6 @@ describe("dashboard numbers", () => {
       null,
       null,
     ]);
-    expect(last[1]?.commits).toBe(2);
     expect(weeks[0]?.[0]?.day).toBe("2025-11-02");
   });
 
@@ -106,34 +62,22 @@ describe("dashboard numbers", () => {
   });
 });
 
-describe("Home", () => {
-  const model = {
-    kind: "lineage",
-    schema: 1,
-    project: { name: "p", path: "/p", generatedAt: at(5) },
-    sessions,
-    files: [{ path: "src/a.ts", count: 2, hits: [] }],
-  } as unknown as LineageViewModel;
-  const render = (extra: Partial<LineageViewModel> = {}) =>
-    renderToStaticMarkup(
-      createElement(Home, {
-        model: { ...model, ...extra },
-        today,
-        onOpenMessage: () => {},
-        onOpenFile: () => {},
-      }),
-    );
+describe("Overview", () => {
+  const render = (extra: Partial<PanelOverview> = {}) =>
+    renderToStaticMarkup(createElement(Overview, { overview: { ...overview, ...extra }, today }));
 
   it("shows the chart, the numbers, the files and the calendar", () => {
     const html = render();
     expect(html).toContain("Talk and the code it led to");
     expect(html).toContain("2 taken by the agent on its own");
     expect(html).toContain("Not measured yet");
-    expect(html).toContain("src/a.ts");
+    expect(html).toContain('href="file:///p/.cogit/map.html#f=src%2Fa.ts"');
     expect(html).toContain("3 thought commits in the last year");
+    // A day with a thought commit links to its first one; a quiet day is no link.
+    expect(html).toContain('href="file:///p/.cogit/map.html#s=s1&amp;m=ha"');
   });
 
-  it("shows what cogit itself spent, per message since the first run", () => {
+  it("shows what cogit itself spent, per message since its first run", () => {
     const html = render({
       spend: {
         runs: 2,
@@ -142,7 +86,7 @@ describe("Home", () => {
         outputTokens: 500,
         cacheReadTokens: 10_000,
         cacheWriteTokens: 0,
-        since: new Date(2026, 10, 3).toISOString(),
+        since: new Date(2026, 10, 3, 9).toISOString(),
       },
     });
     expect(html).toContain("$0.30");
@@ -151,7 +95,25 @@ describe("Home", () => {
     expect(html).toContain("about $0.30 a message");
   });
 
-  it("says so when nothing is recorded", () => {
-    expect(render({ sessions: [] })).toContain("No sessions recorded yet");
+  it("leaves out the chart and the calendar before any message", () => {
+    const html = render({ days: [] });
+    expect(html).not.toContain("Talk and the code it led to");
+    expect(html).toContain("Decisions");
+  });
+
+  it("sits on top of the start page when there are numbers", () => {
+    const panel = {
+      kind: "panel",
+      schema: 1,
+      generatedAt: "2026-11-05T10:00:00.000Z",
+      settings: {},
+      projects: [],
+    } as unknown as PanelViewModel;
+    expect(renderToStaticMarkup(createElement(Panel, { model: panel }))).not.toContain(
+      "home-tiles",
+    );
+    expect(renderToStaticMarkup(createElement(Panel, { model: { ...panel, overview } }))).toContain(
+      "home-tiles",
+    );
   });
 });

@@ -5,6 +5,7 @@
  * the files they touched. The layout is a small force simulation with no
  * randomness, so the same record always draws the same picture.
  */
+import { graphFiles } from "../../cli/src/view/code-files.js";
 import type { ViewFile, ViewFileHit, ViewFileLink } from "../../cli/src/view/model.js";
 
 /** Messages shown per linked file; the focus file shows all of its own. */
@@ -71,33 +72,7 @@ export function isTestPath(path: string): boolean {
   return /(^|\/)(test|tests|__tests__)\//.test(path) || /\.(test|spec)\.[a-z]+$/.test(path);
 }
 
-/**
- * Without a code graph to say which files are code, the files a project
- * rarely decides anything in, by name: lockfiles, config, dotfiles, version
- * and licence files, and dependency or build folders.
- */
-export function isNoiseFile(path: string): boolean {
-  const name = path.split("/").pop() ?? path;
-  return (
-    /(^|\/)(node_modules|dist|build|out|coverage|vendor)\//.test(path) ||
-    path.split("/").some((part) => part.startsWith(".")) ||
-    /\.(json|jsonc|ya?ml|toml|ini|lock|env|cfg|conf)$/i.test(name) ||
-    /^(VERSION|LICEN[CS]E(\..*)?|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/i.test(name)
-  );
-}
-
-/**
- * The files the Graph view offers: the ones the code graph has as code, or,
- * without a graph, every file that is not noise by name.
- */
-export function graphFiles(
-  files: readonly ViewFile[],
-  codeFiles: readonly string[] | undefined,
-): ViewFile[] {
-  if (codeFiles === undefined) return files.filter((file) => !isNoiseFile(file.path));
-  const code = new Set(codeFiles);
-  return files.filter((file) => code.has(file.path));
-}
+export { graphFiles, isNoiseFile } from "../../cli/src/view/code-files.js";
 
 const messageId = (hit: ViewFileHit): string => `${hit.sessionId}:${hit.messageId}`;
 

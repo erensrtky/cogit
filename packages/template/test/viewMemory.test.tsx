@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ViewFile } from "../../cli/src/view/model.js";
 import { FileGraphView } from "../src/FileGraphView.js";
-import { readViewMemory, rememberView } from "../src/viewMemory.js";
+import { readViewMemory, rememberView, withLinkedFile } from "../src/viewMemory.js";
 
 /** A stand-in for the browser's localStorage, or one that refuses every call. */
 function useStorage(storage: Partial<Storage> | "blocked"): Map<string, string> {
@@ -99,5 +99,18 @@ describe("the map's view memory", () => {
     expect(html).toContain(">Session one</button>");
     // Another project starts fresh.
     expect(render("/q")).not.toContain(">Session one</button>");
+  });
+});
+
+describe("a link to the map at a file", () => {
+  it("opens the git view with the Files panel on that file", () => {
+    expect(withLinkedFile({ layout: "graph", panel: "outline" }, "#f=src%2Fa.ts")).toEqual({
+      layout: "git",
+      panel: "files",
+      graphFocus: "src/a.ts",
+    });
+    const memory = { layout: "graph" as const };
+    expect(withLinkedFile(memory, "#s=s1&m=h1")).toBe(memory);
+    expect(withLinkedFile(memory, "#f=")).toBe(memory);
   });
 });

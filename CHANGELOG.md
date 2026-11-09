@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The **Home** view moved from the map to the start page `cogit open` shows, above "Your turn", and adds up every project: messages and thought commits per day, the decisions and the options turned down, what cogit itself cost, the most discussed files (with their project; a click opens that project's map on the file) and a year of thought commits. Each map build saves its project's numbers in `.cogit/state/overview.json` for it. The map is back to the git and Graph views.
+
 ## [1.3.0] - 2026-11-09
 ### Added
 - The map has a **Graph view** beside the git view: the work recorded on the project's code, peeled like an onion. It opens on all the sessions; a click goes inside a session to its branches and inside a branch to its messages, each in a lane colour, and the trail above it or Esc steps back (**Open in place** opens them where they are instead). Parts are linked when they touched the same code files, a rare file counting for more than one everything touches. Picking a file in the Files panel narrows it to the work on that file and the files it imports or is imported by; **All files** goes back. A ringed part landed a commit; **Show files** draws the files and their imports, **Show commits** the commits as squares. Clicking a message opens its card, the same one the git view opens. The git view's own buttons stay in place, disabled, so the toolbar does not move. The map remembers per project, in the browser, which view and side panel were open and where you were in the Graph view, so a refresh or a switch between the views comes back to it. The import links come from the code graph [graphify](https://github.com/safishamsi/graphify) writes; cogit only reads it, and `cogit init` says whether it found one, offers to build one when graphify is installed (`--graph` / `--no-graph`), or prints how to add it.

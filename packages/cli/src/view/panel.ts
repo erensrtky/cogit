@@ -7,6 +7,7 @@ import type { Session } from "../schema/session.js";
 import { atomicWrite, isDirectory } from "../store/fs.js";
 import { readInboxDismissed } from "../store/inbox-state.js";
 import { globalPaths, projectPaths } from "../store/paths.js";
+import { readSpend } from "../store/spend.js";
 import { loadAllSessions, loadConfig, loadRegistry } from "../store/stores.js";
 import {
   compareInboxRows,
@@ -17,11 +18,13 @@ import {
 } from "./inbox.js";
 import { embedViewModel, lastActive, sessionTitle, statusCard } from "./lineage.js";
 import {
+  type PanelOverview,
   type PanelSettings,
   type PanelViewModel,
   VIEW_SCHEMA,
   type ViewInboxRow,
 } from "./model.js";
+import { mergeOverviews, type OverviewPart, readProjectOverview } from "./overview.js";
 import type { SwitcherSource } from "./switcher.js";
 import { TEMPLATE_HTML } from "./template.js";
 
@@ -195,6 +198,8 @@ export async function collectInboxForProject(
 export interface PanelData {
   projects: CollectedProject[];
   inbox: ViewInboxRow[];
+  /** Every project's numbers added up; absent when none has any yet. */
+  overview?: PanelOverview;
 }
 
 /**
@@ -265,7 +270,29 @@ export async function collectPanelData(
   // Each project's rows are aged and sorted on their own; the panel reads them
   // as one list, so the longest-waiting session across projects comes first.
   inbox.sort(compareInboxRows);
-  return { projects, inbox };
+  const overview = await collectOverview(projects);
+  return overview === undefined ? { projects, inbox } : { projects, inbox, overview };
+}
+
+/**
+ * Every project's numbers for the top of the page, read from what each map
+ * build saved; a project whose map was never built adds nothing.
+ */
+export async function collectOverview(
+  projects: readonly { name: string; path: string; missing: boolean }[],
+): Promise<PanelOverview | undefined> {
+  const parts: OverviewPart[] = [];
+  for (const project of projects) {
+    if (project.missing) continue;
+    parts.push({
+      name: project.name,
+      path: project.path,
+      mapUrl: pathToFileURL(projectPaths(project.path).html).href,
+      overview: await readProjectOverview(project.path),
+      spend: await readSpend(project.path),
+    });
+  }
+  return mergeOverviews(parts);
 }
 
 /** The panel cards only; kept for callers that do not need the inbox. */
@@ -333,6 +360,7 @@ export async function buildPanel(opts: PanelOptions): Promise<PanelViewModel> {
     projects: data.projects.map(({ leftOff: _leftOff, ...project }) => project),
     // Oldest first: the row that has waited longest is the one to go back to.
     inbox: data.inbox,
+    ...(data.overview === undefined ? {} : { overview: data.overview }),
   };
 
   // Same safety net as the map: nothing leaves this process unredacted.

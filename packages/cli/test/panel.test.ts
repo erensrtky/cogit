@@ -200,6 +200,9 @@ describe("panel refresh from build", () => {
     expect(afterBuild.projects).toEqual([
       expect.objectContaining({ name: "proj", path: root, missing: false }),
     ]);
+    // The build saved the project's numbers before writing the panel, which shows them.
+    expect(existsSync(projectPaths(root).overview)).toBe(true);
+    expect(afterBuild.overview).toMatchObject({ days: [], decisions: 0, files: [] });
 
     const io = fakeIo(env);
     await sessionWrite({ dir: root }, io, async () => JSON.stringify({ sessionId: "s1" }));
