@@ -130,19 +130,24 @@ the map. In the terminal: `cogit log --file <path>` and `cogit why <path>`.
 ## Graph view
 
 **Git view** draws sessions and messages in time. **Graph view** draws them around one file:
-the thoughts that touched it and the recorded files it imports or is imported by. It answers
+the work that touched it and the recorded files it imports or is imported by. It answers
 "what shaped this file and its neighbours" instead of "what happened when".
 
-It draws the thoughts: each dot is a message titled underneath, and two are linked when they touched
-the same files, thicker for more. The file in focus is left out of that count, since every
-thought on it would link to every other; its thoughts are drawn in the accent colour and
-gather in the middle. Each thought keeps its three strongest links. **Show files** draws the files
-too: the focus in the middle, its linked files around it with their imports, and each thought
-tied to the files it touched.
+It is peeled like an onion. It opens on the **sessions** that touched those files, each titled
+under its circle. Click a session to open it into its **branches**, and a branch into its
+**messages**; the opened session or branch stays as a small hub its parts hang from, and a
+click on the hub folds it again. Clicking a message opens its card, the same one the git view
+opens; if the card's message sits in a folded session or branch, that one lights up.
 
-A ringed thought landed a commit. **Show commits** draws each commit as a square tied to the
-thought that landed it and, with the files drawn, to the files it changed; clicking one opens
-that thought's card.
+At every layer two parts are linked when they touched the same files, thicker for more. The
+file in focus is left out of that count, since everything on it would link to everything
+else; what touched it is drawn in the accent colour and gathers in the middle. Each part
+keeps its three strongest links. **Show files** draws the files too: the focus, its linked
+files with their imports, and which part touched which.
+
+A ringed part landed a commit. **Show commits** draws each commit as a square tied to what
+landed it and, with the files drawn, to the files it changed; clicking one opens the message
+that made it.
 
 Switching to the Graph view opens the **Files** panel, which picks the file there: a row
 moves the graph to that file and opens its history; the file in focus is highlighted and the

@@ -1236,6 +1236,64 @@ body:has(.map-shell.is-expanded) {
   stroke-width: 2.5;
 }
 
+/* The onion's layers: sessions outermost, then branches, then messages. */
+.fg-session circle {
+  fill: var(--raised);
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+.fg-branch circle {
+  fill: var(--raised);
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+
+.fg-session.is-direct circle,
+.fg-branch.is-direct circle {
+  fill: var(--active);
+  stroke: var(--accent);
+}
+
+.fg-node.is-open circle {
+  fill: var(--row-bg);
+  stroke-dasharray: none;
+}
+
+.fg-edge.fg-part {
+  stroke: var(--muted);
+  stroke-opacity: 0.35;
+  stroke-dasharray: 2 3;
+}
+
+.fg-node text.fg-label-session {
+  fill: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fg-node text.fg-label-branch {
+  fill: var(--text);
+  font-size: 11px;
+}
+
+.file-graph-legend .lg-session {
+  width: 12px;
+  height: 12px;
+  background: var(--raised);
+  border: 2px solid var(--text);
+  border-radius: 50%;
+}
+
+.file-graph-legend .lg-branch {
+  width: 10px;
+  height: 10px;
+  background: var(--raised);
+  border: 1.5px dashed var(--muted);
+  border-radius: 50%;
+}
+
 .fg-node.is-faded {
   opacity: 0.3;
 }

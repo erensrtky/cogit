@@ -7,7 +7,8 @@ import {
   graphBounds,
   graphFiles,
   layoutFileGraph,
-  thoughtGraph,
+  onionGraph,
+  type Peeled,
   withCommits,
 } from "./fileGraph.js";
 import {
@@ -45,6 +46,7 @@ export function FileGraphView({
   onFocus,
   onSelect,
   filesAtStart = false,
+  peeledAtStart,
 }: {
   files: readonly ViewFile[] | undefined;
   /** The recorded files the code graph has as code; undefined without a graph. */
@@ -54,14 +56,22 @@ export function FileGraphView({
   active: GraphTarget | null;
   onFocus: (path: string) => void;
   onSelect: (target: GraphTarget) => void;
-  /** Open with the files drawn; the view opens on the thoughts alone otherwise. */
+  /** Open with the files drawn; the view opens on the sessions alone otherwise. */
   filesAtStart?: boolean;
+  /** Sessions and branches open from the start (tests, a link to a message). */
+  peeledAtStart?: { sessions?: readonly string[]; branches?: readonly string[] };
 }) {
   const list = useMemo(() => graphFiles(files ?? [], codeFiles), [files, codeFiles]);
   const current =
     focus !== null && list.some((file) => file.path === focus) ? focus : defaultFocus(list, links);
-  // Thoughts only by default; the Files switch draws the files and their imports too.
+  // The files layer: the files the shown parts touched and which imports which.
   const [showFiles, setShowFiles] = useState(filesAtStart);
+  // Peeled like an onion: sessions first, a click opens one into its branches,
+  // a branch into its messages, and a click on an opened hub folds it again.
+  const [peeled, setPeeled] = useState<Peeled>(() => ({
+    sessions: new Set(peeledAtStart?.sessions ?? []),
+    branches: new Set(peeledAtStart?.branches ?? []),
+  }));
   // The commits layer: a square per commit, tied to the thought that landed it.
   const [showCommits, setShowCommits] = useState(false);
   const full = useMemo(
@@ -70,9 +80,9 @@ export function FileGraphView({
   );
   const graph = useMemo(() => {
     if (full === null || current === undefined) return null;
-    const base = showFiles ? full : thoughtGraph(full, current);
+    const base = onionGraph(full, current, peeled, showFiles);
     return showCommits ? withCommits(base) : base;
-  }, [full, current, showFiles, showCommits]);
+  }, [full, current, peeled, showFiles, showCommits]);
   const nodes = useMemo(() => (graph === null ? [] : layoutFileGraph(graph)), [graph]);
   const bounds = useMemo(() => graphBounds(nodes), [nodes]);
   const at = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
@@ -149,7 +159,12 @@ export function FileGraphView({
       </div>
     );
 
-  const activeId = active === null ? null : `${active.sessionId}:${active.messageId}`;
+  const openMessage = active === null ? null : `${active.sessionId}:${active.messageId}`;
+  // The open message, or the folded session or branch that holds it.
+  const activeId =
+    openMessage === null || at.has(openMessage)
+      ? openMessage
+      : (nodes.find((node) => !node.open && node.members?.includes(openMessage))?.id ?? null);
   const lit = new Set<string>();
   if (activeId !== null && at.has(activeId)) {
     lit.add(activeId);
@@ -165,14 +180,29 @@ export function FileGraphView({
   const fileNodes = (full?.nodes ?? []).filter((node) => node.kind === "file");
   const linkedFiles = fileNodes.length - 1;
   const messages = (full?.nodes.length ?? 0) - fileNodes.length;
+  const sessions = new Set(
+    (full?.nodes ?? []).flatMap((node) => (node.hit === undefined ? [] : [node.hit.sessionId])),
+  ).size;
+  const toggle = (kind: "sessions" | "branches", key: string) =>
+    setPeeled((now) => {
+      const next = new Set(now[kind]);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return { ...now, [kind]: next };
+    });
   const click = (node: GraphNode) => {
     if (dragged.current) return;
     if (node.kind === "file") onFocus(node.id);
+    else if (node.kind === "session") toggle("sessions", node.id.slice("session:".length));
+    else if (node.kind === "branch") toggle("branches", node.id.slice("branch:".length));
     else if (node.kind === "commit") {
-      // A commit opens the thought that landed it.
-      const from = graph.edges.find((edge) => edge.kind === "landed" && edge.to === node.id);
-      const hit = from === undefined ? undefined : at.get(from.from)?.hit;
-      if (hit !== undefined) onSelect({ sessionId: hit.sessionId, messageId: hit.messageId });
+      // A commit opens the message that landed it, even from inside a folded layer.
+      const hash = node.commits?.[0];
+      const landed = (full?.nodes ?? []).find(
+        (other) => other.kind === "message" && hash !== undefined && other.commits?.includes(hash),
+      )?.hit;
+      if (landed !== undefined)
+        onSelect({ sessionId: landed.sessionId, messageId: landed.messageId });
     } else if (node.hit !== undefined)
       onSelect({ sessionId: node.hit.sessionId, messageId: node.hit.messageId });
   };
@@ -206,8 +236,8 @@ export function FileGraphView({
           <span className="file-graph-focus">{current}</span>
           <span className="file-graph-meta">
             {links === undefined
-              ? `${messages} message${messages === 1 ? "" : "s"}; no code graph, so no linked files`
-              : `${linkedFiles} linked file${linkedFiles === 1 ? "" : "s"} · ${messages} message${messages === 1 ? "" : "s"}${
+              ? `${sessions} session${sessions === 1 ? "" : "s"} · ${messages} message${messages === 1 ? "" : "s"}; no code graph, so no linked files`
+              : `${linkedFiles} linked file${linkedFiles === 1 ? "" : "s"} · ${sessions} session${sessions === 1 ? "" : "s"} · ${messages} message${messages === 1 ? "" : "s"}${
                   graph.hidden > 0 ? ` · ${graph.hidden} older on linked files not shown` : ""
                 }`}
           </span>
@@ -261,7 +291,7 @@ export function FileGraphView({
                     key={node.id}
                     className={`fg-node fg-${node.kind}${node.role === "focus" ? " is-focus" : ""}${
                       node.direct ? " is-direct" : ""
-                    }${lit.has(node.id) ? " is-on" : ""}${activeId !== null && !lit.has(node.id) ? " is-faded" : ""}`}
+                    }${node.open ? " is-open" : ""}${lit.has(node.id) ? " is-on" : ""}${activeId !== null && !lit.has(node.id) ? " is-faded" : ""}`}
                     role="button"
                     tabIndex={0}
                     onClick={() => click(node)}
@@ -276,9 +306,15 @@ export function FileGraphView({
                           }`
                         : node.kind === "commit"
                           ? `commit ${node.commits?.[0] ?? ""}`
-                          : `${node.hit?.title ?? ""}\n${node.hit?.sessionTitle ?? ""} · ${node.hit?.label ?? ""}${
-                              node.commits?.length ? `\ncommits: ${node.commits.join(" ")}` : ""
-                            }`}
+                          : node.kind === "session" || node.kind === "branch"
+                            ? `${node.label ?? ""}\n${node.kind} · ${node.members?.length ?? 0} message${
+                                node.members?.length === 1 ? "" : "s"
+                              } · click to ${node.open ? "fold" : "open"}${
+                                node.commits?.length ? `\ncommits: ${node.commits.join(" ")}` : ""
+                              }`
+                            : `${node.hit?.title ?? ""}\n${node.hit?.sessionTitle ?? ""} · ${node.hit?.label ?? ""}${
+                                node.commits?.length ? `\ncommits: ${node.commits.join(" ")}` : ""
+                              }`}
                     </title>
                     {node.kind === "commit" ? (
                       <rect
@@ -290,8 +326,11 @@ export function FileGraphView({
                     ) : (
                       <circle cx={node.x} cy={node.y} r={node.r} />
                     )}
-                    {node.kind === "message" && node.commits?.length ? (
-                      // A ring: this thought landed code.
+                    {node.kind !== "file" &&
+                    node.kind !== "commit" &&
+                    !node.open &&
+                    node.commits?.length ? (
+                      // A ring: this landed code.
                       <circle className="fg-ring" cx={node.x} cy={node.y} r={node.r + 3} />
                     ) : null}
                     {node.kind === "commit" ? (
@@ -309,8 +348,18 @@ export function FileGraphView({
                       <text x={node.x} y={node.y - node.r - 6} textAnchor="middle">
                         {shortName(node.id)}
                       </text>
+                    ) : node.kind === "session" || node.kind === "branch" ? (
+                      // Sessions and branches always carry their title; an opened hub above it.
+                      <text
+                        className={`fg-label fg-label-${node.kind}`}
+                        x={node.x}
+                        y={node.open ? node.y - node.r - 6 : node.y + node.r + 12}
+                        textAnchor="middle"
+                      >
+                        {clip(node.label ?? "")}
+                      </text>
                     ) : !showFiles || lit.has(node.id) ? (
-                      // Thoughts carry their title; with the files drawn, only the lit ones.
+                      // Messages carry their title; with the files drawn, only the lit ones.
                       <text
                         className="fg-label"
                         x={node.x}
@@ -326,47 +375,46 @@ export function FileGraphView({
             </g>
           </svg>
           <div className="file-graph-legend">
+            <span>
+              <i className="lg-session" />
+              session
+            </span>
+            <span>
+              <i className="lg-branch" />
+              branch
+            </span>
+            <span>
+              <i className="lg-message lg-muted" />
+              message
+            </span>
+            <span>
+              <i className="lg-message" />
+              touched {shortName(current)}
+            </span>
+            <span>
+              <i className="lg-landed" />
+              landed a commit
+            </span>
             {showFiles ? (
               <>
                 <span>
                   <i className="lg-file" />
-                  file (size = messages)
-                </span>
-                <span>
-                  <i className="lg-message" />
-                  thought
+                  file
                 </span>
                 <span>
                   <i className="lg-import" />
                   imports
                 </span>
-                <span>
-                  <i className="lg-landed" />
-                  landed a commit
-                </span>
-                <span>click a file to move there · drag · wheel to zoom</span>
               </>
             ) : (
-              <>
-                <span>
-                  <i className="lg-message" />
-                  thought on {shortName(current)}
-                </span>
-                <span>
-                  <i className="lg-message lg-muted" />
-                  thought on a linked file
-                </span>
-                <span>
-                  <i className="lg-import" />
-                  shared files (thicker = more)
-                </span>
-                <span>
-                  <i className="lg-landed" />
-                  landed a commit
-                </span>
-                <span>drag · wheel to zoom</span>
-              </>
+              <span>
+                <i className="lg-import" />
+                shared files (thicker = more)
+              </span>
             )}
+            <span>
+              click a session or branch to open it, its hub to fold it · drag · wheel to zoom
+            </span>
           </div>
         </div>
       </div>
