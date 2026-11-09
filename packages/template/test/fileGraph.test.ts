@@ -405,3 +405,33 @@ describe("the commits layer", () => {
     for (const node of nodes) expect(Number.isFinite(node.x) && Number.isFinite(node.y)).toBe(true);
   });
 });
+
+describe("the layout under load", () => {
+  it("stays on the page with one session tied to many commits, files and commits drawn", () => {
+    // The whole-project picture with files and commits on: one session holds
+    // forty messages, each landing its own commit on one of thirty files.
+    const busy = Array.from({ length: 30 }, (_, f) =>
+      file(
+        `src/f${f}.ts`,
+        Array.from({ length: 40 }, (_, m) => m)
+          .filter((m) => m % 30 === f)
+          .map((m) => ({ ...hit(`m${m}`, "busy"), commits: [`c${String(m).padStart(6, "0")}`] })),
+      ),
+    ).filter((entry) => entry.hits.length > 0);
+    const quiet = file("src/quiet.ts", [hit("q", "quiet")]);
+    const project = buildProjectGraph([...busy, quiet], []);
+    for (const view of [
+      {},
+      { peeled: { sessions: new Set<string>(), branches: new Set<string>() } },
+    ]) {
+      const graph = withCommits(onionGraph(project, undefined, view, true));
+      const nodes = layoutFileGraph(graph);
+      expect(nodes.filter((node) => node.kind === "commit")).toHaveLength(40);
+      for (const node of nodes) {
+        expect(Number.isFinite(node.x) && Number.isFinite(node.y)).toBe(true);
+        expect(Math.abs(node.x)).toBeLessThan(5000);
+        expect(Math.abs(node.y)).toBeLessThan(5000);
+      }
+    }
+  });
+});

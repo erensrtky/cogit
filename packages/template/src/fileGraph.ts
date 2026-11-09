@@ -453,6 +453,8 @@ export function onionGraph(
 }
 
 const ITERATIONS = 300;
+/** The furthest a node moves in one step of the layout. */
+const MAX_STEP = 40;
 const CHARGE = { file: 1400, session: 260, branch: 160, message: 90, commit: 40 } as const;
 const LINK = {
   import: { distance: 200, strength: 0.4 },
@@ -510,6 +512,7 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
     ? { charge: 4, distance: 1.7, gap: 22 }
     : { charge: 1, distance: 1, gap: 3 };
   const springs: { a: number; b: number; distance: number; strength: number }[] = [];
+  const degree = nodes.map(() => 0);
   for (const edge of graph.edges) {
     const a = index.get(edge.from);
     const b = index.get(edge.to);
@@ -518,6 +521,8 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
     // A thought pair sharing more files pulls harder.
     const strength = Math.min(0.6, link.strength * (edge.weight ?? 1));
     springs.push({ a, b, distance: link.distance * room.distance, strength });
+    degree[a] = (degree[a] as number) + 1;
+    degree[b] = (degree[b] as number) + 1;
   }
   const fixed = (node: (typeof nodes)[number]) => node.role === "focus";
   // Without the focus file in the picture, its thoughts gather in the middle.
@@ -544,11 +549,17 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
       const dx = b.x - a.x;
       const dy = b.y - a.y;
       const d = Math.sqrt(dx * dx + dy * dy) || 1;
-      const pull = ((d - spring.distance) / d) * spring.strength * alpha * 0.5;
-      a.vx += dx * pull;
-      a.vy += dy * pull;
-      b.vx -= dx * pull;
-      b.vy -= dy * pull;
+      const pull = ((d - spring.distance) / d) * spring.strength * alpha;
+      // As in d3-force, the end with more links moves less: a session tied to
+      // forty commits would otherwise be yanked forty ways at once and the
+      // layout would swing further on every step until it flew apart.
+      const share =
+        (degree[spring.a] as number) /
+        ((degree[spring.a] as number) + (degree[spring.b] as number));
+      a.vx += dx * pull * (1 - share);
+      a.vy += dy * pull * (1 - share);
+      b.vx -= dx * pull * share;
+      b.vy -= dy * pull * share;
     }
     for (const node of nodes) {
       if (fixed(node)) {
@@ -559,8 +570,9 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
       const gravity = centre && node.direct ? 0.15 : 0.01;
       node.vx -= node.x * gravity * alpha;
       node.vy -= node.y * gravity * alpha;
-      node.vx *= 0.6;
-      node.vy *= 0.6;
+      // A last guard: no step moves a node further than this.
+      node.vx = Math.max(-MAX_STEP, Math.min(MAX_STEP, node.vx * 0.6));
+      node.vy = Math.max(-MAX_STEP, Math.min(MAX_STEP, node.vy * 0.6));
       node.x += node.vx;
       node.y += node.vy;
     }
