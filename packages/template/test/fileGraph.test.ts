@@ -434,4 +434,24 @@ describe("the layout under load", () => {
       }
     }
   });
+
+  it("keeps a part with no link near the others instead of flinging it away", () => {
+    // With the files drawn, a session that touched none of the most discussed
+    // files has no line at all (as in this project's map, where one flew off).
+    const busy = Array.from({ length: PROJECT_FILES + 5 }, (_, f) =>
+      file(`src/f${f}.ts`, [hit(`a${f}`, `s${f % 8}`), hit(`b${f}`, `s${(f + 3) % 8}`)]),
+    );
+    const project = buildProjectGraph([...busy, file("src/alone.ts", [hit("z", "z")])], []);
+    const nodes = layoutFileGraph(onionGraph(project, undefined, {}, true));
+    const nearest = nodes.map((node) =>
+      Math.min(
+        ...nodes
+          .filter((other) => other !== node)
+          .map((other) => Math.hypot(node.x - other.x, node.y - other.y)),
+      ),
+    );
+    const median = [...nearest].sort((a, b) => a - b)[Math.floor(nearest.length / 2)] as number;
+    const alone = nearest[nodes.findIndex((node) => node.id === "session:z")] as number;
+    expect(alone).toBeLessThan(median * 4);
+  });
 });

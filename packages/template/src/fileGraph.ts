@@ -525,6 +525,9 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
     degree[b] = (degree[b] as number) + 1;
   }
   const fixed = (node: (typeof nodes)[number]) => node.role === "focus";
+  // A node with no link has nothing holding it, so the others push it far off
+  // the page; after the layout it is set down beside its nearest linked node.
+  const lonely = new Set(nodes.filter((_, i) => degree[i] === 0));
   // Without the focus file in the picture, its thoughts gather in the middle.
   const centre = !nodes.some(fixed);
 
@@ -592,6 +595,35 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
         b.x += (dx / d) * gap * (share[1] as number);
         b.y += (dy / d) * gap * (share[1] as number);
       }
+  }
+  // Each lonely node goes just outside its nearest linked node, on the side
+  // away from the middle, clear of anything already there.
+  const settled = nodes.filter((node) => !lonely.has(node));
+  if (settled.length > 0) {
+    const cx = settled.reduce((sum, node) => sum + node.x, 0) / settled.length;
+    const cy = settled.reduce((sum, node) => sum + node.y, 0) / settled.length;
+    for (const node of lonely) {
+      let near = settled[0] as (typeof nodes)[number];
+      for (const other of settled)
+        if (
+          Math.hypot(other.x - node.x, other.y - node.y) <
+          Math.hypot(near.x - node.x, near.y - node.y)
+        )
+          near = other;
+      const dx = near.x - cx || 1;
+      const dy = near.y - cy;
+      const length = Math.hypot(dx, dy);
+      let gap = near.r + node.r + room.gap + 8;
+      const at = () => ({ x: near.x + (dx / length) * gap, y: near.y + (dy / length) * gap });
+      const clear = () =>
+        settled.every((other) => {
+          const spot = at();
+          return Math.hypot(other.x - spot.x, other.y - spot.y) >= other.r + node.r + room.gap;
+        });
+      for (let tries = 0; tries < 20 && !clear(); tries += 1) gap += node.r * 2 + room.gap;
+      ({ x: node.x, y: node.y } = at());
+      settled.push(node);
+    }
   }
   return nodes.map(({ vx: _vx, vy: _vy, ...node }) => node);
 }
