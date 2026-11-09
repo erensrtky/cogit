@@ -21162,6 +21162,8 @@ function projectPaths(root) {
     captures: join6(base, "state", "captures.json"),
     /** What cogit's own headless runs cost, one line per run; local. */
     spend: join6(base, "state", "spend.jsonl"),
+    /** The project's numbers for the start page, written with each map build; local. */
+    overview: join6(base, "state", "overview.json"),
     /** What the detached hook children (build, side run) printed; local, capped. */
     detachedLog: join6(base, "state", "detached.log"),
     /** What the record refs last looked like, and what waits to be sent; local. */
@@ -21261,7 +21263,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-LOFPKAAA.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-LS5AIXA5.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -25616,7 +25618,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "1.3.0",
+  version: "1.3.1",
   description: "Git for the intent behind agent-written code.",
   license: "MIT",
   keywords: [
