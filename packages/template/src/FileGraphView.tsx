@@ -276,17 +276,20 @@ export function FileGraphView({
             />
             Show commits
           </label>
-          <label
-            className="file-graph-show"
-            title="Open sessions and branches where they are, keeping the others around them"
-          >
-            <input
-              type="checkbox"
-              checked={inPlace}
-              onChange={(event) => setInPlace(event.target.checked)}
-            />
-            Open in place
-          </label>
+          {/* Only on the outermost layer: inside a session or branch it has nothing to open. */}
+          {inside === undefined ? (
+            <label
+              className="file-graph-show"
+              title="Open sessions and branches where they are, keeping the others around them"
+            >
+              <input
+                type="checkbox"
+                checked={inPlace}
+                onChange={(event) => setInPlace(event.target.checked)}
+              />
+              Open in place
+            </label>
+          ) : null}
           <span className="file-graph-focus">{current ?? "Whole project"}</span>
           <span className="file-graph-meta">
             {current === undefined

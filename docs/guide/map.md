@@ -137,7 +137,7 @@ to go inside it: only its **branches** are left, each in its own lane colour. Cl
 to go inside that too: its **messages**, in the branch's colour. The trail above the picture
 (`All sessions › a session › a branch`) or **Esc** steps back out. Clicking a message opens
 its card, the same one the git view opens; if that message sits in a session or branch you
-are not inside, that one lights up. **Open in place** opens sessions and branches where they
+are not inside, that one lights up. **Open in place**, offered on the outermost layer, opens sessions and branches where they
 are instead, keeping the others around them: an opened one stays as a small hub in its own
 colour, its parts hang from it, and a click on the hub folds it again.
 

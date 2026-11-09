@@ -120,6 +120,10 @@ describe("the Graph view", () => {
     expect(inBranch).toContain(">Session one</button>");
     expect(inBranch).toContain('aria-current="true">Before any branch</button>');
     expect(inBranch).toContain("Esc to step back");
+    // Inside a layer there is nothing to open in place, so the option goes.
+    expect(top).toContain("Open in place");
+    expect(inBranch).not.toContain("Open in place");
+    expect(render({ insideAtStart: { session: "s1" } })).not.toContain("Open in place");
     expect(inBranch.match(/class="fg-node fg-message/g)).toHaveLength(2);
     // Opened in place there is no trail.
     expect(render({ peeledAtStart: { sessions: ["s1"] } })).not.toContain("file-graph-trail");
