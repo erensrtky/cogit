@@ -906,7 +906,8 @@ body:has(.map-shell.is-expanded) {
 
 /* Another person's sessions under the filter: in place, faded, so the lines stay whole. */
 .session-row.is-dimmed,
-.session-rows.is-dimmed {
+.session-rows.is-dimmed,
+.git-row.is-dimmed {
   opacity: 0.35;
 }
 

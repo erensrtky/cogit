@@ -39,9 +39,9 @@ function reasonOf(
 }
 
 /**
- * In the Graph view the list also picks the file the graph is drawn around:
- * a row click moves the graph there, and the rows say which file is in focus
- * and which are linked to it.
+ * The list also picks a file: in the Graph view the graph is drawn around it,
+ * in the git view the work that did not touch it fades. The rows say which
+ * file is picked and which are linked to it.
  */
 export interface FilesPick {
   /** The file in focus; undefined is the whole project. */
@@ -49,6 +49,8 @@ export interface FilesPick {
   linked: ReadonlySet<string>;
   /** A file to focus on, or null for the whole project. */
   onPick: (path: string | null) => void;
+  /** What picking a row does, for its tooltip. */
+  hint: string;
 }
 
 export function FilesView({
@@ -67,7 +69,7 @@ export function FilesView({
   active: FilesTarget | null;
   /** A file a message's card opened, shown with its history. */
   focus?: FilesFocus | null;
-  /** The Graph view's file picker; absent in the git view. */
+  /** The file picker; absent where the list only shows history. */
   pick?: FilesPick | undefined;
   onSelect: (target: FilesTarget) => void;
   onClose: () => void;
@@ -144,7 +146,7 @@ export function FilesView({
                     type="button"
                     className={`outline-item file-row file-row-all${pick.current === undefined ? " is-picked" : ""}`}
                     aria-current={pick.current === undefined ? "true" : undefined}
-                    title="Draw the graph for the whole project"
+                    title="No file picked: the whole project"
                     onClick={() => pick.onPick(null)}
                   >
                     <span className="label">All files</span>
@@ -178,10 +180,10 @@ export function FilesView({
                       title={
                         pick === undefined
                           ? file.path
-                          : `${file.path}${linked ? " · linked to the file in focus" : ""} · draw the graph around it`
+                          : `${file.path}${linked ? " · linked to the file in focus" : ""} · ${pick.hint}`
                       }
                       onClick={() => {
-                        // In the Graph view a row moves the graph there and opens its history.
+                        // A row picks the file and opens its history.
                         if (pick !== undefined) {
                           pick.onPick(file.path);
                           setOpenPath(file.path);

@@ -32,6 +32,7 @@ function Row({
   selected,
   searchHit,
   searchActive,
+  dimmed,
   bigChangeLines,
   onSelect,
   onUnfold,
@@ -44,6 +45,8 @@ function Row({
   searchHit: boolean;
   /** The hit the ↑/↓ counter is on. */
   searchActive: boolean;
+  /** Left out by the file filter: kept in place, faded. */
+  dimmed: boolean;
   /** A change at or above this many lines gets the quiet highlight. */
   bigChangeLines: number;
   onSelect: (row: GitMessageRow) => void;
@@ -81,6 +84,7 @@ function Row({
     searchHit ? "is-search-hit" : "",
     searchActive ? "is-search-active" : "",
     big ? "is-big-change" : "",
+    dimmed ? "is-dimmed" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -139,6 +143,7 @@ export function GitGraph({
   git,
   selectedId,
   highlightIds,
+  touchedIds,
   activeHitId,
   bigChangeLines,
   onSelect,
@@ -150,6 +155,8 @@ export function GitGraph({
   /** Branch the drill-down belongs to. */
   /** Messages that match the map search (Story 8.14); undefined when none. */
   highlightIds: ReadonlySet<string> | undefined;
+  /** With a file filter, the messages that touched the file; the rest fade. Undefined for no filter. */
+  touchedIds?: ReadonlySet<string> | undefined;
   /** The search hit the counter is on, if it belongs to this session. */
   activeHitId: string | null;
   /** A change at or above this many lines gets the quiet highlight. */
@@ -245,6 +252,7 @@ export function GitGraph({
               selected={messageId !== null && selectedId !== null && messageId === selectedId}
               searchHit={messageId !== null && highlightIds?.has(messageId) === true}
               searchActive={messageId !== null && activeHitId !== null && messageId === activeHitId}
+              dimmed={messageId !== null && touchedIds !== undefined && !touchedIds.has(messageId)}
               bigChangeLines={bigChangeLines}
               onSelect={onSelect}
               onUnfold={onUnfold}

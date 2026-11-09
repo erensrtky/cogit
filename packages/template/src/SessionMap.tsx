@@ -154,6 +154,7 @@ export function SessionMap({
   openIds,
   highlightSessionIds,
   person = null,
+  touched = null,
   captured,
   onOpen,
   onOpenCard,
@@ -168,6 +169,8 @@ export function SessionMap({
   highlightSessionIds: ReadonlySet<string>;
   /** The person filter: everyone when left out. */
   person?: PersonFilter;
+  /** The file filter: messages that touched the picked file, by session; null for none. */
+  touched?: ReadonlyMap<string, ReadonlySet<string>> | null;
   /** Suggested + open captured items, by session id (Story 15.3). */
   captured?: ReadonlyMap<string, number> | undefined;
   /** Opens or folds a session's messages (its arrow). */
@@ -275,7 +278,10 @@ export function SessionMap({
               row={row}
               session={session}
               showAuthor={people.showAuthor(session)}
-              dimmed={!people.matches(session, person)}
+              dimmed={
+                !people.matches(session, person) ||
+                (touched !== null && !touched.has(session.sessionId))
+              }
               selected={selectedSessionId === session.sessionId}
               open={openIds.has(session.sessionId)}
               searchHit={highlightSessionIds.has(session.sessionId)}

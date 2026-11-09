@@ -15,6 +15,7 @@ import {
   PROJECT_FILES,
   RELATED_BRANCHES,
   relatedBranches,
+  touchedBy,
   withCommits,
 } from "../src/fileGraph.js";
 
@@ -514,5 +515,24 @@ describe("relatedBranches", () => {
       file("src/pad.ts", [at(hit("p", "pad"), "Pad", "2026-01-01")]),
     ];
     expect(relatedBranches(many, undefined, "s1", "m1")).toHaveLength(RELATED_BRANCHES);
+  });
+});
+
+describe("touchedBy", () => {
+  it("groups the messages that touched a file by session", () => {
+    const touched = touchedBy(
+      [
+        file("src/a.ts", [hit("m1", "s1"), hit("m2", "s1"), hit("m3", "s2")]),
+        file("src/b.ts", [hit("m4", "s3")]),
+      ],
+      "src/a.ts",
+    );
+    expect([...touched.keys()]).toEqual(["s1", "s2"]);
+    expect([...(touched.get("s1") ?? [])]).toEqual(["m1", "m2"]);
+    expect(touched.has("s3")).toBe(false);
+  });
+
+  it("is empty for a file nobody touched", () => {
+    expect(touchedBy(files, "src/none.ts").size).toBe(0);
   });
 });

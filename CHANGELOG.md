@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A message's card has a folded **Related** section: up to three other branches, in this or another session, that worked on the same code files, rare files counting for more, with the files they share. A click opens that branch's message that touched most of them.
 
+- In the git view, picking a file in the **Files** panel fades the sessions and messages that did not touch it, while the panel is open; **All files** clears it. The picked file is the same one the Graph view is drawn around, so switching views keeps it.
+
 ### Changed
 - The map's **Files** list shows code files only, in both views: documents, config, lockfiles and build folders are left out (by the code graph when there is one, by name otherwise), and it has a search box. `cogit log --file` still answers for any path.
 

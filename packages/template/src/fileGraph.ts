@@ -729,3 +729,14 @@ export function relatedBranches(
     )
     .slice(0, RELATED_BRANCHES);
 }
+
+/** The messages that touched `path`, by session; empty when no file has that path. */
+export function touchedBy(
+  files: readonly ViewFile[],
+  path: string,
+): Map<string, ReadonlySet<string>> {
+  const touched = new Map<string, Set<string>>();
+  for (const hit of files.find((file) => file.path === path)?.hits ?? [])
+    touched.set(hit.sessionId, (touched.get(hit.sessionId) ?? new Set()).add(hit.messageId));
+  return touched;
+}

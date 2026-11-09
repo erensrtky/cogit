@@ -25,7 +25,7 @@ import { CapturesView, captureCounts, capturesButtonVisible } from "./CapturesVi
 import { loadMapView, pageToken, saveOpenSessions, saveRowWidth } from "./data.js";
 import { FileGraphView } from "./FileGraphView.js";
 import { type FilesFocus, type FilesTarget, FilesView } from "./FilesView.js";
-import { graphFiles } from "./fileGraph.js";
+import { graphFiles, touchedBy } from "./fileGraph.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
 import { type GitLayout, layoutGitGraph, ROW_WIDTH } from "./gitLayout.js";
@@ -73,6 +73,8 @@ const GraphActions = createContext<{
   /** The person filter (Everyone, You, a teammate); null for everyone. */
   person: PersonFilter;
   people: ReturnType<typeof peopleOf>;
+  /** The file filter: messages that touched the picked file, by session; null for none. */
+  touched: ReadonlyMap<string, ReadonlySet<string>> | null;
 }>({
   selection: null,
   openIds: new Set(),
@@ -86,6 +88,7 @@ const GraphActions = createContext<{
   storeRowWidth: () => {},
   person: null,
   people: peopleOf({ sessions: [] }),
+  touched: null,
 });
 
 /** An opened session: its message graph and where it sits on the canvas. */
@@ -105,6 +108,8 @@ type ProjectData = {
 type ProjectFlowNode = Node<ProjectData, "project">;
 type MapFlowNode = ProjectFlowNode;
 
+const NONE: ReadonlySet<string> = new Set();
+
 function SessionMessages({
   session,
   git,
@@ -116,8 +121,17 @@ function SessionMessages({
   highlights: ReadonlySet<string> | undefined;
   activeHitId: string | null;
 }) {
-  const { selection, bigChangeLines, openNode, unfold, resizeRows, storeRowWidth, person, people } =
-    useContext(GraphActions);
+  const {
+    selection,
+    bigChangeLines,
+    openNode,
+    unfold,
+    resizeRows,
+    storeRowWidth,
+    person,
+    people,
+    touched,
+  } = useContext(GraphActions);
   const own = selection?.sessionId === session.sessionId;
   if (git.rows.length === 0)
     return <p className="graph-status empty">No messages recorded in this session yet.</p>;
@@ -128,6 +142,7 @@ function SessionMessages({
         git={git}
         selectedId={selection?.type === "node" && own ? selection.nodeId : null}
         highlightIds={highlights}
+        touchedIds={touched === null ? undefined : (touched.get(session.sessionId) ?? NONE)}
         activeHitId={activeHitId}
         bigChangeLines={bigChangeLines}
         onSelect={(row) => openNode(session.sessionId, row.message.id)}
@@ -143,8 +158,16 @@ function SessionMessages({
 }
 
 function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
-  const { openSession, openSessionCard, openNode, openContinue, selection, openIds, person } =
-    useContext(GraphActions);
+  const {
+    openSession,
+    openSessionCard,
+    openNode,
+    openContinue,
+    selection,
+    openIds,
+    person,
+    touched,
+  } = useContext(GraphActions);
   // The capture badge sits on each session's own row, expanded or folded
   // (Story 15.3): it counts the session's suggested + open items.
   const capture = useMemo(() => captureCounts(data.model.captures), [data.model.captures]);
@@ -158,6 +181,7 @@ function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
         openIds={openIds}
         highlightSessionIds={data.sessionHits}
         person={person}
+        touched={touched}
         captured={capture}
         onOpen={openSession}
         onOpenCard={openSessionCard}
@@ -393,6 +417,15 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
         ),
       ),
     [model.fileLinks, graphCurrent],
+  );
+  // In the git view the picked file fades the work that did not touch it,
+  // while the Files panel that picked it is open.
+  const touched = useMemo(
+    () =>
+      layout === "git" && showFiles && graphCurrent !== undefined
+        ? touchedBy(graphList, graphCurrent)
+        : null,
+    [layout, showFiles, graphList, graphCurrent],
   );
   // The file a message's card asked the history of; the Files view opens on it.
   const [filesFocus, setFilesFocus] = useState<FilesFocus | null>(null);
@@ -791,6 +824,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       storeRowWidth,
       person,
       people,
+      touched,
     }),
     [
       selection,
@@ -805,6 +839,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
       storeRowWidth,
       person,
       people,
+      touched,
     ],
   );
 
@@ -1001,11 +1036,15 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
                     ]
                   : graphList
               }
-              pick={
-                layout === "graph"
-                  ? { current: graphCurrent, linked: graphLinked, onPick: setGraphFocus }
-                  : undefined
-              }
+              pick={{
+                current: graphCurrent,
+                linked: graphLinked,
+                onPick: setGraphFocus,
+                hint:
+                  layout === "graph"
+                    ? "draw the graph around it"
+                    : "fade the messages that did not touch it",
+              }}
               sessions={model.sessions}
               active={
                 selection?.type === "node"

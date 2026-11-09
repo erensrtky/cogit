@@ -98,14 +98,21 @@ describe("FilesView", () => {
     const other = { ...file, path: "packages/template/src/graph.ts" };
     const html = render({
       files: [file, other],
-      pick: { current: file.path, linked: new Set([other.path]), onPick: () => {} },
+      pick: {
+        current: file.path,
+        linked: new Set([other.path]),
+        onPick: () => {},
+        hint: "draw the graph around it",
+      },
     });
     expect(html).toContain('file-row is-picked" aria-current="true"');
     // The whole project is one click away, and picked when no file is.
     expect(html).toContain(">All files</span>");
-    expect(render({ pick: { current: undefined, linked: new Set(), onPick: () => {} } })).toContain(
-      'file-row file-row-all is-picked" aria-current="true"',
-    );
+    expect(
+      render({
+        pick: { current: undefined, linked: new Set(), onPick: () => {}, hint: "" },
+      }),
+    ).toContain('file-row file-row-all is-picked" aria-current="true"');
 
     expect(html).toContain(
       'file-row is-linked" title="packages/template/src/graph.ts · linked to the file in focus · draw the graph around it"',
