@@ -1360,6 +1360,19 @@ body:has(.map-shell.is-expanded) {
   border-radius: 50%;
 }
 
+.file-graph-legend .lg-muted {
+  background: var(--muted);
+}
+
+.fg-edge.fg-share:not(.is-on) {
+  stroke: var(--muted);
+  stroke-opacity: 0.45;
+}
+
+.file-graph-toggle {
+  padding: 2px 10px;
+}
+
 .file-graph-legend .lg-import {
   width: 16px;
   border-top: 1.5px solid var(--muted);

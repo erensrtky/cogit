@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- The map has a **Graph view** beside the git view: one file in the middle, the recorded files it imports or is imported by around it, and the messages that touched them as dots tied to their files. Clicking a file moves there; clicking a message opens its card, the same one the git view opens. The import links come from the code graph [graphify](https://github.com/safishamsi/graphify) writes; cogit only reads it, and `cogit init` says whether it found one, offers to build one when graphify is installed (`--graph` / `--no-graph`), or prints how to add it. Without a graph the view shows the focus file alone.
+- The map has a **Graph view** beside the git view, around one file picked from a list: by default only the thoughts that touched it and its linked files, two of them linked when they touched the same files; **Files** also draws the files, the recorded files it imports or is imported by, with each thought tied to the files it touched. Clicking a thought opens its card, the same one the git view opens. The git view's own buttons stay in place, disabled, so the toolbar does not move. The import links come from the code graph [graphify](https://github.com/safishamsi/graphify) writes; cogit only reads it, and `cogit init` says whether it found one, offers to build one when graphify is installed (`--graph` / `--no-graph`), or prints how to add it. Without a graph the view shows the focus file alone.
 
 ## [1.2.1] - 2026-11-08
 ### Added

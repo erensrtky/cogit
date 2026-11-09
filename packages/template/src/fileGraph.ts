@@ -32,8 +32,13 @@ export interface GraphNode {
 export interface GraphEdge {
   from: string;
   to: string;
-  /** `import` between two files, `touch` from a message to a file. */
-  kind: "import" | "touch";
+  /**
+   * `import` between two files, `touch` from a message to a file, `share`
+   * between two messages that touched the same files.
+   */
+  kind: "import" | "touch" | "share";
+  /** `share`: how many files the two messages have in common. */
+  weight?: number;
 }
 
 export interface FileGraph {
@@ -128,11 +133,55 @@ export function buildFileGraph(
   return { nodes: [...nodes, ...messages.values()], edges, hidden };
 }
 
+/** The strongest links each thought keeps in the thoughts-only picture. */
+export const SHARED_LINKS = 3;
+
+/**
+ * The same picture without files: only the thoughts, two of them linked when
+ * they touched the same files, weighted by how many. The focus file is left
+ * out of the count, since every thought on it would link to every other; each
+ * thought keeps its {@link SHARED_LINKS} strongest links so it stays readable.
+ */
+export function thoughtGraph(graph: FileGraph, focus: string): FileGraph {
+  const touched = new Map<string, Set<string>>();
+  for (const edge of graph.edges)
+    if (edge.kind === "touch" && edge.to !== focus)
+      touched.set(edge.from, (touched.get(edge.from) ?? new Set()).add(edge.to));
+  const messages = graph.nodes.filter((node) => node.kind === "message");
+  const best = new Map<string, { other: string; weight: number }[]>();
+  for (let i = 0; i < messages.length; i += 1)
+    for (let j = i + 1; j < messages.length; j += 1) {
+      const a = (messages[i] as GraphNode).id;
+      const b = (messages[j] as GraphNode).id;
+      const mine = touched.get(a);
+      const theirs = touched.get(b);
+      if (mine === undefined || theirs === undefined) continue;
+      const weight = [...mine].filter((file) => theirs.has(file)).length;
+      if (weight === 0) continue;
+      best.set(a, [...(best.get(a) ?? []), { other: b, weight }]);
+      best.set(b, [...(best.get(b) ?? []), { other: a, weight }]);
+    }
+  const kept = new Map<string, GraphEdge>();
+  for (const [id, list] of best)
+    for (const { other, weight } of [...list]
+      .sort((x, y) => y.weight - x.weight || x.other.localeCompare(y.other))
+      .slice(0, SHARED_LINKS)) {
+      const [from, to] = id < other ? [id, other] : [other, id];
+      kept.set(`${from}|${to}`, { from, to, kind: "share", weight });
+    }
+  return {
+    nodes: messages.map((node) => ({ ...node, r: node.direct ? 7 : 6 })),
+    edges: [...kept.values()],
+    hidden: graph.hidden,
+  };
+}
+
 const ITERATIONS = 300;
 const CHARGE = { file: 1400, message: 90 } as const;
 const LINK = {
   import: { distance: 200, strength: 0.4 },
   touch: { distance: 60, strength: 0.35 },
+  share: { distance: 70, strength: 0.15 },
 } as const;
 
 /**
@@ -160,17 +209,25 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
     const cy = at.reduce((sum, file) => sum + (file?.y ?? 0), 0) / Math.max(1, at.length);
     // The golden angle spreads siblings evenly without a random start.
     const angle = i * 2.399963;
-    node.x = cx + Math.cos(angle) * 60;
-    node.y = cy + Math.sin(angle) * 60;
+    // With no file to start from (the thoughts-only picture), a spiral.
+    const radius = at.length === 0 ? 18 * Math.sqrt(i + 1) : 60;
+    node.x = cx + Math.cos(angle) * radius;
+    node.y = cy + Math.sin(angle) * radius;
   });
 
   const springs: { a: number; b: number; distance: number; strength: number }[] = [];
   for (const edge of graph.edges) {
     const a = index.get(edge.from);
     const b = index.get(edge.to);
-    if (a !== undefined && b !== undefined) springs.push({ a, b, ...LINK[edge.kind] });
+    if (a === undefined || b === undefined) continue;
+    const link = LINK[edge.kind];
+    // A thought pair sharing more files pulls harder.
+    const strength = Math.min(0.6, link.strength * (edge.weight ?? 1));
+    springs.push({ a, b, distance: link.distance, strength });
   }
   const fixed = (node: (typeof nodes)[number]) => node.role === "focus";
+  // Without the focus file in the picture, its thoughts gather in the middle.
+  const centre = !nodes.some(fixed);
 
   for (let step = 0; step < ITERATIONS; step += 1) {
     const alpha = (1 - step / ITERATIONS) ** 2;
@@ -205,8 +262,9 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
         node.vy = 0;
         continue;
       }
-      node.vx -= node.x * 0.01 * alpha;
-      node.vy -= node.y * 0.01 * alpha;
+      const gravity = centre && node.direct ? 0.04 : 0.01;
+      node.vx -= node.x * gravity * alpha;
+      node.vy -= node.y * gravity * alpha;
       node.vx *= 0.6;
       node.vy *= 0.6;
       node.x += node.vx;

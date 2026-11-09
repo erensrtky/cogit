@@ -6,6 +6,7 @@ import {
   type GraphNode,
   graphBounds,
   layoutFileGraph,
+  thoughtGraph,
 } from "./fileGraph.js";
 import { clampPan, fitView, type PanView, type Size, zoomAt } from "./panZoom.js";
 
@@ -30,6 +31,7 @@ export function FileGraphView({
   active,
   onFocus,
   onSelect,
+  filesAtStart = false,
 }: {
   files: readonly ViewFile[] | undefined;
   links: readonly ViewFileLink[] | undefined;
@@ -37,13 +39,22 @@ export function FileGraphView({
   active: GraphTarget | null;
   onFocus: (path: string) => void;
   onSelect: (target: GraphTarget) => void;
+  /** Open with the files drawn; the view opens on the thoughts alone otherwise. */
+  filesAtStart?: boolean;
 }) {
   const list = files ?? [];
   const current =
     focus !== null && list.some((file) => file.path === focus) ? focus : defaultFocus(list, links);
-  const graph = useMemo(
+  // Thoughts only by default; the Files switch draws the files and their imports too.
+  const [showFiles, setShowFiles] = useState(filesAtStart);
+  const full = useMemo(
     () => (current === undefined ? null : buildFileGraph(list, links, current)),
     [list, links, current],
+  );
+  const graph = useMemo(
+    () =>
+      full === null || current === undefined || showFiles ? full : thoughtGraph(full, current),
+    [full, current, showFiles],
   );
   const nodes = useMemo(() => (graph === null ? [] : layoutFileGraph(graph)), [graph]);
   const bounds = useMemo(() => graphBounds(nodes), [nodes]);
@@ -126,10 +137,14 @@ export function FileGraphView({
   const lit = new Set<string>();
   if (activeId !== null && at.has(activeId)) {
     lit.add(activeId);
-    for (const edge of graph.edges) if (edge.from === activeId) lit.add(edge.to);
+    for (const edge of graph.edges) {
+      if (edge.from === activeId) lit.add(edge.to);
+      if (edge.kind === "share" && edge.to === activeId) lit.add(edge.from);
+    }
   }
-  const linkedFiles = nodes.filter((node) => node.kind === "file").length - 1;
-  const messages = nodes.length - linkedFiles - 1;
+  const fileNodes = (full?.nodes ?? []).filter((node) => node.kind === "file");
+  const linkedFiles = fileNodes.length - 1;
+  const messages = (full?.nodes.length ?? 0) - fileNodes.length;
   const click = (node: GraphNode) => {
     if (dragged.current) return;
     if (node.kind === "file") onFocus(node.id);
@@ -141,7 +156,7 @@ export function FileGraphView({
   const picks = [...list]
     .filter((file) => needle === "" || file.path.toLowerCase().includes(needle))
     .sort((a, b) => b.count - a.count || a.path.localeCompare(b.path));
-  const roleOf = new Map(nodes.map((node) => [node.id, node.role]));
+  const roleOf = new Map(fileNodes.map((node) => [node.id, node.role]));
 
   return (
     <div className="file-graph">
@@ -181,6 +196,19 @@ export function FileGraphView({
       </nav>
       <div className="file-graph-main">
         <div className="file-graph-bar">
+          <button
+            type="button"
+            className="outline-button file-graph-toggle"
+            aria-pressed={showFiles}
+            title={
+              showFiles
+                ? "Hide the files: only the thoughts, linked by the files they share"
+                : "Show the files and which imports which"
+            }
+            onClick={() => setShowFiles((value) => !value)}
+          >
+            Files
+          </button>
           <span className="file-graph-focus">{current}</span>
           <span className="file-graph-meta">
             {links === undefined
@@ -212,12 +240,19 @@ export function FileGraphView({
                   if (a === undefined || b === undefined) return null;
                   const core =
                     edge.kind === "import" && (edge.from === current || edge.to === current);
-                  const on = activeId !== null && edge.from === activeId;
+                  const on =
+                    activeId !== null &&
+                    (edge.from === activeId || (edge.kind === "share" && edge.to === activeId));
                   const direct = edge.kind === "touch" && edge.to === current;
                   return (
                     <line
                       key={`${edge.from}>${edge.to}`}
                       className={`fg-edge fg-${edge.kind}${core ? " is-core" : ""}${direct ? " is-direct" : ""}${on ? " is-on" : ""}`}
+                      style={
+                        edge.kind === "share"
+                          ? { strokeWidth: Math.min(4, 0.8 + (edge.weight ?? 1) * 0.6) }
+                          : undefined
+                      }
                       x1={a.x}
                       y1={a.y}
                       x2={b.x}
@@ -257,19 +292,39 @@ export function FileGraphView({
             </g>
           </svg>
           <div className="file-graph-legend">
-            <span>
-              <i className="lg-file" />
-              file (size = messages)
-            </span>
-            <span>
-              <i className="lg-message" />
-              message
-            </span>
-            <span>
-              <i className="lg-import" />
-              imports
-            </span>
-            <span>click a file to move there · drag · wheel to zoom</span>
+            {showFiles ? (
+              <>
+                <span>
+                  <i className="lg-file" />
+                  file (size = messages)
+                </span>
+                <span>
+                  <i className="lg-message" />
+                  thought
+                </span>
+                <span>
+                  <i className="lg-import" />
+                  imports
+                </span>
+                <span>click a file to move there · drag · wheel to zoom</span>
+              </>
+            ) : (
+              <>
+                <span>
+                  <i className="lg-message" />
+                  thought on {shortName(current)}
+                </span>
+                <span>
+                  <i className="lg-message lg-muted" />
+                  thought on a linked file
+                </span>
+                <span>
+                  <i className="lg-import" />
+                  shared files (thicker = more)
+                </span>
+                <span>drag · wheel to zoom</span>
+              </>
+            )}
           </div>
         </div>
       </div>

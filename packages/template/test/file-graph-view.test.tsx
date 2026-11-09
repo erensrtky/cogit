@@ -33,8 +33,21 @@ const render = (props: Partial<Parameters<typeof FileGraphView>[0]> = {}) =>
   );
 
 describe("the Graph view", () => {
-  it("draws the focus file, its linked files and their messages", () => {
+  it("opens on the thoughts alone, linked by the files they share", () => {
     const html = render();
+    expect(html).toContain('aria-pressed="false"');
+    expect(html).not.toContain("fg-node fg-file");
+    expect(html.match(/class="fg-node fg-message/g)).toHaveLength(2);
+    // m1 touched only the focus, which does not count: no shared-file link.
+    expect(html).not.toContain("fg-share");
+    expect(html).toContain("thought on thought.ts");
+    // The file list still marks the focus and its neighbour.
+    expect(html).toContain('class="file-graph-file is-focus" aria-current="true"');
+  });
+
+  it("draws the focus file, its linked files and their messages with Files on", () => {
+    const html = render({ filesAtStart: true });
+    expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-label="Graph of src/thought.ts"');
     expect(html).toContain("1 linked file · 2 messages");
     // The file list: the focus marked current, its neighbour marked linked.
@@ -48,7 +61,7 @@ describe("the Graph view", () => {
   });
 
   it("lights the open message and the files it touched, fading the rest", () => {
-    const html = render({ active: { sessionId: "s1", messageId: "m1" } });
+    const html = render({ active: { sessionId: "s1", messageId: "m1" }, filesAtStart: true });
     expect(html).toContain("fg-node fg-message is-direct is-on");
     expect(html).toContain("fg-node fg-file is-focus is-on");
     expect(html).toContain("fg-node fg-file is-faded");

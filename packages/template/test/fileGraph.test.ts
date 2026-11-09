@@ -7,6 +7,8 @@ import {
   isTestPath,
   LINKED_MESSAGES,
   layoutFileGraph,
+  SHARED_LINKS,
+  thoughtGraph,
 } from "../src/fileGraph.js";
 
 function hit(messageId: string, sessionId = "s1"): ViewFileHit {
@@ -137,5 +139,46 @@ describe("the Graph view's layout", () => {
     expect(graphBounds([])).toEqual({ minX: 0, minY: 0, width: 1, height: 1 });
     const box = graphBounds([{ id: "a", kind: "file", x: 0, y: 0, r: 10 }]);
     expect(box).toEqual({ minX: -50, minY: -68, width: 100, height: 118 });
+  });
+});
+
+describe("the thoughts-only picture", () => {
+  const full = buildFileGraph(files, links, "src/thought.ts");
+
+  it("links two thoughts by the files they share, leaving the focus file out of the count", () => {
+    const graph = thoughtGraph(full, "src/thought.ts");
+    expect(graph.nodes.every((node) => node.kind === "message")).toBe(true);
+    expect(graph.nodes.map((node) => [node.id, node.r])).toEqual([
+      ["s1:m1", 7],
+      ["s1:m2", 7],
+      ["s1:m3", 6],
+      ["s1:m4", 6],
+    ]);
+    // m1 and m2 share only the focus; m2 and m3 share git.ts.
+    expect(graph.edges).toEqual([{ from: "s1:m2", to: "s1:m3", kind: "share", weight: 1 }]);
+  });
+
+  it("keeps each thought's strongest links only", () => {
+    const many = ["a", "b", "c", "d", "e"].map((id) => hit(id));
+    const crowd = buildFileGraph(
+      [file("f.ts", [hit("z")]), file("x.ts", many)],
+      [{ from: "f.ts", to: "x.ts" }],
+      "f.ts",
+    );
+    const graph = thoughtGraph(crowd, "f.ts");
+    // Ten pairs share x.ts; each thought keeps three, so one pair (d–e) drops.
+    expect(graph.edges).toHaveLength(9);
+    for (const id of ["s1:a", "s1:e"])
+      expect(
+        graph.edges.filter((edge) => edge.from === id || edge.to === id).length,
+      ).toBeGreaterThanOrEqual(SHARED_LINKS);
+    expect(graph.edges.some((edge) => edge.from === "s1:d" && edge.to === "s1:e")).toBe(false);
+  });
+
+  it("lays out with no file in the middle, the same every time", () => {
+    const graph = thoughtGraph(full, "src/thought.ts");
+    const first = layoutFileGraph(graph);
+    expect(first).toEqual(layoutFileGraph(graph));
+    for (const node of first) expect(Number.isFinite(node.x) && Number.isFinite(node.y)).toBe(true);
   });
 });

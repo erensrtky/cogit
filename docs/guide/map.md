@@ -128,16 +128,22 @@ the map. In the terminal: `cogit log --file <path>` and `cogit why <path>`.
 ## Graph view
 
 **Git view** draws sessions and messages in time. **Graph view** draws them around one file:
-the file in focus sits in the middle, the recorded files it imports or is imported by sit
-around it, and each message that touched them is a dot tied to the files it touched. A
-message on the focus file is drawn in the accent colour. It answers "what shaped this file and its neighbours"
-instead of "what happened when".
+the thoughts that touched it and the recorded files it imports or is imported by. It answers
+"what shaped this file and its neighbours" instead of "what happened when".
 
-It opens on the most discussed file that has neighbours; pick another from the list, or click
-a file in the drawing to move there. A changed file in a message's card does the same.
-Clicking a message opens its card, the same one the git view opens. Drag to move, the wheel
-to zoom, a double click to fit. A linked file shows its six newest messages; the focus file
-shows all of its own. Test files show only when one is in focus.
+It opens on the thoughts alone: each dot is a message, and two are linked when they touched
+the same files, thicker for more. The file in focus is left out of that count, since every
+thought on it would link to every other; its thoughts are drawn in the accent colour and
+gather in the middle. Each thought keeps its three strongest links. **Files** draws the files
+too: the focus in the middle, its linked files around it with their imports, and each thought
+tied to the files it touched.
+
+Pick the file from the list on the left (type to filter; the files linked to the focus are
+marked), or with Files on click a file in the drawing. A changed file in a message's card
+moves there too. Clicking a thought opens its card, the same one the git view opens, and
+lights the thoughts or files it is linked to. Drag to move, the wheel to zoom, a double click
+to fit. A linked file brings its six newest thoughts; the focus file brings all of its own.
+Test files show only when one is in focus.
 
 The import links come from a code graph: cogit reads the one
 [graphify](https://github.com/safishamsi/graphify) writes (`graphify update .`), and never
