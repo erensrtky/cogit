@@ -295,7 +295,7 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
         node.vy = 0;
         continue;
       }
-      const gravity = centre && node.direct ? 0.04 : 0.01;
+      const gravity = centre && node.direct ? 0.15 : 0.01;
       node.vx -= node.x * gravity * alpha;
       node.vy -= node.y * gravity * alpha;
       node.vx *= 0.6;

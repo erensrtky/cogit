@@ -131,15 +131,16 @@ the map. In the terminal: `cogit log --file <path>` and `cogit why <path>`.
 the thoughts that touched it and the recorded files it imports or is imported by. It answers
 "what shaped this file and its neighbours" instead of "what happened when".
 
-It opens on **Thoughts**: each dot is a message titled underneath, and two are linked when they touched
+It draws the thoughts: each dot is a message titled underneath, and two are linked when they touched
 the same files, thicker for more. The file in focus is left out of that count, since every
 thought on it would link to every other; its thoughts are drawn in the accent colour and
-gather in the middle. Each thought keeps its three strongest links. **Thoughts + files** draws the files
+gather in the middle. Each thought keeps its three strongest links. **Show files** draws the files
 too: the focus in the middle, its linked files around it with their imports, and each thought
 tied to the files it touched.
 
-Pick the file from the list on the left (type to filter; the files linked to the focus are
-marked), or with the files drawn click one. The list holds code only: the files the code
+Switching to the Graph view opens the **Files** panel, which picks the file there: a row
+moves the graph to that file and opens its history; the file in focus is highlighted and the
+files linked to it are marked. Type to filter. With the files drawn, clicking one works too. The list holds code only: the files the code
 graph has as code, so documents, config, lockfiles and anything `.gitignore` keeps out of the
 graph stay out. Without a graph it leaves out config, lockfiles, dotfiles and dependency or
 build folders by name. A changed file in a message's card

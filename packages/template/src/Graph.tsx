@@ -25,6 +25,7 @@ import { CapturesView, captureCounts, capturesButtonVisible } from "./CapturesVi
 import { loadMapView, pageToken, saveOpenSessions, saveRowWidth } from "./data.js";
 import { FileGraphView } from "./FileGraphView.js";
 import { type FilesFocus, type FilesTarget, FilesView } from "./FilesView.js";
+import { defaultFocus, graphFiles } from "./fileGraph.js";
 import { useFullscreen } from "./fullscreen.js";
 import { GitGraph } from "./GitGraph.js";
 import { type GitLayout, layoutGitGraph, ROW_WIDTH } from "./gitLayout.js";
@@ -367,6 +368,25 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
   // The Graph view (file and import links) instead of the git view, and its focus file.
   const [layout, setLayout] = useState<"git" | "graph">("git");
   const [graphFocus, setGraphFocus] = useState<string | null>(null);
+  // The Graph view's files (code only) and the one it is drawn around; the
+  // Files panel picks it there, marking the files linked to it.
+  const graphList = useMemo(
+    () => graphFiles(model.files ?? [], model.codeFiles),
+    [model.files, model.codeFiles],
+  );
+  const graphCurrent =
+    graphFocus !== null && graphList.some((file) => file.path === graphFocus)
+      ? graphFocus
+      : defaultFocus(graphList, model.fileLinks);
+  const graphLinked = useMemo(
+    () =>
+      new Set(
+        (model.fileLinks ?? []).flatMap((link) =>
+          link.from === graphCurrent ? [link.to] : link.to === graphCurrent ? [link.from] : [],
+        ),
+      ),
+    [model.fileLinks, graphCurrent],
+  );
   // The file a message's card asked the history of; the Files view opens on it.
   const [filesFocus, setFilesFocus] = useState<FilesFocus | null>(null);
   const [showCaptures, setShowCaptures] = useState(false);
@@ -824,7 +844,13 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
               type="button"
               aria-pressed={layout === "graph"}
               title="One file, the files it imports or is imported by, and the messages that touched them"
-              onClick={() => setLayout("graph")}
+              onClick={() => {
+                // The graph is drawn around a file, so the Files panel opens to pick it.
+                setLayout("graph");
+                setShowFiles(true);
+                setShowOutline(false);
+                setShowCaptures(false);
+              }}
             >
               Graph view
             </button>
@@ -950,7 +976,12 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
             />
           ) : showFiles ? (
             <FilesView
-              files={model.files}
+              files={layout === "graph" ? graphList : model.files}
+              pick={
+                layout === "graph"
+                  ? { current: graphCurrent, linked: graphLinked, onPick: setGraphFocus }
+                  : undefined
+              }
               sessions={model.sessions}
               active={
                 selection?.type === "node"
@@ -975,7 +1006,7 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
                 files={model.files}
                 codeFiles={model.codeFiles}
                 links={model.fileLinks}
-                focus={graphFocus}
+                focus={graphCurrent ?? null}
                 active={
                   selection?.type === "node"
                     ? { sessionId: selection.sessionId, messageId: selection.nodeId }

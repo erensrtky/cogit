@@ -38,11 +38,23 @@ function reasonOf(
   return rejected === undefined ? undefined : `not: ${rejected.option}`;
 }
 
+/**
+ * In the Graph view the list also picks the file the graph is drawn around:
+ * a row click moves the graph there, and the rows say which file is in focus
+ * and which are linked to it.
+ */
+export interface FilesPick {
+  current: string | undefined;
+  linked: ReadonlySet<string>;
+  onPick: (path: string) => void;
+}
+
 export function FilesView({
   files,
   sessions,
   active,
   focus = null,
+  pick,
   onSelect,
   onClose,
 }: {
@@ -53,10 +65,16 @@ export function FilesView({
   active: FilesTarget | null;
   /** A file a message's card opened, shown with its history. */
   focus?: FilesFocus | null;
+  /** The Graph view's file picker; absent in the git view. */
+  pick?: FilesPick | undefined;
   onSelect: (target: FilesTarget) => void;
   onClose: () => void;
 }) {
-  const all = files ?? [];
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+  const every = files ?? [];
+  const all =
+    needle === "" ? every : every.filter((file) => file.path.toLowerCase().includes(needle));
   const [openPath, setOpenPath] = useState<string | null>(focus?.path ?? null);
 
   // The card asks for a file's history (its messages, the way `cogit why`
@@ -75,7 +93,7 @@ export function FilesView({
   const activePath =
     active === null
       ? null
-      : (all.find((file) =>
+      : (every.find((file) =>
           file.hits.some(
             (hit) => hit.sessionId === active.sessionId && hit.messageId === active.messageId,
           ),
@@ -88,20 +106,34 @@ export function FilesView({
     <nav className="outline files-view" aria-label="File history">
       <header className="outline-head">
         <span className="outline-title">Files</span>
-        <span className="outline-badge">{all.length}</span>
+        <span className="outline-badge">{every.length}</span>
         <button type="button" className="drilldown-close" aria-label="Hide files" onClick={onClose}>
           ×
         </button>
       </header>
+      {every.length > 0 ? (
+        <input
+          type="search"
+          className="files-search"
+          placeholder="Find a file"
+          aria-label="Find a file"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      ) : null}
       <div className="outline-scroll">
-        {all.length === 0 ? (
+        {every.length === 0 ? (
           <p className="empty">
             No files recorded yet. The agent lists the files each message touched.
           </p>
+        ) : all.length === 0 ? (
+          <p className="empty">No file matches.</p>
         ) : (
           <ul className="outline-list">
             {all.map((file) => {
               const open = openPath === file.path;
+              const picked = pick?.current === file.path;
+              const linked = pick?.linked.has(file.path) === true;
               return (
                 <li key={file.path} data-file-path={file.path}>
                   <div className="outline-row">
@@ -116,9 +148,24 @@ export function FilesView({
                     </button>
                     <button
                       type="button"
-                      className={`outline-item file-row${activePath === file.path ? " is-active" : ""}`}
-                      title={file.path}
-                      onClick={() => setOpenPath(open ? null : file.path)}
+                      className={`outline-item file-row${activePath === file.path ? " is-active" : ""}${
+                        picked ? " is-picked" : linked ? " is-linked" : ""
+                      }`}
+                      aria-current={picked ? "true" : undefined}
+                      title={
+                        pick === undefined
+                          ? file.path
+                          : `${file.path}${linked ? " · linked to the file in focus" : ""} · draw the graph around it`
+                      }
+                      onClick={() => {
+                        // In the Graph view a row moves the graph there and opens its history.
+                        if (pick !== undefined) {
+                          pick.onPick(file.path);
+                          setOpenPath(file.path);
+                          return;
+                        }
+                        setOpenPath(open ? null : file.path);
+                      }}
                     >
                       <span className="label file-path">{file.path}</span>
                       <span className="outline-count">{file.count}</span>

@@ -9,7 +9,15 @@ import {
   layoutFileGraph,
   thoughtGraph,
 } from "./fileGraph.js";
-import { clampPan, fitView, type PanView, type Size, zoomAt } from "./panZoom.js";
+import {
+  clampPan,
+  fitView,
+  MIN_SCALE,
+  PAN_PAD,
+  type PanView,
+  type Size,
+  zoomAt,
+} from "./panZoom.js";
 
 /**
  * The Graph view: one file in focus, the recorded files it imports or is
@@ -67,7 +75,6 @@ export function FileGraphView({
   const at = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
   const viewport = useRef<HTMLDivElement>(null);
-  const [query, setQuery] = useState("");
   const [view, setView] = useState<PanView>({ x: 0, y: 0, scale: 1 });
   const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
   // The click that ends a drag is not a node click.
@@ -87,7 +94,7 @@ export function FileGraphView({
     if (element === null) return;
     const fit = () => {
       const size = box();
-      if (size !== null) setView(fitView(size, content));
+      if (size !== null) setView(fitView(size, content, PAN_PAD, MIN_SCALE));
     };
     fit();
     if (typeof ResizeObserver === "undefined") return;
@@ -158,68 +165,21 @@ export function FileGraphView({
       onSelect({ sessionId: node.hit.sessionId, messageId: node.hit.messageId });
   };
 
-  const needle = query.trim().toLowerCase();
-  const picks = [...list]
-    .filter((file) => needle === "" || file.path.toLowerCase().includes(needle))
-    .sort((a, b) => b.count - a.count || a.path.localeCompare(b.path));
-  const roleOf = new Map(fileNodes.map((node) => [node.id, node.role]));
-
   return (
     <div className="file-graph">
-      <nav className="file-graph-files" aria-label="Files">
-        <input
-          type="search"
-          className="file-graph-search"
-          placeholder="Find a file"
-          aria-label="Find a file"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <ul>
-          {picks.map((file) => {
-            const role = roleOf.get(file.path);
-            const slash = file.path.lastIndexOf("/");
-            return (
-              <li key={file.path}>
-                <button
-                  type="button"
-                  className={`file-graph-file${role === "focus" ? " is-focus" : role ? " is-linked" : ""}`}
-                  aria-current={role === "focus" ? "true" : undefined}
-                  title={role && role !== "focus" ? `${file.path} · ${role}` : file.path}
-                  onClick={() => onFocus(file.path)}
-                >
-                  <span className="file-graph-path">
-                    <span className="file-graph-dir">{file.path.slice(0, slash + 1)}</span>
-                    {file.path.slice(slash + 1)}
-                  </span>
-                  <span className="file-graph-count">{file.count}</span>
-                </button>
-              </li>
-            );
-          })}
-          {picks.length === 0 ? <li className="file-graph-none">No file matches.</li> : null}
-        </ul>
-      </nav>
       <div className="file-graph-main">
         <div className="file-graph-bar">
-          <span className="view-switch file-graph-mode" role="group" aria-label="Show">
-            <button
-              type="button"
-              aria-pressed={!showFiles}
-              title="Only the thoughts, linked when they touched the same files"
-              onClick={() => setShowFiles(false)}
-            >
-              Thoughts
-            </button>
-            <button
-              type="button"
-              aria-pressed={showFiles}
-              title="The thoughts with the files they touched and which file imports which"
-              onClick={() => setShowFiles(true)}
-            >
-              Thoughts + files
-            </button>
-          </span>
+          <label
+            className="file-graph-show"
+            title="Draw the files the thoughts touched, and which file imports which"
+          >
+            <input
+              type="checkbox"
+              checked={showFiles}
+              onChange={(event) => setShowFiles(event.target.checked)}
+            />
+            Show files
+          </label>
           <span className="file-graph-focus">{current}</span>
           <span className="file-graph-meta">
             {links === undefined
@@ -239,7 +199,7 @@ export function FileGraphView({
           onPointerCancel={endDrag}
           onDoubleClick={() => {
             const size = box();
-            if (size !== null) setView(fitView(size, content));
+            if (size !== null) setView(fitView(size, content, PAN_PAD, MIN_SCALE));
           }}
         >
           <svg className="file-graph-svg" role="img" aria-label={`Graph of ${current}`}>

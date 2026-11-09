@@ -1132,83 +1132,6 @@ body:has(.map-shell.is-expanded) {
   min-height: 420px;
 }
 
-/* The file list on the left: the way to pick the file in focus. */
-.file-graph-files {
-  display: flex;
-  flex-direction: column;
-  width: 260px;
-  flex: none;
-  border-right: 1px solid var(--line);
-}
-
-.file-graph-search {
-  margin: 10px;
-  padding: 5px 8px;
-  color: var(--text);
-  background: var(--raised);
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  font: inherit;
-  font-size: 13px;
-}
-
-.file-graph-files ul {
-  flex: 1;
-  min-height: 0;
-  margin: 0;
-  padding: 0 6px 10px;
-  overflow-y: auto;
-  list-style: none;
-}
-
-.file-graph-file {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  padding: 4px 8px;
-  color: var(--text);
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.file-graph-file:hover {
-  background: var(--hover);
-}
-
-.file-graph-file.is-linked {
-  border-left: 2px solid var(--muted);
-}
-
-.file-graph-file.is-focus {
-  background: var(--active);
-  border-color: var(--accent);
-}
-
-.file-graph-path {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  direction: rtl;
-  text-align: left;
-}
-
-.file-graph-dir,
-.file-graph-count,
-.file-graph-none {
-  color: var(--muted);
-}
-
-.file-graph-none {
-  padding: 4px 8px;
-  font-size: 12px;
-}
-
 .file-graph-main {
   display: flex;
   flex: 1;
@@ -1369,8 +1292,33 @@ body:has(.map-shell.is-expanded) {
   stroke-opacity: 0.45;
 }
 
-.file-graph-mode button {
-  padding: 3px 10px;
+.file-graph-show {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* The Files panel's search, and its rows when it picks the Graph view's file. */
+.files-search {
+  margin: 0 10px 8px;
+  padding: 5px 8px;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.file-row.is-picked {
+  background: var(--active);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.file-row.is-linked {
+  box-shadow: inset 2px 0 0 var(--muted);
 }
 
 .fg-node text.fg-label {
@@ -2582,17 +2530,6 @@ time {
     flex: 1;
     height: auto;
     min-height: 0;
-  }
-
-  .file-graph {
-    flex-direction: column;
-  }
-
-  .file-graph-files {
-    width: auto;
-    max-height: 180px;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
   }
 }
 

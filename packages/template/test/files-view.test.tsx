@@ -49,13 +49,20 @@ const sessions = [
   },
 ] as unknown as ViewSession[];
 
-function render(over: { focus?: { path: string; key: number } | null } = {}): string {
+function render(
+  over: {
+    focus?: { path: string; key: number } | null;
+    files?: ViewFile[];
+    pick?: Parameters<typeof FilesView>[0]["pick"];
+  } = {},
+): string {
   return renderToStaticMarkup(
     createElement(FilesView, {
-      files: [file],
+      files: over.files ?? [file],
       sessions,
       active: null,
       focus: over.focus ?? null,
+      pick: over.pick,
       onSelect: () => {},
       onClose: () => {},
     }),
@@ -80,5 +87,22 @@ describe("FilesView", () => {
     expect(open).toContain("The map needs data.");
     // No why yet: the first rejected option stands in for it.
     expect(open).toContain("not: trust the build");
+  });
+
+  it("offers a search over the files", () => {
+    expect(render()).toContain('placeholder="Find a file"');
+    expect(render({ files: [] })).not.toContain('placeholder="Find a file"');
+  });
+
+  it("marks the Graph view's file in focus and the files linked to it", () => {
+    const other = { ...file, path: "packages/template/src/graph.ts" };
+    const html = render({
+      files: [file, other],
+      pick: { current: file.path, linked: new Set([other.path]), onPick: () => {} },
+    });
+    expect(html).toContain('file-row is-picked" aria-current="true"');
+    expect(html).toContain(
+      'file-row is-linked" title="packages/template/src/graph.ts · linked to the file in focus · draw the graph around it"',
+    );
   });
 });

@@ -107,4 +107,10 @@ describe("previewSize", () => {
     expect(previewSize(panel, { width: 788, height: 200 })).toEqual({ width: 394, height: 100 });
     expect(previewSize(panel, { width: 2000, height: 300 })).toEqual({ width: 1000, height: 150 });
   });
+
+  it("fits below the legibility floor when the caller allows it", () => {
+    const wide = { width: 4000, height: 1000 };
+    expect(fitView({ width: 1000, height: 800 }, wide).scale).toBe(0.5);
+    expect(fitView({ width: 1000, height: 800 }, wide, 8, 0.25).scale).toBe(0.25);
+  });
 });

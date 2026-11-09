@@ -63,9 +63,17 @@ function openAxis(view: number, content: number, pad: number): number {
   return content + 2 * pad <= view ? (view - content) / 2 : pad;
 }
 
-/** The opening view: fitted, centred when it fits, otherwise from the top-left. */
-export function fitView(viewport: Size, content: Size, pad: number = PAN_PAD): PanView {
-  const scale = fitScale(viewport, content);
+/**
+ * The opening view: fitted, centred when it fits, otherwise from the top-left.
+ * A picture that reads at a glance (the Graph view) may pass a lower floor.
+ */
+export function fitView(
+  viewport: Size,
+  content: Size,
+  pad: number = PAN_PAD,
+  floor: number = FIT_FLOOR,
+): PanView {
+  const scale = fitScale(viewport, content, floor);
   return clampPan(
     {
       scale,

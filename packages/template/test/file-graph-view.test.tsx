@@ -35,25 +35,19 @@ const render = (props: Partial<Parameters<typeof FileGraphView>[0]> = {}) =>
 describe("the Graph view", () => {
   it("opens on the thoughts alone, linked by the files they share", () => {
     const html = render();
-    expect(html).toContain('aria-pressed="false"');
+    expect(html).toContain('<input type="checkbox"/>Show files');
     expect(html).not.toContain("fg-node fg-file");
     expect(html.match(/class="fg-node fg-message/g)).toHaveLength(2);
     // m1 touched only the focus, which does not count: no shared-file link.
     expect(html).not.toContain("fg-share");
     expect(html).toContain("thought on thought.ts");
-    // The file list still marks the focus and its neighbour.
-    expect(html).toContain('class="file-graph-file is-focus" aria-current="true"');
   });
 
   it("draws the focus file, its linked files and their messages with Files on", () => {
     const html = render({ filesAtStart: true });
-    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('<input type="checkbox" checked=""/>Show files');
     expect(html).toContain('aria-label="Graph of src/thought.ts"');
     expect(html).toContain("1 linked file · 2 messages");
-    // The file list: the focus marked current, its neighbour marked linked.
-    expect(html).toContain('class="file-graph-file is-focus" aria-current="true"');
-    expect(html).toContain('class="file-graph-file is-linked" title="src/git.ts · imports"');
-    expect(html).toContain('<span class="file-graph-count">2</span>');
     expect(html.match(/class="fg-node fg-file/g)).toHaveLength(2);
     expect(html.match(/class="fg-node fg-message/g)).toHaveLength(2);
     expect(html).toContain("fg-edge fg-import is-core");
@@ -68,17 +62,16 @@ describe("the Graph view", () => {
     expect(html).toContain("is-on");
   });
 
-  it("lists only the files the code graph has as code", () => {
-    const html = render({ codeFiles: ["src/thought.ts"] });
-    expect(html).toContain("src/</span>thought.ts");
-    expect(html).not.toContain("src/</span>git.ts");
+  it("draws only the files the code graph has as code", () => {
+    const html = render({ codeFiles: ["src/thought.ts"], filesAtStart: true });
+    expect(html).toContain(">thought.ts</text>");
+    expect(html).not.toContain(">git.ts</text>");
   });
 
   it("titles each thought under its dot, and switches between the two pictures", () => {
     const html = render();
     expect(html).toContain('class="fg-label"');
     expect(html).toContain(">Message m1</text>");
-    expect(html).toContain('aria-pressed="true" title="Only the thoughts');
     // With the files drawn, a thought is titled only when lit.
     expect(render({ filesAtStart: true })).not.toContain('class="fg-label"');
   });
