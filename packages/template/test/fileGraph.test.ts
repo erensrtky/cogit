@@ -4,6 +4,9 @@ import {
   branchKey,
   buildFileGraph,
   buildProjectGraph,
+  type FileGraph,
+  type GraphEdge,
+  type GraphNode,
   graphBounds,
   graphFiles,
   isNoiseFile,
@@ -151,6 +154,65 @@ describe("the Graph view's layout", () => {
     }
     // The input is left as it is.
     expect(graph.nodes.every((node) => node.x === 0 && node.y === 0)).toBe(true);
+  });
+
+  it("keeps what was drawn in place when a layer is turned on or off", () => {
+    // Sessions around files, then the same picture with each session's commits.
+    const base: FileGraph = { nodes: [], edges: [], hidden: 0 };
+    for (let f = 0; f < 4; f += 1) base.nodes.push({ id: `f${f}`, kind: "file", x: 0, y: 0, r: 6 });
+    for (let s = 0; s < 12; s += 1) {
+      base.nodes.push({ id: `s${s}`, kind: "session", x: 0, y: 0, r: 8 });
+      base.edges.push({ from: `s${s}`, to: `f${s % 4}`, kind: "touch" });
+    }
+    const more: FileGraph = { ...base, nodes: [...base.nodes], edges: [...base.edges] };
+    for (let s = 0; s < 12; s += 1)
+      for (let c = 0; c < 3; c += 1) {
+        more.nodes.push({ id: `s${s}c${c}`, kind: "commit", x: 0, y: 0, r: 3 });
+        more.edges.push({ from: `s${s}`, to: `s${s}c${c}`, kind: "landed" });
+      }
+    const placed = (nodes: GraphNode[]) => new Map(nodes.map((n) => [n.id, { x: n.x, y: n.y }]));
+
+    const before = layoutFileGraph(base);
+    const after = layoutFileGraph(more, placed(before));
+    for (const node of before)
+      expect(after.find((n) => n.id === node.id)).toMatchObject({ x: node.x, y: node.y });
+    // The new commits settle near the session that landed them, clear of the rest.
+    const touching: string[] = [];
+    for (const node of after.filter((n) => n.kind === "commit")) {
+      expect(Number.isFinite(node.x) && Number.isFinite(node.y)).toBe(true);
+      const session = after.find((n) => n.id === node.id.replace(/c\d$/, "")) as GraphNode;
+      expect(Math.hypot(node.x - session.x, node.y - session.y)).toBeLessThan(120);
+      for (const other of after)
+        if (other !== node && Math.hypot(node.x - other.x, node.y - other.y) <= node.r + other.r)
+          touching.push(`${node.id} ${other.id}`);
+    }
+    expect(touching).toEqual([]);
+    // Turned off again, nothing left moves.
+    expect(layoutFileGraph(base, placed(after))).toEqual(before);
+  });
+
+  it("lays out a thousand nodes without overlaps", () => {
+    const nodes: GraphNode[] = [];
+    const edges: GraphEdge[] = [];
+    for (let f = 0; f < 100; f += 1) nodes.push({ id: `f${f}`, kind: "file", x: 0, y: 0, r: 6 });
+    for (let s = 0; nodes.length < 1000; s += 1) {
+      nodes.push({ id: `s${s}`, kind: "session", x: 0, y: 0, r: 8 });
+      edges.push({ from: `s${s}`, to: `f${(s * 7) % 100}`, kind: "touch" });
+      for (let c = 0; c < 3 && nodes.length < 1000; c += 1) {
+        nodes.push({ id: `s${s}c${c}`, kind: "commit", x: 0, y: 0, r: 3 });
+        edges.push({ from: `s${s}`, to: `s${s}c${c}`, kind: "landed" });
+      }
+    }
+    const laid = layoutFileGraph({ nodes, edges, hidden: 0 });
+    for (const node of laid) expect(Number.isFinite(node.x) && Number.isFinite(node.y)).toBe(true);
+    let overlaps = 0;
+    for (let i = 0; i < laid.length; i += 1)
+      for (let j = i + 1; j < laid.length; j += 1) {
+        const a = laid[i] as GraphNode;
+        const b = laid[j] as GraphNode;
+        if (Math.hypot(a.x - b.x, a.y - b.y) <= a.r + b.r) overlaps += 1;
+      }
+    expect(overlaps).toBe(0);
   });
 
   it("does not let two nodes overlap", () => {

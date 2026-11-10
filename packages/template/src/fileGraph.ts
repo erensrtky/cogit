@@ -440,27 +440,135 @@ const LINK = {
   part: { distance: 55, strength: 0.6 },
 } as const;
 
+/** Barnes-Hut: a cell this much smaller than its distance counts as one body. */
+const THETA = 0.9;
+
+interface Cell {
+  x: number;
+  y: number;
+  size: number;
+  /** Summed charge root and the charge-weighted centre of what the cell holds. */
+  q: number;
+  cx: number;
+  cy: number;
+  bodies: number[];
+  kids?: (Cell | undefined)[];
+}
+
+/**
+ * A quadtree over the nodes, so the repulsion of a far group is one sum instead
+ * of one per node: the layout costs n log n a step, not n², and a project with
+ * a thousand parts no longer freezes the page.
+ */
+function quadtree(xs: number[], ys: number[], qs: number[]): Cell {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < xs.length; i += 1) {
+    minX = Math.min(minX, xs[i] as number);
+    minY = Math.min(minY, ys[i] as number);
+    maxX = Math.max(maxX, xs[i] as number);
+    maxY = Math.max(maxY, ys[i] as number);
+  }
+  const root: Cell = {
+    x: minX,
+    y: minY,
+    size: Math.max(maxX - minX, maxY - minY, 1),
+    q: 0,
+    cx: 0,
+    cy: 0,
+    bodies: [],
+  };
+  const insert = (cell: Cell, i: number): void => {
+    const q = qs[i] as number;
+    cell.cx = (cell.cx * cell.q + (xs[i] as number) * q) / (cell.q + q);
+    cell.cy = (cell.cy * cell.q + (ys[i] as number) * q) / (cell.q + q);
+    cell.q += q;
+    // Bodies on the same spot, or cells too small to split further, share a leaf.
+    if (cell.kids === undefined && (cell.bodies.length === 0 || cell.size < 1)) {
+      cell.bodies.push(i);
+      return;
+    }
+    if (cell.kids === undefined) {
+      cell.kids = [];
+      const held = cell.bodies;
+      cell.bodies = [];
+      for (const j of held) place(cell, j);
+    }
+    place(cell, i);
+  };
+  const place = (cell: Cell, i: number): void => {
+    const half = cell.size / 2;
+    const right = (xs[i] as number) >= cell.x + half ? 1 : 0;
+    const down = (ys[i] as number) >= cell.y + half ? 1 : 0;
+    const kids = cell.kids as (Cell | undefined)[];
+    const slot = down * 2 + right;
+    let kid = kids[slot];
+    if (kid === undefined) {
+      kid = {
+        x: cell.x + right * half,
+        y: cell.y + down * half,
+        size: half,
+        q: 0,
+        cx: 0,
+        cy: 0,
+        bodies: [],
+      };
+      kids[slot] = kid;
+    }
+    insert(kid, i);
+  };
+  for (let i = 0; i < xs.length; i += 1) insert(root, i);
+  return root;
+}
+
 /**
  * Places the nodes: the focus at the origin, the linked files on a ring, the
  * messages near the files they touched, then settles them with a force
  * simulation (repulsion, springs, collision) like d3-force's, with no
  * randomness. Returns new nodes; the input is left as it is.
+ *
+ * `previous` holds where nodes were last drawn: those keep their place, and only
+ * the new ones settle around them, so turning a layer on or off does not move
+ * what was already on the screen.
  */
-export function layoutFileGraph(graph: FileGraph): GraphNode[] {
+export function layoutFileGraph(
+  graph: FileGraph,
+  previous?: ReadonlyMap<string, { x: number; y: number }>,
+): GraphNode[] {
   const nodes = graph.nodes.map((node) => ({ ...node, vx: 0, vy: 0 }));
   const index = new Map(nodes.map((node, i) => [node.id, i]));
+  const kept = new Set<string>();
+  for (const node of nodes) {
+    const was = previous?.get(node.id);
+    if (was === undefined) continue;
+    node.x = was.x;
+    node.y = was.y;
+    kept.add(node.id);
+  }
+  const listed = <T>(map: Map<string, T[]>, key: string, value: T): void => {
+    const list = map.get(key);
+    if (list === undefined) map.set(key, [value]);
+    else list.push(value);
+  };
+  const neighbours = new Map<string, string[]>();
+  for (const edge of graph.edges) {
+    listed(neighbours, edge.from, edge.to);
+    listed(neighbours, edge.to, edge.from);
+  }
   const files = nodes.filter((node) => node.kind === "file");
-  const ring = files.filter((node) => node.role !== "focus");
+  const ring = files.filter((node) => node.role !== "focus" && !kept.has(node.id));
   ring.forEach((node, i) => {
     const angle = (i / Math.max(1, ring.length)) * 2 * Math.PI;
     node.x = Math.cos(angle) * 220;
     node.y = Math.sin(angle) * 220;
   });
-  const touches = graph.edges.filter((edge) => edge.kind === "touch");
+  const touchedBy = new Map<string, string[]>();
+  for (const edge of graph.edges) if (edge.kind === "touch") listed(touchedBy, edge.from, edge.to);
   nodes.forEach((node, i) => {
-    if (node.kind === "file" || node.kind === "commit") return;
-    const own = touches.filter((edge) => edge.from === node.id);
-    const at = own.map((edge) => nodes[index.get(edge.to) as number]);
+    if (node.kind === "file" || node.kind === "commit" || kept.has(node.id)) return;
+    const at = (touchedBy.get(node.id) ?? []).map((id) => nodes[index.get(id) as number]);
     const cx = at.reduce((sum, file) => sum + (file?.x ?? 0), 0) / Math.max(1, at.length);
     const cy = at.reduce((sum, file) => sum + (file?.y ?? 0), 0) / Math.max(1, at.length);
     // The golden angle spreads siblings evenly without a random start.
@@ -475,11 +583,23 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
     if (edge.kind !== "landed") continue;
     const message = nodes[index.get(edge.from) as number];
     const commit = nodes[index.get(edge.to) as number];
-    if (message === undefined || commit === undefined || commit.x !== 0 || commit.y !== 0) continue;
+    if (message === undefined || commit === undefined || kept.has(commit.id)) continue;
+    if (commit.x !== 0 || commit.y !== 0) continue;
     const angle = (index.get(edge.to) as number) * 2.399963;
     commit.x = message.x + Math.cos(angle) * 20;
     commit.y = message.y + Math.sin(angle) * 20;
   }
+  // A node new to a picture that was already drawn starts beside what it links to.
+  if (kept.size > 0)
+    nodes.forEach((node, i) => {
+      if (kept.has(node.id)) return;
+      const anchors = (neighbours.get(node.id) ?? []).filter((id) => kept.has(id));
+      if (anchors.length === 0) return;
+      const at = anchors.map((id) => nodes[index.get(id) as number] as (typeof nodes)[number]);
+      const angle = i * 2.399963;
+      node.x = at.reduce((sum, n) => sum + n.x, 0) / at.length + Math.cos(angle) * 40;
+      node.y = at.reduce((sum, n) => sum + n.y, 0) / at.length + Math.sin(angle) * 40;
+    });
 
   // Thoughts alone carry a title under each dot, so they keep more room.
   const thoughtsOnly = !nodes.some((node) => node.kind === "file");
@@ -499,28 +619,44 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
     degree[a] = (degree[a] as number) + 1;
     degree[b] = (degree[b] as number) + 1;
   }
-  const fixed = (node: (typeof nodes)[number]) => node.role === "focus";
+  const fixed = (node: (typeof nodes)[number]) => node.role === "focus" || kept.has(node.id);
   // A node with no link has nothing holding it, so the others push it far off
   // the page; after the layout it is set down beside its nearest linked node.
-  const lonely = new Set(nodes.filter((_, i) => degree[i] === 0));
+  const lonely = new Set(nodes.filter((node, i) => degree[i] === 0 && !kept.has(node.id)));
   // Without the focus file in the picture, its thoughts gather in the middle.
-  const centre = !nodes.some(fixed);
+  const centre = !nodes.some((node) => node.role === "focus");
+  const charge = nodes.map((node) => Math.sqrt(CHARGE[node.kind]));
+  const reach = Math.max(1, ...nodes.map((node) => node.r)) * 2 + room.gap;
 
-  for (let step = 0; step < ITERATIONS; step += 1) {
+  const steps = nodes.every(fixed) ? 0 : ITERATIONS;
+  for (let step = 0; step < steps; step += 1) {
     const alpha = (1 - step / ITERATIONS) ** 2;
-    for (let i = 0; i < nodes.length; i += 1)
-      for (let j = i + 1; j < nodes.length; j += 1) {
-        const a = nodes[i] as (typeof nodes)[number];
-        const b = nodes[j] as (typeof nodes)[number];
-        const dx = b.x - a.x || 0.01;
-        const dy = b.y - a.y || 0.01;
-        const d2 = Math.max(dx * dx + dy * dy, 25);
-        const push = (alpha * room.charge * Math.sqrt(CHARGE[a.kind] * CHARGE[b.kind])) / d2;
-        a.vx -= dx * push;
-        a.vy -= dy * push;
-        b.vx += dx * push;
-        b.vy += dy * push;
-      }
+    const xs = nodes.map((node) => node.x);
+    const ys = nodes.map((node) => node.y);
+    const tree = quadtree(xs, ys, charge);
+    nodes.forEach((a, i) => {
+      if (fixed(a)) return;
+      const qa = (charge[i] as number) * alpha * room.charge;
+      const visit = (cell: Cell): void => {
+        const dx = cell.cx - a.x || 0.01;
+        const dy = cell.cy - a.y || 0.01;
+        const d2 = dx * dx + dy * dy;
+        if (cell.kids === undefined || (cell.size * cell.size) / d2 < THETA * THETA) {
+          // A leaf, or a cell far enough to stand for everything in it.
+          let q = cell.q;
+          if (cell.kids === undefined && cell.bodies.includes(i)) {
+            q -= charge[i] as number;
+            if (q <= 0) return;
+          }
+          const push = (qa * q) / Math.max(d2, 25);
+          a.vx -= dx * push;
+          a.vy -= dy * push;
+          return;
+        }
+        for (const kid of cell.kids) if (kid !== undefined) visit(kid);
+      };
+      visit(tree);
+    });
     for (const spring of springs) {
       const a = nodes[spring.a] as (typeof nodes)[number];
       const b = nodes[spring.b] as (typeof nodes)[number];
@@ -554,22 +690,33 @@ export function layoutFileGraph(graph: FileGraph): GraphNode[] {
       node.x += node.vx;
       node.y += node.vy;
     }
-    // Collision: no two circles overlap, and the focus never moves.
-    for (let i = 0; i < nodes.length; i += 1)
-      for (let j = i + 1; j < nodes.length; j += 1) {
-        const a = nodes[i] as (typeof nodes)[number];
-        const b = nodes[j] as (typeof nodes)[number];
-        const dx = b.x - a.x || 0.01;
-        const dy = b.y - a.y || 0.01;
-        const d = Math.sqrt(dx * dx + dy * dy);
-        const gap = a.r + b.r + room.gap - d;
-        if (gap <= 0) continue;
-        const share = fixed(a) ? [0, 1] : fixed(b) ? [1, 0] : [0.5, 0.5];
-        a.x -= (dx / d) * gap * (share[0] as number);
-        a.y -= (dy / d) * gap * (share[0] as number);
-        b.x += (dx / d) * gap * (share[1] as number);
-        b.y += (dy / d) * gap * (share[1] as number);
-      }
+    // Collision: no two circles overlap, and a fixed node never moves. Only
+    // nodes in the same or a neighbouring grid cell can touch.
+    const grid = new Map<string, number[]>();
+    nodes.forEach((node, i) => {
+      listed(grid, `${Math.floor(node.x / reach)},${Math.floor(node.y / reach)}`, i);
+    });
+    for (let i = 0; i < nodes.length; i += 1) {
+      const a = nodes[i] as (typeof nodes)[number];
+      const gx = Math.floor(a.x / reach);
+      const gy = Math.floor(a.y / reach);
+      for (let ox = -1; ox <= 1; ox += 1)
+        for (let oy = -1; oy <= 1; oy += 1)
+          for (const j of grid.get(`${gx + ox},${gy + oy}`) ?? []) {
+            if (j <= i) continue;
+            const b = nodes[j] as (typeof nodes)[number];
+            const dx = b.x - a.x || 0.01;
+            const dy = b.y - a.y || 0.01;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            const gap = a.r + b.r + room.gap - d;
+            if (gap <= 0 || (fixed(a) && fixed(b))) continue;
+            const share = fixed(a) ? [0, 1] : fixed(b) ? [1, 0] : [0.5, 0.5];
+            a.x -= (dx / d) * gap * (share[0] as number);
+            a.y -= (dy / d) * gap * (share[0] as number);
+            b.x += (dx / d) * gap * (share[1] as number);
+            b.y += (dy / d) * gap * (share[1] as number);
+          }
+    }
   }
   // Each lonely node goes just outside its nearest linked node, on the side
   // away from the middle, clear of anything already there.

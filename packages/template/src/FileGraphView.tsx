@@ -147,7 +147,24 @@ export function FileGraphView({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [inPlace]);
-  const nodes = useMemo(() => (graph === null ? [] : layoutFileGraph(graph)), [graph]);
+  // Where each node was last drawn. A layer turned on or off (files, commits, a
+  // part opened in place) keeps the rest where it was; a new focus file or a
+  // step into a session or branch is a new picture and starts afresh.
+  const picture = `${current ?? ""}\n${here?.session ?? ""}\n${here?.branch ?? ""}`;
+  const placed = useRef<{ picture: string; at: Map<string, { x: number; y: number }> }>({
+    picture: "",
+    at: new Map(),
+  });
+  const nodes = useMemo(() => {
+    if (graph === null) return [];
+    const previous = placed.current.picture === picture ? placed.current.at : undefined;
+    const laid = layoutFileGraph(graph, previous);
+    placed.current = {
+      picture,
+      at: new Map(laid.map((node) => [node.id, { x: node.x, y: node.y }])),
+    };
+    return laid;
+  }, [graph, picture]);
   const bounds = useMemo(() => graphBounds(nodes), [nodes]);
   const at = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
