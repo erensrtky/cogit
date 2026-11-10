@@ -182,8 +182,29 @@ export function headlessEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return { ...process.env, ...env, COGIT_DISABLE: "1" };
 }
 
-function claudeBin(): string {
-  return process.platform === "win32" ? "claude.cmd" : "claude";
+/** What cmd.exe may see in the shim's arguments: nothing it would read as syntax. */
+const SHIM_SAFE = /^[\w.:@[\]/-]+$/;
+
+/**
+ * How to start the agent. Plain `claude` finds `claude.exe` on Windows too.
+ * An npm install leaves only a `claude.cmd` shim, which Node refuses to spawn
+ * without a shell since CVE-2024-27980 (issue #2), so that route goes through
+ * `cmd.exe`, and refuses an argument instead of escaping it.
+ */
+export function claudeCommand(
+  args: string[],
+  shim: boolean,
+  env: NodeJS.ProcessEnv = process.env,
+): { command: string; args: string[]; verbatim: boolean } {
+  if (!shim) return { command: "claude", args, verbatim: false };
+  const unsafe = args.find((arg) => !SHIM_SAFE.test(arg));
+  if (unsafe !== undefined)
+    throw new CliError(`cannot pass ${JSON.stringify(unsafe)} to claude.cmd safely`);
+  return {
+    command: env.ComSpec ?? "cmd.exe",
+    args: ["/d", "/s", "/c", `"claude.cmd ${args.join(" ")}"`],
+    verbatim: true,
+  };
 }
 
 /** How long one headless run may take; a closing pass usually needs under two minutes. */
@@ -204,26 +225,44 @@ export function runClaude(
   spend?: { root: string; kind: string },
 ): Promise<string> {
   const limit = Number(env.COGIT_CLAUDE_TIMEOUT_MS) || CLAUDE_TIMEOUT_MS;
+  const args = [
+    "-p",
+    // A resumed run reads the whole conversation; nothing is written back to it.
+    ...(resume === undefined ? [] : ["--resume", resume.sessionId]),
+    "--safe-mode",
+    "--no-session-persistence",
+    "--model",
+    model,
+    "--output-format",
+    "json",
+  ];
+  const run = (shim: boolean): Promise<string> =>
+    runClaudeOnce(prompt, claudeCommand(args, shim, env), model, env, limit, resume, spend);
+  if (process.platform !== "win32") return run(false);
+  return run(false).catch((error: unknown) =>
+    error instanceof MissingClaudeError ? run(true) : Promise.reject(error),
+  );
+}
+
+/** Plain `claude` was not found; on Windows the `claude.cmd` shim is tried next. */
+class MissingClaudeError extends CliError {}
+
+function runClaudeOnce(
+  prompt: string,
+  command: { command: string; args: string[]; verbatim: boolean },
+  model: string,
+  env: NodeJS.ProcessEnv,
+  limit: number,
+  resume?: { sessionId: string; cwd: string },
+  spend?: { root: string; kind: string },
+): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(
-      claudeBin(),
-      [
-        "-p",
-        // A resumed run reads the whole conversation; nothing is written back to it.
-        ...(resume === undefined ? [] : ["--resume", resume.sessionId]),
-        "--safe-mode",
-        "--no-session-persistence",
-        "--model",
-        model,
-        "--output-format",
-        "json",
-      ],
-      {
-        env: headlessEnv(env),
-        stdio: ["pipe", "pipe", "pipe"],
-        ...(resume === undefined ? {} : { cwd: resume.cwd }),
-      },
-    );
+    const child = spawn(command.command, command.args, {
+      env: headlessEnv(env),
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsVerbatimArguments: command.verbatim,
+      ...(resume === undefined ? {} : { cwd: resume.cwd }),
+    });
     let out = "";
     let err = "";
     let timedOut = false;
@@ -239,9 +278,10 @@ export function runClaude(
     child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
       err += chunk;
     });
-    child.on("error", (error) => {
+    child.on("error", (error: NodeJS.ErrnoException) => {
       clearTimeout(timer);
-      reject(new CliError(`could not run claude: ${error.message}`));
+      const message = `could not run claude: ${error.message}`;
+      reject(error.code === "ENOENT" ? new MissingClaudeError(message) : new CliError(message));
     });
     child.on("close", (code) => {
       clearTimeout(timer);
