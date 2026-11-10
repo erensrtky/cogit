@@ -85,19 +85,23 @@ describe("recordSpend and readSpend", () => {
 });
 
 describe("runClaude", () => {
-  it("notes the run's cost when told which project it was for", async () => {
-    const bin = join(root, "bin");
-    await mkdir(bin, { recursive: true });
-    const file = join(bin, "claude");
-    await writeFile(
-      file,
-      `#!/usr/bin/env node\nprocess.stdin.resume();\nprocess.stdin.on("end", () => process.stdout.write(${JSON.stringify(ENVELOPE)}));\n`,
-    );
-    await chmod(file, 0o755);
-    const env = { PATH: `${bin}:${process.env.PATH ?? ""}` };
-    expect(await runClaude("hi", "haiku", env)).toBe(ENVELOPE);
-    expect(await readSpend(root)).toBeUndefined();
-    await runClaude("hi", "haiku", env, undefined, { root, kind: "shape" });
-    expect((await readSpend(root))?.runs).toBe(1);
-  });
+  // The stand-in claude is a script with a #! line, which Windows cannot start.
+  it.skipIf(process.platform === "win32")(
+    "notes the run's cost when told which project it was for",
+    async () => {
+      const bin = join(root, "bin");
+      await mkdir(bin, { recursive: true });
+      const file = join(bin, "claude");
+      await writeFile(
+        file,
+        `#!/usr/bin/env node\nprocess.stdin.resume();\nprocess.stdin.on("end", () => process.stdout.write(${JSON.stringify(ENVELOPE)}));\n`,
+      );
+      await chmod(file, 0o755);
+      const env = { PATH: `${bin}:${process.env.PATH ?? ""}` };
+      expect(await runClaude("hi", "haiku", env)).toBe(ENVELOPE);
+      expect(await readSpend(root)).toBeUndefined();
+      await runClaude("hi", "haiku", env, undefined, { root, kind: "shape" });
+      expect((await readSpend(root))?.runs).toBe(1);
+    },
+  );
 });

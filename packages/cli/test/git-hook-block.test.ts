@@ -189,13 +189,18 @@ describe("telling a dry-run push apart", () => {
   });
 
   it("reads a real process on Linux and through ps, and nothing on other systems", () => {
-    for (const info of [readProc(process.pid), readProcess(process.pid, "darwin")]) {
-      expect(info?.ppid).toBe(process.ppid);
-      expect(info?.args.join(" ")).toContain("node");
+    // /proc is Linux's own, and Windows has no ps.
+    const readers = [
+      ...(process.platform === "linux" ? [readProc] : []),
+      ...(process.platform === "win32"
+        ? []
+        : [readPs, (pid: number) => readProcess(pid, "darwin")]),
+    ];
+    for (const read of readers) {
+      expect(read(process.pid)?.ppid).toBe(process.ppid);
+      expect(read(process.pid)?.args.join(" ")).toContain("node");
+      expect(read(2 ** 30)).toBeUndefined();
     }
-    expect(readPs(process.pid)?.ppid).toBe(process.ppid);
-    expect(readProc(2 ** 30)).toBeUndefined();
-    expect(readPs(2 ** 30)).toBeUndefined();
     expect(readProcess(process.pid, "win32")).toBeUndefined();
     // Under vitest no git push is running, so the push counts as real.
     expect(pushIsDryRun()).toBe(false);

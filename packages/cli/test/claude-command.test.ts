@@ -45,26 +45,41 @@ describe("runClaude on Windows", () => {
     Object.defineProperty(process, "platform", { value: platform });
   });
 
-  it("falls back to the claude.cmd shim when plain claude is missing", async () => {
+  // Linux and macOS stand in for Windows here; the next test runs the real thing.
+  it.skipIf(platform === "win32")(
+    "falls back to the claude.cmd shim when plain claude is missing",
+    async () => {
+      const bin = join(root, "bin");
+      await mkdir(bin, { recursive: true });
+      // Stands in for cmd.exe: notes what it was asked to run and answers.
+      const shell = join(bin, "fake-cmd");
+      const argv = join(root, "argv.json");
+      await writeFile(
+        shell,
+        `#!${process.execPath}\nrequire("node:fs").writeFileSync(${JSON.stringify(argv)}, JSON.stringify(process.argv.slice(2)));\nprocess.stdin.resume();\nprocess.stdin.on("end", () => process.stdout.write("answer"));\n`,
+      );
+      await chmod(shell, 0o755);
+      Object.defineProperty(process, "platform", { value: "win32" });
+      const env = { PATH: root, ComSpec: shell };
+      expect(await runClaude("hi", "haiku", env)).toBe("answer");
+      const args = JSON.parse(await readFile(argv, "utf8")) as string[];
+      expect(args.slice(0, 3)).toEqual(["/d", "/s", "/c"]);
+      expect(args.join(" ")).toContain("claude.cmd -p --safe-mode");
+    },
+  );
+
+  it.runIf(platform === "win32")("runs a real claude.cmd through the real cmd.exe", async () => {
     const bin = join(root, "bin");
     await mkdir(bin, { recursive: true });
-    // Stands in for cmd.exe: notes what it was asked to run and answers.
-    const shell = join(bin, "fake-cmd");
-    const argv = join(root, "argv.json");
-    await writeFile(
-      shell,
-      `#!${process.execPath}\nrequire("node:fs").writeFileSync(${JSON.stringify(argv)}, JSON.stringify(process.argv.slice(2)));\nprocess.stdin.resume();\nprocess.stdin.on("end", () => process.stdout.write("answer"));\n`,
-    );
-    await chmod(shell, 0o755);
-    Object.defineProperty(process, "platform", { value: "win32" });
-    const env = { PATH: root, ComSpec: shell };
-    expect(await runClaude("hi", "haiku", env)).toBe("answer");
-    const args = JSON.parse(await readFile(argv, "utf8")) as string[];
-    expect(args.slice(0, 3)).toEqual(["/d", "/s", "/c"]);
-    expect(args.join(" ")).toContain("claude.cmd -p --safe-mode");
+    // Reads the prompt off stdin, as claude does, then answers.
+    await writeFile(join(bin, "claude.cmd"), "@echo off\r\nmore >nul\r\necho answer %*\r\n");
+    const env = { PATH: `${bin};${process.env.SystemRoot ?? "C:\\Windows"}\\System32` };
+    const out = await runClaude("hi", "haiku", env);
+    expect(out).toContain("answer -p --safe-mode");
+    expect(out).toContain("--model haiku");
   });
 
-  it("says claude is missing when neither is there", async () => {
+  it.skipIf(platform === "win32")("says claude is missing when neither is there", async () => {
     Object.defineProperty(process, "platform", { value: "win32" });
     const env = { PATH: root, ComSpec: join(root, "no-such-cmd") };
     await expect(runClaude("hi", "haiku", env)).rejects.toThrow(/could not run claude/);

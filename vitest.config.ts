@@ -21,6 +21,8 @@ export default defineConfig({
   test: {
     include: ["packages/*/test/**/*.test.{ts,tsx}"],
     globalSetup: ["./packages/cli/test/global-setup.ts"],
+    // Starting git and node costs several times more on Windows.
+    ...(process.platform === "win32" ? { testTimeout: 30_000, hookTimeout: 60_000 } : {}),
     coverage: {
       provider: "v8",
       include: ["packages/*/src/**", "scripts/**"],

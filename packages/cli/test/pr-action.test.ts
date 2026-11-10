@@ -48,7 +48,7 @@ describe("the pull request Action", () => {
     expect(io.lines.join("\n")).toMatch(/Commit and push it/);
 
     await installPrAction(root, io);
-    expect(io.lines.at(-1)).toBe(".github/workflows/cogit.yml is already there.");
+    expect(io.lines.at(-1)).toBe(`${join(".github", "workflows", "cogit.yml")} is already there.`);
 
     await writeFile(workflow(), "name: mine\n");
     await installPrAction(root, io);

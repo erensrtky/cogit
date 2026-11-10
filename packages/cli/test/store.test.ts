@@ -27,13 +27,13 @@ const T0 = "2026-10-21T10:00:00.000Z";
 
 describe("paths", () => {
   it("resolves the global dir from env", () => {
-    expect(globalPaths({ COGIT_HOME: "/x" }).config).toBe("/x/config.json");
-    expect(globalPaths({ XDG_CONFIG_HOME: "/xdg" }).base).toBe("/xdg/cogit");
+    expect(globalPaths({ COGIT_HOME: "/x" }).config).toBe(join("/x", "config.json"));
+    expect(globalPaths({ XDG_CONFIG_HOME: "/xdg" }).base).toBe(join("/xdg", "cogit"));
     expect(globalPaths({}).base).toMatch(/\.config\/cogit$/);
   });
 
   it("still reads the pre-rename names for one minor version", () => {
-    expect(globalPaths({ CODELINEAGE_HOME: "/old" }).config).toBe("/old/config.json");
+    expect(globalPaths({ CODELINEAGE_HOME: "/old" }).config).toBe(join("/old", "config.json"));
     expect(globalPaths({ COGIT_HOME: "/new", CODELINEAGE_HOME: "/old" }).base).toBe("/new");
     expect(captureDisabled({ CODELINEAGE_DISABLE: "1" })).toBe(true);
     expect(captureDisabled({ COGIT_DISABLE: "1" })).toBe(true);
@@ -42,10 +42,10 @@ describe("paths", () => {
 
   it("lays out the project dir", () => {
     const p = projectPaths("/r");
-    expect(p.session("s1")).toBe("/r/.cogit/sessions/s1.json");
-    expect(p.state("s1")).toBe("/r/.cogit/state/s1.json");
-    expect(p.lock("project")).toBe("/r/.cogit/locks/project.lock");
-    expect(p.html).toBe("/r/.cogit/map.html");
+    expect(p.session("s1")).toBe(join("/r", ".cogit", "sessions", "s1.json"));
+    expect(p.state("s1")).toBe(join("/r", ".cogit", "state", "s1.json"));
+    expect(p.lock("project")).toBe(join("/r", ".cogit", "locks", "project.lock"));
+    expect(p.html).toBe(join("/r", ".cogit", "map.html"));
   });
 });
 
