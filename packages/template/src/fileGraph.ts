@@ -771,6 +771,44 @@ export function graphBounds(nodes: readonly GraphNode[]): {
   };
 }
 
+const ARROWS: Record<string, { x: number; y: number }> = {
+  ArrowRight: { x: 1, y: 0 },
+  ArrowLeft: { x: -1, y: 0 },
+  ArrowDown: { x: 0, y: 1 },
+  ArrowUp: { x: 0, y: -1 },
+};
+
+/**
+ * Where an arrow key goes from a node: the nearest node within 45° of that way,
+ * a node straight ahead before one off to the side. Null for any other key or
+ * when nothing lies that way. The graph is one Tab stop; arrows move inside it.
+ */
+export function nodeTowards(
+  nodes: readonly Pick<GraphNode, "id" | "x" | "y">[],
+  fromId: string,
+  key: string,
+): string | null {
+  const way = ARROWS[key];
+  const from = nodes.find((node) => node.id === fromId);
+  if (way === undefined || from === undefined) return null;
+  let best: string | null = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (const node of nodes) {
+    if (node.id === fromId) continue;
+    const dx = node.x - from.x;
+    const dy = node.y - from.y;
+    const along = dx * way.x + dy * way.y;
+    const aside = Math.abs(dx * way.y - dy * way.x);
+    if (along <= 0 || aside > along) continue;
+    const score = along + 2 * aside;
+    if (score < bestScore) {
+      bestScore = score;
+      best = node.id;
+    }
+  }
+  return best;
+}
+
 /** The most other branches a message's card names as related. */
 export const RELATED_BRANCHES = 3;
 

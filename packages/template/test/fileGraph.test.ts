@@ -14,6 +14,7 @@ import {
   LINKED_MESSAGES,
   layoutFileGraph,
   NO_BRANCH,
+  nodeTowards,
   onionGraph,
   PROJECT_FILES,
   RELATED_BRANCHES,
@@ -596,5 +597,29 @@ describe("touchedBy", () => {
 
   it("is empty for a file nobody touched", () => {
     expect(touchedBy(files, "src/none.ts").size).toBe(0);
+  });
+});
+
+describe("moving between nodes with the arrow keys", () => {
+  const nodes = [
+    { id: "centre", x: 0, y: 0 },
+    { id: "right", x: 100, y: 0 },
+    { id: "far-right", x: 200, y: 0 },
+    { id: "right-low", x: 50, y: 40 },
+    { id: "down", x: 30, y: 50 },
+    { id: "up", x: 10, y: -80 },
+  ];
+
+  it("goes to the nearest node that way, straight ahead before off to the side", () => {
+    // right-low is nearer, but 40 off the line; right is 100 ahead and on it.
+    expect(nodeTowards(nodes, "centre", "ArrowRight")).toBe("right");
+    expect(nodeTowards(nodes, "centre", "ArrowUp")).toBe("up");
+    expect(nodeTowards(nodes, "centre", "ArrowDown")).toBe("down");
+  });
+
+  it("stays put when nothing lies that way or the key is not an arrow", () => {
+    expect(nodeTowards(nodes, "centre", "ArrowLeft")).toBeNull();
+    expect(nodeTowards(nodes, "centre", "Tab")).toBeNull();
+    expect(nodeTowards(nodes, "missing", "ArrowRight")).toBeNull();
   });
 });

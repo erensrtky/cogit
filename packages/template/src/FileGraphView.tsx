@@ -9,6 +9,7 @@ import {
   graphFiles,
   layoutFileGraph,
   NO_BRANCH,
+  nodeTowards,
   type OnionView,
   onionGraph,
   type Peeled,
@@ -22,6 +23,7 @@ import {
   PAN_PAD,
   type PanView,
   type Size,
+  showPoint,
   zoomAt,
 } from "./panZoom.js";
 import { readViewMemory, rememberView } from "./viewMemory.js";
@@ -233,6 +235,23 @@ export function FileGraphView({
     drag.current = null;
   };
 
+  // The graph is one Tab stop: the node last focused, or the focus file, or the
+  // first node. Arrow keys move between nodes and bring the next one into view.
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const nodeElements = useRef(new Map<string, SVGGElement>());
+  const tabStop = at.has(focusId ?? "")
+    ? focusId
+    : (nodes.find((node) => node.role === "focus") ?? nodes[0])?.id;
+  const moveFocus = (fromId: string, key: string) => {
+    const nextId = nodeTowards(nodes, fromId, key);
+    const next = nextId === null ? undefined : at.get(nextId);
+    if (next === undefined) return;
+    setFocusId(next.id);
+    nodeElements.current.get(next.id)?.focus();
+    const size = box();
+    if (size !== null) setView(showPoint(view, size, next.x - bounds.minX, next.y - bounds.minY));
+  };
+
   if (graph === null)
     return (
       <div className="file-graph">
@@ -441,10 +460,19 @@ export function FileGraphView({
                       node.direct ? " is-direct" : ""
                     }${node.open ? " is-open" : ""}${lit.has(node.id) ? " is-on" : ""}${activeId !== null && !lit.has(node.id) ? " is-faded" : ""}`}
                     role="button"
-                    tabIndex={0}
+                    tabIndex={node.id === tabStop ? 0 : -1}
+                    ref={(element) => {
+                      if (element === null) nodeElements.current.delete(node.id);
+                      else nodeElements.current.set(node.id, element);
+                    }}
+                    onFocus={() => setFocusId(node.id)}
                     onClick={() => click(node)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") click(node);
+                      else if (event.key.startsWith("Arrow")) {
+                        event.preventDefault();
+                        moveFocus(node.id, event.key);
+                      }
                     }}
                   >
                     <title>

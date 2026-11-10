@@ -33,6 +33,15 @@ const render = (props: Partial<Parameters<typeof FileGraphView>[0]> = {}) =>
   );
 
 describe("the Graph view", () => {
+  it("is one Tab stop, on the focus file, with the other nodes reached by arrows", () => {
+    const html = render({ filesAtStart: true });
+    const stops = [...html.matchAll(/<g class="(fg-node[^"]*)"[^>]*tabindex="(-?\d)"/g)];
+    expect(stops.length).toBeGreaterThan(1);
+    expect(stops.filter((stop) => stop[2] === "0").map((stop) => stop[1])).toEqual([
+      expect.stringContaining("fg-file"),
+    ]);
+  });
+
   it("opens on the sessions, titled, with the files hidden", () => {
     const html = render();
     expect(html).toContain('<input type="checkbox"/>Show files');

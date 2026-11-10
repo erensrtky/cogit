@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - The Graph view keeps what is on the screen in place when **Show files**, **Show commits** or **Open in place** adds or removes a layer; only the new parts settle around it. Its layout is also several times faster on a big project (a thousand parts in about 0.6 s instead of 4 s), so the page no longer freezes.
 - Secret masking adds [secretlint](https://github.com/secretlint/secretlint)'s maintained provider rules (Stripe, SendGrid, Shopify, Linear, Groq, Cloudflare, Vercel, Hugging Face and more) beside cogit's own patterns for passwords typed on a command line.
+- The Graph view is one Tab stop instead of one per part: Tab lands on the focus file (or the last part you were on), the arrow keys move to the nearest part that way and bring it on screen, and Enter opens it. On a big project the keyboard no longer has to step through every part to get past the graph.
 - **Tasks** is off for new installs (`captures` now defaults to `false`). An existing config keeps the value it stored, so nothing changes for people already using cogit; turn it on in Settings or with `cogit config set captures true`.
 
 ### Fixed

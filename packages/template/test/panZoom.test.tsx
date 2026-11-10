@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { MermaidDiagram } from "../src/MermaidDiagram.js";
-import { clampPan, fitScale, fitView, previewSize, zoomAt } from "../src/panZoom.js";
+import { clampPan, fitScale, fitView, previewSize, showPoint, zoomAt } from "../src/panZoom.js";
 
 const box = { width: 800, height: 500 };
 
@@ -63,6 +63,19 @@ describe("zoomAt", () => {
   it("stays within 0.25 and 3", () => {
     expect(zoomAt({ scale: 2, x: 0, y: 0 }, 10, 0, 0).scale).toBe(3);
     expect(zoomAt({ scale: 0.5, x: 0, y: 0 }, 0.01, 0, 0).scale).toBe(0.25);
+  });
+});
+
+describe("showPoint", () => {
+  const view = { x: -100, y: 0, scale: 2 };
+  const box = { width: 400, height: 300 };
+
+  it("leaves the view alone when the point is on screen", () => {
+    expect(showPoint(view, box, 100, 50)).toBe(view);
+  });
+
+  it("centres an off-screen point at the same scale", () => {
+    expect(showPoint(view, box, 400, 50)).toEqual({ x: -600, y: 50, scale: 2 });
   });
 });
 

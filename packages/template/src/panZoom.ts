@@ -103,6 +103,21 @@ export function zoomAt(
 }
 
 /**
+ * The view moved so a point of the content (`px`, `py`) is on screen: unchanged
+ * when it already is, otherwise centred on it at the same scale.
+ */
+export function showPoint(view: PanView, viewport: Size, px: number, py: number): PanView {
+  const x = px * view.scale + view.x;
+  const y = py * view.scale + view.y;
+  if (x >= 0 && y >= 0 && x <= viewport.width && y <= viewport.height) return view;
+  return {
+    ...view,
+    x: viewport.width / 2 - px * view.scale,
+    y: viewport.height / 2 - py * view.scale,
+  };
+}
+
+/**
  * The size the panel's preview draws a diagram at: shrunk to the box's width
  * (never enlarged), and never below the legibility floor. A tall diagram keeps
  * its text size and the box scrolls down, instead of shrinking to the box's
