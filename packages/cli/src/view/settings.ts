@@ -138,6 +138,17 @@ const EDITABLE: FieldSpec[] = [
     kind: "boolean",
   },
   {
+    key: "inbox",
+    label: "Your turn",
+    help: 'The "Your turn" box on the start page and on every map: sessions where the agent answered and waits on you.',
+    details:
+      "On, the start page and each map list the sessions whose last word is the agent's, or " +
+      "whose record says it needs you, newest waits first. Off, the box is gone everywhere " +
+      "and cogit no longer reads the transcripts for it. Rows you closed with × stay closed " +
+      "when you turn it back on.",
+    kind: "boolean",
+  },
+  {
     key: "semanticSearch",
     label: "Search by meaning",
     help: "The map's search also finds messages that mean the same thing in other words, using Ollama on this machine.",
@@ -307,6 +318,7 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   tryBeforeNotes: true,
   shapes: true,
   captures: true,
+  inbox: true,
   semanticSearch: false,
   embeddingModel: "bge-m3",
   shareConversations: false,
@@ -328,6 +340,7 @@ export function editableSettings(settings: PanelSettings): PanelEditableSettings
     tryBeforeNotes: settings.tryBeforeNotes,
     shapes: settings.shapes,
     captures: settings.captures,
+    inbox: settings.inbox,
     semanticSearch: settings.semanticSearch,
     language: settings.language,
     shareConversations: settings.shareConversations,

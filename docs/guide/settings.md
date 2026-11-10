@@ -64,6 +64,14 @@ For every message that landed commits, a small representation of what the change
 
 When a session ends, the side model reads what its record left open and drafts at most three things a person would ask for, in the conversation's language. The list is yours: accept, dismiss or close each item. Sessions with nothing open cost no model call; the map's Tasks button appears only while something waits or is open. Off, nothing is drafted and the list already in the store is kept, not deleted.
 
+### Your turn
+
+`inbox` · default `true`
+
+**The "Your turn" box on the start page and on every map: sessions where the agent answered and waits on you.**
+
+On, the start page and each map list the sessions whose last word is the agent's, or whose record says it needs you, newest waits first. Off, the box is gone everywhere and cogit no longer reads the transcripts for it. Rows you closed with × stay closed when you turn it back on.
+
 ### Search by meaning
 
 `semanticSearch` · default `false`

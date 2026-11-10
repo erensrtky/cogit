@@ -70,6 +70,7 @@ export function panelSettings(config: Config): PanelSettings {
     tryBeforeNotes: config.tryBeforeNotes,
     shapes: config.shapes,
     captures: config.captures,
+    inbox: config.inbox,
     semanticSearch: config.semanticSearch,
     embeddingModel: config.embeddingModel,
     shareConversations: config.shareConversations,
@@ -149,6 +150,8 @@ export async function collectInboxForProject(
   config: Config,
   now: string,
 ): Promise<ViewInboxRow[]> {
+  // Turned off: no rows anywhere, and no transcript read for them.
+  if (config.inbox === false) return [];
   const agent = defaultAgent();
   const cutoff = Date.parse(now) - config.inboxMaxAgeDays * 24 * 60 * 60 * 1000;
   const candidates: InboxCandidate[] = [];

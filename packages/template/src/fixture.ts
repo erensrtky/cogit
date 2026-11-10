@@ -62,6 +62,7 @@ export const fixture: LineageViewModel = {
     tryBeforeNotes: true,
     shapes: true,
     captures: true,
+    inbox: true,
     semanticSearch: false,
     embeddingModel: "bge-m3",
     shareConversations: false,

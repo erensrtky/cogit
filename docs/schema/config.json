@@ -119,6 +119,10 @@
       "minimum": 1,
       "maximum": 3650
     },
+    "inbox": {
+      "default": true,
+      "type": "boolean"
+    },
     "agents": {
       "default": [
         "claude-code"
@@ -159,6 +163,7 @@
     "bigChangeLines",
     "tryBeforeNotes",
     "inboxMaxAgeDays",
+    "inbox",
     "agents",
     "setupHintOff"
   ],

@@ -414,6 +414,16 @@ describe("collectInboxForProject", () => {
       lastMessage: "Ready.",
     });
     expect(rows[0]?.pending).toHaveLength(5);
+    // Turned off in the settings: no row, on the start page or any map.
+    expect(
+      await collectInboxForProject(
+        { name: "alpha", path: root },
+        await loadSessions(root),
+        transcripts,
+        { inboxMaxAgeDays: 7, bigChangeLines: 300, inbox: false } as never,
+        T0,
+      ),
+    ).toEqual([]);
   });
 
   it("skips an old session before reading its transcript and treats a broken one as silence", async () => {

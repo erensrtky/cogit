@@ -102,6 +102,12 @@ export const Config = z.object({
    * deleted.
    */
   inboxMaxAgeDays: z.int().min(1).max(3650).default(1),
+  /**
+   * Whether the "Your turn" inbox shows at all, on the start page and on every
+   * map. Off, no row is worked out and no transcript is read for it; the
+   * dismissals already made are kept.
+   */
+  inbox: z.boolean().default(true),
   agents: z.array(z.string().min(1)).default(["claude-code"]),
   /** Project roots ("don't ask again" in this project) where the setup hint stays silent. */
   setupHintOff: z.array(z.string().min(1)).default([]),

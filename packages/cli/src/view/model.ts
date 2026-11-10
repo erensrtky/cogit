@@ -40,6 +40,7 @@ export const PANEL_EDITABLE_KEYS = [
   "tryBeforeNotes",
   "shapes",
   "captures",
+  "inbox",
   "semanticSearch",
   "language",
   "shareConversations",
@@ -544,6 +545,8 @@ export interface PanelSettings {
    * curated list (Story 15.1).
    */
   captures: boolean;
+  /** Whether the "Your turn" inbox shows, on the start page and on every map. */
+  inbox: boolean;
   /** Whether the map's search also finds messages by meaning, through the local Ollama. */
   semanticSearch: boolean;
   /** The Ollama embedding model the meaning search uses. */

@@ -590,6 +590,7 @@ describe("settings read", () => {
         tryBeforeNotes: true,
         shapes: true,
         captures: true,
+        inbox: true,
         semanticSearch: false,
         language: "auto",
         shareConversations: false,

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Your turn** can be turned off in Settings (`cogit config set inbox false`): the box goes from the start page and from every map, and cogit stops reading transcripts for it. Rows closed with × stay closed when it is turned back on.
 - **Search by meaning** (off by default): the map's search also finds messages that say the same thing in other words, ranked closest first and followed by the word matches. It uses an embedding model in your local Ollama (`bge-m3` by default, `cogit config set embeddingModel <name>` to change it), so nothing leaves the machine and no model call is paid. Each map build fingerprints only the new or changed messages into the project's local state. Turn it on in Settings or from the one-time offer under the search box; when Ollama is not running or the model is missing, the box says what to run.
 - The map's search narrows to what is open: while a session or a message is open, **All · This session · This branch** under the search box keeps the hits to that session or to the branch the message sits in. The box's hint now says it takes words or a message hash.
 
