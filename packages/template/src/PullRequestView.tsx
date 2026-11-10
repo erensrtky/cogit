@@ -17,8 +17,9 @@ type Asked =
 /**
  * The map's Pull request view: the checked-out branch as `cogit pr` describes
  * it, for the person about to open the pull request. A page the local server
- * served asks for the branch each time the view opens, since switching branches
- * does not rebuild the map; a saved page shows the branch it was built on and
+ * served asks for the branch each time the view opens, and again whenever the
+ * window comes back into view (the user switched branches in a terminal),
+ * since switching branches does not rebuild the map; a saved page shows the branch it was built on and
  * says so. A thought opens its card, where the Shape and the diff are; the copy
  * button takes the same Markdown `cogit pr` prints.
  */
@@ -43,16 +44,26 @@ export function PullRequestView({
   useEffect(() => {
     if (dir === undefined || token === undefined) return;
     let current = true;
-    loadPullRequest(dir, token).then(
-      (answer) => {
-        if (current) setAsked({ status: "answered", pr: answer });
-      },
-      () => {
-        if (current) setAsked({ status: "failed" });
-      },
-    );
+    // Asking again keeps the view on screen until the answer comes.
+    const ask = () =>
+      loadPullRequest(dir, token).then(
+        (answer) => {
+          if (current) setAsked({ status: "answered", pr: answer });
+        },
+        () => {
+          if (current) setAsked({ status: "failed" });
+        },
+      );
+    const askAgain = () => {
+      if (document.visibilityState === "visible") void ask();
+    };
+    void ask();
+    window.addEventListener("focus", askAgain);
+    document.addEventListener("visibilitychange", askAgain);
     return () => {
       current = false;
+      window.removeEventListener("focus", askAgain);
+      document.removeEventListener("visibilitychange", askAgain);
     };
   }, [dir, token]);
 
