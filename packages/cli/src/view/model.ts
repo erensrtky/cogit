@@ -545,8 +545,8 @@ export interface PanelSettings {
   sideModel: string;
   messageSummaries: boolean;
   startupContext: boolean;
-  /** Whether `claude -p` and SDK sessions are recorded. */
-  recordHeadless: boolean;
+  /** Which `claude -p` and SDK sessions are recorded: none, those people and scripts start, or all. */
+  recordHeadless: "off" | "auto" | "all";
   /**
    * Whether a message that landed commits gets a Shape (Story 13.6): a small
    * plain-language or diagram view of what the change does.

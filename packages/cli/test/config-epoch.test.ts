@@ -35,6 +35,17 @@ describe("config", () => {
     expect(io.lines.at(-1)).toBe('"haiku"');
   });
 
+  it("reads the old on/off Headless sessions as All and Off, and starts new installs on Auto", async () => {
+    expect((await loadConfig(env)).recordHeadless).toBe("auto");
+    const file = globalPaths(env).config;
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, JSON.stringify({ schema: 1, recordHeadless: false }));
+    expect((await loadConfig(env)).recordHeadless).toBe("off");
+    await writeFile(file, JSON.stringify({ schema: 1, recordHeadless: true }));
+    expect((await loadConfig(env)).recordHeadless).toBe("all");
+    await expect(configSet("recordHeadless", "sometimes", fakeIo(env))).rejects.toThrow();
+  });
+
   it("sets numbers, booleans, strings and agent lists", async () => {
     const io = fakeIo(env);
     await configSet("updateEveryTurns", "3", io);

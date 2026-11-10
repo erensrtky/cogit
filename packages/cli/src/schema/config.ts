@@ -66,13 +66,21 @@ export const Config = z.object({
    */
   startupContext: z.boolean().default(true),
   /**
-   * Whether sessions started without a person (`claude -p`, an SDK) are recorded.
-   * Off by default: other plugins start them in the background, one per prompt,
-   * and they would fill the map and the inbox. A tool that does real work
-   * headless (a loop like Ralph) marks its own sessions with `COGIT_RECORD=1`
-   * instead, and only those are recorded.
+   * Which sessions started without a person (`claude -p`, an SDK) are recorded.
+   * `off`: none. `all`: every one, other plugins' background runs included.
+   * `auto` (new installs): those a person or a script started (a loop like
+   * Ralph, a cron job: no Claude Code process above them) and those a recorded
+   * session's own commands started (marked `COGIT_RECORD=1`), but not the ones
+   * another plugin's hook starts, one per prompt. A config written while this
+   * was a boolean reads `true` as `all` and `false` as `off`, so an existing
+   * install keeps what it had.
    */
-  recordHeadless: z.boolean().default(false),
+  recordHeadless: z
+    .preprocess(
+      (value) => (value === true ? "all" : value === false ? "off" : value),
+      z.enum(["off", "auto", "all"]),
+    )
+    .default("auto"),
   /** Port the local map server binds on `127.0.0.1`. */
   serverPort: z.int().min(1).max(65535).default(4747),
   /**

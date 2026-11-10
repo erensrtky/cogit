@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { isClaudeProcess, startedInsideSession } from "../src/agents/claude/hooks.js";
 import { AGENTS, defaultAgent } from "../src/agents/index.js";
+import type { ProcessInfo } from "../src/push-command.js";
 
 /**
  * The adapter is the only place that knows which agent cogit records. These
@@ -34,5 +36,41 @@ describe("agent adapter", () => {
 
   it("reads its state directory from its own env var", () => {
     expect(defaultAgent().configDir({ CLAUDE_CONFIG_DIR: "/tmp/claude" })).toBe("/tmp/claude");
+  });
+
+  it("knows a Claude Code process by its arguments", () => {
+    expect(isClaudeProcess(["claude", "-p", "hi"])).toBe(true);
+    expect(isClaudeProcess(["/home/u/.local/share/claude/versions/2.1.300", "-p"])).toBe(true);
+    expect(isClaudeProcess(["C:\\Users\\u\\.local\\bin\\claude.exe"])).toBe(true);
+    expect(
+      isClaudeProcess(["node", "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js"]),
+    ).toBe(true);
+    expect(isClaudeProcess(["node", "/plugin/dist/cli.js", "hook", "stop"])).toBe(false);
+    expect(isClaudeProcess(["bash", "ralph_loop.sh"])).toBe(false);
+    expect(isClaudeProcess([])).toBe(false);
+  });
+
+  it("tells a session another session started from one a script started", () => {
+    // pid -> [ppid, args]; walking up from the hook's parent, pid 10.
+    const tree = (rows: Record<number, [number, string[]]>) => (pid: number) => {
+      const row = rows[pid];
+      return row === undefined ? undefined : ({ ppid: row[0], args: row[1] } satisfies ProcessInfo);
+    };
+    const own: [number, string[]] = [20, ["claude", "-p"]];
+    // Ralph: hook shell, the session, the loop script, systemd.
+    const script = tree({ 10: [11, ["sh"]], 11: own, 20: [1, ["bash", "ralph_loop.sh"]] });
+    expect(startedInsideSession(script, 10)).toBe(false);
+    // Another plugin's hook: the session, the hook's node, the person's Claude Code.
+    const hook = tree({ 10: own, 20: [30, ["node", "recall.mjs"]], 30: [1, ["claude"]] });
+    expect(startedInsideSession(hook, 10)).toBe(true);
+    // A sandbox hides what is above its own PID 1: the top, no second Claude.
+    const sandboxed = tree({ 10: own, 20: [99, ["bwrap"]] });
+    expect(startedInsideSession(sandboxed, 10)).toBe(false);
+    // No process tree (Windows), or no Claude Code in it: no answer.
+    expect(startedInsideSession(() => undefined, 10)).toBeUndefined();
+    expect(startedInsideSession(tree({ 10: [1, ["sh"]] }), 10)).toBeUndefined();
+    expect(startedInsideSession(tree({ 10: [11, ["sh"]] }), 10)).toBeUndefined();
+    // The real tree reads without throwing; what it says depends on who runs the tests.
+    expect([true, false, undefined]).toContain(defaultAgent().startedInsideSession());
   });
 });

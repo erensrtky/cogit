@@ -586,7 +586,7 @@ describe("settings read", () => {
         recorder: "mixed",
         messageSummaries: true,
         startupContext: true,
-        recordHeadless: false,
+        recordHeadless: "auto",
         shapes: true,
         captures: false,
         inbox: true,

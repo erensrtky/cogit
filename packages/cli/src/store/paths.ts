@@ -18,8 +18,9 @@ export function captureDisabled(env: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 /**
- * Whether the tool that started this headless session asked cogit to record it
- * (`COGIT_RECORD=1`), whatever `recordHeadless` says. cogit's own background
+ * Whether this headless session carries the record mark (`COGIT_RECORD=1`): a
+ * recorded session hands it to the commands it runs, and a tool may set it
+ * itself. It counts when `recordHeadless` is `auto`. cogit's own background
  * runs never get here: they carry `COGIT_DISABLE`, which is checked first.
  */
 export function recordMarked(env: NodeJS.ProcessEnv): boolean {

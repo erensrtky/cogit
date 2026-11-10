@@ -58,7 +58,7 @@ export const fixture: LineageViewModel = {
     sideModel: "haiku",
     messageSummaries: false,
     startupContext: true,
-    recordHeadless: false,
+    recordHeadless: "auto",
     shapes: true,
     captures: true,
     inbox: true,

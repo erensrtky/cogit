@@ -319,10 +319,10 @@ describe("doctor", () => {
     const later = new Date(Date.now() + 60_000);
     await utimes(headless, later, later);
     expect((await check(root, "sessions")).status).toBe("ok");
-    await updateConfig((config) => ({ ...config, recordHeadless: true }), env);
+    await updateConfig((config) => ({ ...config, recordHeadless: "all" }), env);
     expect((await check(root, "sessions")).fix).toBe("cogit backfill h1 --tail");
-    await updateConfig((config) => ({ ...config, recordHeadless: false }), env);
-    // Marked with COGIT_RECORD=1, it has a record; its unrecorded tail counts.
+    await updateConfig((config) => ({ ...config, recordHeadless: "auto" }), env);
+    // Recorded (Auto let it in), its unrecorded tail counts.
     await record(root, "h1", []);
     expect((await check(root, "sessions")).fix).toBe("cogit backfill h1 --tail");
     await rm(join(root, ".cogit", "sessions", "h1.json"));

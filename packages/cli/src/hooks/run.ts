@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type AgentAdapter, defaultAgent, type HookInput } from "../agents/index.js";
 import { Slug } from "../schema/common.js";
+import type { Config } from "../schema/config.js";
 import { captureDisabled, projectPaths, recordMarked } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadConfig } from "../store/stores.js";
@@ -35,6 +36,25 @@ export interface HookDeps {
   cli?: string;
   /** Starts the detached process; tests observe instead of spawning. */
   spawnDetached?: (cli: string, args: string[], env: NodeJS.ProcessEnv, log?: string) => void;
+  /** Stands in for the agent's process-tree check; tests fix the answer. */
+  startedInsideSession?: () => boolean | undefined;
+}
+
+/**
+ * Whether a headless session is recorded under `recordHeadless`. In `auto` a
+ * session is recorded when it carries the mark a recorded session hands to its
+ * commands, or when nothing in Claude Code started it (a loop script, cron);
+ * one another plugin's hook started is not, and neither is one where the
+ * process tree cannot be read.
+ */
+export function recordsHeadless(
+  mode: Config["recordHeadless"],
+  env: NodeJS.ProcessEnv,
+  startedInsideSession: () => boolean | undefined,
+): boolean {
+  if (mode === "all") return true;
+  if (mode === "off") return false;
+  return recordMarked(env) || startedInsideSession() === false;
 }
 
 const HANDLERS: Record<string, (ctx: HookContext) => Promise<HookOutput | undefined>> = {
@@ -125,11 +145,13 @@ export async function runHook(
       await agent
         .markLive(input.session_id)
         .catch((err: Error) => debug(`cogit mark: ${err.message}`));
-    // A session nobody types into is left alone unless the user asked for all of
-    // them, or the tool that started it marked it with COGIT_RECORD=1 (a loop
-    // like Ralph does real work headless; another plugin's summarizer does not).
-    if (agent.isHeadless(env) && !recordMarked(env) && !(await loadConfig(env)).recordHeadless)
-      return undefined;
+    const { recordHeadless } = await loadConfig(env);
+    const inside = deps.startedInsideSession ?? (() => agent.startedInsideSession());
+    if (agent.isHeadless(env) && !recordsHeadless(recordHeadless, env, inside)) return undefined;
+    // What this session starts through its own commands (a `claude -p` handed a
+    // task) is recorded with it.
+    if (handler === onSessionStart && recordHeadless === "auto")
+      await agent.markChildren(env).catch((err: Error) => debug(`cogit mark: ${err.message}`));
     // In a linked worktree both point at the worktree; the record lives in the main checkout.
     const { root } = await resolveProjectRoot(env[agent.projectDirEnv] ?? input.cwd ?? ".");
     const initialized = existsSync(projectPaths(root).project);

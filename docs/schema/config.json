@@ -84,8 +84,13 @@
       "type": "boolean"
     },
     "recordHeadless": {
-      "default": false,
-      "type": "boolean"
+      "default": "auto",
+      "type": "string",
+      "enum": [
+        "off",
+        "auto",
+        "all"
+      ]
     },
     "serverPort": {
       "default": 4747,

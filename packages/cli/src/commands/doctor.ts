@@ -417,7 +417,7 @@ const CHECK_SPECS: CheckSpec[] = [
       // A headless session with a record was marked (COGIT_RECORD=1); its tail counts.
       const recorded = new Set(sessions.map((session) => session.sessionId));
       const newest = await newestTranscript(transcripts, (id, file) =>
-        recordHeadless || recorded.has(id)
+        recordHeadless === "all" || recorded.has(id)
           ? Promise.resolve(false)
           : ctx.agent.isHeadlessTranscript(file),
       );

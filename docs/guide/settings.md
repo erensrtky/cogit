@@ -34,11 +34,11 @@ When a chat starts, the agent gets a short summary of where the previous session
 
 ### Headless sessions
 
-`recordHeadless` · default `false`
+`recordHeadless` · default `auto`
 
-**Record sessions that start without a person, such as `claude -p`.**
+**Which sessions that start without a person, such as `claude -p`, are recorded.**
 
-Some plugins and scripts run `claude -p` in the background, often once per prompt. Off, cogit leaves those sessions out of the map and the inbox. Turn it on if you do real work through `claude -p` or the SDK and want all of it recorded. To record only one tool's sessions, such as a loop script, start them with `COGIT_RECORD=1` and leave this off.
+Auto (recommended) records the ones you or your scripts start, such as a loop like Ralph or a cron job, and the ones your recorded chats start through a command, such as a task handed to another `claude -p`. It leaves out the ones other plugins start in the background, often once per prompt, which would fill the map and the inbox. Off records only the chats you type into. All records every one. On Windows, Auto records a script's sessions only when the script starts them with `COGIT_RECORD=1`.
 
 ### Intent, Shape and Code
 

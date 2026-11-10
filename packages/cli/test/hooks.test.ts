@@ -120,6 +120,9 @@ describe("runHook", () => {
   let debug: string[];
   let spawned: string[][];
 
+  // What the process tree would say: started from inside another session or not.
+  let inside: boolean | undefined;
+
   const stop = (extra: Record<string, unknown> = {}, e = env) =>
     runHook(
       "stop",
@@ -130,12 +133,18 @@ describe("runHook", () => {
       {
         cli: "/plugin/dist/cli.js",
         spawnDetached: (cli, args) => spawned.push([cli, ...args]),
+        startedInsideSession: () => inside,
       },
     );
 
   const sessionStart = (source: string, e = env, id = "s1") =>
-    runHook("sessionstart", JSON.stringify({ session_id: id, cwd: root, source }), e, T0, (l) =>
-      debug.push(l),
+    runHook(
+      "sessionstart",
+      JSON.stringify({ session_id: id, cwd: root, source }),
+      e,
+      T0,
+      (l) => debug.push(l),
+      { startedInsideSession: () => inside },
     );
 
   // The catch-up itself is covered by backfill.test.ts; here we only see the spawn.
@@ -159,6 +168,7 @@ describe("runHook", () => {
     env = envFor(dir);
     debug = [];
     spawned = [];
+    inside = false;
   });
 
   const initialized = async (everyTurns: number) => {
@@ -300,27 +310,56 @@ describe("runHook", () => {
     expect(await sessionStart("clear")).toBeUndefined();
   });
 
-  it("leaves `claude -p` sessions alone unless recordHeadless is on", async () => {
+  it("in Auto, leaves out a `claude -p` another session's hook started", async () => {
     const headless = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli" };
+    inside = true;
     expect(await sessionStart("startup", headless)).toBeUndefined();
     await initialized(1);
     expect(await sessionStart("startup", headless)).toBeUndefined();
     expect(await stop({}, headless)).toBeUndefined();
     expect(spawned).toEqual([]);
-    await configSet("recordHeadless", "true", fakeIo(env));
+    // Unreadable process tree (Windows): left out too.
+    inside = undefined;
+    expect(await sessionStart("startup", headless)).toBeUndefined();
+  });
+
+  it("in Auto, records one a script started and one a recorded session's command started", async () => {
+    await initialized(1);
+    const headless = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli" };
+    inside = false;
     expect(await sessionStart("startup", headless)).toContain("records this project's lineage");
     await stop({}, headless);
     expect(spawned).not.toEqual([]);
-  });
-
-  it("records a `claude -p` session its tool marked with COGIT_RECORD=1", async () => {
-    await initialized(1);
-    const marked = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli", COGIT_RECORD: "1" };
+    inside = true;
+    const marked = { ...headless, COGIT_RECORD: "1" };
     expect(await sessionStart("startup", marked)).toContain("records this project's lineage");
-    await stop({}, marked);
-    expect(spawned).not.toEqual([]);
     // cogit's own background runs stay out, marked or not.
     expect(await sessionStart("startup", { ...marked, COGIT_DISABLE: "1" })).toBeUndefined();
+  });
+
+  it("hands the mark to the session's commands in Auto only", async () => {
+    await initialized(1);
+    const file = join(dir, "claude-env");
+    await sessionStart("startup", { ...env, CLAUDE_ENV_FILE: file });
+    expect(await readFile(file, "utf8")).toBe("export COGIT_RECORD=1\n");
+    await rm(file);
+    await configSet("recordHeadless", "off", fakeIo(env));
+    await sessionStart("startup", { ...env, CLAUDE_ENV_FILE: file });
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it("follows Off and All whatever started the session", async () => {
+    await initialized(1);
+    const marked = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli", COGIT_RECORD: "1" };
+    inside = false;
+    await configSet("recordHeadless", "off", fakeIo(env));
+    expect(await sessionStart("startup", marked)).toBeUndefined();
+    inside = true;
+    // The old boolean still reads: true is All.
+    await configSet("recordHeadless", "true", fakeIo(env));
+    expect(await sessionStart("startup", { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli" })).toContain(
+      "records this project's lineage",
+    );
   });
 
   it("silences the setup hint per project with hint-off and undoes it with hint-on", async () => {

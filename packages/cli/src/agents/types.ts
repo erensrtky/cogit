@@ -160,6 +160,13 @@ export interface AgentAdapter {
   isHeadless(env: NodeJS.ProcessEnv): boolean;
   /** The same for a transcript on disk: whether a headless run wrote it. */
   isHeadlessTranscript(file: string): Promise<boolean>;
+  /**
+   * Whether this session was started from inside another session of the agent
+   * (its hooks or its commands); undefined where that cannot be read.
+   */
+  startedInsideSession(): boolean | undefined;
+  /** Passes `COGIT_RECORD=1` to the commands this session runs, where the agent allows it. */
+  markChildren(env: NodeJS.ProcessEnv): Promise<void>;
   /** Hook output that adds context for the agent, in the agent's own protocol. */
   additionalContext(event: string, text: string): Record<string, unknown>;
   /** A hook answer that shows one line to the user, not to the agent. */
