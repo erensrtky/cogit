@@ -8,7 +8,10 @@ are the ones your own Claude Code login makes for the side model.
 The record (`.cogit/sessions/`) holds titles, short summaries, decisions with their reasons
 and rejected options, the agent's work items, commit hashes and file paths. Never tool output,
 never file contents. The agent is told never to record secrets, credentials or personal data,
-and a redaction pass for key and token patterns runs over everything the map writes or shows.
+and a redaction pass runs over everything the map writes or shows: provider tokens through
+[secretlint](https://github.com/secretlint/secretlint)'s recommended rules, and passwords typed on
+a command line (`mysql -p…`, `PGPASSWORD=`, `curl -u`, `--password …`) through cogit's own
+patterns. It is a safety net, not a guarantee: a secret in a shape neither knows gets through.
 
 ## What stays on your machine
 

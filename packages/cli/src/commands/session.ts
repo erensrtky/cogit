@@ -102,7 +102,7 @@ export async function sessionWrite(
     throw new CliError(`input does not match the session schema: ${issues.join("; ")}`);
   }
 
-  const { value: redacted, count } = redactDeep(parsed.data);
+  const { value: redacted, count } = await redactDeep(parsed.data);
   // Story 13.6: shapes are written only while the setting is on; the CLI owns
   // the stamp and each tool's validation, so every writer's answer is stored
   // the same way.

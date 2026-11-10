@@ -398,7 +398,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
       // distiller and the CLI write. A corrupt or missing file is an empty list.
       built.captures = (await readCaptures(root, io.warn)).items;
       // The skill already avoids secrets; this is the safety net before rendering.
-      const redacted = redactDeep(built);
+      const redacted = await redactDeep(built);
       if (redacted.count > 0)
         io.warn(`redacted ${redacted.count} secret-looking value(s) in the map`);
 

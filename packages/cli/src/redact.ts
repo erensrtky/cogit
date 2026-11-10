@@ -1,6 +1,11 @@
+import { lintSource } from "@secretlint/core";
+import { creator as recommended } from "@secretlint/secretlint-rule-preset-recommend";
+
 /**
  * Best-effort secret redaction. The skill already tells the agent not to record
  * secrets; this is the safety net before anything is written or rendered.
+ * Two layers: our own patterns for passwords typed on a command line, which no
+ * provider ruleset knows, and secretlint's maintained rules for provider tokens.
  */
 const MASK = "[REDACTED]";
 
@@ -81,20 +86,67 @@ export function redactText(text: string): { text: string; count: number } {
   return { text: out, count };
 }
 
-/** Redacts every string inside a JSON-like value. */
-export function redactDeep<T>(value: T): { value: T; count: number } {
+/** Applies `f` to every string inside a JSON-like value, in a fixed order. */
+function mapStrings(value: unknown, f: (text: string) => string): unknown {
+  if (typeof value === "string") return f(value);
+  if (Array.isArray(value)) return value.map((v) => mapStrings(v, f));
+  if (value !== null && typeof value === "object")
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, mapStrings(v, f)]));
+  return value;
+}
+
+const SECRETLINT = {
+  rules: [{ id: "@secretlint/secretlint-rule-preset-recommend", rule: recommended }],
+};
+/** URLs with a password: ours masks only the password and keeps the user and host. */
+const OURS = new Set([
+  "@secretlint/secretlint-rule-basicauth",
+  "@secretlint/secretlint-rule-database-connection-string",
+]);
+/** Joins the strings for one secretlint run; no token spans it. */
+const SEPARATOR = "\n\u0000\n";
+
+/** Masks the provider tokens secretlint finds, in one run over all the strings. */
+async function maskProviderTokens(texts: string[]): Promise<{ texts: string[]; count: number }> {
+  if (texts.length === 0) return { texts, count: 0 };
+  const result = await lintSource({
+    source: { filePath: "record.txt", content: texts.join(SEPARATOR), contentType: "text" },
+    options: { config: SECRETLINT },
+  });
+  const ranges = result.messages.filter((m) => !OURS.has(m.ruleId)).map((m) => m.range);
+  if (ranges.length === 0) return { texts, count: 0 };
   let count = 0;
-  const walk = (v: unknown): unknown => {
-    if (typeof v === "string") {
-      const r = redactText(v);
-      count += r.count;
-      return r.text;
+  let start = 0;
+  const out = texts.map((text) => {
+    const end = start + text.length;
+    // Last first, so earlier offsets still hold; a range two rules both found counts once.
+    const inside = ranges.filter(([a, b]) => a >= start && b <= end).sort((x, y) => y[0] - x[0]);
+    let masked = text;
+    let before = Number.POSITIVE_INFINITY;
+    for (const [a, b] of inside) {
+      if (b > before) continue;
+      masked = `${masked.slice(0, a - start)}${MASK}${masked.slice(b - start)}`;
+      before = a;
+      count++;
     }
-    if (Array.isArray(v)) return v.map(walk);
-    if (v !== null && typeof v === "object") {
-      return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
-    }
-    return v;
-  };
-  return { value: walk(value) as T, count };
+    start = end + SEPARATOR.length;
+    return masked;
+  });
+  return { texts: out, count };
+}
+
+/** Redacts every string inside a JSON-like value. */
+export async function redactDeep<T>(value: T): Promise<{ value: T; count: number }> {
+  let count = 0;
+  const texts: string[] = [];
+  const ours = mapStrings(value, (text) => {
+    const r = redactText(text);
+    count += r.count;
+    texts.push(r.text);
+    return r.text;
+  });
+  const providers = await maskProviderTokens(texts);
+  let i = 0;
+  const masked = mapStrings(ours, () => providers.texts[i++] as string);
+  return { value: masked as T, count: count + providers.count };
 }

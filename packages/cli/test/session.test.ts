@@ -82,12 +82,52 @@ describe("redactText", () => {
     expect(redactText(input)).toEqual({ text: input, count: 0 });
   });
 
-  it("walks nested values and counts hits", () => {
-    const r = redactDeep({ a: ["password=hunter22!", 3, null], b: { c: "ok", d: true } });
+  it("walks nested values and counts hits", async () => {
+    const r = await redactDeep({ a: ["password=hunter22!", 3, null], b: { c: "ok", d: true } });
     expect(r).toEqual({
       value: { a: ["password=[REDACTED]", 3, null], b: { c: "ok", d: true } },
       count: 1,
     });
+  });
+});
+
+describe("redactDeep with secretlint's provider rules", () => {
+  const token = (prefix: string, n: number) =>
+    prefix + "aB3dE5gH7jK9mN1pQ2sT4vW6yZ8cF0hL".repeat(3).slice(0, n);
+  const stripe = token("sk_live_", 24);
+  const sendgrid = `SG.${token("", 22)}.${token("", 43)}`;
+  const webhook = `https://hooks.slack.com/services/T0ABCDEF1/B0ABCDEF2/${token("", 24)}`;
+
+  it("masks provider tokens our patterns do not know, each in its own string", async () => {
+    const r = await redactDeep({
+      a: `pay with ${stripe} today`,
+      b: ["nothing here", `mail ${sendgrid}`],
+      c: { d: `post to ${webhook}` },
+    });
+    expect(r).toEqual({
+      value: {
+        a: "pay with [REDACTED] today",
+        b: ["nothing here", "mail [REDACTED]"],
+        c: { d: "post to [REDACTED]" },
+      },
+      count: 3,
+    });
+  });
+
+  it("keeps the host of a URL with a password, which our pattern masks alone", async () => {
+    const r = await redactDeep(["postgres://admin:s3cr3t@db.local/x"]);
+    expect(r).toEqual({ value: ["postgres://admin:[REDACTED]@db.local/x"], count: 1 });
+  });
+
+  it("counts a token both layers find once, and leaves hashes alone", async () => {
+    const both = token("ghp_", 40);
+    const hashes = "commit 0d94351a2b3c4d5e6f708192a3b4c5d6e7f80912, message h703239287a92";
+    const r = await redactDeep([both, hashes]);
+    expect(r).toEqual({ value: ["[REDACTED]", hashes], count: 1 });
+  });
+
+  it("does nothing for a value with no strings", async () => {
+    expect(await redactDeep({ n: 1, ok: true })).toEqual({ value: { n: 1, ok: true }, count: 0 });
   });
 });
 

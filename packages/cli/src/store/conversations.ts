@@ -134,7 +134,7 @@ export async function appendConversationTurns(
   // gets the same secret net as the page, not the raw text. Compared again after
   // it: a turn with a secret is longer raw than stored, and must not append on
   // every build.
-  const value = redactDeep(fresh).value.filter((turn) => {
+  const value = (await redactDeep(fresh)).value.filter((turn) => {
     const held = stored.get(turn.uuid);
     return !held || answerSize(turn) > answerSize(held);
   });

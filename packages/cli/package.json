@@ -44,6 +44,8 @@
   },
   "devDependencies": {
     "@inquirer/prompts": "^8.7.4",
+    "@secretlint/core": "^13.1.0",
+    "@secretlint/secretlint-rule-preset-recommend": "^13.1.0",
     "commander": "^15.0.0",
     "mermaid": "^11.17.2",
     "tsup": "^9.0.0",

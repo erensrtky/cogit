@@ -369,7 +369,7 @@ export async function buildPanel(opts: PanelOptions): Promise<PanelViewModel> {
   };
 
   // Same safety net as the map: nothing leaves this process unredacted.
-  const redacted = redactDeep(model);
+  const redacted = await redactDeep(model);
   if (redacted.count > 0)
     io.warn(`redacted ${redacted.count} secret-looking value(s) in the panel`);
 
