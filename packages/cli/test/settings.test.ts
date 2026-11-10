@@ -73,7 +73,7 @@ describe("settings model", () => {
       recordHeadless: false,
       tryBeforeNotes: true,
       shapes: true,
-      captures: true,
+      captures: false,
       inbox: true,
       semanticSearch: false,
       language: "tr",

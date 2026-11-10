@@ -323,6 +323,8 @@ describe("cogit captures", () => {
     await mkdir(root);
     io = fakeIo(envFor(dir));
     await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+    // Off by default since 1.4.0.
+    await configSet("captures", "true", fakeIo(envFor(dir)));
     const s1 = session({
       sessionId: "s1",
       title: "Parser",
@@ -445,6 +447,7 @@ process.stdin.on("end", async () => {
     await mkdir(root);
     await fakeClaude({ items: [{ text: "write the docs" }], duplicateOf: [] });
     await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
+    await configSet("captures", "true", fakeIo(env));
     await writeFile(projectPaths(root).session("s1"), JSON.stringify(s1()));
     // A session with nothing left open costs no call; --all passes over it.
     const s2 = {
@@ -607,6 +610,7 @@ process.stdin.on("end", () => {
     );
     const env = { ...envFor(dir), PATH: pathWith(bin) };
     await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
+    await configSet("captures", "true", fakeIo(env));
     const folder = join(envFor(dir).CLAUDE_CONFIG_DIR ?? "", "projects", "proj");
     await mkdir(folder, { recursive: true });
     const at = (m: number) => `2026-10-23T10:0${m}:00.000Z`;

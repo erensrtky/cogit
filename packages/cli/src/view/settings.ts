@@ -317,7 +317,7 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   recordHeadless: false,
   tryBeforeNotes: true,
   shapes: true,
-  captures: true,
+  captures: false,
   inbox: true,
   semanticSearch: false,
   embeddingModel: "bge-m3",

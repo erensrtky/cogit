@@ -48,9 +48,10 @@ export const Config = z.object({
   /**
    * Whether the side model distils each session's leftover work into a short
    * curated list (Story 15.1). Off writes nothing; items already in the store
-   * are kept and come back when it is turned on again.
+   * are kept and come back when it is turned on again. Off by default since
+   * 1.4.0 for new installs; a config written before keeps the value it stored.
    */
-  captures: z.boolean().default(true),
+  captures: z.boolean().default(false),
   /**
    * Whether the map's search also finds messages by meaning, through an
    * embedding model in the local Ollama. Off by default: it needs Ollama and a

@@ -58,7 +58,7 @@ For every message that landed commits, a small representation of what the change
 
 ### Tasks
 
-`captures` · default `true`
+`captures` · default `false`
 
 **Work that came up in a session and didn't get finished, caught by the side model when the session closes.**
 
