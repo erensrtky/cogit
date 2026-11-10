@@ -361,10 +361,17 @@ describe("cogit pr (Story 10.1)", () => {
     const base = await git("rev-parse", "HEAD~5");
     await git("branch", "--set-upstream-to=main");
     const resolved = await resolvePrBase(root, undefined, env);
-    expect(resolved).toEqual({ ref: "@{upstream}", commit: base });
+    expect(resolved).toEqual({ ref: "main", commit: base });
     const model = await pr({ dir: root, io });
-    expect(model.base.ref).toBe("@{upstream}");
+    expect(model.base.ref).toBe("main");
     expect(model.thoughts).toHaveLength(2);
+    // Stacked on another local branch: the title names that branch.
+    await git("branch", "stack-base", "HEAD~3");
+    await git("branch", "--set-upstream-to=stack-base");
+    expect(await resolvePrBase(root, undefined, env)).toEqual({
+      ref: "stack-base",
+      commit: await git("rev-parse", "HEAD~3"),
+    });
   });
 
   it("keeps describing the whole branch once it is pushed with -u", async () => {

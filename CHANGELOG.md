@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- The map's **Pull request** view asks for the branch again when you come back to the window, so a `git switch` in a terminal shows without reloading the page.
+- A Shape Flow whose node id is a word Mermaid reserves (`box`, `end`, `loop`…) drew as plain text in the map and broke its `mermaid` block in `cogit pr`; the diagram now uses its own ids.
+- The Pull request view's title, and the base in `cogit pr --json`, name the branch you track (`→ main`, `→ origin/main`, or the branch you stacked on) instead of `@{upstream}`.
 
 ## [1.4.0] - 2026-11-10
 ### Added

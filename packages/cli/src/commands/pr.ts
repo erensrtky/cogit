@@ -23,7 +23,7 @@ const exec = promisify(execFile);
 export const PR_CHAR_CAP = 60_000;
 
 export interface PrBase {
-  /** The ref the user asked for, or `@{upstream}` / `main` / `master`. */
+  /** The ref the user asked for, or the upstream's name (`main`, `origin/main`) / `main` / `master`. */
   ref: string;
   /** The full hash of the merge base `base..HEAD` starts from. */
   commit: string;
@@ -204,8 +204,11 @@ export async function resolvePrBase(
   const upstream = await revParse(root, "@{upstream}", env);
   if (upstream !== undefined && tracked !== `refs/heads/${branch}`) {
     const mergeBase = await git(root, ["merge-base", "HEAD", upstream], env);
-    if (mergeBase !== undefined && /^[0-9a-f]{40}$/.test(mergeBase))
-      return { ref: "@{upstream}", commit: mergeBase };
+    if (mergeBase !== undefined && /^[0-9a-f]{40}$/.test(mergeBase)) {
+      // The name the branch tracks, as the title shows it; not `@{upstream}`.
+      const name = await git(root, ["rev-parse", "--abbrev-ref", "@{upstream}"], env);
+      return { ref: name || "@{upstream}", commit: mergeBase };
+    }
   }
   const remoteHead = await git(root, ["rev-parse", "--abbrev-ref", `${remote}/HEAD`], env);
   const candidates = [
