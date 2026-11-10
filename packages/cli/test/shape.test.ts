@@ -271,11 +271,11 @@ describe("the Flow tool", () => {
     expect(flowToMermaid(text)).toBe(
       [
         "flowchart TD",
-        '  a>"⚡ after a commit"]',
-        `  b{"◇ was it 'recorded'?"}`,
-        '  c[("▤ shape queue")]',
-        "  a --> b",
-        '  b -->|"no"| c',
+        '  n1>"⚡ after a commit"]',
+        `  n2{"◇ was it 'recorded'?"}`,
+        '  n3[("▤ shape queue")]',
+        "  n1 --> n2",
+        '  n2 -->|"no"| n3',
       ].join("\n"),
     );
   });
@@ -296,13 +296,30 @@ describe("the Flow tool", () => {
     expect(flowToMermaid(ordered)).toBe(
       [
         "sequenceDiagram",
-        "  participant a as ⚡ after a commit",
-        "  participant b as ƒ enqueue",
-        "  participant c as ▤ queue - pending",
-        "  a->>b: 1.",
-        "  b->>c: 2. puts it in: the queue",
+        "  participant n1 as ⚡ after a commit",
+        "  participant n2 as ƒ enqueue",
+        "  participant n3 as ▤ queue - pending",
+        "  n1->>n2: 1.",
+        "  n2->>n3: 2. puts it in: the queue",
       ].join("\n"),
     );
+    // A Flow id Mermaid reserves (`box`, `end`) never reaches the Mermaid.
+    const reserved = JSON.stringify({
+      nodes: [
+        { id: "hits", kind: "fn", label: "hits" },
+        { id: "box", kind: "person", label: "scope box" },
+        { id: "end", kind: "store", label: "end" },
+      ],
+      edges: [
+        { from: "hits", to: "box" },
+        { from: "box", to: "end" },
+      ],
+      ordered: true,
+    });
+    const drawn = flowToMermaid(reserved) ?? "";
+    expect(drawn).toContain("  n1->>n2: 1.");
+    expect(drawn).toContain("  n2->>n3: 2.");
+    expect(drawn).not.toMatch(/\b(box|end)->>|->>(box|end)\b|participant (box|end) /);
     expect(flowToMermaid("not json")).toBeUndefined();
     expect(flowToMermaid(JSON.stringify({ nodes: [], edges: [] }))).toBeUndefined();
   });

@@ -211,11 +211,21 @@ function sequenceText(text: string, actor: boolean): string {
  * `sequenceDiagram` — one `participant` column per node and one numbered arrow
  * per edge, top to bottom — and an unordered one is a `flowchart TD`, one box
  * per node with its kind's symbol and shape, one edge per arrow. Undefined for
- * input the rules refuse. The same input is always byte-identical.
+ * input the rules refuse. The same input is always byte-identical. The node ids
+ * in the Mermaid are `n1`, `n2`… in node order, not the Flow's own: a Flow id
+ * may be a word Mermaid reserves (`box`, `end`, `loop`…), and Mermaid then
+ * refuses the whole diagram. The ids never show; the labels do.
  */
 export function flowToMermaid(text: string): string | undefined {
-  const flow = parseFlow(text);
-  if (flow === undefined) return undefined;
+  const parsed = parseFlow(text);
+  if (parsed === undefined) return undefined;
+  const ids = new Map(parsed.nodes.map((node, index) => [node.id, `n${index + 1}`]));
+  const id = (flowId: string) => ids.get(flowId) ?? flowId;
+  const flow = {
+    ordered: parsed.ordered,
+    nodes: parsed.nodes.map((node) => ({ ...node, id: id(node.id) })),
+    edges: parsed.edges.map((edge) => ({ ...edge, from: id(edge.from), to: id(edge.to) })),
+  };
   const symbol = (kind: string) => UNIVERSAL_KINDS.find((entry) => entry.id === kind)?.symbol ?? "";
   if (flow.ordered) {
     const lines = ["sequenceDiagram"];
