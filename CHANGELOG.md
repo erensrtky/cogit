@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The map's search narrows to what is open: while a session or a message is open, **All · This session · This branch** under the search box keeps the hits to that session or to the branch the message sits in. The box's hint now says it takes words or a message hash.
 
 ### Fixed
+- `cogit log`, `cogit search` and the map build were slow on a long-used project (about 5.5 s for `log` and 20 s for a build here, over 1.2 GB of Claude Code transcripts): every command read every transcript line by line again. What a transcript says is now kept in `~/.cache/cogit` while the file is unchanged, which brings `log` and `search` under a second. A recorded commit that is gone from the repository no longer makes the build ask git about each commit one by one.
 - A "Your turn" row closed with × came back when the page was reloaded: the server stored the dismissal but kept serving the page built before it until the next recording. It now rebuilds the project's map and the start page before it answers.
 
 ## [1.3.1] - 2026-11-09

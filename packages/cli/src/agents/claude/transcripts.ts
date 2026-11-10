@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { ChatTurn, ForkOrigin, LastTurn, ToolUse, UserMessage } from "../types.js";
 import { forkOrigin } from "./fork.js";
+import { cachedTurns } from "./turn-cache.js";
 
 /**
  * Reading Claude Code's transcripts. A session is one JSONL file under
@@ -307,7 +308,12 @@ async function readTranscriptTurns(file: string): Promise<ChatTurn[]> {
   return turns;
 }
 
-async function readAllTurns(file: string): Promise<ChatTurn[]> {
+/** Every turn of a transcript, from the on-disk cache while the file is unchanged. */
+function readAllTurns(file: string): Promise<ChatTurn[]> {
+  return cachedTurns(file, parseAllTurns);
+}
+
+async function parseAllTurns(file: string): Promise<ChatTurn[]> {
   const turns: ChatTurn[] = [];
   /** Uuids already read, to notice a chain that starts again (a resumed process). */
   const seen = new Set<string>();

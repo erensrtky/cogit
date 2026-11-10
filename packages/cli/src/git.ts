@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { promisify } from "node:util";
@@ -137,6 +137,43 @@ function parseCommitLines(stdout: string): CommitLine[] {
 }
 
 /** The recorded hash may be short or full; either way it names the same commit. */
+/**
+ * The given hashes git knows as commits in the repository at `root`, in one
+ * `git cat-file --batch-check` call. One hash git no longer knows (rebased
+ * away, another checkout) makes a batched `git log` fail, and asking for every
+ * hash alone instead costs a process per commit; this sorts them out first.
+ * Undefined when git cannot answer, so the callers keep their old path.
+ */
+export async function knownCommits(
+  root: string,
+  hashes: readonly string[],
+): Promise<Set<string> | undefined> {
+  return new Promise((done) => {
+    const child = spawn("git", ["-C", root, "cat-file", "--batch-check"], {
+      stdio: ["pipe", "pipe", "ignore"],
+    });
+    let out = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
+      out += chunk;
+    });
+    child.on("error", () => done(undefined));
+    child.on("close", (code) => {
+      if (code !== 0) return done(undefined);
+      const lines = out.split("\n");
+      // One answer line per asked line, in order: `<sha> commit <size>` or `<hash> missing`.
+      done(new Set(hashes.filter((_, at) => lines[at]?.split(" ")[1] === "commit")));
+    });
+    child.stdin.on("error", () => {});
+    child.stdin.end(`${hashes.join("\n")}\n`);
+  });
+}
+
+/** The hashes worth one batched `git log`: the known ones, or all when git could not say. */
+async function batchable(root: string, wanted: string[]): Promise<string[]> {
+  const known = await knownCommits(root, wanted);
+  return known === undefined ? wanted : wanted.filter((hash) => known.has(hash));
+}
+
 function matches(recorded: string, commit: CommitLine): boolean {
   return commit.full.startsWith(recorded) || recorded.startsWith(commit.short);
 }
@@ -144,15 +181,15 @@ function matches(recorded: string, commit: CommitLine): boolean {
 /**
  * Subjects of the given commit hashes in the repository at `root`, keyed by the
  * hash the record holds (Story 8.8: commit tags on the map). Missing commits and
- * a missing git binary are not errors: the map shows those tags greyed. One
- * `git log` call covers the common case; a hash git no longer knows makes that
- * call fail, so the fallback asks for each hash alone and keeps the rest.
+ * a missing git binary are not errors: the map shows those tags greyed. The
+ * hashes git no longer knows are left out first ({@link knownCommits}), so one
+ * `git log` call covers them all; if that still fails, each hash is asked alone.
  */
 export async function readCommitSubjects(
   root: string,
   hashes: Iterable<string>,
 ): Promise<Map<string, string>> {
-  const wanted = [...new Set(hashes)];
+  const wanted = await batchable(root, [...new Set(hashes)]);
   const out = new Map<string, string>();
   if (wanted.length === 0) return out;
 
@@ -230,7 +267,7 @@ export async function readCommitFiles(
   root: string,
   hashes: Iterable<string>,
 ): Promise<Map<string, string[]>> {
-  const wanted = [...new Set(hashes)];
+  const wanted = await batchable(root, [...new Set(hashes)]);
   const out = new Map<string, string[]>();
   if (wanted.length === 0) return out;
 
@@ -329,7 +366,7 @@ export async function readCommitChanges(
   root: string,
   hashes: Iterable<string>,
 ): Promise<Map<string, CommitChange>> {
-  const wanted = [...new Set(hashes)];
+  const wanted = await batchable(root, [...new Set(hashes)]);
   const out = new Map<string, CommitChange>();
   if (wanted.length === 0) return out;
 

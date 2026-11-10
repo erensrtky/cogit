@@ -20,6 +20,8 @@ export function setup(): () => void {
   const outside = mkdtempSync(join(tmpdir(), "cogit-nogit-"));
   process.env.COGIT_TEST_NO_GIT = outside;
   process.env.TMPDIR = tmp;
+  // The transcript cache (turn-cache.ts) stays out of the real ~/.cache too.
+  process.env.COGIT_CACHE_DIR = join(tmp, "cache");
   const index = join(root, "packages/template/dist/index.html");
   if (!existsSync(index)) {
     execFileSync("npm", ["run", "build", "-w", "template"], { cwd: root, stdio: "ignore" });

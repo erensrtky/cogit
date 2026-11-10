@@ -72,6 +72,14 @@ sandbox that does not write through to that directory loses them after each run;
 the sandbox or set `COGIT_HOME` to a directory that persists. Project records in `.cogit/` are
 not affected.
 
+## Commands get slow, or you want the disk space back
+
+cogit reads Claude Code's transcripts, which grow to tens of megabytes per session. It keeps
+what it read from each one in `~/.cache/cogit/turns/` (or `$XDG_CACHE_HOME/cogit`, or
+`$COGIT_CACHE_DIR`) and reads a transcript again only when it changed. The cache holds a copy
+of your messages and the agent's written replies, stays on this machine and is never shared.
+Deleting the folder is safe: the next command is slower once and fills it again.
+
 ## A setup hint keeps appearing
 
 In a repository without cogit, a new session mentions once that cogit is not set up. To stop
