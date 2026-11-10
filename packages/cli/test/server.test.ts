@@ -15,7 +15,9 @@ import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import pkg from "../package.json" with { type: "json" };
 import { buildProject } from "../src/commands/build.js";
+import { configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
+import { updateIndex } from "../src/semantic.js";
 import {
   CONFIG_TOKEN_HEADER,
   checkHealth,
@@ -37,7 +39,12 @@ import { readMapView } from "../src/store/map-view.js";
 import { globalPaths, projectPaths } from "../src/store/paths.js";
 import { loadConfig, loadSession, updateConfig } from "../src/store/stores.js";
 import { builtBy } from "../src/view/lineage.js";
-import { DATA_ELEMENT_ID, LIVE_META_NAME, TOKEN_META_NAME } from "../src/view/model.js";
+import {
+  DATA_ELEMENT_ID,
+  LIVE_META_NAME,
+  type LineageViewModel,
+  TOKEN_META_NAME,
+} from "../src/view/model.js";
 import { envFor, fakeIo, noGitProject, T0, tempDir } from "./helpers.js";
 
 const TEMPLATE = `<!doctype html><html><head><title>cogit</title></head><body><div id="root"></div>
@@ -583,6 +590,7 @@ describe("settings read", () => {
         tryBeforeNotes: true,
         shapes: true,
         captures: true,
+        semanticSearch: false,
         language: "auto",
         shareConversations: false,
       },
@@ -1320,5 +1328,74 @@ describe("commit diff endpoint (Story 10.5)", () => {
     const body = JSON.parse(reply.body) as { text: string };
     expect(body.text).toContain("diff too large");
     expect(body.text).toContain(`git show ${sha}`);
+  });
+});
+
+describe("search by meaning endpoint", () => {
+  /** A one-route Ollama: every text becomes [1, length]. */
+  async function fakeOllama(): Promise<{ host: string; close: () => Promise<void> }> {
+    const server = createHttpServer((req, res) => {
+      let body = "";
+      req.on("data", (chunk) => {
+        body += chunk;
+      });
+      req.on("end", () => {
+        const input = (JSON.parse(body) as { input: string[] }).input;
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ embeddings: input.map((text) => [1, text.length]) }));
+      });
+    });
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    const { port } = server.address() as AddressInfo;
+    return {
+      host: `127.0.0.1:${port}`,
+      close: () => new Promise((done) => server.close(() => done())),
+    };
+  }
+
+  it("answers with the closest messages once it is on and indexed, and says why when not", async () => {
+    const ollama = await fakeOllama();
+    try {
+      env = { ...env, OLLAMA_HOST: ollama.host };
+      const server = await start();
+      const token = await panelToken(server);
+      const headers = { origin: `http://127.0.0.1:${server.port}`, [CONFIG_TOKEN_HEADER]: token };
+      const url = (q: string, at = root) =>
+        `${server.url}/api/search/meaning?dir=${encodeURIComponent(at)}&q=${encodeURIComponent(q)}`;
+
+      const off = await request(url("login"), headers);
+      expect(off.status).toBe(503);
+      expect(off.body).toContain("Turn it on in Settings");
+
+      await configSet("semanticSearch", "true", fakeIo(env));
+      const empty = await request(url("login"), headers);
+      expect(empty.status).toBe(425);
+      expect(empty.body).toContain("Fingerprinting the messages");
+
+      await updateIndex(
+        root,
+        {
+          sessions: [
+            { sessionId: "s1", messages: [{ id: "h1", kind: "message", title: "Login" }] },
+          ],
+        } as unknown as LineageViewModel,
+        "bge-m3",
+        env,
+      );
+      const found = await request(url("login"), headers);
+      expect(found.status).toBe(200);
+      expect(JSON.parse(found.body).hits).toEqual([
+        expect.objectContaining({ sessionId: "s1", messageId: "h1" }),
+      ]);
+
+      expect((await request(url("login"), { ...headers, [CONFIG_TOKEN_HEADER]: "x" })).status).toBe(
+        403,
+      );
+      expect((await request(url(""), headers)).status).toBe(400);
+      expect((await request(url("login", join(dir, "elsewhere")), headers)).status).toBe(403);
+      expect((await request(url("login"), headers, "HEAD")).status).toBe(405);
+    } finally {
+      await ollama.close();
+    }
   });
 });

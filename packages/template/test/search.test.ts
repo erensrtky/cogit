@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { LineageViewModel } from "../../cli/src/view/model.js";
 import type { SearchHit } from "../../cli/src/view/search.js";
 import { type MapSearchState, SearchBox } from "../src/MapSearch.js";
+import { declineOffer, meaningHits, mergeHits, offerDeclined } from "../src/meaningSearch.js";
 import { branchOf, scopeHits } from "../src/searchScope.js";
 
 const hit = (index: number): SearchHit => ({
@@ -159,5 +160,97 @@ describe("search scope", () => {
     expect(
       render({ current: "branch", session: "One", branch: "First", onScope: () => {} }),
     ).toContain('placeholder="Search this branch: words or a message hash"');
+  });
+});
+
+describe("search by meaning on the map", () => {
+  const model = {
+    sessions: [
+      {
+        sessionId: "s1",
+        title: "",
+        messages: [
+          { id: "h1", kind: "message", title: "Fix login", label: "m1", at: "2026-10-21" },
+        ],
+      },
+    ],
+  } as unknown as LineageViewModel;
+
+  it("turns the server's hits into map hits and keeps word hits after them", () => {
+    const meaning = meaningHits(model, [
+      { sessionId: "s1", messageId: "h1", score: 0.7 },
+      { sessionId: "s1", messageId: "gone", score: 0.6 },
+      { sessionId: "nope", messageId: "h1", score: 0.5 },
+    ]);
+    expect(meaning).toEqual([
+      {
+        sessionId: "s1",
+        sessionTitle: "s1",
+        messageId: "h1",
+        label: "m1",
+        at: "2026-10-21",
+        field: "meaning",
+        excerpt: "Fix login",
+      },
+    ]);
+    const words = [
+      { ...hit(0), sessionId: "s1", messageId: "h1" },
+      { ...hit(1), sessionId: "s1", messageId: "h2" },
+    ];
+    expect(mergeHits(meaning, words).map((h) => [h.messageId, h.field])).toEqual([
+      ["h1", "meaning"],
+      ["h2", "title"],
+    ]);
+  });
+
+  it("remembers a no to the offer, and treats blocked storage as not asked", () => {
+    const items = new Map<string, string>();
+    (globalThis as { window?: unknown }).window = {
+      localStorage: {
+        getItem: (key: string) => items.get(key) ?? null,
+        setItem: (key: string, value: string) => void items.set(key, value),
+      },
+    };
+    expect(offerDeclined()).toBe(false);
+    declineOffer();
+    expect(offerDeclined()).toBe(true);
+    (globalThis as { window?: unknown }).window = {
+      localStorage: {
+        getItem: () => {
+          throw new Error("blocked");
+        },
+        setItem: () => {
+          throw new Error("blocked");
+        },
+      },
+    };
+    expect(offerDeclined()).toBe(false);
+    expect(() => declineOffer()).not.toThrow();
+    delete (globalThis as { window?: unknown }).window;
+    expect(offerDeclined()).toBe(false);
+  });
+
+  it("offers it once, shows why it cannot run, and says how hits are ranked", () => {
+    const render = (meaning: Parameters<typeof SearchBox>[0]["meaning"]) =>
+      renderToStaticMarkup(
+        createElement(SearchBox, {
+          value: "login",
+          state: state(),
+          onQuery: () => {},
+          onStep: () => {},
+          onClear: () => {},
+          meaning,
+          onMeaning: () => {},
+        }),
+      );
+    expect(render(null)).not.toContain("map-search-meaning");
+    expect(render({ offer: true, note: null, ranked: false })).toContain("Turn on");
+    expect(render({ offer: false, note: "Run `ollama pull bge-m3`.", ranked: false })).toContain(
+      "ollama pull bge-m3",
+    );
+    expect(render({ offer: false, note: null, ranked: true })).toContain(
+      "Closest in meaning first",
+    );
+    expect(render({ offer: false, note: null, ranked: false })).not.toContain("map-search-meaning");
   });
 });

@@ -69,6 +69,16 @@
       "default": true,
       "type": "boolean"
     },
+    "semanticSearch": {
+      "default": false,
+      "type": "boolean"
+    },
+    "embeddingModel": {
+      "default": "bge-m3",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
     "startupContext": {
       "default": true,
       "type": "boolean"
@@ -139,6 +149,8 @@
     "messageSummaries",
     "shapes",
     "captures",
+    "semanticSearch",
+    "embeddingModel",
     "startupContext",
     "recordHeadless",
     "serverPort",

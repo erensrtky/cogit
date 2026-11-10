@@ -93,6 +93,8 @@ describe("buildPanel", () => {
         tryBeforeNotes: true,
         shapes: true,
         captures: true,
+        semanticSearch: false,
+        embeddingModel: "bge-m3",
         shareConversations: false,
         agents: ["claude-code"],
         bigChangeLines: 300,

@@ -27,6 +27,8 @@ export function SearchBox({
   onStep,
   onClear,
   scope = null,
+  meaning = null,
+  onMeaning,
 }: {
   /** The text in the box; the hits in `state` may lag behind it while scanning. */
   value: string;
@@ -44,6 +46,13 @@ export function SearchBox({
     branch: string | null;
     onScope: (scope: SearchScope) => void;
   } | null;
+  /**
+   * Search by meaning while a query is typed on a live map: the one-time offer
+   * when it is off, a note when it cannot run, and whether the hits are ranked
+   * by meaning. Null hides it.
+   */
+  meaning?: { offer: boolean; note: string | null; ranked: boolean } | null;
+  onMeaning?: (answer: "yes" | "no") => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -168,6 +177,21 @@ export function SearchBox({
         </div>
       )}
       {hint === null ? null : <p className="map-search-hint">{hint}</p>}
+      {meaning === null || meaning === undefined ? null : meaning.offer && meaning.note === null ? (
+        <p className="map-search-meaning">
+          Search by meaning too? Uses Ollama on this machine.{" "}
+          <button type="button" onClick={() => onMeaning?.("yes")}>
+            Turn on
+          </button>
+          <button type="button" onClick={() => onMeaning?.("no")}>
+            No thanks
+          </button>
+        </p>
+      ) : meaning.note !== null ? (
+        <p className="map-search-meaning">{meaning.note}</p>
+      ) : meaning.ranked ? (
+        <p className="map-search-meaning">Closest in meaning first, then the word matches.</p>
+      ) : null}
     </div>
   );
 }

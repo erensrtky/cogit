@@ -11,7 +11,8 @@ import type { LineageViewModel, ViewChatTurn, ViewNode, ViewStatus } from "./mod
  * `ş`, `ğ`, `ç`, `ö`, `ü` match their plain forms.
  */
 
-export type SearchField = "title" | "branch" | "conversation" | "session";
+/** Where a hit matched; `meaning` is a search-by-meaning hit, ranked by closeness. */
+export type SearchField = "title" | "branch" | "conversation" | "session" | "meaning";
 
 /** One session as the matcher sees it; the CLI and the map both build these. */
 export interface SearchSource {

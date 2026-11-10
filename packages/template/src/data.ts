@@ -246,3 +246,48 @@ export async function saveSetting(
   } | null;
   return body?.value ?? (value as PanelSettings[keyof PanelSettings]);
 }
+
+/** One message the server found close in meaning to the query. */
+export interface MeaningHit {
+  sessionId: string;
+  messageId: string;
+  score: number;
+}
+
+/** A meaning search the server refused; `later` when it is only not ready yet. */
+export class MeaningError extends Error {
+  constructor(
+    message: string,
+    readonly later: boolean,
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * Search by meaning, through the local server and the user's Ollama. A refusal
+ * (the setting off, Ollama down, the model missing) throws with the server's
+ * plain-words reason, which the search box shows as it is.
+ */
+export async function searchMeaning(
+  dir: string,
+  query: string,
+  token: string,
+  signal?: AbortSignal,
+): Promise<MeaningHit[]> {
+  const params = new URLSearchParams({ dir, q: query });
+  const response = await fetch(`/api/search/meaning?${params.toString()}`, {
+    headers: { "x-cogit-token": token },
+    cache: "no-store",
+    ...(signal === undefined ? {} : { signal }),
+  });
+  if (!response.ok) {
+    const text = (await response.text()).trim();
+    throw new MeaningError(
+      text || `search by meaning failed (HTTP ${response.status})`,
+      response.status === 425,
+    );
+  }
+  const body = (await response.json().catch(() => null)) as { hits?: MeaningHit[] } | null;
+  return body?.hits ?? [];
+}

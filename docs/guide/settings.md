@@ -64,6 +64,14 @@ For every message that landed commits, a small representation of what the change
 
 When a session ends, the side model reads what its record left open and drafts at most three things a person would ask for, in the conversation's language. The list is yours: accept, dismiss or close each item. Sessions with nothing open cost no model call; the map's Tasks button appears only while something waits or is open. Off, nothing is drafted and the list already in the store is kept, not deleted.
 
+### Search by meaning
+
+`semanticSearch` · default `false`
+
+**The map's search also finds messages that mean the same thing in other words, using Ollama on this machine.**
+
+Off, the search finds the words you type. On, cogit asks the embedding model in your local Ollama for a fingerprint of every message once, keeps them in the project's local state (never shared), and ranks the messages closest in meaning first, then the word matches. It needs Ollama running and the model pulled (`ollama pull bge-m3`, about 1.2 GB); nothing leaves this machine and no model call is paid. Works in maps opened with `cogit open`. Change the model with `cogit config set embeddingModel <name>`.
+
 ### Language
 
 `language` · default `auto`
@@ -115,6 +123,14 @@ When a session ends, the side model records whatever nobody got to, then reads t
 **The small model that records outside the chat.**
 
 The small model behind every side record: every few turns in mixed mode, all the time in side mode, and at session end. Haiku is cheap and good enough for titles, parents and short decisions.
+
+### Embedding model
+
+`embeddingModel` · default `bge-m3`
+
+**The Ollama model behind search by meaning.**
+
+The local Ollama model that turns messages into fingerprints for search by meaning. bge-m3 reads many languages well; a smaller one such as nomic-embed-text is lighter but mostly English. Changing it rebuilds the fingerprints on the next map build.
 
 ### Agents
 

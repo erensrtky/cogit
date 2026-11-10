@@ -138,6 +138,19 @@ const EDITABLE: FieldSpec[] = [
     kind: "boolean",
   },
   {
+    key: "semanticSearch",
+    label: "Search by meaning",
+    help: "The map's search also finds messages that mean the same thing in other words, using Ollama on this machine.",
+    details:
+      "Off, the search finds the words you type. On, cogit asks the embedding model in your " +
+      "local Ollama for a fingerprint of every message once, keeps them in the project's " +
+      "local state (never shared), and ranks the messages closest in meaning first, then the " +
+      "word matches. It needs Ollama running and the model pulled (`ollama pull bge-m3`, " +
+      "about 1.2 GB); nothing leaves this machine and no model call is paid. Works in maps " +
+      "opened with `cogit open`. Change the model with `cogit config set embeddingModel <name>`.",
+    kind: "boolean",
+  },
+  {
     key: "language",
     label: "Language",
     help: "Language the agent writes records in; `auto` follows the chat.",
@@ -200,6 +213,15 @@ export const CLI_ONLY: CliSetting[] = [
       "The small model behind every side record: every few turns in mixed mode, all the " +
       "time in side mode, and at session end. Haiku is cheap and good enough for titles, " +
       "parents and short decisions.",
+  },
+  {
+    key: "embeddingModel",
+    label: "Embedding model",
+    help: "The Ollama model behind search by meaning.",
+    details:
+      "The local Ollama model that turns messages into fingerprints for search by meaning. " +
+      "bge-m3 reads many languages well; a smaller one such as nomic-embed-text is lighter " +
+      "but mostly English. Changing it rebuilds the fingerprints on the next map build.",
   },
   {
     key: "agents",
@@ -285,6 +307,8 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   tryBeforeNotes: true,
   shapes: true,
   captures: true,
+  semanticSearch: false,
+  embeddingModel: "bge-m3",
   shareConversations: false,
   agents: ["claude-code"],
   bigChangeLines: 300,
@@ -304,6 +328,7 @@ export function editableSettings(settings: PanelSettings): PanelEditableSettings
     tryBeforeNotes: settings.tryBeforeNotes,
     shapes: settings.shapes,
     captures: settings.captures,
+    semanticSearch: settings.semanticSearch,
     language: settings.language,
     shareConversations: settings.shareConversations,
   };

@@ -52,6 +52,14 @@ export const Config = z.object({
    */
   captures: z.boolean().default(true),
   /**
+   * Whether the map's search also finds messages by meaning, through an
+   * embedding model in the local Ollama. Off by default: it needs Ollama and a
+   * model download, which not every machine can spare.
+   */
+  semanticSearch: z.boolean().default(false),
+  /** The Ollama embedding model the meaning search uses. */
+  embeddingModel: z.string().trim().min(1).max(64).default("bge-m3"),
+  /**
    * Whether SessionStart hands the agent the lineage of the previous session and
    * how to read the record (`log` / `show`). On by default; costs only tokens.
    */

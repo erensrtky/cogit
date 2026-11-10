@@ -423,6 +423,28 @@ main.map-page {
   opacity: 0.4;
 }
 
+/* Search by meaning: the one-time offer, a reason it cannot run, or how hits are ranked. */
+.map-search-meaning {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+}
+
+.map-search-meaning button {
+  margin-left: 6px;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.map-search-meaning button:hover {
+  text-decoration: underline;
+}
+
 /* All · This session · This branch, under the box while something is open. */
 .map-search-scope {
   display: flex;

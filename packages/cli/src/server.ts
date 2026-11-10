@@ -18,6 +18,7 @@ import { regenerateShape } from "./commands/shape.js";
 import { diffTooLarge, isDiffSha, readCommitDiff } from "./diff.js";
 import { defaultsPrompter, type Io } from "./io.js";
 import { Config } from "./schema/config.js";
+import { NotIndexedYet, SemanticUnavailable, searchByMeaning } from "./semantic.js";
 import {
   CAPTURE_ID,
   CaptureTransitionError,
@@ -479,6 +480,59 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
     });
     const view = await readMapView(root);
     res.end(JSON.stringify({ ok: true, rowWidths: view.rowWidths, open: view.open }));
+  }
+
+  /**
+   * `GET /api/search/meaning?dir&q`: the messages closest in meaning to `q`,
+   * from the project's fingerprints and the local Ollama. Same Origin and token
+   * checks as the settings read, a registered project only. With the setting
+   * off, or Ollama unable to answer, a 503 carries what to do in plain words;
+   * before the first fingerprints are in, a 425 tells the page to ask again.
+   */
+  async function readMeaningSearch(
+    req: IncomingMessage,
+    res: ServerResponse,
+    port: number,
+    url: URL,
+  ): Promise<void> {
+    if (
+      !readOriginAllowed(req.headers.origin, port) ||
+      !tokenMatches(req.headers[CONFIG_TOKEN_HEADER])
+    ) {
+      respond(res, 403, "forbidden");
+      return;
+    }
+    const dir = url.searchParams.get("dir");
+    const query = url.searchParams.get("q")?.trim() ?? "";
+    if (!dir || query === "" || query.length > 500) {
+      respond(res, 400, "dir and q (at most 500 characters) are required");
+      return;
+    }
+    const root = await registeredRoot(env, dir);
+    if (root === null) {
+      respond(res, 403, "not a registered project");
+      return;
+    }
+    const config = await loadConfig(env);
+    if (!config.semanticSearch) {
+      respond(res, 503, "Search by meaning is off. Turn it on in Settings.");
+      return;
+    }
+    try {
+      const hits = await searchByMeaning(root, query, config.embeddingModel, env);
+      res.writeHead(200, {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+      });
+      res.end(JSON.stringify({ ok: true, hits }));
+    } catch (err) {
+      // 425 Too Early: the page asks again shortly; 503 needs the user.
+      respond(
+        res,
+        err instanceof NotIndexedYet ? 425 : err instanceof SemanticUnavailable ? 503 : 500,
+        (err as Error).message,
+      );
+    }
   }
 
   /**
@@ -1028,6 +1082,14 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
         return;
       }
       await readDiff(req, res, port, url);
+      return;
+    }
+    if (url.pathname === "/api/search/meaning") {
+      if (req.method !== "GET") {
+        respond(res, 405, "method not allowed");
+        return;
+      }
+      await readMeaningSearch(req, res, port, url);
       return;
     }
     if (url.pathname === "/api/map-view") {

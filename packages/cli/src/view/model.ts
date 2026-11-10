@@ -40,6 +40,7 @@ export const PANEL_EDITABLE_KEYS = [
   "tryBeforeNotes",
   "shapes",
   "captures",
+  "semanticSearch",
   "language",
   "shareConversations",
 ] as const;
@@ -543,6 +544,10 @@ export interface PanelSettings {
    * curated list (Story 15.1).
    */
   captures: boolean;
+  /** Whether the map's search also finds messages by meaning, through the local Ollama. */
+  semanticSearch: boolean;
+  /** The Ollama embedding model the meaning search uses. */
+  embeddingModel: string;
   shareConversations: boolean;
   agents: string[];
   /** A message whose linked commits crossed this many lines counts as big (10.3). */

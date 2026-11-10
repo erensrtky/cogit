@@ -214,6 +214,16 @@ While a session or a message is open, **All · This session · This branch** und
 the search to it: find the session first, then the one place in it. Closing the card goes back
 to the whole project.
 
+**Search by meaning** finds messages that say the same thing in other words: "the closed row comes
+back" finds "dismiss bug". It is off by default and uses [Ollama](https://ollama.com) on your
+machine, so nothing leaves it and no model call is paid. Turn it on in Settings, or with **Turn on**
+under the search box the first time you search in a map opened with `cogit open`; it needs Ollama
+running and the model pulled (`ollama pull bge-m3`, about 1.2 GB). cogit then fingerprints every
+message once (about half a minute for 1,400 messages; the box waits and shows the results
+when they are ready) and only new ones after that, in the project's
+local state. The closest messages come first, then the word matches. A machine without the room
+for it keeps the word search as it is; **No thanks** hides the offer.
+
 ## Switching projects
 
 Under the project's name, a strip of the most recently active projects and

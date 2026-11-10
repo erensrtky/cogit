@@ -70,6 +70,8 @@ export function panelSettings(config: Config): PanelSettings {
     tryBeforeNotes: config.tryBeforeNotes,
     shapes: config.shapes,
     captures: config.captures,
+    semanticSearch: config.semanticSearch,
+    embeddingModel: config.embeddingModel,
     shareConversations: config.shareConversations,
     agents: config.agents,
     bigChangeLines: config.bigChangeLines,

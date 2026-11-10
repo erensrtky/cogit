@@ -24,6 +24,7 @@ import { reconcileRecords, recordSyncStatus } from "../record-sync.js";
 import { redactDeep } from "../redact.js";
 import { Slug } from "../schema/common.js";
 import { SESSION_SCHEMA, type Session } from "../schema/session.js";
+import { updateIndex } from "../semantic.js";
 import { readCaptures } from "../store/captures.js";
 import { readProjectChanges } from "../store/changes.js";
 import {
@@ -431,6 +432,15 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
     });
   } catch (err) {
     io.warn(`could not build panel.html: ${(err as Error).message}`);
+  }
+  // Search by meaning: fingerprint the new and changed messages, after the map
+  // is written so a slow or missing Ollama never holds the page back.
+  if (config.semanticSearch) {
+    try {
+      await updateIndex(root, model, config.embeddingModel, io.env);
+    } catch (err) {
+      io.warn(`search by meaning: ${(err as Error).message}`);
+    }
   }
   return model;
 }

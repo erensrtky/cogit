@@ -27,6 +27,8 @@ describe("settings model", () => {
       tryBeforeNotes: parsed.tryBeforeNotes,
       shapes: parsed.shapes,
       captures: parsed.captures,
+      semanticSearch: parsed.semanticSearch,
+      embeddingModel: parsed.embeddingModel,
       shareConversations: parsed.shareConversations,
       agents: parsed.agents,
       bigChangeLines: parsed.bigChangeLines,
@@ -71,6 +73,7 @@ describe("settings model", () => {
       tryBeforeNotes: true,
       shapes: true,
       captures: true,
+      semanticSearch: false,
       language: "tr",
       shareConversations: false,
     });
