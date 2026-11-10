@@ -1,7 +1,12 @@
 import { appendFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { z } from "zod";
-import { type ReadProcess, readProcess } from "../../push-command.js";
+import {
+  type ProcessInfo,
+  type ReadProcess,
+  readProcess,
+  readWindowsProcesses,
+} from "../../push-command.js";
 import type { HookInput } from "../types.js";
 
 /**
@@ -58,22 +63,44 @@ export function isClaudeProcess(args: readonly string[]): boolean {
 }
 
 /**
+ * How this platform reads one process: `/proc` or `ps` per process, and on
+ * Windows one PowerShell table, read on first use.
+ */
+export function platformReader(
+  platform: NodeJS.Platform = process.platform,
+  readTable: () => Map<number, ProcessInfo> | undefined = readWindowsProcesses,
+): ReadProcess {
+  if (platform !== "win32") return (pid) => readProcess(pid, platform);
+  let table: Map<number, ProcessInfo> | undefined | null = null;
+  return (pid) => {
+    if (table === null) table = readTable();
+    return table?.get(pid);
+  };
+}
+
+/**
  * Whether this session was started from inside another Claude Code session:
  * walking up from the hook, the first Claude Code process is the session's own,
  * and a second one above it is the session that started it, through its hooks
  * or its commands. A loop script or a cron job has none. Undefined where the
- * process tree cannot be read (Windows).
+ * process tree cannot be read. Windows hands a dead parent's pid to new
+ * processes, so a "parent" that started after its child is a stranger: the walk
+ * stops there, as at the top.
  */
 export function startedInsideSession(
-  read: ReadProcess = (pid) => readProcess(pid),
+  read: ReadProcess = platformReader(),
   start: number = process.ppid,
 ): boolean | undefined {
   let pid = start;
   let found = 0;
+  let childStarted: number | undefined;
   for (let depth = 0; depth < 64 && pid > 1; depth += 1) {
     const info = read(pid);
     // Unreadable from the start: no answer; later (a sandbox's own PID 1): the top.
     if (info === undefined) return depth === 0 ? undefined : found > 0 ? false : undefined;
+    if (info.started !== undefined && childStarted !== undefined && info.started > childStarted)
+      return found > 0 ? false : undefined;
+    childStarted = info.started;
     if (isClaudeProcess(info.args)) {
       found += 1;
       if (found === 2) return true;

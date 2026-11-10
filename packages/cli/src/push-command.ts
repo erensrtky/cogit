@@ -9,10 +9,11 @@ import { basename } from "node:path";
  * counts as real, as before.
  */
 
-/** One process: its parent's pid and its argument list. */
+/** One process: its parent's pid, its argument list and, where known, when it started (ms). */
 export interface ProcessInfo {
   ppid: number;
   args: string[];
+  started?: number;
 }
 
 export type ReadProcess = (pid: number) => ProcessInfo | undefined;
@@ -86,6 +87,63 @@ export function readProc(pid: number): ProcessInfo | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Windows has neither `/proc` nor `ps`: one PowerShell call lists every process
+ * with its parent, command line and start time, and the caller walks that
+ * table. Undefined when PowerShell does not answer in time. It takes about half
+ * a second, so it is read once per walk, never per process.
+ */
+export function readWindowsProcesses(
+  run: typeof spawnSync = spawnSync,
+): Map<number, ProcessInfo> | undefined {
+  const script =
+    "Get-CimInstance Win32_Process | ForEach-Object { [pscustomobject]@{ " +
+    "p = $_.ProcessId; pp = $_.ParentProcessId; n = $_.Name; c = $_.CommandLine; " +
+    "t = if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() } else { 0 } " +
+    "} } | ConvertTo-Json -Compress";
+  const out = run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+    encoding: "utf8",
+    timeout: 10_000,
+    windowsHide: true,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  return out.status === 0 ? parseWindowsProcesses(out.stdout ?? "") : undefined;
+}
+
+/**
+ * The table `readWindowsProcesses` prints: one object, or an array of them, with
+ * the pid, parent pid, image name, command line (null when Windows hides it)
+ * and start time.
+ */
+export function parseWindowsProcesses(json: string): Map<number, ProcessInfo> | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return undefined;
+  }
+  const rows = Array.isArray(parsed) ? parsed : [parsed];
+  const table = new Map<number, ProcessInfo>();
+  for (const row of rows) {
+    if (typeof row !== "object" || row === null) continue;
+    const { p, pp, n, c, t } = row as Record<string, unknown>;
+    if (typeof p !== "number" || typeof pp !== "number") continue;
+    const args =
+      typeof c === "string" && c.trim() !== ""
+        ? windowsCommandLine(c)
+        : typeof n === "string"
+          ? [n]
+          : [];
+    table.set(p, { ppid: pp, args, ...(typeof t === "number" && t > 0 ? { started: t } : {}) });
+  }
+  return table;
+}
+
+/** A Windows command line as arguments: quoted runs kept whole, enough to read the program and its script. */
+export function windowsCommandLine(line: string): string[] {
+  return [...line.matchAll(/"([^"]*)"|[^\s"]+/g)].map((match) => match[1] ?? match[0]);
 }
 
 /** `ps` joins the arguments with spaces; enough to spot `push` and its flags. */
