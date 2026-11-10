@@ -42,11 +42,11 @@ record, because the Action reads it from the remote. Delete the file to stop it.
 ## What it prints
 
 The goal, the sessions the work came from, each message with its decisions and rejected
-options, and its commits and files. When the message behind a commit is only "commit it",
+options, its Shape, and its commits and files. GitHub draws the Shape's diagrams itself. When the message behind a commit is only "commit it",
 **Led here** lists the earlier messages of the same thread that decided something, back to
 the previous commit. For example:
 
-```markdown
+````markdown
 ## Goal
 - Add refresh-token rotation — Refresh tokens (9c32ab18)
 
@@ -66,6 +66,15 @@ Led here:
 - m21 Keep the old token valid for 30 seconds — two tabs refresh at the same time
   - considered and rejected: a lock around refresh — it adds a round trip to every request
 
+Shape:
+
+```mermaid
+flowchart TD
+  a(["⚡ refresh request"]) --> b{"◇ token used before?"}
+  b -->|"yes"| c["✕ revoke the family"]
+  b -->|"no"| d["ƒ issue a new pair"]
+```
+
 Commits:
 - `a1b2c3d` feat(auth): rotate refresh tokens on use
   - `src/auth/tokens.ts`
@@ -77,7 +86,7 @@ Commits:
 - `cogit show <message-hash>` opens a thought: its decisions, the options it rejected, and the conversation turn for whoever has it locally.
 - `cogit show <sha>` opens the thought behind a commit.
 - This project shares its record, so a reviewer with cogit in their clone gets the same `cogit show` output once the author has pushed.
-```
+````
 
 ## Safe on a public pull request
 

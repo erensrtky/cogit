@@ -1,4 +1,4 @@
-import type { ViewShape } from "./model.js";
+import type { ViewShape, ViewShapeTool } from "./model.js";
 
 /**
  * What the map should say about a message's Shape (Story 13.6). Kept out of the
@@ -284,3 +284,40 @@ export const SHAPE_READING: Readonly<Record<string, string>> = {
   pseudo:
     "What the code does now, in order, one step per line; each step starts with the symbol of what it is.",
 };
+
+/**
+ * A Shape as Markdown for a pull request: GitHub draws `mermaid` blocks, so a
+ * Flow, a Mermaid diagram and a sequence come out as diagrams, a Before / After
+ * table as a table, and the text tools as a code block. A tool the registry
+ * refused, or one this CLI cannot render, is left out. Empty when nothing is.
+ */
+export function shapeMarkdown(tools: readonly ViewShapeTool[]): string[] {
+  const blocks: string[][] = [];
+  for (const tool of tools) {
+    if (tool.valid === false) continue;
+    if (tool.kind === "flow") {
+      const mermaid = flowToMermaid(tool.text);
+      if (mermaid !== undefined) blocks.push(fenced("mermaid", mermaid));
+    } else if (tool.kind === "mermaid" || tool.kind === "sequence") {
+      blocks.push(fenced("mermaid", tool.text));
+    } else if (tool.kind === "table") {
+      const rows = tableRows(tool.text);
+      if (rows === undefined) continue;
+      blocks.push([
+        "| Case | Before | After |",
+        "| --- | --- | --- |",
+        ...rows.map((row) => `| ${row.join(" | ")} |`),
+      ]);
+    } else if (tool.kind === "pseudo" || tool.kind === "interface" || tool.kind === "example") {
+      blocks.push(fenced("text", tool.text));
+    }
+  }
+  return blocks.flatMap((block, index) => (index === 0 ? block : ["", ...block]));
+}
+
+/** A fenced block whose fence is longer than any backtick run inside it. */
+function fenced(lang: string, text: string): string[] {
+  const longest = Math.max(0, ...(text.match(/`+/g) ?? []).map((run) => run.length));
+  const fence = "`".repeat(Math.max(3, longest + 1));
+  return [`${fence}${lang}`, text.trimEnd(), fence];
+}

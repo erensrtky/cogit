@@ -18,7 +18,13 @@ import {
   validateShapeTools,
 } from "../src/shape.js";
 import { loadSession } from "../src/store/stores.js";
-import { flowToMermaid, shapeKindsUsed, shapePreview, tableRows } from "../src/view/shape.js";
+import {
+  flowToMermaid,
+  shapeKindsUsed,
+  shapeMarkdown,
+  shapePreview,
+  tableRows,
+} from "../src/view/shape.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
 const PSEUDO = "1. Read the record\n2. Merge the node";
@@ -496,5 +502,51 @@ describe("session write stores Shapes", () => {
     const loaded = await loadSession(dir, "s2");
     if (!loaded.found || !loaded.ok) throw new Error("session not written");
     expect(loaded.data.nodes[0]?.shape).toBeUndefined();
+  });
+});
+
+describe("a Shape in a pull request", () => {
+  const flow = JSON.stringify({
+    nodes: [
+      { id: "a", kind: "event", label: "after a commit" },
+      { id: "b", kind: "fn", label: "write the record" },
+    ],
+    edges: [{ from: "a", to: "b" }],
+    ordered: false,
+  });
+
+  it("draws diagrams as mermaid blocks, a table as a table and text as code", () => {
+    const lines = shapeMarkdown([
+      { kind: "flow", text: flow },
+      { kind: "sequence", text: "sequenceDiagram\n  Git->>CLI: post-commit" },
+      { kind: "table", text: "an empty log | throws | prints nothing" },
+      { kind: "pseudo", text: "1. read\n2. write" },
+    ]);
+    const text = lines.join("\n");
+    expect(text).toContain(`\`\`\`mermaid\n${flowToMermaid(flow)}\n\`\`\``);
+    expect(text).toContain("```mermaid\nsequenceDiagram\n  Git->>CLI: post-commit\n```");
+    expect(text).toContain(
+      "| Case | Before | After |\n| --- | --- | --- |\n| an empty log | throws | prints nothing |",
+    );
+    expect(text).toContain("```text\n1. read\n2. write\n```");
+  });
+
+  it("leaves out a refused tool, a table it cannot read and a kind it does not know", () => {
+    expect(
+      shapeMarkdown([
+        { kind: "pseudo", text: "1. read\n2. write", valid: false },
+        { kind: "table", text: "only | two" },
+        { kind: "flow", text: "not json" },
+        { kind: "hologram", text: "?" },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("fences text that holds backticks with a longer fence", () => {
+    expect(shapeMarkdown([{ kind: "example", text: "```js → ok" }])).toEqual([
+      "````text",
+      "```js → ok",
+      "````",
+    ]);
   });
 });

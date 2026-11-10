@@ -19,6 +19,7 @@ import { createProgram } from "../src/program.js";
 import type { Session } from "../src/schema/session.js";
 import { appendConversationTurns } from "../src/store/conversations.js";
 import { projectPaths } from "../src/store/paths.js";
+import type { ViewNode } from "../src/view/model.js";
 import { envFor, type FakeIo, fakeIo, noGitProject, T0, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
@@ -445,6 +446,7 @@ describe("cogit pr (Story 10.1)", () => {
     const withoutFiles = formatPr(model, {
       includeFiles: false,
       includeSummaries: true,
+      includeShapes: true,
       dropped: ["files"],
     });
     const filesDropped = renderPr(model, withoutFiles.length);
@@ -456,6 +458,7 @@ describe("cogit pr (Story 10.1)", () => {
     const withoutBoth = formatPr(model, {
       includeFiles: false,
       includeSummaries: false,
+      includeShapes: true,
       dropped: ["files", "summaries"],
     });
     const summariesDropped = renderPr(model, withoutBoth.length);
@@ -471,6 +474,60 @@ describe("cogit pr (Story 10.1)", () => {
     expect(capped.truncated).toBe(true);
     expect(capped.text.length).toBeLessThanOrEqual(200);
     expect(capped.text).toContain("Truncated to fit the size cap");
+  });
+
+  it("carries a message's Shape into the description, and drops it after the summaries", () => {
+    // Long enough that dropping the file list and the summary is not enough.
+    const diagram = `flowchart TD\n${Array.from({ length: 20 }, (_, i) => `  A${i} --> B${i}`).join("\n")}`;
+    const message = {
+      id: A,
+      label: "m1",
+      kind: "message",
+      title: "A thought",
+      parent: null,
+      summary: "A summary.",
+      shape: { tools: [{ kind: "mermaid", text: diagram }], commits: [] },
+    } as unknown as ViewNode;
+    const session: Session = {
+      schema: 1,
+      sessionId: "s1",
+      agent: "claude-code",
+      title: "Session",
+      startedAt: T0,
+      updatedAt: T0,
+      status: { goal: "", done: [], pending: [], next: "" },
+      nodes: [],
+    };
+    const model = buildPrModel({
+      base: { ref: "main", commit: "0".repeat(40) },
+      head: "1".repeat(40),
+      policy: "share",
+      sessions: [{ session, messages: [message], turns: null }],
+      commits: [
+        {
+          full: "2".repeat(40),
+          short: "2222222",
+          at: T0,
+          subject: "feat: x",
+          thoughts: [A],
+          files: [],
+        },
+      ],
+    });
+    expect(model.thoughts[0]?.shape).toEqual([{ kind: "mermaid", text: diagram }]);
+    const full = renderPr(model, 1_000_000);
+    expect(full.text).toContain(`Shape:\n\n\`\`\`mermaid\n${diagram}\n\`\`\``);
+
+    const lean = formatPr(model, {
+      includeFiles: false,
+      includeSummaries: false,
+      includeShapes: false,
+      dropped: ["files", "summaries", "shapes"],
+    });
+    const dropped = renderPr(model, lean.length);
+    expect(dropped.dropped).toEqual(["files", "summaries", "shapes"]);
+    expect(dropped.text).not.toContain("```mermaid");
+    expect(dropped.text).toContain("file lists, summaries and Shape diagrams");
   });
 
   it("runs through the CLI", async () => {

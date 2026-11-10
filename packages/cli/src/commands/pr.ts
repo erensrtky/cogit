@@ -4,7 +4,8 @@ import { cogitIgnored, findGitRoot, gitUserEmail, readCommitFiles } from "../git
 import { CliError, type Io } from "../io.js";
 import type { Session } from "../schema/session.js";
 import { earliestSessionStart, readThoughtTrailers } from "../thought.js";
-import type { ViewNode } from "../view/model.js";
+import type { ViewNode, ViewShapeTool } from "../view/model.js";
+import { shapeMarkdown } from "../view/shape.js";
 import {
   type EffectiveSession,
   loadEffectiveSessions,
@@ -105,6 +106,8 @@ export interface PrThought {
    * plain "commit it", and the reason sits a few messages up.
    */
   ledHere: PrLedHere[];
+  /** The message's Shape, when one was written: what the change does. */
+  shape?: ViewShapeTool[];
   commits: PrCommit[];
 }
 
@@ -374,6 +377,7 @@ export function buildPrModel(input: BuildPrInput): PrModel {
             alternatives: decision.alternatives ?? [],
           })),
           ledHere: [],
+          ...(message.shape?.tools.length ? { shape: message.shape.tools } : {}),
           commits: [],
         };
         thoughts.set(id, thought);
@@ -442,11 +446,15 @@ export function buildPrModel(input: BuildPrInput): PrModel {
   };
 }
 
+/** What the size cap may leave out, in the order it does. */
+export type PrDroppable = "files" | "summaries" | "shapes";
+
 export interface PrFormatOptions {
   includeFiles: boolean;
   includeSummaries: boolean;
+  includeShapes: boolean;
   /** What the size cap dropped, said at the end of the description. */
-  dropped?: ("files" | "summaries")[];
+  dropped?: PrDroppable[];
 }
 
 function alternativeLine(alt: { option: string; why: string }, indent = ""): string {
@@ -514,6 +522,8 @@ export function formatPr(model: PrModel, opts: PrFormatOptions): string {
           for (const alt of step.alternatives) lines.push(alternativeLine(alt, "  "));
         }
       }
+      const shape = opts.includeShapes ? shapeMarkdown(thought.shape ?? []) : [];
+      if (shape.length > 0) lines.push("", "Shape:", "", ...shape);
       lines.push("", "Commits:");
       for (const commit of thought.commits) {
         lines.push(`- \`${commit.short}\` ${oneLine(commit.subject)}`);
@@ -552,8 +562,11 @@ export function formatPr(model: PrModel, opts: PrFormatOptions): string {
 
   const dropped = opts.dropped ?? [];
   if (dropped.length > 0) {
-    const names = dropped.map((item) => (item === "files" ? "file lists" : "summaries"));
-    const text = names.length === 1 ? names[0] : `${names[0]} and ${names[1]}`;
+    const names = dropped.map((item) =>
+      item === "files" ? "file lists" : item === "shapes" ? "Shape diagrams" : "summaries",
+    );
+    const text =
+      names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
     lines.push("", `_Left out to stay under the size cap: ${text}._`);
   }
   return lines.join("\n");
@@ -561,38 +574,45 @@ export function formatPr(model: PrModel, opts: PrFormatOptions): string {
 
 export interface PrRendered {
   text: string;
-  dropped: ("files" | "summaries")[];
+  dropped: PrDroppable[];
   truncated: boolean;
 }
 
 /**
  * Fits the description under the cap by dropping the file lists first, then the
- * summaries (Story 10.1), and says what was left out. A description still over
+ * summaries (Story 10.1), then the Shape diagrams, and says what was left out. A description still over
  * the cap after both is cut, so GitHub never refuses the body.
  */
 export function renderPr(model: PrModel, cap = PR_CHAR_CAP): PrRendered {
-  const levels: {
-    includeFiles: boolean;
-    includeSummaries: boolean;
-    dropped: ("files" | "summaries")[];
-  }[] = [
-    { includeFiles: true, includeSummaries: true, dropped: [] },
-    { includeFiles: false, includeSummaries: true, dropped: ["files"] },
-    { includeFiles: false, includeSummaries: false, dropped: ["files", "summaries"] },
+  const levels: (PrFormatOptions & { dropped: PrDroppable[] })[] = [
+    { includeFiles: true, includeSummaries: true, includeShapes: true, dropped: [] },
+    { includeFiles: false, includeSummaries: true, includeShapes: true, dropped: ["files"] },
+    {
+      includeFiles: false,
+      includeSummaries: false,
+      includeShapes: true,
+      dropped: ["files", "summaries"],
+    },
+    {
+      includeFiles: false,
+      includeSummaries: false,
+      includeShapes: false,
+      dropped: ["files", "summaries", "shapes"],
+    },
   ];
   for (const level of levels) {
     const text = formatPr(model, level);
     if (text.length <= cap) return { text, dropped: level.dropped, truncated: false };
   }
-  const full = formatPr(model, levels[2] as (typeof levels)[number]);
+  const full = formatPr(model, levels[3] as (typeof levels)[number]);
   const note =
-    "\n\n_Truncated to fit the size cap; file lists and summaries were left out. " +
+    "\n\n_Truncated to fit the size cap; file lists, summaries and Shape diagrams were left out. " +
     "Open a thought with `cogit show` for the rest._";
   if (note.length >= cap)
-    return { text: note.slice(0, cap), dropped: ["files", "summaries"], truncated: true };
+    return { text: note.slice(0, cap), dropped: ["files", "summaries", "shapes"], truncated: true };
   return {
     text: full.slice(0, cap - note.length) + note,
-    dropped: ["files", "summaries"],
+    dropped: ["files", "summaries", "shapes"],
     truncated: true,
   };
 }
