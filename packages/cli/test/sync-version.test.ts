@@ -52,7 +52,21 @@ describe("sync-version", () => {
     }
   });
 
-  it("leaves this repository unchanged when it is already in sync", () => {
-    expect(run(() => {})).toEqual([]);
+  it("never takes a manifest back below VERSION, so a bump before the release stays", async () => {
+    const root = await tempDir();
+    await writeFile(join(root, "VERSION"), "1.3.1\n");
+    const [ahead, behind] = TARGETS as [string, string];
+    for (const [rel, version] of [
+      [ahead, "1.4.0"],
+      [behind, "1.2.0"],
+    ] as const) {
+      await mkdir(join(root, rel, ".."), { recursive: true });
+      await writeFile(join(root, rel), JSON.stringify({ name: "x", version }));
+    }
+    const lines: string[] = [];
+    // run() on a copy: the real repository is never written by a test.
+    expect(run((line: string) => lines.push(line), root)).toEqual([behind]);
+    expect(lines).toEqual([`${behind}: version 1.3.1`]);
+    expect(JSON.parse(await readFile(join(root, ahead), "utf8")).version).toBe("1.4.0");
   });
 });
