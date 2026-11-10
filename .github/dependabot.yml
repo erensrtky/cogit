@@ -12,6 +12,13 @@ updates:
     commit-message:
       prefix: build
       include: scope
+    ignore:
+      # The types follow the oldest Node cogit supports (engines: >=22.13).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # 12.x adds about 1.9 MB to the package for nothing the map draws yet.
+      - dependency-name: mermaid
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
