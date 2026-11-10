@@ -55,7 +55,7 @@ the previous commit. For example:
 
 ## Sessions
 Open a whole session with `cogit log --session <id>` or the map.
-- Refresh tokens (9c32ab18) · m12–m29 · 2026-10-24 09:12 → 2026-10-24 11:40
+- Refresh tokens (9c32ab18) · m12–m29 · 2026-10-24 09:12 → 2026-10-24 11:40 UTC
 
 ## Thoughts
 

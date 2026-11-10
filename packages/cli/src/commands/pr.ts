@@ -7,13 +7,7 @@ import { earliestSessionStart, readThoughtTrailers } from "../thought.js";
 import { buildMessages } from "../view/lineage.js";
 import type { ViewNode, ViewPullRequest, ViewShapeTool } from "../view/model.js";
 import { shapeMarkdown } from "../view/shape.js";
-import {
-  type EffectiveSession,
-  loadEffectiveSessions,
-  openProject,
-  shortHash,
-  stamp,
-} from "./log.js";
+import { type EffectiveSession, loadEffectiveSessions, openProject, shortHash } from "./log.js";
 
 const exec = promisify(execFile);
 
@@ -477,6 +471,15 @@ function decisionLines(thought: PrThought): string[] {
   return lines;
 }
 
+/**
+ * `2026-10-24 09:12` in UTC. A pull request is read in every time zone and the
+ * Action runs in UTC, so the description says which one it uses.
+ */
+function utcStamp(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : date.toISOString().slice(0, 16).replace("T", " ");
+}
+
 /** The Markdown body of the PR, in the order Story 10.1 fixes. */
 export function formatPr(model: PrModel, opts: PrFormatOptions): string {
   const lines: string[] = ["## Goal"];
@@ -496,7 +499,7 @@ export function formatPr(model: PrModel, opts: PrFormatOptions): string {
       const range = session.from === session.to ? session.from : `${session.from}–${session.to}`;
       lines.push(
         `- ${session.title} (${session.shortId}) · ${range} · ` +
-          `${stamp(session.startedAt)} → ${stamp(session.updatedAt)}`,
+          `${utcStamp(session.startedAt)} → ${utcStamp(session.updatedAt)} UTC`,
       );
     }
   }

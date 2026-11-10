@@ -487,6 +487,9 @@ describe("cogit pr (Story 10.1)", () => {
 
     const full = renderPr(model, 1_000_000);
     expect(full.dropped).toEqual([]);
+    // Read in every time zone: the session's times are UTC and say so.
+    const utc = new Date(T0).toISOString().slice(0, 16).replace("T", " ");
+    expect(full.text).toContain(`${utc} → ${utc} UTC`);
     expect(full.text).toContain("src/a-very-long-file-name.ts");
     expect(full.text).toContain("A summary that is dropped last.");
 
