@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePatch, sideBySide } from "../src/diffView.js";
+import { parsePatch, sideBySide } from "../src/patch.js";
 
 /**
  * Story 10.5: the message details show git's own patch. The parse and the

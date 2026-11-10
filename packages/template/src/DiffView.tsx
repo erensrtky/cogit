@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { embeddedDiff, loadDiff, pageToken } from "./data.js";
-import { type DiffFile, type DiffHunk, parsePatch, sideBySide } from "./diffView.js";
+import { type DiffFile, type DiffHunk, parsePatch, sideBySide } from "./patch.js";
 
 /** The viewer's choice of diff layout; kept locally, never sent anywhere. */
 const MODE_KEY = "cogit.diffSideBySide";
