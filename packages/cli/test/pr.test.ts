@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { init } from "../src/commands/init.js";
 import { shortHash } from "../src/commands/log.js";
 import {
+  branchPullRequest,
   buildPrModel,
   copyToClipboard,
   formatPr,
@@ -291,6 +292,52 @@ describe("cogit pr (Story 10.1)", () => {
     expect(text).toContain("a reviewer with cogit in their clone");
     expect(text).not.toContain(SECRET);
     expect(text).not.toContain("Conversation:");
+  });
+
+  it("gives the map's Pull request view what cogit pr prints for the branch", async () => {
+    const view = await branchPullRequest(root, [session()], env);
+    expect(view?.branch).toBe("master");
+    expect(view?.base).toBe("main");
+    expect(view?.model.thoughts[0]?.id).toBe(A);
+    await pr({ dir: root, io });
+    expect(view?.markdown).toBe(io.lines.join("\n"));
+
+    // On the branch pull requests merge into, there is nothing to merge.
+    await git("checkout", "-q", "main");
+    const onBase = await branchPullRequest(root, [session()], env);
+    expect(onBase?.branch).toBe("main");
+    expect(onBase?.model.thoughts).toEqual([]);
+    expect(onBase?.model.unlinked).toEqual([]);
+
+    const outside = await tempDir();
+    expect(await branchPullRequest(outside, [], env)).toBeUndefined();
+    // A record it cannot read leaves the view out instead of failing the map.
+    const broken = { ...session(), nodes: null } as unknown as Session;
+    expect(await branchPullRequest(root, [broken], env)).toBeUndefined();
+    // A repository with no commit yet, and one with no branch to merge into.
+    const fresh = join(await tempDir(), "fresh");
+    await mkdir(fresh);
+    await run("git", ["-C", fresh, "init", "-q", "-b", "dev"], { env });
+    expect(await branchPullRequest(fresh, [], env)).toBeUndefined();
+    await writeFile(join(fresh, "a.txt"), "a\n");
+    await run("git", ["-C", fresh, "add", "a.txt"], { env });
+    await run(
+      "git",
+      [
+        "-C",
+        fresh,
+        "-c",
+        "user.email=t@example.com",
+        "-c",
+        "user.name=T",
+        "commit",
+        "-q",
+        "-m",
+        "a",
+      ],
+      { env },
+    );
+    expect(await branchPullRequest(fresh, [], env)).toBeUndefined();
   });
 
   it("prints the same content as JSON for other tools", async () => {

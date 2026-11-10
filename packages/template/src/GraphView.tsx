@@ -32,6 +32,7 @@ import { type GitLayout, layoutGitGraph, ROW_WIDTH } from "./gitLayout.js";
 import { centreViewport, headOf, inBand, type MapPoint, visibleBand } from "./graph.js";
 import type { MapSearchState } from "./MapSearch.js";
 import { Outline, type OutlineTarget } from "./Outline.js";
+import { PullRequestView } from "./PullRequestView.js";
 import { filterOf, type PersonFilter, peopleOf, valueOf } from "./people.js";
 import { RowEdge, type RowWidths, rowWidthsOf } from "./RowEdge.js";
 import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
@@ -417,8 +418,8 @@ function Flow({
   const [showFiles, setShowFiles] = useState(memory.panel === "files");
   // The Graph view (file and import links) instead of the git view, and its focus file.
   // A map left on the old Home view opens on the git view.
-  const [layout, setLayout] = useState<"git" | "graph">(
-    memory.layout === "graph" ? "graph" : "git",
+  const [layout, setLayout] = useState<"git" | "graph" | "pr">(
+    memory.layout === "graph" || memory.layout === "pr" ? memory.layout : "git",
   );
   const [graphFocus, setGraphFocus] = useState<string | null>(memory.graphFocus ?? null);
   // The Graph view's files (code only) and the one it is drawn around; the
@@ -926,6 +927,14 @@ function Flow({
             >
               Graph view
             </button>
+            <button
+              type="button"
+              aria-pressed={layout === "pr"}
+              title="This branch as a pull request: its goal, thoughts and commits, ready to copy"
+              onClick={() => setLayout("pr")}
+            >
+              Pull request
+            </button>
           </span>
           {/* Git-only controls stay in place in the Graph view, disabled, so the
               buttons after them never move under the pointer. */}
@@ -1087,7 +1096,12 @@ function Flow({
             />
           ) : null}
           <div className="graph-canvas">
-            {layout === "graph" ? (
+            {layout === "pr" ? (
+              <PullRequestView
+                pr={model.pullRequest}
+                onSelect={(sessionId, messageId) => openNode(sessionId, messageId)}
+              />
+            ) : layout === "graph" ? (
               <FileGraphView
                 files={model.files}
                 codeFiles={model.codeFiles}

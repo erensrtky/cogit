@@ -55,6 +55,7 @@ import {
 } from "../view/panel.js";
 import { switcherEntries } from "../view/switcher-entries.js";
 import { TEMPLATE_HTML } from "../view/template.js";
+import { branchPullRequest } from "./pr.js";
 
 export interface BuildOptions {
   dir: string;
@@ -394,6 +395,9 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
         built.codeFiles = code.files;
         built.fileLinks = code.links;
       }
+      // The Pull request view: this branch as `cogit pr` describes it.
+      const pullRequest = await branchPullRequest(root, withThoughts, io.env);
+      if (pullRequest !== undefined) built.pullRequest = pullRequest;
       // Story 15.1: the curated captured-work list, from the local store the
       // distiller and the CLI write. A corrupt or missing file is an empty list.
       built.captures = (await readCaptures(root, io.warn)).items;

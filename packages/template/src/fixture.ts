@@ -220,6 +220,79 @@ export const fixture: LineageViewModel = {
     ),
   ].sort((a, b) => a.startedAt.localeCompare(b.startedAt)),
   // Patches carried by the page, so the demo map shows a diff with no server.
+  pullRequest: {
+    branch: "feat/template",
+    base: "origin/main",
+    markdown: "## Goal\n- Render the lineage map from build data",
+    model: {
+      base: { ref: "origin/main", commit: "0".repeat(40) },
+      head: "1".repeat(40),
+      policy: "share",
+      goals: [
+        {
+          text: "Render the lineage map from build data",
+          sessionId: "fixture-template",
+          sessionTitle: "Template package",
+        },
+      ],
+      sessions: [
+        {
+          sessionId: "fixture-template",
+          shortId: "fixture-",
+          title: "Template package",
+          startedAt: "2026-10-24T09:00:00.000Z",
+          updatedAt: "2026-10-24T10:30:00.000Z",
+          from: "m3",
+          to: "m4",
+          thoughtCount: 2,
+          commitCount: 3,
+        },
+      ],
+      thoughts: [
+        {
+          id: "m4",
+          shortId: "m4",
+          label: "m4",
+          sessionId: "fixture-template",
+          shortSessionId: "fixture-",
+          sessionTitle: "Template package",
+          title: "Build the dev fixture",
+          why: "Three sessions in start order exercise every branch shape.",
+          decidedBy: "agreed",
+          alternatives: [
+            { option: "ship the fixture as a JSON file", why: "the map types it once" },
+          ],
+          agentDecisions: [],
+          ledHere: [
+            {
+              id: "m3",
+              shortId: "m3",
+              label: "m3",
+              title: "Read data from the DOM",
+              why: "A fetch would break file://.",
+              alternatives: [],
+            },
+          ],
+          shape: [
+            {
+              kind: "mermaid",
+              text: "flowchart TD\n  A[fixture.ts] --> B[Lay out the git rows] --> C[Render the map]",
+            },
+          ],
+          commits: [
+            {
+              full: "a".repeat(40),
+              short: "aaaaaaa",
+              at: "2026-10-24T09:45:00.000Z",
+              subject: "feat(template): add the dev fixture",
+              files: ["packages/template/src/fixture.ts"],
+            },
+          ],
+        },
+      ],
+      unlinked: [{ full: "b".repeat(40), short: "bbbbbbb", subject: "chore: bump the lockfile" }],
+    },
+  },
   diffs: {
     "1a2b3c4": {
       "": [

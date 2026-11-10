@@ -4,7 +4,8 @@ import { cogitIgnored, findGitRoot, gitUserEmail, readCommitFiles } from "../git
 import { CliError, type Io } from "../io.js";
 import type { Session } from "../schema/session.js";
 import { earliestSessionStart, readThoughtTrailers } from "../thought.js";
-import type { ViewNode, ViewShapeTool } from "../view/model.js";
+import { buildMessages } from "../view/lineage.js";
+import type { ViewNode, ViewPullRequest, ViewShapeTool } from "../view/model.js";
 import { shapeMarkdown } from "../view/shape.js";
 import {
   type EffectiveSession,
@@ -668,18 +669,20 @@ export interface PrOptions {
   cap?: number;
 }
 
-/** `cogit pr [base]`: reads the record and the branch, prints the description. */
-export async function pr(opts: PrOptions): Promise<PrModel> {
-  const root = await openProject(opts.dir);
-  const gitRoot = await findGitRoot(root);
-  if (gitRoot === undefined) throw new CliError("not in a git repository");
-  const env = opts.io.env;
-
-  const head = await revParse(gitRoot, "HEAD", env);
-  if (head === undefined) throw new CliError("HEAD has no commits yet");
-  const base = await resolvePrBase(gitRoot, opts.base, env);
+/**
+ * The pull request of `head` against `base` from the given record: the commits
+ * between them, their trailers and files, and the thoughts behind them. Shared
+ * by `cogit pr` and the map's Pull request view, so the two never disagree.
+ */
+async function collectPr(
+  root: string,
+  gitRoot: string,
+  base: PrBase,
+  head: string,
+  sessions: EffectiveSession[],
+  env: NodeJS.ProcessEnv,
+): Promise<PrModel> {
   const commits = await readPrCommits(gitRoot, base.commit, head, env);
-  const sessions = await loadEffectiveSessions(root, opts.io);
   const userEmail = await gitUserEmail(gitRoot, env);
   const trailers =
     commits.length === 0
@@ -696,7 +699,7 @@ export async function pr(opts: PrOptions): Promise<PrModel> {
           commits.map((commit) => commit.full),
         );
 
-  const model = buildPrModel({
+  return buildPrModel({
     base,
     head,
     policy: (await cogitIgnored(root)) ? "ignore" : "share",
@@ -711,6 +714,57 @@ export async function pr(opts: PrOptions): Promise<PrModel> {
       };
     }),
   });
+}
+
+/**
+ * The map's Pull request view: the checked-out branch against where it will
+ * merge, built from the record the map already loaded. Undefined outside git,
+ * before the first commit, or when no merge target can be found.
+ */
+export async function branchPullRequest(
+  root: string,
+  sessions: readonly Session[],
+  env: NodeJS.ProcessEnv,
+): Promise<ViewPullRequest | undefined> {
+  // The map is built on every recording; a git or a record that fails here
+  // leaves the view out and never fails the map.
+  try {
+    const gitRoot = await findGitRoot(root);
+    if (gitRoot === undefined) return undefined;
+    const head = await revParse(gitRoot, "HEAD", env);
+    if (head === undefined) return undefined;
+    const base = await resolvePrBase(gitRoot, undefined, env).catch(() => undefined);
+    if (base === undefined) return undefined;
+    const branch = await git(gitRoot, ["symbolic-ref", "--quiet", "--short", "HEAD"], env);
+    const effective = sessions.map((session) => ({
+      session,
+      messages: buildMessages(session.nodes),
+      turns: null,
+    }));
+    const model = await collectPr(root, gitRoot, base, head, effective, env);
+    return {
+      ...(branch === undefined ? {} : { branch }),
+      base: base.ref,
+      model,
+      markdown: renderPr(model).text,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/** `cogit pr [base]`: reads the record and the branch, prints the description. */
+export async function pr(opts: PrOptions): Promise<PrModel> {
+  const root = await openProject(opts.dir);
+  const gitRoot = await findGitRoot(root);
+  if (gitRoot === undefined) throw new CliError("not in a git repository");
+  const env = opts.io.env;
+
+  const head = await revParse(gitRoot, "HEAD", env);
+  if (head === undefined) throw new CliError("HEAD has no commits yet");
+  const base = await resolvePrBase(gitRoot, opts.base, env);
+  const sessions = await loadEffectiveSessions(root, opts.io);
+  const model = await collectPr(root, gitRoot, base, head, sessions, env);
 
   const rendered = renderPr(model, opts.cap ?? PR_CHAR_CAP);
   if (opts.copy === true && !(await copyToClipboard(rendered.text, env))) {

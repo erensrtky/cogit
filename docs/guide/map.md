@@ -170,6 +170,17 @@ The import links come from a code graph: cogit reads the one
 builds or refreshes it itself. Without one the view shows the focus file and its messages
 only. See [Getting started](getting-started.md).
 
+## Pull request
+
+The third view shows the branch you are on as a pull request, the same way `cogit pr` describes
+it: the goal, one card per thought with its reason, the options it rejected, the messages that
+led to it and its Shape, then the commits no thought is behind. A thought's title opens its
+card, where the diff is. **Copy as PR description** copies the Markdown `cogit pr` prints.
+
+On the branch pull requests merge into (`main` against `main`) there is nothing to merge, so the
+view says so; it fills on a branch with commits its base does not have yet. The page is built
+for the branch checked out at the time, and the next build follows a branch switch.
+
 ## Tasks
 
 Working with an agent is improvised: things that would have been a plan's items get done,

@@ -9,6 +9,9 @@ On the branch, before opening the pull request:
 cogit pr main --copy   # Markdown on stdout, also copied to the clipboard
 ```
 
+The map shows the same thing in its **Pull request** view, with a button that copies it. See
+[The map](map.md#pull-request).
+
 Without a base it describes everything the branch adds to where it will merge: the branch it
 tracks when that is another branch (`main`, or the branch it is stacked on), else the remote's
 default branch, else `main`, else `master`. Pushing the branch, merging `main` into it or rebasing

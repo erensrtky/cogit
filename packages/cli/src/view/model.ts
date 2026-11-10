@@ -1,3 +1,4 @@
+import type { PrModel } from "../commands/pr.js";
 import type { BranchSummary, NodeKind } from "../schema/session.js";
 
 /**
@@ -298,6 +299,17 @@ export interface ViewInboxRow {
   transcriptAvailable: boolean;
 }
 
+/** The map's Pull request view: the checked-out branch against where it will merge. */
+export interface ViewPullRequest {
+  /** The checked-out branch; absent on a detached HEAD. */
+  branch?: string;
+  /** Where it will merge, as `cogit pr` picks it (`main`, `origin/main`, …). */
+  base: string;
+  model: PrModel;
+  /** What `cogit pr` prints: the description the view copies. */
+  markdown: string;
+}
+
 export interface LineageViewModel {
   /** A shared project's first download failed, so an empty map does not mean an empty record. */
   recordDownloadFailed?: boolean;
@@ -340,6 +352,12 @@ export interface LineageViewModel {
    * lockfiles and build folders by name.
    */
   codeFiles?: string[];
+  /**
+   * The checked-out branch as a pull request, for the map's Pull request view:
+   * what `cogit pr` prints for it, built at the same time. Absent outside git,
+   * before the first commit, or when no merge target was found.
+   */
+  pullRequest?: ViewPullRequest;
   /**
    * Patches embedded at build time, by commit and then by file ("" for the
    * whole commit), so a saved map can show a diff without the local server.

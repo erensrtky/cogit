@@ -7,7 +7,7 @@
  */
 
 export interface ViewMemory {
-  layout?: "git" | "graph" | "home";
+  layout?: "git" | "graph" | "pr" | "home";
   panel?: "outline" | "files" | "tasks" | "none";
   graphFocus?: string | null;
   showFiles?: boolean;
