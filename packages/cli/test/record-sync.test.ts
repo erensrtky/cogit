@@ -337,38 +337,43 @@ describe("the record on its own refs", () => {
     expect(parseGitVersion("no version here")).toBeUndefined();
   });
 
-  it("downloads with a git too old for --no-write-fetch-head, and names its error", async () => {
-    await record(alice, "s1", "First", "alice@example.com");
-    await push(alice);
-    const bob = await cloneAs("bob");
-    // A git 2.20 stand-in: reports the old version and refuses the newer flag.
-    const bin = join(dir, "old-git");
-    await mkdir(bin, { recursive: true });
-    const real = (await run("sh", ["-c", "command -v git"], { env: gitEnv })).stdout.trim();
-    await writeFile(
-      join(bin, "git"),
-      [
-        "#!/bin/sh",
-        'for a in "$@"; do',
-        '  [ "$a" = version ] && { echo "git version 2.20.1"; exit 0; }',
-        '  [ "$a" = --no-write-fetch-head ] && { echo "error: unknown option no-write-fetch-head" >&2; echo "usage: git fetch" >&2; echo "    --filter <args>  object filtering" >&2; exit 129; }',
-        "done",
-        `exec '${real}' "$@"`,
-      ].join("\n"),
-    );
-    await chmod(join(bin, "git"), 0o755);
-    const old = { ...env, PATH: `${bin}:${env.PATH ?? process.env.PATH ?? ""}` };
-    expect(await downloadRecords(bob, old)).toBe(true);
-    expect(await refs(bob, "refs/cogit-remote")).toHaveLength(1);
+  // The stand-in git is a shell script, which Windows cannot start.
 
-    // Claiming a newer version, it fails: the reason is git's error line, not its usage list.
-    const script = await readFile(join(bin, "git"), "utf8");
-    await writeFile(join(bin, "git"), script.replace("2.20.1", "2.30.0"));
-    expect(await downloadRecords(bob, old)).toBe(false);
-    expect((await recordSyncStatus(bob, env)).downloadError).toBe(
-      "error: unknown option no-write-fetch-head",
-    );
-  });
+  it.skipIf(process.platform === "win32")(
+    "downloads with a git too old for --no-write-fetch-head, and names its error",
+    async () => {
+      await record(alice, "s1", "First", "alice@example.com");
+      await push(alice);
+      const bob = await cloneAs("bob");
+      // A git 2.20 stand-in: reports the old version and refuses the newer flag.
+      const bin = join(dir, "old-git");
+      await mkdir(bin, { recursive: true });
+      const real = (await run("sh", ["-c", "command -v git"], { env: gitEnv })).stdout.trim();
+      await writeFile(
+        join(bin, "git"),
+        [
+          "#!/bin/sh",
+          'for a in "$@"; do',
+          '  [ "$a" = version ] && { echo "git version 2.20.1"; exit 0; }',
+          '  [ "$a" = --no-write-fetch-head ] && { echo "error: unknown option no-write-fetch-head" >&2; echo "usage: git fetch" >&2; echo "    --filter <args>  object filtering" >&2; exit 129; }',
+          "done",
+          `exec '${real}' "$@"`,
+        ].join("\n"),
+      );
+      await chmod(join(bin, "git"), 0o755);
+      const old = { ...env, PATH: `${bin}:${env.PATH ?? process.env.PATH ?? ""}` };
+      expect(await downloadRecords(bob, old)).toBe(true);
+      expect(await refs(bob, "refs/cogit-remote")).toHaveLength(1);
+
+      // Claiming a newer version, it fails: the reason is git's error line, not its usage list.
+      const script = await readFile(join(bin, "git"), "utf8");
+      await writeFile(join(bin, "git"), script.replace("2.20.1", "2.30.0"));
+      expect(await downloadRecords(bob, old)).toBe(false);
+      expect((await recordSyncStatus(bob, env)).downloadError).toBe(
+        "error: unknown option no-write-fetch-head",
+      );
+    },
+  );
 
   it("adds the refspec once, in this clone's config only", async () => {
     const bob = await cloneAs("bob");

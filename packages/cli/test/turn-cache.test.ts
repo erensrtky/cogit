@@ -85,7 +85,7 @@ describe("the transcript turn cache", () => {
   it("lives under COGIT_CACHE_DIR, else the XDG cache, else ~/.cache", async () => {
     expect(turnCacheDir({ COGIT_CACHE_DIR: "/c" })).toBe(join("/c", "turns"));
     expect(turnCacheDir({ XDG_CACHE_HOME: "/x" })).toBe(join("/x", "cogit", "turns"));
-    expect(turnCacheDir({})).toMatch(/\.cache\/cogit\/turns$/);
+    expect(turnCacheDir({})).toMatch(/\.cache[\\/]cogit[\\/]turns$/);
     await mkdir(turnCacheDir(env), { recursive: true });
   });
 });

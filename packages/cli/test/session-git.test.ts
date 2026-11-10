@@ -253,31 +253,41 @@ describe("ignore files and git hooks", () => {
     }
   });
 
-  it("runs the CLI through node when cogit is not on PATH", async () => {
-    // A stand-in CLI that records the arguments the hook passed.
-    const marker = join(dir, "called.txt");
-    const cli = join(dir, "cli.js");
-    await writeFile(
-      cli,
-      `require("node:fs").writeFileSync(${JSON.stringify(marker)}, process.argv.slice(2).join(" "));\n`,
-    );
-    const hook = join(dir, "hook.sh");
-    await writeFile(hook, `#!/bin/sh\n${hookBlock("pre-commit", root, cli)}\n`);
-    // Only node in its own directory: a global `npm install -g @cogit/cli` puts cogit
-    // next to node, which would take this test off the path it checks.
-    const bin = join(dir, "bin");
-    await mkdir(bin);
-    await symlink(process.execPath, join(bin, "node"));
-    await run("sh", [hook, "x"], { env: { PATH: `${bin}:/usr/bin:/bin` } });
-    expect(await readFile(marker, "utf8")).toBe(`hook pre-commit --dir ${root} x`);
-  });
+  // The hook runs through sh, which a Windows PATH lacks.
 
-  it("stays silent and succeeds with neither cogit nor the CLI", async () => {
-    const hook = join(dir, "hook.sh");
-    await writeFile(hook, `#!/bin/sh\n${hookBlock("pre-commit", root, join(dir, "gone.js"))}\n`);
-    const { stderr } = await run("sh", [hook], { env: { PATH: "/usr/bin:/bin" } });
-    expect(stderr).toBe("");
-  });
+  it.skipIf(process.platform === "win32")(
+    "runs the CLI through node when cogit is not on PATH",
+    async () => {
+      // A stand-in CLI that records the arguments the hook passed.
+      const marker = join(dir, "called.txt");
+      const cli = join(dir, "cli.js");
+      await writeFile(
+        cli,
+        `require("node:fs").writeFileSync(${JSON.stringify(marker)}, process.argv.slice(2).join(" "));\n`,
+      );
+      const hook = join(dir, "hook.sh");
+      await writeFile(hook, `#!/bin/sh\n${hookBlock("pre-commit", root, cli)}\n`);
+      // Only node in its own directory: a global `npm install -g @cogit/cli` puts cogit
+      // next to node, which would take this test off the path it checks.
+      const bin = join(dir, "bin");
+      await mkdir(bin);
+      await symlink(process.execPath, join(bin, "node"));
+      await run("sh", [hook, "x"], { env: { PATH: `${bin}:/usr/bin:/bin` } });
+      expect(await readFile(marker, "utf8")).toBe(`hook pre-commit --dir ${root} x`);
+    },
+  );
+
+  // The hook runs through sh, which a Windows PATH lacks.
+
+  it.skipIf(process.platform === "win32")(
+    "stays silent and succeeds with neither cogit nor the CLI",
+    async () => {
+      const hook = join(dir, "hook.sh");
+      await writeFile(hook, `#!/bin/sh\n${hookBlock("pre-commit", root, join(dir, "gone.js"))}\n`);
+      const { stderr } = await run("sh", [hook], { env: { PATH: "/usr/bin:/bin" } });
+      expect(stderr).toBe("");
+    },
+  );
 
   it("puts back blocks a tool wiped, but none after hooks uninstall", async () => {
     const hooks = join(root, ".git", "hooks");

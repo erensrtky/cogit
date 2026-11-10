@@ -42,14 +42,19 @@ function guard(sessionId: string, attended: string): Promise<string> {
 
 /** Runs `fn` with the process temp dir pointed at the test's own. */
 async function withTmp<T>(fn: () => Promise<T>): Promise<T> {
-  const saved = process.env.TMPDIR;
-  process.env.TMPDIR = tmp;
+  // os.tmpdir() reads TMPDIR on Unix and TEMP / TMP on Windows.
+  const keys = ["TMPDIR", "TEMP", "TMP"] as const;
+  const saved = keys.map((key) => process.env[key]);
+  for (const key of keys) process.env[key] = tmp;
   try {
     return await fn();
   } finally {
     // assigning undefined would store the string "undefined"
-    if (saved === undefined) delete process.env.TMPDIR;
-    else process.env.TMPDIR = saved;
+    keys.forEach((key, i) => {
+      const value = saved[i];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
   }
 }
 

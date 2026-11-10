@@ -45,7 +45,7 @@ import {
   type LineageViewModel,
   TOKEN_META_NAME,
 } from "../src/view/model.js";
-import { envFor, fakeIo, noGitProject, T0, tempDir } from "./helpers.js";
+import { envFor, fakeIo, noGitProject, pathWith, T0, tempDir, writeFakeClaude } from "./helpers.js";
 
 const TEMPLATE = `<!doctype html><html><head><title>cogit</title></head><body><div id="root"></div>
 <script id="${DATA_ELEMENT_ID}" type="application/json"></script></body></html>`;
@@ -880,17 +880,15 @@ describe("shape regenerate endpoint", () => {
       ordered: false,
     });
     const answer = JSON.stringify({ tools: [{ kind: "flow", text: flow }] });
-    await writeFile(
-      join(bin, "claude"),
-      `#!/usr/bin/env node
-process.stdin.resume();
+    await writeFakeClaude(
+      bin,
+      `process.stdin.resume();
 process.stdin.on("end", () => {
   process.stdout.write(JSON.stringify({ type: "result", subtype: "success", result: ${JSON.stringify(answer)} }));
 });
 `,
     );
-    await chmod(join(bin, "claude"), 0o755);
-    env = { ...env, PATH: `${bin}:${process.env.PATH ?? ""}` };
+    env = { ...env, PATH: pathWith(bin) };
     const server = await start();
     const token = await panelToken(server);
     const reply = await regenerateWrite(server, token, {

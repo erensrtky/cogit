@@ -29,7 +29,7 @@ describe("paths", () => {
   it("resolves the global dir from env", () => {
     expect(globalPaths({ COGIT_HOME: "/x" }).config).toBe(join("/x", "config.json"));
     expect(globalPaths({ XDG_CONFIG_HOME: "/xdg" }).base).toBe(join("/xdg", "cogit"));
-    expect(globalPaths({}).base).toMatch(/\.config\/cogit$/);
+    expect(globalPaths({}).base).toMatch(/\.config[\\/]cogit$/);
   });
 
   it("still reads the pre-rename names for one minor version", () => {
@@ -122,7 +122,8 @@ describe("withLock", () => {
   it("takes over a lock older than staleMs, but not a live recent one", async () => {
     const lock = join(dir, "x.lock");
     await mkdir(lock);
-    await writeFile(join(lock, "owner"), "1"); // pid 1 is alive (EPERM for non-root)
+    // The parent process is alive, on every system (pid 1 is not on Windows).
+    await writeFile(join(lock, "owner"), String(process.ppid));
     await expect(withLock(lock, async () => 1, { timeoutMs: 0 })).rejects.toBeInstanceOf(
       LockBusyError,
     );
@@ -143,7 +144,7 @@ describe("withLock", () => {
     const lock = join(dir, "held.lock");
     expect(await isLockHeld(lock)).toBe(false);
     await mkdir(lock);
-    await writeFile(join(lock, "owner"), "1");
+    await writeFile(join(lock, "owner"), String(process.ppid));
     expect(await isLockHeld(lock)).toBe(true);
     // The hook may ask and still take the lock afterwards.
     expect(await isLockHeld(lock)).toBe(true);
@@ -151,7 +152,8 @@ describe("withLock", () => {
     expect(await isLockHeld(lock)).toBe(false);
   });
 
-  it("rethrows unexpected mkdir errors", async () => {
+  // chmod cannot make a folder read-only on Windows.
+  it.skipIf(process.platform === "win32")("rethrows unexpected mkdir errors", async () => {
     const ro = join(dir, "ro");
     await mkdir(ro);
     await chmod(ro, 0o555);

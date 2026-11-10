@@ -66,8 +66,8 @@ describe("launchFile", () => {
   it("resolves true once the opener starts", async () => {
     const calls: string[][] = [];
     expect(await launchFile("/p/map.html", fakeSpawn("spawn", calls))).toBe(true);
-    const { command } = openerCommand(process.platform, "/p/map.html");
-    expect(calls).toEqual([[command, "/p/map.html"]]);
+    const { command, args } = openerCommand(process.platform, "/p/map.html");
+    expect(calls).toEqual([[command, ...args]]);
   });
 
   it("resolves false when the opener binary is missing", async () => {

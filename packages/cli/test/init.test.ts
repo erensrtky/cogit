@@ -363,6 +363,8 @@ describe("git helpers", () => {
     const git = (...args: string[]) => run("git", ["-C", root, ...args]);
     await git("init", "-q");
     const options = { name: "P", retention: "keep", allowSkill: false, language: "auto" } as const;
+    // Windows' git reads the global config even without HOME; keep it out.
+    env = { ...env, GIT_CONFIG_GLOBAL: join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1" };
     const bare = fakeIo(env);
     await init(root, options, bare);
     expect(bare.warnings.join("\n")).toMatch(/no user\.email/);

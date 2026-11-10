@@ -481,41 +481,49 @@ describe("cogit pr (Story 10.1)", () => {
     expect(cliIo.lines.join("\n")).toContain("Session");
   });
 
-  it("copies with the first clipboard tool that exists", async () => {
-    const bin = join(dir, "bin");
-    const empty = join(dir, "empty-bin");
-    await mkdir(bin);
-    await mkdir(empty);
-    const out = join(dir, "clipboard.txt");
-    const wlCopy = join(bin, "wl-copy");
-    await writeFile(wlCopy, `#!/bin/sh\ncat > "${out}"\n`);
-    await chmod(wlCopy, 0o755);
+  // The stand-in wl-copy is a shell script, which Windows cannot start.
+  it.skipIf(process.platform === "win32")(
+    "copies with the first clipboard tool that exists",
+    async () => {
+      const bin = join(dir, "bin");
+      const empty = join(dir, "empty-bin");
+      await mkdir(bin);
+      await mkdir(empty);
+      const out = join(dir, "clipboard.txt");
+      const wlCopy = join(bin, "wl-copy");
+      await writeFile(wlCopy, `#!/bin/sh\ncat > "${out}"\n`);
+      await chmod(wlCopy, 0o755);
 
-    expect(await copyToClipboard("hello", { ...env, PATH: `${bin}:${env.PATH}` })).toBe(true);
-    expect(await readFile(out, "utf8")).toBe("hello");
-    expect(await copyToClipboard("hello", { ...env, PATH: empty })).toBe(false);
-  });
+      expect(await copyToClipboard("hello", { ...env, PATH: `${bin}:${env.PATH}` })).toBe(true);
+      expect(await readFile(out, "utf8")).toBe("hello");
+      expect(await copyToClipboard("hello", { ...env, PATH: empty })).toBe(false);
+    },
+  );
 
-  it("copies through pr and warns plainly when there is no clipboard tool", async () => {
-    const bin = join(dir, "bin");
-    await mkdir(bin);
-    const out = join(dir, "clipboard.txt");
-    const wlCopy = join(bin, "wl-copy");
-    await writeFile(wlCopy, `#!/bin/sh\ncat > "${out}"\n`);
-    await chmod(wlCopy, 0o755);
+  // The stand-in wl-copy is a shell script, which Windows cannot start.
+  it.skipIf(process.platform === "win32")(
+    "copies through pr and warns plainly when there is no clipboard tool",
+    async () => {
+      const bin = join(dir, "bin");
+      await mkdir(bin);
+      const out = join(dir, "clipboard.txt");
+      const wlCopy = join(bin, "wl-copy");
+      await writeFile(wlCopy, `#!/bin/sh\ncat > "${out}"\n`);
+      await chmod(wlCopy, 0o755);
 
-    const copied = fakeIo({ ...env, PATH: `${bin}:${env.PATH}` });
-    await pr({ dir: root, io: copied, copy: true });
-    expect(await readFile(out, "utf8")).toContain("## Goal");
-    expect(copied.warnings).toEqual([]);
+      const copied = fakeIo({ ...env, PATH: `${bin}:${env.PATH}` });
+      await pr({ dir: root, io: copied, copy: true });
+      expect(await readFile(out, "utf8")).toContain("## Goal");
+      expect(copied.warnings).toEqual([]);
 
-    const gitOnly = join(dir, "git-only");
-    await mkdir(gitOnly);
-    await symlink(await findExecutable("git"), join(gitOnly, "git"));
-    const bare = fakeIo({ ...env, PATH: gitOnly });
-    await pr({ dir: root, io: bare, copy: true });
-    expect(bare.warnings.join("\n")).toContain("no clipboard tool found");
-  });
+      const gitOnly = join(dir, "git-only");
+      await mkdir(gitOnly);
+      await symlink(await findExecutable("git"), join(gitOnly, "git"));
+      const bare = fakeIo({ ...env, PATH: gitOnly });
+      await pr({ dir: root, io: bare, copy: true });
+      expect(bare.warnings.join("\n")).toContain("no clipboard tool found");
+    },
+  );
 
   it("parses only well-formed commit lines", () => {
     const line = ["a".repeat(40), "aaaaaaa", T0, "a@example.com", "feat: a"].join("\0");

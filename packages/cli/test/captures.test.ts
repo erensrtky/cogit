@@ -28,7 +28,7 @@ import { withLock } from "../src/store/lock.js";
 import { projectPaths } from "../src/store/paths.js";
 import { type CaptureSourceSession, captureInput, hasOpenWork } from "../src/view/captures.js";
 import { DATA_ELEMENT_ID } from "../src/view/model.js";
-import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
+import { envFor, type FakeIo, fakeIo, pathWith, T0, tempDir, writeFakeClaude } from "./helpers.js";
 
 const TEMPLATE = `<!doctype html><html><body><div id="root"></div>
     <script id="${DATA_ELEMENT_ID}" type="application/json"></script></body></html>`;
@@ -404,11 +404,9 @@ describe("distilling with the side model", () => {
   async function fakeClaude(answer: unknown): Promise<void> {
     bin = join(dir, "bin");
     await mkdir(bin, { recursive: true });
-    const file = join(bin, "claude");
-    await writeFile(
-      file,
-      `#!/usr/bin/env node
-let input = "";
+    await writeFakeClaude(
+      bin,
+      `let input = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (c) => { input += c; });
 process.stdin.on("end", async () => {
@@ -418,8 +416,7 @@ process.stdin.on("end", async () => {
 });
 `,
     );
-    await chmod(file, 0o755);
-    env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+    env = { ...envFor(dir), PATH: pathWith(bin) };
     io = fakeIo(env);
   }
 
@@ -592,10 +589,9 @@ describe("the session-end pass", () => {
     await mkdir(root);
     const bin = join(dir, "bin");
     await mkdir(bin, { recursive: true });
-    await writeFile(
-      join(bin, "claude"),
-      `#!/usr/bin/env node
-let input = "";
+    await writeFakeClaude(
+      bin,
+      `let input = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (c) => { input += c; });
 process.stdin.on("end", () => {
@@ -609,8 +605,7 @@ process.stdin.on("end", () => {
 });
 `,
     );
-    await chmod(join(bin, "claude"), 0o755);
-    const env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+    const env = { ...envFor(dir), PATH: pathWith(bin) };
     await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
     const folder = join(envFor(dir).CLAUDE_CONFIG_DIR ?? "", "projects", "proj");
     await mkdir(folder, { recursive: true });

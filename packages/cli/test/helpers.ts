@@ -1,10 +1,31 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { init } from "../src/commands/init.js";
 import type { Io, Prompter } from "../src/io.js";
 
 export const T0 = "2026-10-21T10:00:00.000Z";
+
+/**
+ * Writes a stand-in `claude` that runs this node script. Windows cannot start a
+ * #! script, so there it is a `claude.cmd` shim, the way npm installs claude,
+ * which also takes cogit's own fallback to the shim (issue #2).
+ */
+export async function writeFakeClaude(bin: string, script: string): Promise<void> {
+  await mkdir(bin, { recursive: true });
+  if (process.platform === "win32") {
+    await writeFile(join(bin, "claude.cjs"), script);
+    await writeFile(join(bin, "claude.cmd"), `@"${process.execPath}" "%~dp0claude.cjs" %*\r\n`);
+    return;
+  }
+  await writeFile(join(bin, "claude"), `#!/usr/bin/env node\n${script}`);
+  await chmod(join(bin, "claude"), 0o755);
+}
+
+/** PATH with `bin` in front, joined the way this system joins it. */
+export function pathWith(bin: string): string {
+  return `${bin}${delimiter}${process.env.PATH ?? ""}`;
+}
 
 export async function tempDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "cogit-"));

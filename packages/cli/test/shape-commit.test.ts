@@ -13,7 +13,7 @@ import { drainShapeQueue, queuedShapes } from "../src/shape-queue.js";
 import { withLock } from "../src/store/lock.js";
 import { projectPaths } from "../src/store/paths.js";
 import { loadSession } from "../src/store/stores.js";
-import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
+import { envFor, fakeIo, pathWith, T0, tempDir, writeFakeClaude } from "./helpers.js";
 
 const run = promisify(execFile);
 
@@ -71,20 +71,17 @@ describe("a Shape follows the commit's Thought trailer (Story 13.6)", () => {
   const fakeClaude = async (): Promise<NodeJS.ProcessEnv> => {
     const bin = join(dir, "bin");
     await mkdir(bin, { recursive: true });
-    const file = join(bin, "claude");
     const count = JSON.stringify(join(dir, "runs.txt"));
-    await writeFile(
-      file,
-      `#!/usr/bin/env node
-process.stdin.resume();
+    await writeFakeClaude(
+      bin,
+      `process.stdin.resume();
 process.stdin.on("end", () => {
   require("node:fs").appendFileSync(${count}, "x");
   process.stdout.write(JSON.stringify({ type: "result", subtype: "success", result: ${JSON.stringify(ANSWER)} }));
 });
 `,
     );
-    await chmod(file, 0o755);
-    return { ...env, PATH: `${bin}:${process.env.PATH ?? ""}` };
+    return { ...env, PATH: pathWith(bin) };
   };
 
   const shapeOf = async (id: string) => {

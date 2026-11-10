@@ -18,7 +18,7 @@ import { messageHash } from "../src/messages.js";
 import type { Session } from "../src/schema/session.js";
 import { readEvents, sideOwnedParents } from "../src/store/events.js";
 import { loadSession } from "../src/store/stores.js";
-import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
+import { envFor, fakeIo, pathWith, T0, tempDir, writeFakeClaude } from "./helpers.js";
 
 const labels = (n: number) => Array.from({ length: n }, (_, i) => `m${i + 1}`);
 const thread = (messages: string, from?: string | null): Thread => ({
@@ -262,10 +262,9 @@ describe("backfill --tail --close", () => {
       ],
       leftOff: "Work done; the detour is open",
     });
-    await writeFile(
-      join(bin, "claude"),
-      `#!/usr/bin/env node
-let input = "";
+    await writeFakeClaude(
+      bin,
+      `let input = "";
 process.stdin.on("data", (c) => { input += c; });
 process.stdin.on("end", async () => {
   (await import("node:fs")).appendFileSync(${JSON.stringify(join(dir, "prompt.txt"))}, input + "\\n");
@@ -273,8 +272,7 @@ process.stdin.on("end", async () => {
 });
 `,
     );
-    await chmod(join(bin, "claude"), 0o755);
-    const env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+    const env = { ...envFor(dir), PATH: pathWith(bin) };
     await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
     const folder = join(envFor(dir).CLAUDE_CONFIG_DIR ?? "", "projects", "proj");
     await mkdir(folder, { recursive: true });
@@ -348,10 +346,9 @@ process.stdin.on("end", async () => {
       leftOff: "done",
     });
     // Each run logs its arguments and directory; a resumed run answers as the reviewer.
-    await writeFile(
-      join(bin, "claude"),
-      `#!/usr/bin/env node
-let input = "";
+    await writeFakeClaude(
+      bin,
+      `let input = "";
 process.stdin.on("data", (c) => { input += c; });
 process.stdin.on("end", async () => {
   const fs = await import("node:fs");
@@ -362,8 +359,7 @@ process.stdin.on("end", async () => {
 });
 `,
     );
-    await chmod(join(bin, "claude"), 0o755);
-    const env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+    const env = { ...envFor(dir), PATH: pathWith(bin) };
     await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
     const folder = join(envFor(dir).CLAUDE_CONFIG_DIR ?? "", "projects", "proj");
     await mkdir(folder, { recursive: true });
@@ -445,18 +441,16 @@ process.stdin.on("end", async () => {
   it("skips the review when the transcript names no model, and when it fails", async () => {
     const bin = join(dir, "bin");
     await mkdir(bin, { recursive: true });
-    await writeFile(
-      join(bin, "claude"),
-      `#!/usr/bin/env node
-process.stdin.resume();
+    await writeFakeClaude(
+      bin,
+      `process.stdin.resume();
 process.stdin.on("end", () => {
   if (process.argv.includes("--resume")) { process.stderr.write("no"); process.exit(2); }
   process.stdout.write(JSON.stringify({ result: JSON.stringify({ threads: [], leftOff: "x" }) }));
 });
 `,
     );
-    await chmod(join(bin, "claude"), 0o755);
-    const env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+    const env = { ...envFor(dir), PATH: pathWith(bin) };
     await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
     const folder = join(envFor(dir).CLAUDE_CONFIG_DIR ?? "", "projects", "proj");
     await mkdir(folder, { recursive: true });
@@ -491,10 +485,9 @@ process.stdin.on("end", () => {
     await mkdir(bin, { recursive: true });
     // Only the close pass answers; the tail backfill before it writes no status.
     const fake = async (answer: unknown): Promise<void> => {
-      await writeFile(
-        join(bin, "claude"),
-        `#!/usr/bin/env node
-let input = "";
+      await writeFakeClaude(
+        bin,
+        `let input = "";
 process.stdin.on("data", (c) => { input += c; });
 process.stdin.on("end", () => {
   const answer = input.includes("You close a cogit lineage record")
@@ -504,7 +497,6 @@ process.stdin.on("end", () => {
 });
 `,
       );
-      await chmod(join(bin, "claude"), 0o755);
     };
     const closedStatus = {
       goal: "Ship it",
@@ -516,7 +508,7 @@ process.stdin.on("end", () => {
       { name: "Work", messages: "m1-m2", from: null, asked: "a", outcome: "o", open: "" },
     ];
     await fake({ threads, leftOff: "Built", status: closedStatus });
-    const env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+    const env = { ...envFor(dir), PATH: pathWith(bin) };
     await init(root, { name: "proj", retention: "keep", language: "auto" }, fakeIo(env));
     // The agent owns the status in mixed mode; the close pass fills it only when empty.
     await configSet("recorder", "mixed", fakeIo(env));

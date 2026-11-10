@@ -18,7 +18,7 @@ import { messageHash } from "../src/messages.js";
 import type { Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
 import { loadSession } from "../src/store/stores.js";
-import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
+import { envFor, fakeIo, pathWith, T0, tempDir, writeFakeClaude } from "./helpers.js";
 
 let dir: string;
 let root: string;
@@ -45,11 +45,8 @@ const typed = (text: string, minute: number) => ({
 /** Puts a fake `claude` first on PATH and returns the env that finds it. */
 async function fakeClaude(script: string, path: string): Promise<NodeJS.ProcessEnv> {
   const bin = join(path, "bin");
-  await mkdir(bin, { recursive: true });
-  const file = join(bin, "claude");
-  await writeFile(file, `#!/usr/bin/env node\n${script}\n`);
-  await chmod(file, 0o755);
-  return { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+  await writeFakeClaude(bin, `${script}\n`);
+  return { ...envFor(dir), PATH: pathWith(bin) };
 }
 
 /** Reads stdin, keeps the prompt for inspection and prints a result envelope. */

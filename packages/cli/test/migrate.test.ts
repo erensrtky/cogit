@@ -47,17 +47,22 @@ describe("migrateProject", () => {
     expect(hook).toContain("hook prepare-commit-msg --dir");
   });
 
-  it("leaves the old dir alone when the filesystem refuses the rename", async () => {
-    const root = await tempDir();
-    await mkdir(join(root, ".codelineage"), { recursive: true });
-    await chmod(root, 0o555);
-    try {
-      expect(await migrateProject(root)).toBe(false);
-      expect(existsSync(join(root, ".codelineage"))).toBe(true);
-    } finally {
-      await chmod(root, 0o755);
-    }
-  });
+  // chmod cannot make a folder read-only on Windows.
+
+  it.skipIf(process.platform === "win32")(
+    "leaves the old dir alone when the filesystem refuses the rename",
+    async () => {
+      const root = await tempDir();
+      await mkdir(join(root, ".codelineage"), { recursive: true });
+      await chmod(root, 0o555);
+      try {
+        expect(await migrateProject(root)).toBe(false);
+        expect(existsSync(join(root, ".codelineage"))).toBe(true);
+      } finally {
+        await chmod(root, 0o755);
+      }
+    },
+  );
 
   it("touches nothing when both directories exist and warns once", async () => {
     const root = await tempDir();

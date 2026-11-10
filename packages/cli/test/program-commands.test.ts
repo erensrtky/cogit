@@ -274,7 +274,9 @@ describe("commands through the CLI", () => {
     await rm(gone, { recursive: true });
 
     await cli("config", "prune", "--dry-run");
-    expect(io.lines.at(-1)).toMatch(new RegExp(`^Would remove .+ \\(${gone}\\)$`));
+    expect(io.lines.at(-1)).toMatch(
+      new RegExp(`^Would remove .+ \\(${gone.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}\\)$`),
+    );
     await cli("config", "prune");
     expect(io.lines.at(-1)).toMatch(new RegExp(`^Removed .+ \\(${gone}\\)$`));
   });
