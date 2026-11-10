@@ -13,8 +13,9 @@ const empty = (branch: string | undefined, base: string): ViewPullRequest => ({
   base,
   model: { ...ready.model, thoughts: [], unlinked: [] },
 });
+const builtAt = "2026-10-24T12:00:00.000Z";
 const render = (pr: ViewPullRequest | undefined) =>
-  renderToStaticMarkup(createElement(PullRequestView, { pr, onSelect: () => {} }));
+  renderToStaticMarkup(createElement(PullRequestView, { pr, builtAt, onSelect: () => {} }));
 
 describe("the Pull request view", () => {
   it("follows cogit pr: the branch against where it will merge", () => {
@@ -61,6 +62,24 @@ describe("the Pull request view", () => {
     expect(html).toContain("ship the fixture as a JSON file");
     expect(html).toContain("Read data from the DOM");
     expect(html).toContain("chore: bump the lockfile");
+  });
+
+  it("says a saved page shows the branch it was built on", () => {
+    expect(render(ready)).toContain("As of ");
+    expect(render(undefined)).toContain("when this page was built");
+  });
+
+  it("asks the local server for the branch checked out now", () => {
+    const html = renderToStaticMarkup(
+      createElement(PullRequestView, {
+        pr: ready,
+        builtAt,
+        live: { dir: "/p", token: "t" },
+        onSelect: () => {},
+      }),
+    );
+    expect(html).toContain("Reading the branch");
+    expect(html).not.toContain("feat/template");
   });
 
   it("says why it is empty", () => {

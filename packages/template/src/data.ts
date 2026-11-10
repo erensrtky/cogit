@@ -4,6 +4,7 @@ import {
   type PageModel,
   type PanelSettings,
   TOKEN_META_NAME,
+  type ViewPullRequest,
 } from "../../cli/src/view/model.js";
 
 /** Parses and checks the JSON contract; throws when the shape is not a page. */
@@ -94,6 +95,24 @@ export async function loadMapView(
     throw new Error(text || `could not read the map view (HTTP ${response.status})`);
   }
   return (await response.json()) as { rowWidths?: unknown; open?: unknown };
+}
+
+/**
+ * The checked-out branch as a pull request, asked each time the Pull request
+ * view opens: the page embeds it as of the last build, and a branch switch does
+ * not rebuild the map. Null when there is none to show.
+ */
+export async function loadPullRequest(dir: string, token: string): Promise<ViewPullRequest | null> {
+  const response = await fetch(`/api/pull-request?dir=${encodeURIComponent(dir)}`, {
+    headers: { "x-cogit-token": token },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const text = (await response.text()).trim();
+    throw new Error(text || `could not read the pull request (HTTP ${response.status})`);
+  }
+  const body = (await response.json()) as { pullRequest?: ViewPullRequest | null };
+  return body.pullRequest ?? null;
 }
 
 /** Stores which sessions are open, so a reload opens them again; needs the local server. */

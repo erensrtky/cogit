@@ -3953,3 +3953,17 @@ a.home-day:hover {
   text-align: left;
   cursor: pointer;
 }
+
+.pr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--muted);
+}
+
+.pr-note {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+}

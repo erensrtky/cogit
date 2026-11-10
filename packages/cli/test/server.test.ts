@@ -1142,6 +1142,47 @@ describe("row width endpoint", () => {
     expect((await widthWrite(server, token, { ...good, pad: "x".repeat(5000) })).status).toBe(413);
   });
 
+  it("reads the branch checked out now for the Pull request view", async () => {
+    const server = await start();
+    const token = await panelToken(server);
+    const headers = { origin: `http://127.0.0.1:${server.port}`, [CONFIG_TOKEN_HEADER]: token };
+    const url = `${server.url}/api/pull-request?dir=${encodeURIComponent(root)}`;
+    // Not in git yet: nothing to show.
+    const none = await request(url, headers);
+    expect(none.status).toBe(200);
+    expect(JSON.parse(none.body)).toEqual({ ok: true, pullRequest: null });
+
+    const git = async (...args: string[]) =>
+      promisify(execFile)("git", ["-C", root, ...args], {
+        env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", HOME: dir },
+      });
+    await git("init", "-q", "-b", "main");
+    await git("config", "user.email", "t@example.com");
+    await git("config", "user.name", "T");
+    await writeFile(join(root, "a.txt"), "a\n");
+    await git("add", "a.txt");
+    await git("commit", "-q", "-m", "base");
+    await git("checkout", "-q", "-b", "feat/x");
+    await writeFile(join(root, "b.txt"), "b\n");
+    await git("add", "b.txt");
+    await git("commit", "-q", "-m", "feat: b");
+    const answer = JSON.parse((await request(url, headers)).body);
+    expect(answer.pullRequest).toMatchObject({ branch: "feat/x", base: "main" });
+    expect(answer.pullRequest.model.unlinked[0].subject).toBe("feat: b");
+
+    expect((await request(url, { ...headers, [CONFIG_TOKEN_HEADER]: "nope" })).status).toBe(403);
+    expect((await request(`${server.url}/api/pull-request`, headers)).status).toBe(400);
+    expect(
+      (
+        await request(
+          `${server.url}/api/pull-request?dir=${encodeURIComponent(join(dir, "elsewhere"))}`,
+          headers,
+        )
+      ).status,
+    ).toBe(403);
+    expect((await request(url, headers, "HEAD")).status).toBe(405);
+  });
+
   it("stores the open sessions and reads the whole view back for a reload", async () => {
     const server = await start();
     const token = await panelToken(server);

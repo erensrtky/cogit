@@ -14,9 +14,11 @@ import { fileURLToPath } from "node:url";
 import pkg from "../package.json" with { type: "json" };
 import { defaultAgent } from "./agents/index.js";
 import { buildProject } from "./commands/build.js";
+import { currentPullRequest } from "./commands/pr.js";
 import { regenerateShape } from "./commands/shape.js";
 import { diffTooLarge, isDiffSha, readCommitDiff } from "./diff.js";
 import { defaultsPrompter, type Io } from "./io.js";
+import { redactDeep } from "./redact.js";
 import { Config } from "./schema/config.js";
 import { NotIndexedYet, SemanticUnavailable, searchByMeaning } from "./semantic.js";
 import {
@@ -480,6 +482,45 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
     });
     const view = await readMapView(root);
     res.end(JSON.stringify({ ok: true, rowWidths: view.rowWidths, open: view.open }));
+  }
+
+  /**
+   * `GET /api/pull-request?dir`: the checked-out branch as `cogit pr` describes
+   * it, asked each time the map's Pull request view opens, so a branch switch
+   * shows without a rebuild. Same Origin and token checks as the settings read,
+   * a registered project only; redacted like the map. `null` when there is no
+   * pull request to show (outside git, no commit, no branch to merge into).
+   */
+  async function readPullRequest(
+    req: IncomingMessage,
+    res: ServerResponse,
+    port: number,
+    url: URL,
+  ): Promise<void> {
+    if (
+      !readOriginAllowed(req.headers.origin, port) ||
+      !tokenMatches(req.headers[CONFIG_TOKEN_HEADER])
+    ) {
+      respond(res, 403, "forbidden");
+      return;
+    }
+    const dir = url.searchParams.get("dir");
+    if (!dir) {
+      respond(res, 400, "dir is required");
+      return;
+    }
+    const root = await registeredRoot(env, dir);
+    if (root === null) {
+      respond(res, 403, "not a registered project");
+      return;
+    }
+    const current = await currentPullRequest(root, buildIo);
+    const pullRequest = current === undefined ? null : (await redactDeep(current)).value;
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify({ ok: true, pullRequest }));
   }
 
   /**
@@ -1090,6 +1131,14 @@ export async function startMapServer(opts: MapServerOptions): Promise<MapServer>
         return;
       }
       await readMeaningSearch(req, res, port, url);
+      return;
+    }
+    if (url.pathname === "/api/pull-request") {
+      if (req.method !== "GET") {
+        respond(res, 405, "method not allowed");
+        return;
+      }
+      await readPullRequest(req, res, port, url);
       return;
     }
     if (url.pathname === "/api/map-view") {

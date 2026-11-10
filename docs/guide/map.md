@@ -178,8 +178,10 @@ led to it and its Shape, then the commits no thought is behind. A thought's titl
 card, where the diff is. **Copy as PR description** copies the Markdown `cogit pr` prints.
 
 On the branch pull requests merge into (`main` against `main`) there is nothing to merge, so the
-view says so; it fills on a branch with commits its base does not have yet. The page is built
-for the branch checked out at the time, and the next build follows a branch switch.
+view says so; it fills on a branch with commits its base does not have yet. Opened from
+`cogit open`, the view asks for the branch checked out at that moment, so a `git checkout` shows
+the next time you open it, without rebuilding the map. A saved copy of the page shows the
+branch it was built on and says when that was.
 
 ## Tasks
 

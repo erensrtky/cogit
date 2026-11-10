@@ -343,6 +343,11 @@ function Flow({
   const [refocus, setRefocus] = useState(0);
   /** Open sessions are stored only once the stored view has been read. */
   const viewLoaded = useRef(false);
+  // The Pull request view asks the local server for the branch checked out now.
+  const liveServer = useMemo(() => {
+    const token = pageToken();
+    return token === null ? undefined : { dir: model.project.path, token };
+  }, [model.project.path]);
   // The embedded view is as of the last build; a reload right after a change
   // can beat the rebuild, so a served page asks for the stored one once.
   useEffect(() => {
@@ -1099,6 +1104,8 @@ function Flow({
             {layout === "pr" ? (
               <PullRequestView
                 pr={model.pullRequest}
+                builtAt={model.project.generatedAt}
+                live={liveServer}
                 onSelect={(sessionId, messageId) => openNode(sessionId, messageId)}
               />
             ) : layout === "graph" ? (

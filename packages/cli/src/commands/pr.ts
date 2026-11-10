@@ -718,16 +718,16 @@ async function collectPr(
 
 /**
  * The map's Pull request view: the checked-out branch against where it will
- * merge, built from the record the map already loaded. Undefined outside git,
- * before the first commit, or when no merge target can be found.
+ * merge, from the record `load` returns. Undefined outside git, before the
+ * first commit, or when no merge target can be found. The map is built on
+ * every recording and the view asks on every visit; a git or a record that
+ * fails here leaves the view out and never fails either.
  */
-export async function branchPullRequest(
+async function pullRequestFor(
   root: string,
-  sessions: readonly Session[],
+  load: () => Promise<EffectiveSession[]>,
   env: NodeJS.ProcessEnv,
 ): Promise<ViewPullRequest | undefined> {
-  // The map is built on every recording; a git or a record that fails here
-  // leaves the view out and never fails the map.
   try {
     const gitRoot = await findGitRoot(root);
     if (gitRoot === undefined) return undefined;
@@ -736,12 +736,7 @@ export async function branchPullRequest(
     const base = await resolvePrBase(gitRoot, undefined, env).catch(() => undefined);
     if (base === undefined) return undefined;
     const branch = await git(gitRoot, ["symbolic-ref", "--quiet", "--short", "HEAD"], env);
-    const effective = sessions.map((session) => ({
-      session,
-      messages: buildMessages(session.nodes),
-      turns: null,
-    }));
-    const model = await collectPr(root, gitRoot, base, head, effective, env);
+    const model = await collectPr(root, gitRoot, base, head, await load(), env);
     return {
       ...(branch === undefined ? {} : { branch }),
       base: base.ref,
@@ -751,6 +746,29 @@ export async function branchPullRequest(
   } catch {
     return undefined;
   }
+}
+
+/** The view at build time, from the record the map already loaded. */
+export function branchPullRequest(
+  root: string,
+  sessions: readonly Session[],
+  env: NodeJS.ProcessEnv,
+): Promise<ViewPullRequest | undefined> {
+  return pullRequestFor(
+    root,
+    async () =>
+      sessions.map((session) => ({
+        session,
+        messages: buildMessages(session.nodes),
+        turns: null,
+      })),
+    env,
+  );
+}
+
+/** The view as it is now, for the local server: the branch may have changed since the build. */
+export function currentPullRequest(root: string, io: Io): Promise<ViewPullRequest | undefined> {
+  return pullRequestFor(root, () => loadEffectiveSessions(root, io), io.env);
 }
 
 /** `cogit pr [base]`: reads the record and the branch, prints the description. */
