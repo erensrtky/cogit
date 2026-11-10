@@ -55,8 +55,5 @@ The agent reads the same commands:
 
 - **At session start** it gets a short note on where the previous session left off, and how
   to read the record (`startupContext`).
-- **Before it edits a file** that has rejected options on record, it gets a short "earlier,
-  for this file" note listing at most five of them, once per file per session
-  (`tryBeforeNotes`). It is information, not a rule: the note never blocks the edit.
 - **When you ask** "why did we do this?" or "did we try X before?", it can run `why`, `show`
   or `search` itself.

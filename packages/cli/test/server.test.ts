@@ -587,7 +587,6 @@ describe("settings read", () => {
         messageSummaries: true,
         startupContext: true,
         recordHeadless: false,
-        tryBeforeNotes: true,
         shapes: true,
         captures: false,
         inbox: true,

@@ -67,7 +67,6 @@ export function panelSettings(config: Config): PanelSettings {
     messageSummaries: config.messageSummaries,
     startupContext: config.startupContext,
     recordHeadless: config.recordHeadless,
-    tryBeforeNotes: config.tryBeforeNotes,
     shapes: config.shapes,
     captures: config.captures,
     inbox: config.inbox,

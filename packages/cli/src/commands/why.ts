@@ -50,15 +50,6 @@ export interface WhyHit {
   decisions: WhyDecision[];
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** `26 Oct`, the short date the note shows; an unparseable value stays as it is. */
-export function dayStamp(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
-}
-
 function oneLine(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
@@ -298,76 +289,4 @@ function printHits(io: Io, hits: readonly WhyHit[]): void {
   for (const line of formatWhy(hits)) io.out(line);
   io.out("");
   io.out("`cogit show <hash>` opens the thought; the record is the agent's summary.");
-}
-
-/** How many rejected options one PreToolUse note carries. */
-export const TRY_BEFORE_MAX_ITEMS = 5;
-
-/** Roughly how long the note may be; the rest is left to `cogit why`. */
-export const TRY_BEFORE_MAX_CHARS = 600;
-
-interface RejectedItem extends WhyAlternative {
-  messageId: string;
-  at: string;
-}
-
-/** Every rejected option behind the file, in the hits' (newest-first) order. */
-export function rejectedItems(hits: readonly WhyHit[]): RejectedItem[] {
-  const items: RejectedItem[] = [];
-  for (const hit of hits) {
-    for (const decision of hit.decisions) {
-      for (const alt of decision.alternatives) {
-        items.push({ ...alt, messageId: hit.messageId, at: hit.at });
-      }
-    }
-  }
-  return items;
-}
-
-/**
- * The note a PreToolUse hook adds when the agent is about to edit a file whose
- * earlier thoughts rejected some options. A fact from the record, not a rule:
- * the agent and the user decide what to do with it. At most five options and
- * about {@link TRY_BEFORE_MAX_CHARS} characters; the rest points at
- * `cogit why <file>`. Undefined when there is nothing to say.
- */
-export function tryBeforeNote(file: string, hits: readonly WhyHit[]): string | undefined {
-  const items = rejectedItems(hits);
-  if (items.length === 0) return undefined;
-
-  const header = "Earlier, for this file:";
-  const footer = "Decide knowingly.";
-  const more = `See \`cogit why ${file}\` for more.`;
-  const lines: string[] = [];
-  for (const item of items.slice(0, TRY_BEFORE_MAX_ITEMS)) {
-    const reason = oneLine(item.why) === "" ? "no reason recorded" : oneLine(item.why);
-    const line =
-      `- "${oneLine(item.option)}" was considered and rejected ` +
-      `(${shortHash(item.messageId)}, ${dayStamp(item.at)}): ${reason}`;
-    const truncated = lines.length + 1 < items.length;
-    const total = [header, ...lines, line, footer, ...(truncated ? [more] : [])].join("\n");
-    if (total.length <= TRY_BEFORE_MAX_CHARS) {
-      lines.push(line);
-      continue;
-    }
-    // No room left. Count and character caps both end in the same "more" line.
-    break;
-  }
-  if (lines.length === 0) {
-    // One option's own reason can be long (the schema allows 200 + 500 chars):
-    // keep the header, footer and pointer, and clip only the option line.
-    const first = items[0];
-    if (first === undefined) return undefined;
-    const reason = oneLine(first.why) === "" ? "no reason recorded" : oneLine(first.why);
-    const full =
-      `- "${oneLine(first.option)}" was considered and rejected ` +
-      `(${shortHash(first.messageId)}, ${dayStamp(first.at)}): ${reason}`;
-    const tail = [footer, ...(items.length > 1 ? [more] : [])].join("\n");
-    const room = TRY_BEFORE_MAX_CHARS - header.length - tail.length - 3;
-    if (room < 40) return undefined;
-    lines.push(full.length <= room ? full : `${full.slice(0, room - 1).trimEnd()}…`);
-  }
-
-  const truncated = lines.length < items.length;
-  return [header, ...lines, footer, ...(truncated ? [more] : [])].join("\n");
 }

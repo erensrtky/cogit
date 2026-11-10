@@ -59,7 +59,6 @@ export const fixture: LineageViewModel = {
     messageSummaries: false,
     startupContext: true,
     recordHeadless: false,
-    tryBeforeNotes: true,
     shapes: true,
     captures: true,
     inbox: true,

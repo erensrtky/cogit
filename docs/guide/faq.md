@@ -78,17 +78,17 @@ missing requirement often shows up there as an option nobody raised.
 
 ### Does it fill the agent's context?
 
-The agent doesn't load the record. It gets a short note when a session starts and, before it
-edits a file, a note with at most five options already rejected for that file, once per file
-per session. That's what stops it from "simplifying" a line back to an option you turned down.
-Both notes can be turned off. The record files are ignored by git, so `git grep` and `rg` don't
-pick them up.
+The agent doesn't load the record. It gets a short note when a session starts, and it can
+look up a file's decisions and rejected options itself with `cogit why` or `cogit search`. The
+note can be turned off. The record files are ignored by git, so `git grep` and `rg` don't pick
+them up.
 
-### Does the agent hear about decisions made in other files?
+### Does the agent hear about earlier decisions before it edits a file?
 
-Not yet. The note before an edit covers that file only, so a reason recorded against a related
-file doesn't reach it. The agent can search the whole record with `cogit search`, but nothing
-makes it do so on its own. This is the main weak spot we know of.
+No. cogit used to add a note before each edit with the options rejected for that file, but it
+linked every option of a message to every file that message touched, so most notes had nothing
+to do with the edit. It was removed until cogit can tell which file a decision is about. The
+agent can still ask: `cogit why <file>` and `cogit search` reach the whole record.
 
 ## Git and teams
 

@@ -101,8 +101,8 @@ including the option that was rejected.*
   a pull request or `git status`. Your chats stay local, `cogit prune` deletes old sessions, and
   key and token patterns are redacted.
 - **The agent gets the context too**: a new session starts where the last one left off, and
-  before editing a file the agent hears what was already tried and rejected there. It works
-  alongside memory tools; it doesn't replace them.
+  the agent can look up what was decided and rejected with `cogit why`. It works alongside
+  memory tools; it doesn't replace them.
 
 ## Install
 

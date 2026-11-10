@@ -104,16 +104,6 @@ const EDITABLE: FieldSpec[] = [
     kind: "boolean",
   },
   {
-    key: "tryBeforeNotes",
-    label: "Tried-before notes",
-    help: "Before the agent edits a file, tell it which options earlier thoughts rejected for it.",
-    details:
-      "Before the agent edits a file, it hears which options earlier thoughts tried and " +
-      "rejected for that file. These are notes from the record, never rules; they can make " +
-      "the agent ask before repeating a dead end.",
-    kind: "boolean",
-  },
-  {
     key: "shapes",
     label: "Intent, Shape and Code",
     help: "A small picture of what each change does, beside its reason and its diff.",
@@ -315,7 +305,6 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   messageSummaries: true,
   startupContext: true,
   recordHeadless: false,
-  tryBeforeNotes: true,
   shapes: true,
   captures: false,
   inbox: true,
@@ -337,7 +326,6 @@ export function editableSettings(settings: PanelSettings): PanelEditableSettings
     messageSummaries: settings.messageSummaries,
     startupContext: settings.startupContext,
     recordHeadless: settings.recordHeadless,
-    tryBeforeNotes: settings.tryBeforeNotes,
     shapes: settings.shapes,
     captures: settings.captures,
     inbox: settings.inbox,

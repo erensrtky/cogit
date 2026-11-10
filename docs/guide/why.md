@@ -26,7 +26,7 @@ cogit keeps that intent in the record and hands it over:
   `cogit show <sha>` opens that message
 - `cogit why <file>` lists what earlier sessions decided and rejected for a file
 - `cogit pr` turns a branch into a review-ready description
-- the agent gets the same record at session start and before it edits a file
+- the agent gets the same record at session start, and can ask `cogit why` itself
 
 It does not promise a faster review; nothing has measured that yet. It gives the reviewer the
 intent they would otherwise have to ask for in comments, and gives the next session the

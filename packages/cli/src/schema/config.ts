@@ -90,12 +90,6 @@ export const Config = z.object({
    */
   bigChangeLines: z.int().min(1).max(1_000_000).default(300),
   /**
-   * Whether the agent is told, before editing a file, about options earlier
-   * thoughts considered and rejected for that file (Story 10.4). A note from
-   * the record, never a rule; off means silence.
-   */
-  tryBeforeNotes: z.boolean().default(true),
-  /**
    * How many days a session stays in the "your turn" inbox (Stories 11.1,
    * 12.2). One day by default: the inbox is for work that is still fresh, not
    * an archive. Raise it to keep rows longer. A config that holds an older value

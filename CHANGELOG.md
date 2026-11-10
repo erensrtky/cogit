@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Graph view is one Tab stop instead of one per part: Tab lands on the focus file (or the last part you were on), the arrow keys move to the nearest part that way and bring it on screen, and Enter opens it. On a big project the keyboard no longer has to step through every part to get past the graph.
 - **Tasks** is off for new installs (`captures` now defaults to `false`). An existing config keeps the value it stored, so nothing changes for people already using cogit; turn it on in Settings or with `cogit config set captures true`.
 
+### Removed
+- The note before each edit ("Earlier, for this file", the `tryBeforeNotes` setting). It gave every rejected option of a message to every file that message touched, so it told the agent about choices that had nothing to do with the edit: in this project's own sessions, none of 38 notes was about the change being made. cogit does not yet know which file a decision is about; until it does, the agent looks decisions up with `cogit why` and `cogit search`. An existing config that still has the setting is read as before.
+
 ### Fixed
 - On Windows `cogit open` did not open the map when the project's path had an `&` in it (`C:\R&D\app`): the page was handed to `cmd /c start`, which read the rest as another command. It now goes to the default browser without a shell.
 - Passwords typed on a command line reached a shared record unmasked: `mysql -p…`, `sshpass -p`, `curl -u user:…`, `--password …` / `--token …`, `PGPASSWORD=` and other prefixed names such as `DB_PASSWORD=` or `MYSQL_PWD=`, `aws_secret_access_key`, `Authorization: Basic` and npm tokens. They are now masked like the other secrets.

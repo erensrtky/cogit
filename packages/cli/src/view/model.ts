@@ -37,7 +37,6 @@ export const PANEL_EDITABLE_KEYS = [
   "messageSummaries",
   "startupContext",
   "recordHeadless",
-  "tryBeforeNotes",
   "shapes",
   "captures",
   "inbox",
@@ -530,11 +529,6 @@ export interface PanelSettings {
   startupContext: boolean;
   /** Whether `claude -p` and SDK sessions are recorded. */
   recordHeadless: boolean;
-  /**
-   * Whether the agent is told before editing a file about options earlier
-   * thoughts considered and rejected (Story 10.4).
-   */
-  tryBeforeNotes: boolean;
   /**
    * Whether a message that landed commits gets a Shape (Story 13.6): a small
    * plain-language or diagram view of what the change does.

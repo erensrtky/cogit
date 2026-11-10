@@ -1,27 +1,20 @@
 import { execFile } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
-import { configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
 import {
   collectWhy,
   collectWhyLine,
   formatWhy,
   nearestProjectDir,
-  rejectedItems,
-  TRY_BEFORE_MAX_CHARS,
-  TRY_BEFORE_MAX_ITEMS,
-  tryBeforeNote,
-  type WhyHit,
   why,
 } from "../src/commands/why.js";
-import { runHook } from "../src/hooks/run.js";
 import { createProgram } from "../src/program.js";
 import type { Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
-import { envFor, fakeIo, noGitDir, noGitProject, T0, tempDir } from "./helpers.js";
+import { envFor, fakeIo, noGitDir, noGitProject, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
 
@@ -42,46 +35,12 @@ function session(over: Partial<Session> = {}): Session {
   };
 }
 
-function hit(over: Partial<WhyHit> = {}): WhyHit {
-  return {
-    sessionId: "s1",
-    sessionTitle: "Ship the parser",
-    messageId: A,
-    label: "m1",
-    at: "2026-10-20T09:00:00.000Z",
-    title: "Parse the file",
-    decisions: [
-      {
-        title: "Parse the file",
-        why: "",
-        alternatives: [{ option: "Keep the loop", why: "It loses data." }],
-      },
-    ],
-    ...over,
-  };
-}
-
 describe("cogit why", () => {
   let dir: string;
   let root: string;
   let env: NodeJS.ProcessEnv;
   let secondCommit: string;
   const git = async (...args: string[]) => run("git", ["-C", root, ...args]);
-
-  const edit = (extra: Record<string, unknown> = {}) =>
-    runHook(
-      "pretooluse",
-      JSON.stringify({
-        session_id: "s1",
-        cwd: root,
-        tool_name: "Edit",
-        tool_input: { file_path: join(root, "a.txt") },
-        ...extra,
-      }),
-      env,
-      T0,
-      () => {},
-    );
 
   beforeEach(async () => {
     dir = await tempDir();
@@ -234,7 +193,6 @@ describe("cogit why", () => {
     });
     await writeFile(projectPaths(root).session("s1"), JSON.stringify(record));
     expect(await collectWhy(root, "a.txt", env)).toEqual([]);
-    expect(tryBeforeNote("a.txt", [])).toBeUndefined();
   });
 
   it("ignores a file no thought links to a commit", async () => {
@@ -306,88 +264,5 @@ describe("cogit why", () => {
     const io = fakeIo(env);
     await why({ dir: root, file: "plain.txt:1", io });
     expect(io.lines).toEqual(["No decisions or rejected alternatives recorded for plain.txt."]);
-  });
-
-  it("writes one note per file per session and then stays quiet", async () => {
-    const first = await edit();
-    expect(first).toBeDefined();
-    const text = (JSON.parse(first ?? "") as { hookSpecificOutput: { additionalContext: string } })
-      .hookSpecificOutput.additionalContext;
-    expect(text).toContain("Earlier, for this file:");
-    expect(text).toContain('"Keep the loop" was considered and rejected (h1111111,');
-    expect(text).toContain("It loses data.");
-    expect(text).toContain("Decide knowingly.");
-    // A second edit of the same file in the same session: no second note.
-    expect(await edit()).toBeUndefined();
-    expect(JSON.parse(await readFile(projectPaths(root).state("s1"), "utf8"))).toMatchObject({
-      notedFiles: ["a.txt"],
-    });
-  });
-
-  it("does not note a file with nothing to say, and remembers the lookup", async () => {
-    await writeFile(join(root, "other.txt"), "x\n");
-    await git("add", "other.txt");
-    await git("commit", "-q", "-m", "chore: other");
-    expect(await edit({ tool_input: { file_path: join(root, "other.txt") } })).toBeUndefined();
-    expect(JSON.parse(await readFile(projectPaths(root).state("s1"), "utf8"))).toMatchObject({
-      notedFiles: ["other.txt"],
-    });
-  });
-
-  it("stays quiet when the setting is off, for other tools, and outside the project", async () => {
-    await configSet("tryBeforeNotes", "false", fakeIo(env));
-    expect(await edit()).toBeUndefined();
-    await configSet("tryBeforeNotes", "true", fakeIo(env));
-    expect(await edit({ tool_name: "Bash", tool_input: { command: "ls" } })).toBeUndefined();
-    expect(await edit({ tool_input: { file_path: join(dir, "outside.txt") } })).toBeUndefined();
-    // Nothing was claimed by the skipped calls.
-    expect(await edit()).toBeDefined();
-  });
-
-  it("keeps the note within five items and 600 characters", () => {
-    const many: WhyHit[] = Array.from({ length: 9 }, (_, index) =>
-      hit({
-        messageId: `h${String(index + 1).repeat(12)}`,
-        decisions: [
-          {
-            title: "d",
-            why: "",
-            alternatives: [{ option: `Option ${index}`, why: "it did not fit" }],
-          },
-        ],
-      }),
-    );
-    const note = tryBeforeNote("a.txt", many);
-    expect(note).toBeDefined();
-    expect(note?.length).toBeLessThanOrEqual(TRY_BEFORE_MAX_CHARS);
-    expect(note?.split("\n").filter((line) => line.startsWith("- "))).toHaveLength(
-      TRY_BEFORE_MAX_ITEMS,
-    );
-    expect(note).toContain("`cogit why a.txt` for more.");
-
-    const oneLong = tryBeforeNote("a.txt", [
-      hit({
-        decisions: [
-          {
-            title: "d",
-            why: "",
-            alternatives: [{ option: "A very long option", why: "y".repeat(500) }],
-          },
-        ],
-      }),
-    ]);
-    expect(oneLong).toBeDefined();
-    expect(oneLong?.length).toBeLessThanOrEqual(TRY_BEFORE_MAX_CHARS);
-    expect(oneLong).toContain("Decide knowingly.");
-  });
-
-  it("counts every rejected option once", () => {
-    expect(rejectedItems([hit(), hit()])).toHaveLength(2);
-  });
-
-  it("never throws when the hook's state cannot be written", async () => {
-    // A regular file where the state directory belongs makes the state write fail.
-    await writeFile(join(projectPaths(root).base, "state"), "not a directory");
-    await expect(edit()).resolves.toBeUndefined();
   });
 });

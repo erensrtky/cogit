@@ -7,7 +7,6 @@ import { Slug } from "../schema/common.js";
 import { captureDisabled, projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadConfig } from "../store/stores.js";
-import { onPreToolUse } from "./pretooluse.js";
 import { onPromptSubmit } from "./promptsubmit.js";
 import { onSessionEnd } from "./sessionend.js";
 import { onSessionStart } from "./sessionstart.js";
@@ -43,7 +42,6 @@ const HANDLERS: Record<string, (ctx: HookContext) => Promise<HookOutput | undefi
   sessionstart: onSessionStart,
   sessionend: onSessionEnd,
   promptsubmit: onPromptSubmit,
-  pretooluse: onPreToolUse,
 };
 
 export const HOOK_EVENTS = Object.keys(HANDLERS);

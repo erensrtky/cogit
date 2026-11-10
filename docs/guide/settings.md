@@ -40,14 +40,6 @@ When a chat starts, the agent gets a short summary of where the previous session
 
 Some plugins and scripts run `claude -p` in the background, often once per prompt. Off, cogit leaves those sessions out of the map and the inbox. Turn it on if you do real work through `claude -p` or the SDK and want it recorded.
 
-### Tried-before notes
-
-`tryBeforeNotes` · default `true`
-
-**Before the agent edits a file, tell it which options earlier thoughts rejected for it.**
-
-Before the agent edits a file, it hears which options earlier thoughts tried and rejected for that file. These are notes from the record, never rules; they can make the agent ask before repeating a dead end.
-
 ### Intent, Shape and Code
 
 `shapes` · default `true`

@@ -46,7 +46,6 @@ export function countTurn(
     recordUpdatedAt,
     turnsSinceSide: 0,
     agentWroteAt: null,
-    notedFiles: [],
   };
   // A change the agent made (the skill ran) restarts its count. A change the
   // side model made does not: otherwise side runs would starve the agent's

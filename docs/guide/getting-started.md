@@ -100,8 +100,7 @@ cogit open        # the panel: every project on this machine
 It runs a small server on `127.0.0.1:4747` and the page refreshes itself while you work. See
 [The map](map.md).
 
-In the next session the agent gets a short note on where the previous one left off, and before
-it edits a file it is told what earlier sessions tried and rejected there.
+In the next session the agent gets a short note on where the previous one left off.
 
 ## Set up a team
 
