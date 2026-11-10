@@ -1,0 +1,42 @@
+# Runs the tests on Linux, Windows and macOS, so a fix for one system cannot quietly
+# break another (issue #2 only showed up on Windows).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Windows would check the files out with CRLF, which the tests and the linter read as changes.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The tests make commits in temporary repositories.
+      - run: |
+          git config --global user.name "cogit ci"
+          git config --global user.email "ci@cogit.invalid"
+      - run: npm run build
+      - if: matrix.os == 'ubuntu-latest'
+        run: npm run lint
+      - run: npm run typecheck
+      - run: npx vitest run
