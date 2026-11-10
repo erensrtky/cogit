@@ -51,9 +51,11 @@ describe("openerCommand", () => {
       command: "open",
       args: ["/p/map.html"],
     });
-    expect(openerCommand("win32", "/p/map.html")).toEqual({
-      command: "cmd",
-      args: ["/c", "start", "", "/p/map.html"],
+    // No shell on Windows: an & in the path or the URL stays part of it.
+    const url = "http://127.0.0.1:4747/map?dir=C%3A%5CR%26D&view=git";
+    expect(openerCommand("win32", url)).toEqual({
+      command: "rundll32",
+      args: ["url.dll,FileProtocolHandler", url],
     });
     expect(openerCommand("linux", "/p/map.html")).toEqual({
       command: "xdg-open",

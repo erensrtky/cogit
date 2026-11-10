@@ -37,10 +37,14 @@ export interface OpenerCommand {
   args: string[];
 }
 
-/** The opener that ships with the platform; Windows `start` is a shell builtin. */
+/**
+ * The opener that ships with the platform. On Windows not `cmd /c start`: cmd
+ * reads `&` in a path or between URL parameters as a second command.
+ */
 export function openerCommand(platform: NodeJS.Platform, file: string): OpenerCommand {
   if (platform === "darwin") return { command: "open", args: [file] };
-  if (platform === "win32") return { command: "cmd", args: ["/c", "start", "", file] };
+  if (platform === "win32")
+    return { command: "rundll32", args: ["url.dll,FileProtocolHandler", file] };
   return { command: "xdg-open", args: [file] };
 }
 
