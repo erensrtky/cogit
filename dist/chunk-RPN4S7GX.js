@@ -41,6 +41,787 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
+// ../../node_modules/boundary/lib/index.js
+var require_lib = __commonJS({
+  "../../node_modules/boundary/lib/index.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.binarySearch = exports.upperBound = exports.lowerBound = exports.compare = void 0;
+    function compare(v1, v2) {
+      return v1 < v2;
+    }
+    exports.compare = compare;
+    function upperBound(array2, value, comp = compare) {
+      let len = array2.length;
+      let i = 0;
+      while (len) {
+        let diff = len >>> 1;
+        let cursor = i + diff;
+        if (comp(value, array2[cursor])) {
+          len = diff;
+        } else {
+          i = cursor + 1;
+          len -= diff + 1;
+        }
+      }
+      return i;
+    }
+    exports.upperBound = upperBound;
+    function lowerBound(array2, value, comp = compare) {
+      let len = array2.length;
+      let i = 0;
+      while (len) {
+        let diff = len >>> 1;
+        let cursor = i + diff;
+        if (comp(array2[cursor], value)) {
+          i = cursor + 1;
+          len -= diff + 1;
+        } else {
+          len = diff;
+        }
+      }
+      return i;
+    }
+    exports.lowerBound = lowerBound;
+    function binarySearch(array2, value, comp = compare) {
+      let cursor = lowerBound(array2, value, comp);
+      return cursor !== array2.length && !comp(value, array2[cursor]);
+    }
+    exports.binarySearch = binarySearch;
+  }
+});
+
+// ../../node_modules/structured-source/lib/structured-source.js
+var require_structured_source = __commonJS({
+  "../../node_modules/structured-source/lib/structured-source.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.StructuredSource = void 0;
+    var boundary_1 = require_lib();
+    var StructuredSource2 = class {
+      /**
+       * @constructs StructuredSource
+       * @param {string} source - source code text.
+       */
+      constructor(source) {
+        this.indice = [0];
+        let regexp = /[\r\n\u2028\u2029]/g;
+        const length = source.length;
+        regexp.lastIndex = 0;
+        while (true) {
+          let result = regexp.exec(source);
+          if (!result) {
+            break;
+          }
+          let index = result.index;
+          if (source.charCodeAt(index) === 13 && source.charCodeAt(index + 1) === 10) {
+            index += 1;
+          }
+          let nextIndex = index + 1;
+          if (length < nextIndex) {
+            break;
+          }
+          this.indice.push(nextIndex);
+          regexp.lastIndex = nextIndex;
+        }
+      }
+      get line() {
+        return this.indice.length;
+      }
+      /**
+       * @param {SourceLocation} loc - location indicator.
+       * @return {[ number, number ]} range.
+       */
+      locationToRange(loc) {
+        return [this.positionToIndex(loc.start), this.positionToIndex(loc.end)];
+      }
+      /**
+       * @param {[ number, number ]} range - pair of indice.
+       * @return {SourceLocation} location.
+       */
+      rangeToLocation(range) {
+        return {
+          start: this.indexToPosition(range[0]),
+          end: this.indexToPosition(range[1])
+        };
+      }
+      /**
+       * @param {SourcePosition} pos - position indicator.
+       * @return {number} index.
+       */
+      positionToIndex(pos) {
+        let start = this.indice[pos.line - 1];
+        return start + pos.column;
+      }
+      /**
+       * @param {number} index - index to the source code.
+       * @return {SourcePosition} position.
+       */
+      indexToPosition(index) {
+        const startLine = (0, boundary_1.upperBound)(this.indice, index);
+        return {
+          line: startLine,
+          column: index - this.indice[startLine - 1]
+        };
+      }
+    };
+    exports.StructuredSource = StructuredSource2;
+  }
+});
+
+// ../../node_modules/ms/index.js
+var require_ms = __commonJS({
+  "../../node_modules/ms/index.js"(exports, module) {
+    "use strict";
+    var s = 1e3;
+    var m = s * 60;
+    var h = m * 60;
+    var d = h * 24;
+    var w = d * 7;
+    var y = d * 365.25;
+    module.exports = function(val, options) {
+      options = options || {};
+      var type = typeof val;
+      if (type === "string" && val.length > 0) {
+        return parse3(val);
+      } else if (type === "number" && isFinite(val)) {
+        return options.long ? fmtLong(val) : fmtShort(val);
+      }
+      throw new Error(
+        "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
+      );
+    };
+    function parse3(str) {
+      str = String(str);
+      if (str.length > 100) {
+        return;
+      }
+      var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
+        str
+      );
+      if (!match) {
+        return;
+      }
+      var n = parseFloat(match[1]);
+      var type = (match[2] || "ms").toLowerCase();
+      switch (type) {
+        case "years":
+        case "year":
+        case "yrs":
+        case "yr":
+        case "y":
+          return n * y;
+        case "weeks":
+        case "week":
+        case "w":
+          return n * w;
+        case "days":
+        case "day":
+        case "d":
+          return n * d;
+        case "hours":
+        case "hour":
+        case "hrs":
+        case "hr":
+        case "h":
+          return n * h;
+        case "minutes":
+        case "minute":
+        case "mins":
+        case "min":
+        case "m":
+          return n * m;
+        case "seconds":
+        case "second":
+        case "secs":
+        case "sec":
+        case "s":
+          return n * s;
+        case "milliseconds":
+        case "millisecond":
+        case "msecs":
+        case "msec":
+        case "ms":
+          return n;
+        default:
+          return void 0;
+      }
+    }
+    function fmtShort(ms) {
+      var msAbs = Math.abs(ms);
+      if (msAbs >= d) {
+        return Math.round(ms / d) + "d";
+      }
+      if (msAbs >= h) {
+        return Math.round(ms / h) + "h";
+      }
+      if (msAbs >= m) {
+        return Math.round(ms / m) + "m";
+      }
+      if (msAbs >= s) {
+        return Math.round(ms / s) + "s";
+      }
+      return ms + "ms";
+    }
+    function fmtLong(ms) {
+      var msAbs = Math.abs(ms);
+      if (msAbs >= d) {
+        return plural2(ms, msAbs, d, "day");
+      }
+      if (msAbs >= h) {
+        return plural2(ms, msAbs, h, "hour");
+      }
+      if (msAbs >= m) {
+        return plural2(ms, msAbs, m, "minute");
+      }
+      if (msAbs >= s) {
+        return plural2(ms, msAbs, s, "second");
+      }
+      return ms + " ms";
+    }
+    function plural2(ms, msAbs, n, name) {
+      var isPlural = msAbs >= n * 1.5;
+      return Math.round(ms / n) + " " + name + (isPlural ? "s" : "");
+    }
+  }
+});
+
+// ../../node_modules/debug/src/common.js
+var require_common = __commonJS({
+  "../../node_modules/debug/src/common.js"(exports, module) {
+    "use strict";
+    function setup(env) {
+      createDebug.debug = createDebug;
+      createDebug.default = createDebug;
+      createDebug.coerce = coerce;
+      createDebug.disable = disable;
+      createDebug.enable = enable;
+      createDebug.enabled = enabled;
+      createDebug.humanize = require_ms();
+      createDebug.destroy = destroy;
+      Object.keys(env).forEach((key) => {
+        createDebug[key] = env[key];
+      });
+      createDebug.names = [];
+      createDebug.skips = [];
+      createDebug.formatters = {};
+      function selectColor(namespace) {
+        let hash2 = 0;
+        for (let i = 0; i < namespace.length; i++) {
+          hash2 = (hash2 << 5) - hash2 + namespace.charCodeAt(i);
+          hash2 |= 0;
+        }
+        return createDebug.colors[Math.abs(hash2) % createDebug.colors.length];
+      }
+      createDebug.selectColor = selectColor;
+      function createDebug(namespace) {
+        let prevTime;
+        let enableOverride = null;
+        let namespacesCache;
+        let enabledCache;
+        function debug2(...args) {
+          if (!debug2.enabled) {
+            return;
+          }
+          const self2 = debug2;
+          const curr = Number(/* @__PURE__ */ new Date());
+          const ms = curr - (prevTime || curr);
+          self2.diff = ms;
+          self2.prev = prevTime;
+          self2.curr = curr;
+          prevTime = curr;
+          args[0] = createDebug.coerce(args[0]);
+          if (typeof args[0] !== "string") {
+            args.unshift("%O");
+          }
+          let index = 0;
+          args[0] = args[0].replace(/%([a-zA-Z%])/g, (match, format) => {
+            if (match === "%%") {
+              return "%";
+            }
+            index++;
+            const formatter = createDebug.formatters[format];
+            if (typeof formatter === "function") {
+              const val = args[index];
+              match = formatter.call(self2, val);
+              args.splice(index, 1);
+              index--;
+            }
+            return match;
+          });
+          createDebug.formatArgs.call(self2, args);
+          const logFn = self2.log || createDebug.log;
+          logFn.apply(self2, args);
+        }
+        debug2.namespace = namespace;
+        debug2.useColors = createDebug.useColors();
+        debug2.color = createDebug.selectColor(namespace);
+        debug2.extend = extend2;
+        debug2.destroy = createDebug.destroy;
+        Object.defineProperty(debug2, "enabled", {
+          enumerable: true,
+          configurable: false,
+          get: () => {
+            if (enableOverride !== null) {
+              return enableOverride;
+            }
+            if (namespacesCache !== createDebug.namespaces) {
+              namespacesCache = createDebug.namespaces;
+              enabledCache = createDebug.enabled(namespace);
+            }
+            return enabledCache;
+          },
+          set: (v) => {
+            enableOverride = v;
+          }
+        });
+        if (typeof createDebug.init === "function") {
+          createDebug.init(debug2);
+        }
+        return debug2;
+      }
+      function extend2(namespace, delimiter2) {
+        const newDebug = createDebug(this.namespace + (typeof delimiter2 === "undefined" ? ":" : delimiter2) + namespace);
+        newDebug.log = this.log;
+        return newDebug;
+      }
+      function enable(namespaces) {
+        createDebug.save(namespaces);
+        createDebug.namespaces = namespaces;
+        createDebug.names = [];
+        createDebug.skips = [];
+        const split = (typeof namespaces === "string" ? namespaces : "").trim().replace(/\s+/g, ",").split(",").filter(Boolean);
+        for (const ns of split) {
+          if (ns[0] === "-") {
+            createDebug.skips.push(ns.slice(1));
+          } else {
+            createDebug.names.push(ns);
+          }
+        }
+      }
+      function matchesTemplate(search, template) {
+        let searchIndex = 0;
+        let templateIndex = 0;
+        let starIndex = -1;
+        let matchIndex = 0;
+        while (searchIndex < search.length) {
+          if (templateIndex < template.length && (template[templateIndex] === search[searchIndex] || template[templateIndex] === "*")) {
+            if (template[templateIndex] === "*") {
+              starIndex = templateIndex;
+              matchIndex = searchIndex;
+              templateIndex++;
+            } else {
+              searchIndex++;
+              templateIndex++;
+            }
+          } else if (starIndex !== -1) {
+            templateIndex = starIndex + 1;
+            matchIndex++;
+            searchIndex = matchIndex;
+          } else {
+            return false;
+          }
+        }
+        while (templateIndex < template.length && template[templateIndex] === "*") {
+          templateIndex++;
+        }
+        return templateIndex === template.length;
+      }
+      function disable() {
+        const namespaces = [
+          ...createDebug.names,
+          ...createDebug.skips.map((namespace) => "-" + namespace)
+        ].join(",");
+        createDebug.enable("");
+        return namespaces;
+      }
+      function enabled(name) {
+        for (const skip of createDebug.skips) {
+          if (matchesTemplate(name, skip)) {
+            return false;
+          }
+        }
+        for (const ns of createDebug.names) {
+          if (matchesTemplate(name, ns)) {
+            return true;
+          }
+        }
+        return false;
+      }
+      function coerce(val) {
+        if (val instanceof Error) {
+          return val.stack || val.message;
+        }
+        return val;
+      }
+      function destroy() {
+        console.warn("Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.");
+      }
+      createDebug.enable(createDebug.load());
+      return createDebug;
+    }
+    module.exports = setup;
+  }
+});
+
+// ../../node_modules/debug/src/browser.js
+var require_browser = __commonJS({
+  "../../node_modules/debug/src/browser.js"(exports, module) {
+    "use strict";
+    exports.formatArgs = formatArgs;
+    exports.save = save;
+    exports.load = load3;
+    exports.useColors = useColors;
+    exports.storage = localstorage();
+    exports.destroy = /* @__PURE__ */ (() => {
+      let warned = false;
+      return () => {
+        if (!warned) {
+          warned = true;
+          console.warn("Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.");
+        }
+      };
+    })();
+    exports.colors = [
+      "#0000CC",
+      "#0000FF",
+      "#0033CC",
+      "#0033FF",
+      "#0066CC",
+      "#0066FF",
+      "#0099CC",
+      "#0099FF",
+      "#00CC00",
+      "#00CC33",
+      "#00CC66",
+      "#00CC99",
+      "#00CCCC",
+      "#00CCFF",
+      "#3300CC",
+      "#3300FF",
+      "#3333CC",
+      "#3333FF",
+      "#3366CC",
+      "#3366FF",
+      "#3399CC",
+      "#3399FF",
+      "#33CC00",
+      "#33CC33",
+      "#33CC66",
+      "#33CC99",
+      "#33CCCC",
+      "#33CCFF",
+      "#6600CC",
+      "#6600FF",
+      "#6633CC",
+      "#6633FF",
+      "#66CC00",
+      "#66CC33",
+      "#9900CC",
+      "#9900FF",
+      "#9933CC",
+      "#9933FF",
+      "#99CC00",
+      "#99CC33",
+      "#CC0000",
+      "#CC0033",
+      "#CC0066",
+      "#CC0099",
+      "#CC00CC",
+      "#CC00FF",
+      "#CC3300",
+      "#CC3333",
+      "#CC3366",
+      "#CC3399",
+      "#CC33CC",
+      "#CC33FF",
+      "#CC6600",
+      "#CC6633",
+      "#CC9900",
+      "#CC9933",
+      "#CCCC00",
+      "#CCCC33",
+      "#FF0000",
+      "#FF0033",
+      "#FF0066",
+      "#FF0099",
+      "#FF00CC",
+      "#FF00FF",
+      "#FF3300",
+      "#FF3333",
+      "#FF3366",
+      "#FF3399",
+      "#FF33CC",
+      "#FF33FF",
+      "#FF6600",
+      "#FF6633",
+      "#FF9900",
+      "#FF9933",
+      "#FFCC00",
+      "#FFCC33"
+    ];
+    function useColors() {
+      if (typeof window !== "undefined" && window.process && (window.process.type === "renderer" || window.process.__nwjs)) {
+        return true;
+      }
+      if (typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)) {
+        return false;
+      }
+      let m;
+      return typeof document !== "undefined" && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance || // Is firebug? http://stackoverflow.com/a/398120/376773
+      typeof window !== "undefined" && window.console && (window.console.firebug || window.console.exception && window.console.table) || // Is firefox >= v31?
+      // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+      typeof navigator !== "undefined" && navigator.userAgent && (m = navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/)) && parseInt(m[1], 10) >= 31 || // Double check webkit in userAgent just in case we are in a worker
+      typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
+    }
+    function formatArgs(args) {
+      args[0] = (this.useColors ? "%c" : "") + this.namespace + (this.useColors ? " %c" : " ") + args[0] + (this.useColors ? "%c " : " ") + "+" + module.exports.humanize(this.diff);
+      if (!this.useColors) {
+        return;
+      }
+      const c = "color: " + this.color;
+      args.splice(1, 0, c, "color: inherit");
+      let index = 0;
+      let lastC = 0;
+      args[0].replace(/%[a-zA-Z%]/g, (match) => {
+        if (match === "%%") {
+          return;
+        }
+        index++;
+        if (match === "%c") {
+          lastC = index;
+        }
+      });
+      args.splice(lastC, 0, c);
+    }
+    exports.log = console.debug || console.log || (() => {
+    });
+    function save(namespaces) {
+      try {
+        if (namespaces) {
+          exports.storage.setItem("debug", namespaces);
+        } else {
+          exports.storage.removeItem("debug");
+        }
+      } catch (error62) {
+      }
+    }
+    function load3() {
+      let r;
+      try {
+        r = exports.storage.getItem("debug") || exports.storage.getItem("DEBUG");
+      } catch (error62) {
+      }
+      if (!r && typeof process !== "undefined" && "env" in process) {
+        r = process.env.DEBUG;
+      }
+      return r;
+    }
+    function localstorage() {
+      try {
+        return localStorage;
+      } catch (error62) {
+      }
+    }
+    module.exports = require_common()(exports);
+    var { formatters } = module.exports;
+    formatters.j = function(v) {
+      try {
+        return JSON.stringify(v);
+      } catch (error62) {
+        return "[UnexpectedJSONParseError]: " + error62.message;
+      }
+    };
+  }
+});
+
+// ../../node_modules/debug/src/node.js
+var require_node = __commonJS({
+  "../../node_modules/debug/src/node.js"(exports, module) {
+    "use strict";
+    var tty = __require("tty");
+    var util = __require("util");
+    exports.init = init;
+    exports.log = log2;
+    exports.formatArgs = formatArgs;
+    exports.save = save;
+    exports.load = load3;
+    exports.useColors = useColors;
+    exports.destroy = util.deprecate(
+      () => {
+      },
+      "Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`."
+    );
+    exports.colors = [6, 2, 3, 4, 5, 1];
+    try {
+      const supportsColor = __require("supports-color");
+      if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
+        exports.colors = [
+          20,
+          21,
+          26,
+          27,
+          32,
+          33,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          56,
+          57,
+          62,
+          63,
+          68,
+          69,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          92,
+          93,
+          98,
+          99,
+          112,
+          113,
+          128,
+          129,
+          134,
+          135,
+          148,
+          149,
+          160,
+          161,
+          162,
+          163,
+          164,
+          165,
+          166,
+          167,
+          168,
+          169,
+          170,
+          171,
+          172,
+          173,
+          178,
+          179,
+          184,
+          185,
+          196,
+          197,
+          198,
+          199,
+          200,
+          201,
+          202,
+          203,
+          204,
+          205,
+          206,
+          207,
+          208,
+          209,
+          214,
+          215,
+          220,
+          221
+        ];
+      }
+    } catch (error62) {
+    }
+    exports.inspectOpts = Object.keys(process.env).filter((key) => {
+      return /^debug_/i.test(key);
+    }).reduce((obj, key) => {
+      const prop = key.substring(6).toLowerCase().replace(/_([a-z])/g, (_, k) => {
+        return k.toUpperCase();
+      });
+      let val = process.env[key];
+      if (/^(yes|on|true|enabled)$/i.test(val)) {
+        val = true;
+      } else if (/^(no|off|false|disabled)$/i.test(val)) {
+        val = false;
+      } else if (val === "null") {
+        val = null;
+      } else {
+        val = Number(val);
+      }
+      obj[prop] = val;
+      return obj;
+    }, {});
+    function useColors() {
+      return "colors" in exports.inspectOpts ? Boolean(exports.inspectOpts.colors) : tty.isatty(process.stderr.fd);
+    }
+    function formatArgs(args) {
+      const { namespace: name, useColors: useColors2 } = this;
+      if (useColors2) {
+        const c = this.color;
+        const colorCode = "\x1B[3" + (c < 8 ? c : "8;5;" + c);
+        const prefix = `  ${colorCode};1m${name} \x1B[0m`;
+        args[0] = prefix + args[0].split("\n").join("\n" + prefix);
+        args.push(colorCode + "m+" + module.exports.humanize(this.diff) + "\x1B[0m");
+      } else {
+        args[0] = getDate() + name + " " + args[0];
+      }
+    }
+    function getDate() {
+      if (exports.inspectOpts.hideDate) {
+        return "";
+      }
+      return (/* @__PURE__ */ new Date()).toISOString() + " ";
+    }
+    function log2(...args) {
+      return process.stderr.write(util.formatWithOptions(exports.inspectOpts, ...args) + "\n");
+    }
+    function save(namespaces) {
+      if (namespaces) {
+        process.env.DEBUG = namespaces;
+      } else {
+        delete process.env.DEBUG;
+      }
+    }
+    function load3() {
+      return process.env.DEBUG;
+    }
+    function init(debug2) {
+      debug2.inspectOpts = {};
+      const keys = Object.keys(exports.inspectOpts);
+      for (let i = 0; i < keys.length; i++) {
+        debug2.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
+      }
+    }
+    module.exports = require_common()(exports);
+    var { formatters } = module.exports;
+    formatters.o = function(v) {
+      this.inspectOpts.colors = this.useColors;
+      return util.inspect(v, this.inspectOpts).split("\n").map((str) => str.trim()).join(" ");
+    };
+    formatters.O = function(v) {
+      this.inspectOpts.colors = this.useColors;
+      return util.inspect(v, this.inspectOpts);
+    };
+  }
+});
+
+// ../../node_modules/debug/src/index.js
+var require_src = __commonJS({
+  "../../node_modules/debug/src/index.js"(exports, module) {
+    "use strict";
+    if (typeof process === "undefined" || process.type === "renderer" || process.browser === true || process.__nwjs) {
+      module.exports = require_browser();
+    } else {
+      module.exports = require_node();
+    }
+  }
+});
+
 // ../../node_modules/cli-width/index.js
 var require_cli_width = __commonJS({
   "../../node_modules/cli-width/index.js"(exports, module) {
@@ -85,7 +866,7 @@ var require_cli_width = __commonJS({
 });
 
 // ../../node_modules/mute-stream/lib/index.js
-var require_lib = __commonJS({
+var require_lib2 = __commonJS({
   "../../node_modules/mute-stream/lib/index.js"(exports, module) {
     "use strict";
     var Stream = __require("stream");
@@ -209,13 +990,13 @@ var require_lib = __commonJS({
 
 // src/git-hooks.ts
 import { execFile as execFile3 } from "child_process";
-import { existsSync as existsSync6, realpathSync } from "fs";
-import { chmod, mkdir as mkdir6, readFile as readFile9, realpath as realpath3, rm as rm4, stat as stat12 } from "fs/promises";
-import { dirname as dirname11, join as join12, resolve as resolve7 } from "path";
+import { existsSync as existsSync5, realpathSync } from "fs";
+import { chmod, mkdir as mkdir7, readFile as readFile10, realpath as realpath3, rm as rm5, stat as stat11 } from "fs/promises";
+import { dirname as dirname10, join as join12, resolve as resolve4 } from "path";
 import { promisify as promisify3 } from "util";
 
 // src/git.ts
-import { execFile } from "child_process";
+import { execFile, spawn } from "child_process";
 import { readFile as readFile2, stat as stat2 } from "fs/promises";
 import { dirname as dirname2, isAbsolute, join as join2, relative, sep } from "path";
 import { promisify } from "util";
@@ -224,9 +1005,9 @@ import { promisify } from "util";
 import { randomBytes } from "crypto";
 import { mkdir, open, readFile, rename, rm, stat } from "fs/promises";
 import { basename, dirname, join } from "path";
-async function isDirectory(path2) {
+async function isDirectory(path3) {
   try {
-    return (await stat(path2)).isDirectory();
+    return (await stat(path3)).isDirectory();
   } catch {
     return false;
   }
@@ -315,8 +1096,8 @@ async function ensureGitignore(root, policy) {
   const missing = gitignoreLines(policy).filter((l) => !present.has(l));
   if (missing.length === 0) return [];
   const block = [present.has(HEADER) ? [] : [HEADER], missing].flat().join("\n");
-  const sep7 = text === "" || text.endsWith("\n") ? "" : "\n";
-  await atomicWrite(file2, `${text}${sep7}${block}
+  const sep5 = text === "" || text.endsWith("\n") ? "" : "\n";
+  await atomicWrite(file2, `${text}${sep5}${block}
 `);
   return missing;
 }
@@ -349,11 +1130,36 @@ function parseCommitLines(stdout) {
   }
   return out;
 }
+async function knownCommits(root, hashes) {
+  return new Promise((done) => {
+    const child = spawn("git", ["-C", root, "cat-file", "--batch-check"], {
+      stdio: ["pipe", "pipe", "ignore"]
+    });
+    let out = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => {
+      out += chunk;
+    });
+    child.on("error", () => done(void 0));
+    child.on("close", (code) => {
+      if (code !== 0) return done(void 0);
+      const lines = out.split("\n");
+      done(new Set(hashes.filter((_, at) => lines[at]?.split(" ")[1] === "commit")));
+    });
+    child.stdin.on("error", () => {
+    });
+    child.stdin.end(`${hashes.join("\n")}
+`);
+  });
+}
+async function batchable(root, wanted) {
+  const known = await knownCommits(root, wanted);
+  return known === void 0 ? wanted : wanted.filter((hash2) => known.has(hash2));
+}
 function matches(recorded, commit) {
   return commit.full.startsWith(recorded) || recorded.startsWith(commit.short);
 }
 async function readCommitSubjects(root, hashes) {
-  const wanted = [...new Set(hashes)];
+  const wanted = await batchable(root, [...new Set(hashes)]);
   const out = /* @__PURE__ */ new Map();
   if (wanted.length === 0) return out;
   const remember = (entries) => {
@@ -406,7 +1212,7 @@ function parseFileSections(stdout) {
   return out;
 }
 async function readCommitFiles(root, hashes) {
-  const wanted = [...new Set(hashes)];
+  const wanted = await batchable(root, [...new Set(hashes)]);
   const out = /* @__PURE__ */ new Map();
   if (wanted.length === 0) return out;
   const remember = (entries) => {
@@ -460,16 +1266,16 @@ function parseChangeSections(stdout) {
     const parts = line.split("	");
     if (parts.length < 3) continue;
     const [added, removed, ...rest] = parts;
-    const path2 = rest.join("	").trim();
-    if (path2 === "") continue;
+    const path3 = rest.join("	").trim();
+    if (path3 === "") continue;
     current.added += Number.parseInt(added ?? "", 10) || 0;
     current.removed += Number.parseInt(removed ?? "", 10) || 0;
-    current.files.push(path2);
+    current.files.push(path3);
   }
   return out;
 }
 async function readCommitChanges(root, hashes) {
-  const wanted = [...new Set(hashes)];
+  const wanted = await batchable(root, [...new Set(hashes)]);
   const out = /* @__PURE__ */ new Map();
   if (wanted.length === 0) return out;
   const remember = (entries) => {
@@ -623,18 +1429,18 @@ async function commitBetween(root, from, to, env = process.env) {
 async function gitHooksDir(root) {
   try {
     const { stdout } = await exec("git", ["-C", root, "rev-parse", "--git-path", "hooks"]);
-    const path2 = stdout.trim();
-    if (path2 === "") return void 0;
-    return isAbsolute(path2) ? path2 : join2(root, path2);
+    const path3 = stdout.trim();
+    if (path3 === "") return void 0;
+    return isAbsolute(path3) ? path3 : join2(root, path3);
   } catch {
     return void 0;
   }
 }
 
 // src/hooks/run.ts
-import { spawn as spawn2 } from "child_process";
-import { closeSync, existsSync as existsSync5, mkdirSync, openSync, statSync as statSync2, writeSync } from "fs";
-import { dirname as dirname10 } from "path";
+import { spawn as spawn3 } from "child_process";
+import { closeSync, existsSync as existsSync4, mkdirSync, openSync, statSync as statSync2, writeSync } from "fs";
+import { dirname as dirname9 } from "path";
 import { fileURLToPath } from "url";
 
 // src/agents/types.ts
@@ -1457,10 +2263,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path2) {
-  if (!path2)
+function getElementAtPath(obj, path3) {
+  if (!path3)
     return obj;
-  return path2.reduce((acc, key) => acc?.[key], obj);
+  return path3.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -1800,11 +2606,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path2, issues) {
+function prefixIssues(path3, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path2);
+    iss.path.unshift(path3);
     return iss;
   });
 }
@@ -2266,16 +3072,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path2 = []) => {
+  const processError = (error63, path3 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path2, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
       } else {
-        const fullpath = [...path2, ...issue2.path];
+        const fullpath = [...path3, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -2314,17 +3120,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path2 = []) => {
+  const processError = (error63, path3 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path2, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
       } else {
-        const fullpath = [...path2, ...issue2.path];
+        const fullpath = [...path3, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -2363,8 +3169,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path2 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path2) {
+  const path3 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path3) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -4660,7 +5466,7 @@ function handleIntersectionResults(result, left, right) {
   const unrecKeys = /* @__PURE__ */ new Map();
   let unrecIssue;
   const keyIssues = /* @__PURE__ */ new Map();
-  const collect2 = (iss, side) => {
+  const collect = (iss, side) => {
     let keys;
     if (iss.code === "unrecognized_keys" && !iss.path?.length) {
       unrecIssue ?? (unrecIssue = iss);
@@ -4681,11 +5487,11 @@ function handleIntersectionResults(result, left, right) {
     return true;
   };
   for (const iss of left.issues) {
-    if (!collect2(iss, "l"))
+    if (!collect(iss, "l"))
       result.issues.push(iss);
   }
   for (const iss of right.issues) {
-    if (!collect2(iss, "r"))
+    if (!collect(iss, "r"))
       result.issues.push(iss);
   }
   const bothKeys = [...unrecKeys].filter(([, f]) => f.l && f.r).map(([k]) => k);
@@ -5707,7 +6513,7 @@ var recursive = /* @__PURE__ */ new WeakMap();
 var NONE = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
-function isRecursive(inst, stack, resolve8) {
+function isRecursive(inst, stack, resolve5) {
   const cached2 = recursive.get(inst);
   if (cached2 !== void 0)
     return cached2 ? PROVEN : NONE;
@@ -5717,7 +6523,7 @@ function isRecursive(inst, stack, resolve8) {
   let result = NONE;
   const check2 = (child) => {
     if (result !== PROVEN && child?._zod) {
-      const answer = isRecursive(child, stack, resolve8);
+      const answer = isRecursive(child, stack, resolve5);
       if (answer > result)
         result = answer;
     }
@@ -5728,7 +6534,7 @@ function isRecursive(inst, stack, resolve8) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
       if (spread && !desc.enumerable)
         continue;
-      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve8) : NONE;
+      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve5) : NONE;
       if (child > answer)
         answer = child;
     }
@@ -5792,7 +6598,7 @@ function isRecursive(inst, stack, resolve8) {
       break;
     // `$ZodLazy` caches its inner on the def, so a resolved edge is followed exactly
     case "lazy": {
-      const inner = def._cachedInner ?? (resolve8 ? inst._zod.innerType : void 0);
+      const inner = def._cachedInner ?? (resolve5 ? inst._zod.innerType : void 0);
       merge2(inner ? isRecursive(inner, stack, false) : ASSUMED);
       break;
     }
@@ -17849,15 +18655,15 @@ var initializer2 = (inst, issues) => {
   if (_installedErrorProtos.has(proto))
     return;
   _installedErrorProtos.add(proto);
-  _lazyMethod(proto, "format", (self) => (mapper) => formatError(self, mapper));
-  _lazyMethod(proto, "flatten", (self) => (mapper) => flattenError(self, mapper));
-  _lazyMethod(proto, "addIssue", (self) => (issue2) => {
-    self.issues.push(issue2);
-    self.message = JSON.stringify(self.issues, jsonStringifyReplacer, 2);
+  _lazyMethod(proto, "format", (self2) => (mapper) => formatError(self2, mapper));
+  _lazyMethod(proto, "flatten", (self2) => (mapper) => flattenError(self2, mapper));
+  _lazyMethod(proto, "addIssue", (self2) => (issue2) => {
+    self2.issues.push(issue2);
+    self2.message = JSON.stringify(self2.issues, jsonStringifyReplacer, 2);
   });
-  _lazyMethod(proto, "addIssues", (self) => (issues2) => {
-    self.issues.push(...issues2);
-    self.message = JSON.stringify(self.issues, jsonStringifyReplacer, 2);
+  _lazyMethod(proto, "addIssues", (self2) => (issues2) => {
+    self2.issues.push(...issues2);
+    self2.message = JSON.stringify(self2.issues, jsonStringifyReplacer, 2);
   });
   Object.defineProperty(proto, "isEmpty", {
     configurable: true,
@@ -18703,7 +19509,7 @@ var ZodObject = /* @__PURE__ */ $constructor("ZodObject", (inst, def) => {
   $ZodObjectJIT.init(inst, def);
   ZodType.init(inst, def);
   inst._zod.processJSONSchema = (ctx, json2, params) => objectProcessor(inst, ctx, json2, params);
-  util_exports.installLazyProp(inst, "shape", (self) => self._zod.def.shape, false);
+  util_exports.installLazyProp(inst, "shape", (self2) => self2._zod.def.shape, false);
 }, {
   keyof() {
     return _enum2(Object.keys(this._zod.def.shape));
@@ -19502,13 +20308,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path2 = ref.slice(1).split("/").filter(Boolean);
-  if (path2.length === 0) {
+  const path3 = ref.slice(1).split("/").filter(Boolean);
+  if (path3.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path2[0] === defsKey) {
-    const key = path2[1] === void 0 ? void 0 : decodeJSONPointerSegment(path2[1]);
+  if (path3[0] === defsKey) {
+    const key = path3[1] === void 0 ? void 0 : decodeJSONPointerSegment(path3[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -20365,10 +21171,7 @@ var ClaudeHookInput = external_exports.looseObject({
   transcript_path: external_exports.string().optional(),
   stop_hook_active: external_exports.boolean().optional(),
   /** SessionStart only: `startup`, `resume`, `clear` or `compact`. */
-  source: external_exports.string().optional(),
-  /** PreToolUse only: the tool and its arguments (`file_path` on the write tools). */
-  tool_name: external_exports.string().optional(),
-  tool_input: external_exports.looseObject({}).optional()
+  source: external_exports.string().optional()
 });
 function parseHookInput(stdin) {
   let raw;
@@ -20585,9 +21388,9 @@ async function writeProjectSetup(root) {
 
 // src/agents/claude/transcripts.ts
 import { createReadStream as createReadStream2 } from "fs";
-import { access, open as open3, readdir as readdir2, stat as stat4 } from "fs/promises";
-import { homedir as homedir2 } from "os";
-import { join as join5 } from "path";
+import { access, open as open3, readdir as readdir2, stat as stat5 } from "fs/promises";
+import { homedir as homedir3 } from "os";
+import { isAbsolute as isAbsolute2, join as join6, relative as relative2, sep as sep2 } from "path";
 import { createInterface as createInterface2 } from "readline";
 
 // src/agents/claude/fork.ts
@@ -20670,12 +21473,49 @@ async function forkOrigin(file2, turns, readTurns, isMessage, depth = 0) {
   return { sessionId: basename2(best.file, ".jsonl"), copied: best.shared, last: copy };
 }
 
+// src/agents/claude/turn-cache.ts
+import { createHash, randomBytes as randomBytes2 } from "crypto";
+import { mkdir as mkdir3, readFile as readFile3, rename as rename2, rm as rm2, stat as stat4, writeFile as writeFile2 } from "fs/promises";
+import { homedir as homedir2 } from "os";
+import { join as join5 } from "path";
+var TURN_CACHE_VERSION = 1;
+function turnCacheDir(env = process.env) {
+  const base = env.COGIT_CACHE_DIR ?? join5(env.XDG_CACHE_HOME ?? join5(homedir2(), ".cache"), "cogit");
+  return join5(base, "turns");
+}
+async function cachedTurns(file2, parse3, env = process.env) {
+  const info = await stat4(file2);
+  const dir = turnCacheDir(env);
+  const entryFile = join5(
+    dir,
+    `${createHash("sha256").update(file2).digest("hex").slice(0, 32)}.json`
+  );
+  try {
+    const entry2 = JSON.parse(await readFile3(entryFile, "utf8"));
+    if (entry2.v === TURN_CACHE_VERSION && entry2.size === info.size && entry2.mtimeMs === info.mtimeMs && Array.isArray(entry2.turns))
+      return entry2.turns;
+  } catch {
+  }
+  const turns = await parse3(file2);
+  const entry = { v: TURN_CACHE_VERSION, size: info.size, mtimeMs: info.mtimeMs, turns };
+  const tmp = `${entryFile}.${process.pid}.${randomBytes2(4).toString("hex")}.tmp`;
+  try {
+    await mkdir3(dir, { recursive: true });
+    await writeFile2(tmp, JSON.stringify(entry));
+    await rename2(tmp, entryFile);
+  } catch {
+    await rm2(tmp, { force: true }).catch(() => {
+    });
+  }
+  return turns;
+}
+
 // src/agents/claude/transcripts.ts
 function claudeConfigDir(env = process.env) {
-  return env.CLAUDE_CONFIG_DIR ?? join5(homedir2(), ".claude");
+  return env.CLAUDE_CONFIG_DIR ?? join6(homedir3(), ".claude");
 }
 async function findTranscript(sessionId, env = process.env) {
-  const projectsDir = join5(claudeConfigDir(env), "projects");
+  const projectsDir = join6(claudeConfigDir(env), "projects");
   let dirs;
   try {
     dirs = await readdir2(projectsDir, { withFileTypes: true });
@@ -20684,7 +21524,7 @@ async function findTranscript(sessionId, env = process.env) {
   }
   for (const dir of dirs) {
     if (!dir.isDirectory()) continue;
-    const file2 = join5(projectsDir, dir.name, `${sessionId}.jsonl`);
+    const file2 = join6(projectsDir, dir.name, `${sessionId}.jsonl`);
     try {
       await access(file2);
       return file2;
@@ -20695,7 +21535,7 @@ async function findTranscript(sessionId, env = process.env) {
 }
 async function collectTranscripts(env = process.env) {
   const found = /* @__PURE__ */ new Map();
-  const projectsDir = join5(claudeConfigDir(env), "projects");
+  const projectsDir = join6(claudeConfigDir(env), "projects");
   let projectDirs;
   try {
     projectDirs = await readdir2(projectsDir, { withFileTypes: true });
@@ -20704,7 +21544,7 @@ async function collectTranscripts(env = process.env) {
   }
   for (const entry of projectDirs) {
     if (!entry.isDirectory()) continue;
-    const dir = join5(projectsDir, entry.name);
+    const dir = join6(projectsDir, entry.name);
     let files;
     try {
       files = await readdir2(dir);
@@ -20712,7 +21552,7 @@ async function collectTranscripts(env = process.env) {
       continue;
     }
     for (const file2 of files) {
-      if (file2.endsWith(".jsonl")) found.set(file2.slice(0, -".jsonl".length), join5(dir, file2));
+      if (file2.endsWith(".jsonl")) found.set(file2.slice(0, -".jsonl".length), join6(dir, file2));
     }
   }
   return found;
@@ -20764,8 +21604,12 @@ function displayTurn(turn, roots) {
     /<pasted_content[^>]*>([\s\S]*?)<\/pasted_content[^>]*>/g,
     "\n[Pasted]\n$1\n[/Pasted]\n"
   ).trim();
-  const relative8 = (file2) => {
-    for (const root of roots) if (file2.startsWith(`${root}/`)) return file2.slice(root.length + 1);
+  const fromRoot = (file2) => {
+    if (!isAbsolute2(file2)) return file2;
+    for (const root of roots) {
+      const rel = relative2(root, file2);
+      if (rel !== "" && !rel.startsWith("..") && !isAbsolute2(rel)) return rel.split(sep2).join("/");
+    }
     return file2;
   };
   return {
@@ -20775,7 +21619,7 @@ function displayTurn(turn, roots) {
     // Steps and questions feed the recorder only; the map keeps the counts.
     tools: {
       commands: turn.tools.commands,
-      files: turn.tools.files.map(relative8),
+      files: turn.tools.files.map(fromRoot),
       other: turn.tools.other
     }
   };
@@ -20798,13 +21642,13 @@ function addAssistant(turn, line) {
       turn.replies.push(block.text);
     } else if (block?.type === "tool_use") {
       const input2 = block.input ?? {};
-      const path2 = input2.file_path;
+      const path3 = input2.file_path;
       if (block.name === "Bash") {
         turn.tools.commands += 1;
         if (typeof input2.description === "string" && input2.description.trim() !== "")
           addOnce(turn.tools, "steps", input2.description.trim());
-      } else if (EDIT_TOOLS.has(block.name) && typeof path2 === "string") {
-        if (!turn.tools.files.includes(path2)) turn.tools.files.push(path2);
+      } else if (EDIT_TOOLS.has(block.name) && typeof path3 === "string") {
+        if (!turn.tools.files.includes(path3)) turn.tools.files.push(path3);
       } else {
         turn.tools.other += 1;
         if (block.name === "AskUserQuestion" && Array.isArray(input2.questions))
@@ -20870,7 +21714,7 @@ function isMessageLine(line) {
 }
 var turnCache = /* @__PURE__ */ new Map();
 async function readTranscriptTurns(file2) {
-  const size = (await stat4(file2)).size;
+  const size = (await stat5(file2)).size;
   const cached2 = turnCache.get(file2);
   if (cached2 && cached2.size === size) return cached2.turns;
   const turns = readAllTurns(file2);
@@ -20878,7 +21722,10 @@ async function readTranscriptTurns(file2) {
   turns.catch(() => turnCache.delete(file2));
   return turns;
 }
-async function readAllTurns(file2) {
+function readAllTurns(file2) {
+  return cachedTurns(file2, parseAllTurns);
+}
+async function parseAllTurns(file2) {
   const turns = [];
   const seen = /* @__PURE__ */ new Set();
   let pendingResume = false;
@@ -21127,8 +21974,8 @@ function parseMessageRef(ref) {
 }
 
 // src/store/paths.ts
-import { homedir as homedir3 } from "os";
-import { join as join6 } from "path";
+import { homedir as homedir4 } from "os";
+import { join as join7 } from "path";
 var DIR_NAME = ".cogit";
 var OLD_DIR_NAME = ".codelineage";
 var CONFIG_DIR_NAME = "cogit";
@@ -21140,79 +21987,81 @@ function captureDisabled(env = process.env) {
   return env.COGIT_DISABLE === "1" || env.CODELINEAGE_DISABLE === "1";
 }
 function projectPaths(root) {
-  const base = join6(root, DIR_NAME);
+  const base = join7(root, DIR_NAME);
   return {
     base,
-    project: join6(base, "project.json"),
-    sessions: join6(base, "sessions"),
-    session: (id) => join6(base, "sessions", `${id}.json`),
+    project: join7(base, "project.json"),
+    sessions: join7(base, "sessions"),
+    session: (id) => join7(base, "sessions", `${id}.json`),
     /** Append-only structure events for a session (Story 8.5). */
-    events: (id) => join6(base, "sessions", `${id}.events.jsonl`),
+    events: (id) => join7(base, "sessions", `${id}.events.jsonl`),
     /** Pre-migration copies of the record files. */
-    backup: (name) => join6(base, name),
+    backup: (name) => join7(base, name),
     /** The conversation store: what the drill-down needs, outliving the transcript. */
-    conversations: join6(base, "conversations"),
-    conversation: (id) => join6(base, "conversations", `${id}.jsonl.gz`),
-    state: (id) => join6(base, "state", `${id}.json`),
+    conversations: join7(base, "conversations"),
+    conversation: (id) => join7(base, "conversations", `${id}.jsonl.gz`),
+    state: (id) => join7(base, "state", `${id}.json`),
     /** Inbox rows the user dismissed, per session (Story 11.1); also local. */
-    inboxState: join6(base, "state", "inbox.json"),
+    inboxState: join7(base, "state", "inbox.json"),
     /** How the user left the map: open sessions and dragged row widths; also local. */
-    mapView: join6(base, "state", "map.json"),
+    mapView: join7(base, "state", "map.json"),
     /** The curated captured-work list (Story 15.1); local, never committed. */
-    captures: join6(base, "state", "captures.json"),
+    captures: join7(base, "state", "captures.json"),
     /** What cogit's own headless runs cost, one line per run; local. */
-    spend: join6(base, "state", "spend.jsonl"),
+    spend: join7(base, "state", "spend.jsonl"),
+    /** Search-by-meaning fingerprints of the messages, by the embedding model; local. */
+    embeddings: join7(base, "state", "embeddings.json"),
     /** The project's numbers for the start page, written with each map build; local. */
-    overview: join6(base, "state", "overview.json"),
+    overview: join7(base, "state", "overview.json"),
     /** What the detached hook children (build, side run) printed; local, capped. */
-    detachedLog: join6(base, "state", "detached.log"),
+    detachedLog: join7(base, "state", "detached.log"),
     /** What the record refs last looked like, and what waits to be sent; local. */
-    recordSync: join6(base, "state", "record-sync.json"),
+    recordSync: join7(base, "state", "record-sync.json"),
     /** Present after `cogit hooks uninstall`: the refresh then adds no block; local. */
-    hooksOff: join6(base, "state", "hooks-off"),
+    hooksOff: join7(base, "state", "hooks-off"),
     /** Present once `cogit pr` has suggested the pull request Action; local. */
-    actionHint: join6(base, "state", "action-hint"),
+    actionHint: join7(base, "state", "action-hint"),
     /** The code graph engine's file links, cut down for hooks; rebuilt when the graph changes; local. */
-    graphIndex: join6(base, "state", "graph-index.json"),
+    graphIndex: join7(base, "state", "graph-index.json"),
     /** Commits waiting for their message's record before a Shape; local. */
-    shapeQueue: join6(base, "state", "shape-queue"),
-    locks: join6(base, "locks"),
+    shapeQueue: join7(base, "state", "shape-queue"),
+    locks: join7(base, "locks"),
     /** Where the skill drops session JSON for `session write --file`. */
-    inbox: (id) => join6(base, "inbox", `${id}.json`),
-    lock: (name) => join6(base, "locks", `${name}.lock`),
-    html: join6(base, "map.html"),
+    inbox: (id) => join7(base, "inbox", `${id}.json`),
+    lock: (name) => join7(base, "locks", `${name}.lock`),
+    html: join7(base, "map.html"),
     /**
      * The session whose next code commit carries its record (Story 9.3), written
      * by the UserPromptSubmit hook. Local state, never committed.
      */
-    head: join6(base, "HEAD"),
+    head: join7(base, "HEAD"),
     /** The project-scoped ignore rules that keep local state out of git. */
-    gitignore: join6(base, ".gitignore")
+    gitignore: join7(base, ".gitignore")
   };
 }
 function defaultConfigBase(name, env = process.env) {
-  return join6(env.XDG_CONFIG_HOME ?? join6(homedir3(), ".config"), name);
+  return join7(env.XDG_CONFIG_HOME ?? join7(homedir4(), ".config"), name);
 }
 function globalPaths(env = process.env) {
   const base = configuredHome(env) ?? defaultConfigBase(CONFIG_DIR_NAME, env);
   return {
     base,
-    config: join6(base, "config.json"),
-    registry: join6(base, "projects.json"),
-    lock: join6(base, "registry.lock"),
-    panel: join6(base, "panel.html")
+    config: join7(base, "config.json"),
+    registry: join7(base, "projects.json"),
+    lock: join7(base, "registry.lock"),
+    panel: join7(base, "panel.html")
   };
 }
 
 // src/store/root.ts
 import { existsSync as existsSync2 } from "fs";
-import { readFile as readFile4, stat as stat6 } from "fs/promises";
-import { dirname as dirname4, join as join8, relative as relative2, resolve as resolve2 } from "path";
+import { readFile as readFile5, stat as stat7 } from "fs/promises";
+import { dirname as dirname4, join as join9, relative as relative3, resolve as resolve2 } from "path";
 
 // src/store/migrate.ts
 import { existsSync } from "fs";
-import { readFile as readFile3, rename as rename2, stat as stat5 } from "fs/promises";
-import { join as join7, resolve, sep as sep2 } from "path";
+import { readFile as readFile4, rename as rename3, stat as stat6 } from "fs/promises";
+import { join as join8, resolve, sep as sep3 } from "path";
 var checkedProjects = /* @__PURE__ */ new Set();
 var checkedGlobals = /* @__PURE__ */ new Set();
 var pendingWarnings = [];
@@ -21228,15 +22077,15 @@ function renameGitignoreLines(text) {
     return line.replace(/^(\s*)\/\.codelineage(?=\/|$)/, "$1/.cogit");
   }).join("\n");
 }
-async function isDirectory2(path2) {
-  return stat5(path2).then(
+async function isDirectory2(path3) {
+  return stat6(path3).then(
     (info) => info.isDirectory(),
     () => false
   );
 }
 async function moveDir(from, to) {
   try {
-    await rename2(from, to);
+    await rename3(from, to);
     return true;
   } catch {
     return false;
@@ -21246,8 +22095,8 @@ async function migrateProject(root) {
   const dir = resolve(root);
   if (checkedProjects.has(dir)) return false;
   checkedProjects.add(dir);
-  const oldDir = join7(dir, OLD_DIR_NAME);
-  const newDir = join7(dir, DIR_NAME);
+  const oldDir = join8(dir, OLD_DIR_NAME);
+  const newDir = join8(dir, DIR_NAME);
   const oldIsDir = await isDirectory2(oldDir);
   if (!oldIsDir) return false;
   if (existsSync(newDir)) {
@@ -21257,18 +22106,18 @@ async function migrateProject(root) {
     return false;
   }
   if (!await moveDir(oldDir, newDir)) return false;
-  const gitignore = join7(dir, ".gitignore");
-  const text = await readFile3(gitignore, "utf8").catch(() => void 0);
+  const gitignore = join8(dir, ".gitignore");
+  const text = await readFile4(gitignore, "utf8").catch(() => void 0);
   if (text !== void 0) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-LS5AIXA5.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-AGBO333W.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
 async function rewriteRegistryPaths(file2, oldBase, newBase) {
-  const text = await readFile3(file2, "utf8").catch(() => void 0);
+  const text = await readFile4(file2, "utf8").catch(() => void 0);
   if (text === void 0) return;
   let json2;
   try {
@@ -21280,7 +22129,7 @@ async function rewriteRegistryPaths(file2, oldBase, newBase) {
   let changed = false;
   for (const project of json2.projects) {
     if (typeof project.path !== "string") continue;
-    if (project.path !== oldBase && !project.path.startsWith(`${oldBase}${sep2}`)) continue;
+    if (project.path !== oldBase && !project.path.startsWith(`${oldBase}${sep3}`)) continue;
     project.path = `${newBase}${project.path.slice(oldBase.length)}`;
     changed = true;
   }
@@ -21302,24 +22151,24 @@ async function migrateGlobal(env = process.env) {
     return false;
   }
   if (!await moveDir(oldBase, newBase)) return false;
-  await rewriteRegistryPaths(join7(newBase, "projects.json"), oldBase, newBase);
+  await rewriteRegistryPaths(join8(newBase, "projects.json"), oldBase, newBase);
   return true;
 }
 
 // src/store/root.ts
 async function findLinkedWorktree(start) {
   for (let dir = start; ; dir = dirname4(dir)) {
-    const dotGit = join8(dir, ".git");
-    const info = await stat6(dotGit).catch(() => void 0);
+    const dotGit = join9(dir, ".git");
+    const info = await stat7(dotGit).catch(() => void 0);
     if (info?.isFile()) {
-      const match = /^gitdir:\s*(.+?)\s*$/m.exec(await readFile4(dotGit, "utf8"));
+      const match = /^gitdir:\s*(.+?)\s*$/m.exec(await readFile5(dotGit, "utf8"));
       return match ? { top: dir, gitdir: resolve2(dir, match[1]) } : void 0;
     }
     if (info || dirname4(dir) === dir) return void 0;
   }
 }
 async function readBranch(gitdir) {
-  const head = await readFile4(join8(gitdir, "HEAD"), "utf8").catch(() => "");
+  const head = await readFile5(join9(gitdir, "HEAD"), "utf8").catch(() => "");
   const match = /^ref:\s*refs\/heads\/(.+?)\s*$/m.exec(head);
   return match ? match[1] : null;
 }
@@ -21333,9 +22182,9 @@ async function resolveProjectRoot(dir) {
     }
     const worktree = { path: linked.top, branch: await readBranch(linked.gitdir) };
     await migrateProject(start);
-    const common2 = (await readFile4(join8(linked.gitdir, "commondir"), "utf8")).trim();
+    const common2 = (await readFile5(join9(linked.gitdir, "commondir"), "utf8")).trim();
     const mainTop = dirname4(resolve2(linked.gitdir, common2));
-    const root = join8(mainTop, relative2(linked.top, start));
+    const root = join9(mainTop, relative3(linked.top, start));
     await migrateProject(root);
     if (!existsSync2(projectPaths(root).project) && existsSync2(projectPaths(start).project))
       return { root: start, worktree };
@@ -21395,9 +22244,18 @@ var Config = external_exports.object({
   /**
    * Whether the side model distils each session's leftover work into a short
    * curated list (Story 15.1). Off writes nothing; items already in the store
-   * are kept and come back when it is turned on again.
+   * are kept and come back when it is turned on again. Off by default since
+   * 1.4.0 for new installs; a config written before keeps the value it stored.
    */
-  captures: external_exports.boolean().default(true),
+  captures: external_exports.boolean().default(false),
+  /**
+   * Whether the map's search also finds messages by meaning, through an
+   * embedding model in the local Ollama. Off by default: it needs Ollama and a
+   * model download, which not every machine can spare.
+   */
+  semanticSearch: external_exports.boolean().default(false),
+  /** The Ollama embedding model the meaning search uses. */
+  embeddingModel: external_exports.string().trim().min(1).max(64).default("bge-m3"),
   /**
    * Whether SessionStart hands the agent the lineage of the previous session and
    * how to read the record (`log` / `show`). On by default; costs only tokens.
@@ -21428,12 +22286,6 @@ var Config = external_exports.object({
    */
   bigChangeLines: external_exports.int().min(1).max(1e6).default(300),
   /**
-   * Whether the agent is told, before editing a file, about options earlier
-   * thoughts considered and rejected for that file (Story 10.4). A note from
-   * the record, never a rule; off means silence.
-   */
-  tryBeforeNotes: external_exports.boolean().default(true),
-  /**
    * How many days a session stays in the "your turn" inbox (Stories 11.1,
    * 12.2). One day by default: the inbox is for work that is still fresh, not
    * an archive. Raise it to keep rows longer. A config that holds an older value
@@ -21441,6 +22293,12 @@ var Config = external_exports.object({
    * deleted.
    */
   inboxMaxAgeDays: external_exports.int().min(1).max(3650).default(1),
+  /**
+   * Whether the "Your turn" inbox shows at all, on the start page and on every
+   * map. Off, no row is worked out and no transcript is read for it; the
+   * dismissals already made are kept.
+   */
+  inbox: external_exports.boolean().default(true),
   agents: external_exports.array(external_exports.string().min(1)).default(["claude-code"]),
   /** Project roots ("don't ask again" in this project) where the setup hint stays silent. */
   setupHintOff: external_exports.array(external_exports.string().min(1)).default([])
@@ -21666,13 +22524,6 @@ var HookState = external_exports.object({
    */
   agentWroteAt: IsoDate.nullable().default(null),
   /**
-   * Project-relative files the PreToolUse hook has already told this session
-   * about (Story 10.4): the "tried before" note is once per file per session,
-   * and a file with nothing to say is remembered too, so every edit does not
-   * walk the history again.
-   */
-  notedFiles: external_exports.array(external_exports.string().min(1).max(500)).default([]),
-  /**
    * Closing passes a later session started for this one because its own, at
    * the session end, never finished (machine shut down, run hung or failed).
    */
@@ -21708,8 +22559,8 @@ function parseVersioned(raw, schema, current, migrations = {}) {
 }
 
 // src/store/lock.ts
-import { mkdir as mkdir3, readFile as readFile5, rm as rm2, stat as stat7, writeFile as writeFile2 } from "fs/promises";
-import { dirname as dirname5, join as join9 } from "path";
+import { mkdir as mkdir4, readFile as readFile6, rm as rm3, stat as stat8, writeFile as writeFile3 } from "fs/promises";
+import { dirname as dirname5, join as join10 } from "path";
 import { setTimeout as sleep } from "timers/promises";
 var LockBusyError = class extends Error {
   constructor(lockPath) {
@@ -21728,27 +22579,27 @@ function alive(pid) {
 }
 async function isStale(lockPath, staleMs) {
   try {
-    const owner = Number.parseInt(await readFile5(join9(lockPath, "owner"), "utf8"), 10);
+    const owner = Number.parseInt(await readFile6(join10(lockPath, "owner"), "utf8"), 10);
     if (Number.isInteger(owner) && owner > 0 && !alive(owner)) return true;
   } catch {
   }
-  const info = await stat7(lockPath).catch(() => void 0);
+  const info = await stat8(lockPath).catch(() => void 0);
   return info !== void 0 && Date.now() - info.mtimeMs > staleMs;
 }
 async function acquire(lockPath, opts) {
   const { timeoutMs = 1e4, staleMs = 6e4 } = opts;
   const deadline = Date.now() + timeoutMs;
-  await mkdir3(dirname5(lockPath), { recursive: true });
+  await mkdir4(dirname5(lockPath), { recursive: true });
   for (let delay = 20; ; delay = Math.min(delay * 2, 250)) {
     try {
-      await mkdir3(lockPath);
-      await writeFile2(join9(lockPath, "owner"), String(process.pid));
+      await mkdir4(lockPath);
+      await writeFile3(join10(lockPath, "owner"), String(process.pid));
       return;
     } catch (err) {
       if (err.code !== "EEXIST") throw err;
     }
     if (await isStale(lockPath, staleMs)) {
-      await rm2(lockPath, { recursive: true, force: true });
+      await rm3(lockPath, { recursive: true, force: true });
       continue;
     }
     if (Date.now() >= deadline) throw new LockBusyError(lockPath);
@@ -21756,7 +22607,7 @@ async function acquire(lockPath, opts) {
   }
 }
 async function isLockHeld(lockPath, staleMs = 6e4) {
-  const info = await stat7(lockPath).catch(() => void 0);
+  const info = await stat8(lockPath).catch(() => void 0);
   if (info === void 0) return false;
   return !await isStale(lockPath, staleMs);
 }
@@ -21765,7 +22616,7 @@ async function withLock(lockPath, fn, opts = {}) {
   try {
     return await fn();
   } finally {
-    await rm2(lockPath, { recursive: true, force: true });
+    await rm3(lockPath, { recursive: true, force: true });
   }
 }
 
@@ -21864,13 +22715,5217 @@ var updateState = (root, id, fn, opts) => {
   return update(p.state(id), p.lock(`state-${id}`), HookState, STATE_SCHEMA, fn, opts, true);
 };
 
-// src/hooks/pretooluse.ts
-import { isAbsolute as isAbsolute5, relative as relative6, resolve as resolve6, sep as sep5 } from "path";
+// src/hooks/promptsubmit.ts
+async function onPromptSubmit(ctx) {
+  if (!ctx.initialized) return void 0;
+  await atomicWriteJson(projectPaths(ctx.root).head, {
+    sessionId: ctx.sessionId,
+    ...ctx.input.transcript_path === void 0 ? {} : { transcriptPath: ctx.input.transcript_path },
+    at: ctx.now
+  });
+  await updateState(
+    ctx.root,
+    ctx.sessionId,
+    (cur) => cur ?? HookState.parse({ schema: STATE_SCHEMA }),
+    {
+      timeoutMs: 1500
+    }
+  );
+  await refreshGitHooks(ctx.root).catch(() => void 0);
+  return void 0;
+}
 
-// src/commands/why.ts
-import { existsSync as existsSync3 } from "fs";
-import { stat as stat9 } from "fs/promises";
-import { dirname as dirname8, isAbsolute as isAbsolute4, join as join10, relative as relative5, resolve as resolve5, sep as sep4 } from "path";
+// src/messages.ts
+import { createHash as createHash2 } from "crypto";
+
+// src/store/conversations.ts
+import { appendFile, mkdir as mkdir5, readFile as readFile7 } from "fs/promises";
+import { dirname as dirname6 } from "path";
+import { constants as constants2, gunzipSync, gzipSync } from "zlib";
+
+// ../../node_modules/@secretlint/core/module/SecretLintSourceCodeImpl.js
+var import_structured_source = __toESM(require_structured_source(), 1);
+
+// ../../node_modules/@secretlint/core/module/helper/invariant.js
+function invariant(condition, message) {
+  if (!condition)
+    throw new Error(message);
+}
+
+// ../../node_modules/@secretlint/core/module/SecretLintSourceCodeImpl.js
+var SecretLintSourceCodeImpl = class {
+  hasBOM;
+  content;
+  filePath;
+  physicalFilePath;
+  contentType;
+  ext;
+  structuredSource;
+  constructor({ content = "", ext, filePath, physicalFilePath, contentType }) {
+    invariant(ext || filePath, "should be set either of fileExt or filePath.");
+    this.hasBOM = content.charCodeAt(0) === 65279;
+    this.content = this.hasBOM ? content.slice(1) : content;
+    this.structuredSource = new import_structured_source.StructuredSource(this.content);
+    this.filePath = filePath;
+    this.physicalFilePath = physicalFilePath;
+    this.contentType = contentType;
+    this.ext = ext;
+  }
+  /**
+   * get file path
+   * This return `undefined` if the source code is created without file path.
+   * For example, use core API to create a source code directly.
+   *
+   * You can use this path to detect file type.
+   * However, if you want to read the file content, use `getPhysicalFilePath` instead.
+   * @returns {string|undefined}
+   */
+  getFilePath() {
+    return this.filePath;
+  }
+  /**
+   * get physical file path
+   * This return `undefined` if the source code is not related to file.
+   * For example, the source code is given from the stdin.
+   *
+   * You can use this path to read the file content.
+   */
+  getPhysicalFilePath() {
+    return this.physicalFilePath;
+  }
+  /**
+   * @param {SecretLintSourceNodeLocation} loc - location indicator.
+   * @return {[ number, number ]} range.
+   */
+  locationToRange(loc) {
+    return this.structuredSource.locationToRange(loc);
+  }
+  /**
+   * @param {[ number, number ]} range - pair of indice.
+   * @return {SecretLintSourceNodeLocation} location.
+   */
+  rangeToLocation(range) {
+    const location = this.structuredSource.rangeToLocation(range);
+    return {
+      start: {
+        line: location.start.line,
+        column: location.start.column
+      },
+      end: {
+        line: location.end.line,
+        column: location.end.column
+      }
+    };
+  }
+  /**
+   * @param {Position} pos - position indicator.
+   * @return {number} index.
+   */
+  positionToIndex(pos) {
+    return this.structuredSource.positionToIndex(pos);
+  }
+  /**
+   * @param {number} index - index to the source code.
+   * @return {Position} position.
+   */
+  indexToPosition(index) {
+    const position = this.structuredSource.indexToPosition(index);
+    return {
+      line: position.line,
+      column: position.column
+    };
+  }
+};
+
+// ../../node_modules/@secretlint/core/module/helper/promise-event-emitter.js
+var EventEmitter = class {
+  #listeners = /* @__PURE__ */ new Map();
+  on(type, listener) {
+    const prevSet = this.#listeners.get(type);
+    const listenerSet = prevSet ?? /* @__PURE__ */ new Set();
+    listenerSet?.add(listener);
+    this.#listeners.set(type, listenerSet);
+  }
+  emit(type, ...args) {
+    const listenerSet = this.#listeners.get(type);
+    if (!listenerSet) {
+      return;
+    }
+    for (const listenerSetElement of listenerSet) {
+      listenerSetElement(...args);
+    }
+  }
+  off(type, listener) {
+    const listenerSet = this.#listeners.get(type);
+    if (!listenerSet) {
+      return;
+    }
+    for (const listenerSetElement of listenerSet) {
+      if (listenerSetElement === listener) {
+        listenerSet.delete(listener);
+      }
+    }
+  }
+  removeAllListeners() {
+    this.#listeners.clear();
+  }
+  listenerCount(type) {
+    return this.#listeners.get(type)?.size ?? 0;
+  }
+  listeners(type) {
+    return Array.from(this.#listeners.get(type) ?? []);
+  }
+};
+var PromiseEventEmitter = class {
+  events;
+  constructor() {
+    this.events = new EventEmitter();
+  }
+  listenerCount(type) {
+    return this.events.listenerCount(type);
+  }
+  on(event, listener) {
+    return this.events.on(event, listener);
+  }
+  emit(event, ...args) {
+    const promises = [];
+    this.events.listeners(event).forEach((listener) => {
+      promises.push(listener(...args));
+    });
+    return Promise.all(promises);
+  }
+};
+
+// ../../node_modules/@secretlint/core/module/helper/SecretLintRuleMessageTranslator.js
+var DEFAULT_LOCAL = "en";
+var formatMessage = (messageHandler, props) => {
+  if (typeof props !== "object" || props === null) {
+    return messageHandler();
+  }
+  return messageHandler(props);
+};
+var getMatchedLocaleMessage = (locale, locales) => {
+  const localKeys = Object.keys(locales);
+  const matchLocale = localKeys.find((key) => {
+    return key === locale;
+  });
+  if (matchLocale) {
+    return matchLocale;
+  }
+  const [lang] = locale.split("-");
+  if (!lang) {
+    return DEFAULT_LOCAL;
+  }
+  const fallbackMatchLocal = localKeys.find((key) => {
+    return key === lang;
+  });
+  if (fallbackMatchLocal) {
+    return fallbackMatchLocal;
+  }
+  return DEFAULT_LOCAL;
+};
+var createTranslator = (messages2, options) => {
+  return (messageId, props) => {
+    const messageHandler = messages2[messageId];
+    if (!messageHandler) {
+      throw new Error(`messages:${String(messageId)} is missing in messages.`);
+    }
+    if (typeof messageHandler === "function") {
+      if (typeof messageId !== "string") {
+        throw new Error(`message's key:${String(messageId)} should be string`);
+      }
+      return {
+        message: formatMessage(messageHandler, props),
+        messageId,
+        data: props
+      };
+    }
+    const defaultLocal = options && options.defaultLocale ? options.defaultLocale : DEFAULT_LOCAL;
+    const locale = getMatchedLocaleMessage(defaultLocal, messageHandler);
+    const localizedMessage = messageHandler[locale];
+    if (!localizedMessage) {
+      if (messageHandler[DEFAULT_LOCAL]) {
+        throw new Error(`messages${String(messageId)}.${locale} is missing in messages.`);
+      }
+      throw new Error(`message's key:${String(messageId)}.${DEFAULT_LOCAL} should be defined in messages.`);
+    }
+    if (typeof messageId !== "string") {
+      throw new Error(`message's key:${String(messageId)}.${DEFAULT_LOCAL} should be string`);
+    }
+    return {
+      message: formatMessage(localizedMessage, props),
+      messageId,
+      data: props
+    };
+  };
+};
+
+// ../../node_modules/@secretlint/core/module/RuleContext.js
+var createContextEvents = () => {
+  const contextEvents = new EventEmitter();
+  const REPORT_SYMBOL = /* @__PURE__ */ Symbol("report");
+  const IGNORE_SYMBOL = /* @__PURE__ */ Symbol("ignore");
+  return {
+    report(descriptor) {
+      contextEvents.emit(REPORT_SYMBOL, descriptor);
+    },
+    onReport(handler) {
+      const listener = (descriptor) => {
+        handler(descriptor);
+      };
+      contextEvents.on(REPORT_SYMBOL, listener);
+      return () => {
+        contextEvents.off(REPORT_SYMBOL, listener);
+      };
+    },
+    ignore(descriptor) {
+      contextEvents.emit(IGNORE_SYMBOL, descriptor);
+    },
+    onIgnore(handler) {
+      const listener = (descriptor) => {
+        handler(descriptor);
+      };
+      contextEvents.on(IGNORE_SYMBOL, listener);
+      return () => {
+        contextEvents.off(IGNORE_SYMBOL, listener);
+      };
+    }
+  };
+};
+var createRuleContext = ({ ruleId, ruleParentId, meta: meta3, severity, sourceCode, contextEvents, sharedOptions, locale }) => {
+  return {
+    sharedOptions,
+    createTranslator: (messages2) => {
+      return createTranslator(messages2, {
+        defaultLocale: locale
+      });
+    },
+    ignore(descriptor) {
+      const { message } = descriptor.message;
+      contextEvents.ignore({
+        type: "ignore",
+        ruleId,
+        ruleParentId,
+        range: descriptor.range,
+        targetRuleId: descriptor.targetRuleId,
+        loc: sourceCode.rangeToLocation(descriptor.range),
+        message
+      });
+    },
+    report(descriptor) {
+      const { message, messageId, data } = descriptor.message;
+      const severityLevel = severity ?? "error";
+      if (ruleParentId) {
+        contextEvents.report({
+          ...descriptor,
+          type: "message",
+          ruleId,
+          ruleParentId,
+          loc: sourceCode.rangeToLocation(descriptor.range),
+          severity: severityLevel,
+          message,
+          messageId,
+          docsUrl: meta3.docs?.url ? `${meta3.docs.url}#${messageId}` : void 0,
+          data
+        });
+      } else {
+        contextEvents.report({
+          ...descriptor,
+          type: "message",
+          ruleId,
+          loc: sourceCode.rangeToLocation(descriptor.range),
+          severity: severityLevel,
+          message,
+          messageId,
+          docsUrl: meta3.docs?.url ? `${meta3.docs.url}#${messageId}` : void 0,
+          data
+        });
+      }
+    }
+  };
+};
+
+// ../../node_modules/@secretlint/core/module/SecretLintRuleImpl.js
+var SecretLintRule = class {
+  ruleReportHandle;
+  ruleCreator;
+  descriptorRule;
+  constructor({ descriptorRule, context }) {
+    this.descriptorRule = descriptorRule;
+    this.ruleCreator = descriptorRule.rule;
+    const ruleCreatorOptions = descriptorRule.options || {};
+    this.ruleReportHandle = this.ruleCreator.create(context, ruleCreatorOptions);
+  }
+  allowMessageIds() {
+    if (!this.descriptorRule.allowMessageIds) {
+      return [];
+    }
+    const ruleId = this.ruleCreator.meta.id;
+    return this.descriptorRule.allowMessageIds.map((allowMessageId) => {
+      return {
+        messageId: allowMessageId,
+        ruleId
+      };
+    });
+  }
+  supportSourceCode(sourceCode) {
+    const contentType = sourceCode.contentType;
+    if (contentType === "unknown") {
+      return true;
+    }
+    if (this.ruleCreator.meta.supportedContentTypes.includes("all")) {
+      return true;
+    }
+    return this.ruleCreator.meta.supportedContentTypes.includes(contentType);
+  }
+  async file(source) {
+    const file2 = this.ruleReportHandle.file;
+    if (!file2) {
+      return;
+    }
+    return file2(source);
+  }
+};
+
+// ../../node_modules/@secretlint/profiler/module/index.js
+var SecretLintProfiler = class {
+  perf;
+  PerformanceObserver;
+  observer;
+  /**
+   * Profiling costs performance.
+   * `performance.mark()` and `PerformanceObserver` callback are called for each rule and each file.
+   * So, the profiler should be disabled if the user does not need the profiling result.
+   * https://github.com/secretlint/secretlint/issues/1633
+   */
+  enabled;
+  entries = [];
+  measures = [];
+  /**
+   * Set of mark names that have already been marked as `{mark}::start`
+   */
+  startMarkNames = /* @__PURE__ */ new Set();
+  executionPromises = [];
+  constructor(options) {
+    this.perf = options.perf;
+    this.PerformanceObserver = options.PerformanceObserver;
+    this.enabled = options.enabled ?? true;
+  }
+  get isEnabled() {
+    return this.enabled;
+  }
+  /**
+   * Enable or Disable the profiler.
+   * If the profiler is disabled, `mark()` does nothing and collected entries are cleared.
+   * @param enabled
+   */
+  setEnabled(enabled) {
+    if (this.enabled === enabled) {
+      return;
+    }
+    this.enabled = enabled;
+    if (!enabled) {
+      this.stopObserving();
+    }
+  }
+  startObserving() {
+    const pattern = /(.*?)::end(\|\|.*)?/;
+    const observer = new this.PerformanceObserver((items) => {
+      if (!this.enabled) {
+        return;
+      }
+      const entries = items.getEntries();
+      entries.forEach((entry) => {
+        if (entry.entryType === "mark") {
+          const match = entry.name.match(pattern);
+          const endIdentifier = match ? match[1] : void 0;
+          const suffix = match && match[2] ? match[2] : "";
+          if (endIdentifier) {
+            const startMarkName = `${endIdentifier}::start${suffix}`;
+            if (this.startMarkNames.has(startMarkName)) {
+              this.executionPromises.push(Promise.resolve().then(() => {
+                this.perf.measure(endIdentifier + suffix, startMarkName, entry.name);
+              }));
+            }
+          } else {
+            this.startMarkNames.add(entry.name);
+          }
+          this.entries.push(entry);
+        } else if (entry.entryType === "measure") {
+          this.measures.push(entry);
+        }
+      });
+    });
+    observer.observe({ entryTypes: ["mark", "measure"] });
+    this.observer = observer;
+  }
+  stopObserving() {
+    this.observer?.disconnect();
+    this.observer = void 0;
+    this.entries.length = 0;
+    this.measures.length = 0;
+    this.executionPromises.length = 0;
+    this.startMarkNames.clear();
+  }
+  mark(marker) {
+    if (!this.enabled) {
+      return;
+    }
+    if (!this.observer) {
+      this.startObserving();
+    }
+    if ("id" in marker) {
+      this.perf.mark(`${marker.type}||${marker.id}`);
+    } else {
+      this.perf.mark(marker.type);
+    }
+  }
+  waifForExecutionPromises = () => {
+    return Promise.all(this.executionPromises).finally(() => {
+      this.executionPromises.length = 0;
+    });
+  };
+  async getEntries() {
+    await this.waifForExecutionPromises();
+    return this.entries;
+  }
+  async getMeasures() {
+    await this.waifForExecutionPromises();
+    return this.measures;
+  }
+};
+
+// ../../node_modules/@secretlint/profiler/module/node.js
+import perf_hooks from "perf_hooks";
+var NullPerformanceObserver = class {
+  disconnect() {
+  }
+  observe(_options) {
+  }
+};
+var secretLintProfiler = new SecretLintProfiler({
+  perf: perf_hooks.performance,
+  PerformanceObserver: perf_hooks.PerformanceObserver ? perf_hooks.PerformanceObserver : NullPerformanceObserver
+});
+
+// ../../node_modules/@secretlint/core/module/RunningEvents.js
+var createRunningEvents = () => {
+  const contextEvents = new PromiseEventEmitter();
+  const registerSet = /* @__PURE__ */ new Set();
+  const LINT_HANDLE = /* @__PURE__ */ Symbol("lint:start");
+  const rules2 = [];
+  return {
+    collectAllowMessageIds() {
+      const allowMessageIds = [];
+      rules2.forEach((rule) => {
+        allowMessageIds.push(...rule.allowMessageIds());
+      });
+      return allowMessageIds;
+    },
+    /**
+     * Start to run linting
+     * @param options
+     */
+    runLint(options) {
+      return contextEvents.emit(LINT_HANDLE, options);
+    },
+    registerRule({ descriptorRule, context }) {
+      if (registerSet.has(descriptorRule.id)) {
+        throw new Error(`rule.id:${descriptorRule.id} is already registered.
+                
+Duplicated rule.id is something wrong in .secretlintrc.                
+`);
+      }
+      registerSet.add(descriptorRule.id);
+      const rule = new SecretLintRule({
+        descriptorRule,
+        context
+      });
+      rules2.push(rule);
+      contextEvents.on(LINT_HANDLE, async ({ sourceCode }) => {
+        secretLintProfiler.mark({
+          type: "@core>rule-handler::start",
+          id: descriptorRule.rule.meta.id
+        });
+        if (rule.supportSourceCode(sourceCode)) {
+          await rule.file(sourceCode);
+        }
+        secretLintProfiler.mark({
+          type: "@core>rule-handler::end",
+          id: descriptorRule.rule.meta.id
+        });
+      });
+    },
+    registerRulePreset({ descriptorRulePreset, context }) {
+      const rulePresetCreatorOptions = descriptorRulePreset.options || [];
+      descriptorRulePreset.rule.create(context, rulePresetCreatorOptions);
+    },
+    isRegistered(ruleId) {
+      return registerSet.has(ruleId);
+    }
+  };
+};
+
+// ../../node_modules/@secretlint/core/module/RulePresetContext.js
+var createRulePresetContext = ({ configRulePreset, sourceCode, runningEvents, contextEvents, sharedOptions, locale }) => {
+  const presetRules = configRulePreset.rules || [];
+  if (!Array.isArray(presetRules)) {
+    console.error(`${configRulePreset.id}:PresetRules is invalid format`, presetRules);
+    throw new Error("preset's rules should be an array of rule definitions");
+  }
+  return {
+    sharedOptions,
+    registerRule(rule, defaultValue) {
+      const descriptorRule = presetRules.find((descriptorRule2) => {
+        return descriptorRule2.id === rule.meta.id;
+      });
+      const descriptorRuleOptions = descriptorRule ? descriptorRule.options : void 0;
+      const descriptorRuleDisabled = descriptorRule ? descriptorRule.disabled : void 0;
+      const descriptorRuleSeverity = descriptorRule ? descriptorRule.severity : void 0;
+      const descriptorAllowMessageIds = descriptorRule ? descriptorRule.allowMessageIds : void 0;
+      const context = createRuleContext({
+        // rule id is a single rule in a preset
+        ruleId: rule.meta.id,
+        // parent rule id is rule preset id
+        ruleParentId: configRulePreset.id,
+        meta: rule.meta,
+        severity: descriptorRuleSeverity,
+        sourceCode,
+        contextEvents,
+        sharedOptions,
+        locale
+      });
+      const defaultValueOfPreset = defaultValue ? defaultValue : {};
+      runningEvents.registerRule({
+        descriptorRule: {
+          // options and disabled ...
+          ...defaultValueOfPreset,
+          // Prefer to use user setting
+          // User can override preset setting
+          ...descriptorRule,
+          id: rule.meta.id,
+          options: descriptorRuleOptions,
+          rule,
+          disabled: descriptorRuleDisabled,
+          allowMessageIds: descriptorAllowMessageIds,
+          severity: descriptorRuleSeverity
+        },
+        context
+      });
+    }
+  };
+};
+
+// ../../node_modules/@secretlint/core/module/messages/filter-ignored-process.js
+var isContainedRange = (index, range) => {
+  const [start, end] = range;
+  return start <= index && index <= end;
+};
+function filterIgnoredMessages(options) {
+  const reportedMessages = options.reportedMessages;
+  const ignoreMessages = options.ignoredMessages;
+  return reportedMessages.filter((message) => {
+    return !ignoreMessages.some((ignoreMessage) => {
+      const isInIgnoringRange = isContainedRange(message.range[0], ignoreMessage.range) && isContainedRange(message.range[1], ignoreMessage.range);
+      if (isInIgnoringRange && ignoreMessage.targetRuleId) {
+        if (ignoreMessage.targetRuleId === "*") {
+          return true;
+        }
+        return message.ruleId === ignoreMessage.targetRuleId;
+      }
+      return isInIgnoringRange;
+    });
+  });
+}
+
+// ../../node_modules/@secretlint/core/module/messages/MessageProcessManager.js
+var createMessageProcessor = (processors) => {
+  return {
+    /**
+     * process `messages` with registered processes
+     */
+    process(messages2) {
+      const originalMessages = messages2;
+      if (processors.length === 0) {
+        throw new Error("processors should be > 0");
+      }
+      return processors.reduce((messages3, filter) => {
+        return filter(messages3);
+      }, originalMessages);
+    }
+  };
+};
+
+// ../../node_modules/@secretlint/core/module/messages/filter-duplicated-process.js
+var isEqualMessage = (aMessage, bMessage) => {
+  return aMessage.range[0] === bMessage.range[0] && aMessage.range[1] === bMessage.range[1] && "severity" in aMessage && "severity" in bMessage && aMessage.severity === bMessage.severity && aMessage.message === bMessage.message;
+};
+function filterDuplicatedMessages(messages2 = []) {
+  return messages2.filter((message, index) => {
+    const restMessages = messages2.slice(index + 1);
+    return !restMessages.some((restMessage) => {
+      return isEqualMessage(message, restMessage);
+    });
+  });
+}
+
+// ../../node_modules/@secretlint/core/module/messages/sort-messages-process.js
+function sortMessagesByLocation(messages2) {
+  return messages2.sort(function(a, b) {
+    const startIndexDiff = a.range[0] - b.range[0];
+    if (startIndexDiff === 0) {
+      return a.range[1] - b.range[1];
+    } else {
+      return startIndexDiff;
+    }
+  });
+}
+
+// ../../node_modules/@secretlint/core/module/messages/filter-message-id.js
+var filterByAllowMessageIds = (messages2, allowMessageIds) => {
+  const disabledSet = new Set(allowMessageIds.map((allowMessage) => {
+    return `${allowMessage.ruleId}--${allowMessage.messageId}`;
+  }));
+  return messages2.filter((message) => {
+    return !disabledSet.has(`${message.ruleId}--${message.messageId}`);
+  });
+};
+
+// ../../node_modules/@secretlint/core/module/messages/filter-mask-secrets.js
+var deepMask = (object2, handler) => {
+  for (const key of Object.keys(object2)) {
+    if (typeof object2[key] === "object" && object2[key] !== null) {
+      object2[key] = deepMask(object2[key], handler);
+    } else if (typeof object2[key] === "string") {
+      object2[key] = handler(object2[key]);
+    }
+  }
+  return object2;
+};
+var createMaskValue = (value) => {
+  return "*".repeat(value.length);
+};
+var maskWithValues = (str, maskedValues) => {
+  let result = str;
+  for (const maskValue of maskedValues) {
+    result = result.replaceAll(maskValue, "*".repeat(maskValue.length));
+  }
+  return result;
+};
+var filterMaskSecretsData = (messages2 = []) => {
+  return messages2.map((message) => {
+    if (message.type !== "message") {
+      return message;
+    }
+    const maskedValues = [];
+    const maskedData = message.data ? deepMask(message.data, (value) => {
+      maskedValues.push(value);
+      return createMaskValue(value);
+    }) : void 0;
+    if (!maskedData) {
+      return message;
+    }
+    const maskedMessage = maskWithValues(message.message, maskedValues);
+    return {
+      ...message,
+      message: maskedMessage,
+      data: maskedData
+    };
+  });
+};
+
+// ../../node_modules/@secretlint/core/module/messages/index.js
+var cleanupMessages = (options) => {
+  const reportedMessages = filterIgnoredMessages(options);
+  const reportedMessagesWithoutAllowMessageIds = filterByAllowMessageIds(reportedMessages, options.allowMessageIds);
+  const filters = options.maskSecrets ? [filterDuplicatedMessages, filterMaskSecretsData] : [filterDuplicatedMessages];
+  const filterProcess = createMessageProcessor(filters);
+  return sortMessagesByLocation(filterProcess.process(reportedMessagesWithoutAllowMessageIds));
+};
+
+// ../../node_modules/@secretlint/core/module/index.js
+var import_debug = __toESM(require_src(), 1);
+var debug = (0, import_debug.default)("@secretlint/core");
+var lintSource = ({ source, options }) => {
+  secretLintProfiler.mark({
+    type: "@core>lint::start",
+    id: source.filePath
+  });
+  debug(`source filePath: %O`, source.filePath);
+  debug(`options: %O`, options);
+  const rules2 = options.config.rules;
+  const locale = options.locale ?? "en";
+  const maskSecrets = options.maskSecrets ?? false;
+  const contextEvents = createContextEvents();
+  const runningEvents = createRunningEvents();
+  const reportedMessages = [];
+  const ignoredMessages = [];
+  contextEvents.onReport((message) => {
+    reportedMessages.push(message);
+  });
+  contextEvents.onIgnore((message) => {
+    ignoredMessages.push(message);
+  });
+  const sourceCode = new SecretLintSourceCodeImpl({
+    content: source.content,
+    filePath: source.filePath,
+    physicalFilePath: options.noPhysicFilePath ? void 0 : source.filePath,
+    ext: source.ext || "",
+    contentType: source.contentType
+  });
+  secretLintProfiler.mark({
+    type: "@core>setup-rules::start"
+  });
+  rules2.forEach((rule) => {
+    secretLintProfiler.mark({
+      type: "@core>setup-rule::start",
+      id: rule.rule.meta.id
+    });
+    registerRule({
+      sourceCode,
+      config: options.config,
+      descriptorRule: rule,
+      contextEvents,
+      runningEvents,
+      locale
+    });
+    secretLintProfiler.mark({
+      type: "@core>setup-rule::end",
+      id: rule.rule.meta.id
+    });
+  });
+  secretLintProfiler.mark({
+    type: "@core>setup-rules::end"
+  });
+  return runningEvents.runLint({
+    sourceCode
+  }).then(() => {
+    return {
+      filePath: source.filePath,
+      // binary content should be skipped
+      sourceContent: source.contentType === "text" ? source.content : void 0,
+      sourceContentType: source.contentType,
+      messages: cleanupMessages({
+        reportedMessages,
+        ignoredMessages,
+        allowMessageIds: runningEvents.collectAllowMessageIds(),
+        maskSecrets
+      })
+    };
+  }).finally(() => {
+    secretLintProfiler.mark({
+      type: "@core>lint::end",
+      id: source.filePath
+    });
+  });
+};
+var isRulePreset = (ruleDescriptor) => {
+  return ruleDescriptor.rule.meta.type === "preset";
+};
+var isRule = (ruleDescriptor) => {
+  return ruleDescriptor.rule.meta.type === "scanner";
+};
+var registerRule = ({ sourceCode, config: config2, descriptorRule, contextEvents, runningEvents, locale }) => {
+  const ruleId = descriptorRule.id;
+  if (descriptorRule.disabled) {
+    debug("Skip registerRule %s, because it is disabled", ruleId);
+    return;
+  }
+  debug("registerRule %s", ruleId);
+  const sharedOptionsWithDefault = config2.sharedOptions ?? {};
+  if (isRulePreset(descriptorRule)) {
+    const context = createRulePresetContext({
+      configRulePreset: descriptorRule,
+      sourceCode,
+      contextEvents,
+      runningEvents,
+      sharedOptions: sharedOptionsWithDefault,
+      locale
+    });
+    runningEvents.registerRulePreset({
+      descriptorRulePreset: descriptorRule,
+      context
+    });
+    return;
+  } else if (isRule(descriptorRule)) {
+    const context = createRuleContext({
+      ruleId,
+      severity: descriptorRule.severity,
+      meta: descriptorRule.rule.meta,
+      sourceCode,
+      contextEvents,
+      sharedOptions: sharedOptionsWithDefault,
+      locale
+    });
+    runningEvents.registerRule({
+      descriptorRule,
+      context
+    });
+    return;
+  }
+  throw new Error(`Unknown descriptor type: ${descriptorRule}`);
+};
+
+// ../../node_modules/@secretlint/secretlint-rule-preset-recommend/module/index.js
+import path from "path";
+var commonjsGlobal = typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : {};
+var regexpStringMatcher = {};
+var lodash_uniq;
+var hasRequiredLodash_uniq;
+function requireLodash_uniq() {
+  if (hasRequiredLodash_uniq) return lodash_uniq;
+  hasRequiredLodash_uniq = 1;
+  var LARGE_ARRAY_SIZE = 200;
+  var HASH_UNDEFINED = "__lodash_hash_undefined__";
+  var INFINITY = 1 / 0;
+  var funcTag = "[object Function]", genTag = "[object GeneratorFunction]";
+  var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
+  var reIsHostCtor = /^\[object .+?Constructor\]$/;
+  var freeGlobal = typeof commonjsGlobal == "object" && commonjsGlobal && commonjsGlobal.Object === Object && commonjsGlobal;
+  var freeSelf = typeof self == "object" && self && self.Object === Object && self;
+  var root = freeGlobal || freeSelf || Function("return this")();
+  function arrayIncludes(array2, value) {
+    var length = array2 ? array2.length : 0;
+    return !!length && baseIndexOf(array2, value, 0) > -1;
+  }
+  function baseFindIndex(array2, predicate, fromIndex, fromRight) {
+    var length = array2.length, index = fromIndex + -1;
+    while (++index < length) {
+      if (predicate(array2[index], index, array2)) {
+        return index;
+      }
+    }
+    return -1;
+  }
+  function baseIndexOf(array2, value, fromIndex) {
+    if (value !== value) {
+      return baseFindIndex(array2, baseIsNaN, fromIndex);
+    }
+    var index = fromIndex - 1, length = array2.length;
+    while (++index < length) {
+      if (array2[index] === value) {
+        return index;
+      }
+    }
+    return -1;
+  }
+  function baseIsNaN(value) {
+    return value !== value;
+  }
+  function cacheHas(cache, key) {
+    return cache.has(key);
+  }
+  function getValue(object2, key) {
+    return object2 == null ? void 0 : object2[key];
+  }
+  function isHostObject(value) {
+    var result = false;
+    if (value != null && typeof value.toString != "function") {
+      try {
+        result = !!(value + "");
+      } catch (e) {
+      }
+    }
+    return result;
+  }
+  function setToArray(set2) {
+    var index = -1, result = Array(set2.size);
+    set2.forEach(function(value) {
+      result[++index] = value;
+    });
+    return result;
+  }
+  var arrayProto = Array.prototype, funcProto = Function.prototype, objectProto = Object.prototype;
+  var coreJsData = root["__core-js_shared__"];
+  var maskSrcKey = (function() {
+    var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || "");
+    return uid ? "Symbol(src)_1." + uid : "";
+  })();
+  var funcToString = funcProto.toString;
+  var hasOwnProperty = objectProto.hasOwnProperty;
+  var objectToString = objectProto.toString;
+  var reIsNative = RegExp(
+    "^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
+  );
+  var splice = arrayProto.splice;
+  var Map2 = getNative(root, "Map"), Set2 = getNative(root, "Set"), nativeCreate = getNative(Object, "create");
+  function Hash(entries) {
+    var index = -1, length = entries ? entries.length : 0;
+    this.clear();
+    while (++index < length) {
+      var entry = entries[index];
+      this.set(entry[0], entry[1]);
+    }
+  }
+  function hashClear() {
+    this.__data__ = nativeCreate ? nativeCreate(null) : {};
+  }
+  function hashDelete(key) {
+    return this.has(key) && delete this.__data__[key];
+  }
+  function hashGet(key) {
+    var data = this.__data__;
+    if (nativeCreate) {
+      var result = data[key];
+      return result === HASH_UNDEFINED ? void 0 : result;
+    }
+    return hasOwnProperty.call(data, key) ? data[key] : void 0;
+  }
+  function hashHas(key) {
+    var data = this.__data__;
+    return nativeCreate ? data[key] !== void 0 : hasOwnProperty.call(data, key);
+  }
+  function hashSet(key, value) {
+    var data = this.__data__;
+    data[key] = nativeCreate && value === void 0 ? HASH_UNDEFINED : value;
+    return this;
+  }
+  Hash.prototype.clear = hashClear;
+  Hash.prototype["delete"] = hashDelete;
+  Hash.prototype.get = hashGet;
+  Hash.prototype.has = hashHas;
+  Hash.prototype.set = hashSet;
+  function ListCache(entries) {
+    var index = -1, length = entries ? entries.length : 0;
+    this.clear();
+    while (++index < length) {
+      var entry = entries[index];
+      this.set(entry[0], entry[1]);
+    }
+  }
+  function listCacheClear() {
+    this.__data__ = [];
+  }
+  function listCacheDelete(key) {
+    var data = this.__data__, index = assocIndexOf(data, key);
+    if (index < 0) {
+      return false;
+    }
+    var lastIndex = data.length - 1;
+    if (index == lastIndex) {
+      data.pop();
+    } else {
+      splice.call(data, index, 1);
+    }
+    return true;
+  }
+  function listCacheGet(key) {
+    var data = this.__data__, index = assocIndexOf(data, key);
+    return index < 0 ? void 0 : data[index][1];
+  }
+  function listCacheHas(key) {
+    return assocIndexOf(this.__data__, key) > -1;
+  }
+  function listCacheSet(key, value) {
+    var data = this.__data__, index = assocIndexOf(data, key);
+    if (index < 0) {
+      data.push([key, value]);
+    } else {
+      data[index][1] = value;
+    }
+    return this;
+  }
+  ListCache.prototype.clear = listCacheClear;
+  ListCache.prototype["delete"] = listCacheDelete;
+  ListCache.prototype.get = listCacheGet;
+  ListCache.prototype.has = listCacheHas;
+  ListCache.prototype.set = listCacheSet;
+  function MapCache(entries) {
+    var index = -1, length = entries ? entries.length : 0;
+    this.clear();
+    while (++index < length) {
+      var entry = entries[index];
+      this.set(entry[0], entry[1]);
+    }
+  }
+  function mapCacheClear() {
+    this.__data__ = {
+      "hash": new Hash(),
+      "map": new (Map2 || ListCache)(),
+      "string": new Hash()
+    };
+  }
+  function mapCacheDelete(key) {
+    return getMapData(this, key)["delete"](key);
+  }
+  function mapCacheGet(key) {
+    return getMapData(this, key).get(key);
+  }
+  function mapCacheHas(key) {
+    return getMapData(this, key).has(key);
+  }
+  function mapCacheSet(key, value) {
+    getMapData(this, key).set(key, value);
+    return this;
+  }
+  MapCache.prototype.clear = mapCacheClear;
+  MapCache.prototype["delete"] = mapCacheDelete;
+  MapCache.prototype.get = mapCacheGet;
+  MapCache.prototype.has = mapCacheHas;
+  MapCache.prototype.set = mapCacheSet;
+  function SetCache(values) {
+    var index = -1, length = values ? values.length : 0;
+    this.__data__ = new MapCache();
+    while (++index < length) {
+      this.add(values[index]);
+    }
+  }
+  function setCacheAdd(value) {
+    this.__data__.set(value, HASH_UNDEFINED);
+    return this;
+  }
+  function setCacheHas(value) {
+    return this.__data__.has(value);
+  }
+  SetCache.prototype.add = SetCache.prototype.push = setCacheAdd;
+  SetCache.prototype.has = setCacheHas;
+  function assocIndexOf(array2, key) {
+    var length = array2.length;
+    while (length--) {
+      if (eq(array2[length][0], key)) {
+        return length;
+      }
+    }
+    return -1;
+  }
+  function baseIsNative(value) {
+    if (!isObject3(value) || isMasked(value)) {
+      return false;
+    }
+    var pattern = isFunction(value) || isHostObject(value) ? reIsNative : reIsHostCtor;
+    return pattern.test(toSource(value));
+  }
+  function baseUniq(array2, iteratee, comparator) {
+    var index = -1, includes = arrayIncludes, length = array2.length, isCommon = true, result = [], seen = result;
+    if (length >= LARGE_ARRAY_SIZE) {
+      var set2 = createSet(array2);
+      if (set2) {
+        return setToArray(set2);
+      }
+      isCommon = false;
+      includes = cacheHas;
+      seen = new SetCache();
+    } else {
+      seen = result;
+    }
+    outer:
+      while (++index < length) {
+        var value = array2[index], computed = value;
+        value = value !== 0 ? value : 0;
+        if (isCommon && computed === computed) {
+          var seenIndex = seen.length;
+          while (seenIndex--) {
+            if (seen[seenIndex] === computed) {
+              continue outer;
+            }
+          }
+          result.push(value);
+        } else if (!includes(seen, computed, comparator)) {
+          if (seen !== result) {
+            seen.push(computed);
+          }
+          result.push(value);
+        }
+      }
+    return result;
+  }
+  var createSet = !(Set2 && 1 / setToArray(new Set2([, -0]))[1] == INFINITY) ? noop : function(values) {
+    return new Set2(values);
+  };
+  function getMapData(map2, key) {
+    var data = map2.__data__;
+    return isKeyable(key) ? data[typeof key == "string" ? "string" : "hash"] : data.map;
+  }
+  function getNative(object2, key) {
+    var value = getValue(object2, key);
+    return baseIsNative(value) ? value : void 0;
+  }
+  function isKeyable(value) {
+    var type = typeof value;
+    return type == "string" || type == "number" || type == "symbol" || type == "boolean" ? value !== "__proto__" : value === null;
+  }
+  function isMasked(func) {
+    return !!maskSrcKey && maskSrcKey in func;
+  }
+  function toSource(func) {
+    if (func != null) {
+      try {
+        return funcToString.call(func);
+      } catch (e) {
+      }
+      try {
+        return func + "";
+      } catch (e) {
+      }
+    }
+    return "";
+  }
+  function uniq(array2) {
+    return array2 && array2.length ? baseUniq(array2) : [];
+  }
+  function eq(value, other) {
+    return value === other || value !== value && other !== other;
+  }
+  function isFunction(value) {
+    var tag = isObject3(value) ? objectToString.call(value) : "";
+    return tag == funcTag || tag == genTag;
+  }
+  function isObject3(value) {
+    var type = typeof value;
+    return !!value && (type == "object" || type == "function");
+  }
+  function noop() {
+  }
+  lodash_uniq = uniq;
+  return lodash_uniq;
+}
+var lodash_uniqwith;
+var hasRequiredLodash_uniqwith;
+function requireLodash_uniqwith() {
+  if (hasRequiredLodash_uniqwith) return lodash_uniqwith;
+  hasRequiredLodash_uniqwith = 1;
+  var LARGE_ARRAY_SIZE = 200;
+  var HASH_UNDEFINED = "__lodash_hash_undefined__";
+  var INFINITY = 1 / 0;
+  var funcTag = "[object Function]", genTag = "[object GeneratorFunction]";
+  var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
+  var reIsHostCtor = /^\[object .+?Constructor\]$/;
+  var freeGlobal = typeof commonjsGlobal == "object" && commonjsGlobal && commonjsGlobal.Object === Object && commonjsGlobal;
+  var freeSelf = typeof self == "object" && self && self.Object === Object && self;
+  var root = freeGlobal || freeSelf || Function("return this")();
+  function arrayIncludes(array2, value) {
+    var length = array2 ? array2.length : 0;
+    return !!length && baseIndexOf(array2, value, 0) > -1;
+  }
+  function arrayIncludesWith(array2, value, comparator) {
+    var index = -1, length = array2 ? array2.length : 0;
+    while (++index < length) {
+      if (comparator(value, array2[index])) {
+        return true;
+      }
+    }
+    return false;
+  }
+  function baseFindIndex(array2, predicate, fromIndex, fromRight) {
+    var length = array2.length, index = fromIndex + -1;
+    while (++index < length) {
+      if (predicate(array2[index], index, array2)) {
+        return index;
+      }
+    }
+    return -1;
+  }
+  function baseIndexOf(array2, value, fromIndex) {
+    if (value !== value) {
+      return baseFindIndex(array2, baseIsNaN, fromIndex);
+    }
+    var index = fromIndex - 1, length = array2.length;
+    while (++index < length) {
+      if (array2[index] === value) {
+        return index;
+      }
+    }
+    return -1;
+  }
+  function baseIsNaN(value) {
+    return value !== value;
+  }
+  function cacheHas(cache, key) {
+    return cache.has(key);
+  }
+  function getValue(object2, key) {
+    return object2 == null ? void 0 : object2[key];
+  }
+  function isHostObject(value) {
+    var result = false;
+    if (value != null && typeof value.toString != "function") {
+      try {
+        result = !!(value + "");
+      } catch (e) {
+      }
+    }
+    return result;
+  }
+  function setToArray(set2) {
+    var index = -1, result = Array(set2.size);
+    set2.forEach(function(value) {
+      result[++index] = value;
+    });
+    return result;
+  }
+  var arrayProto = Array.prototype, funcProto = Function.prototype, objectProto = Object.prototype;
+  var coreJsData = root["__core-js_shared__"];
+  var maskSrcKey = (function() {
+    var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || "");
+    return uid ? "Symbol(src)_1." + uid : "";
+  })();
+  var funcToString = funcProto.toString;
+  var hasOwnProperty = objectProto.hasOwnProperty;
+  var objectToString = objectProto.toString;
+  var reIsNative = RegExp(
+    "^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
+  );
+  var splice = arrayProto.splice;
+  var Map2 = getNative(root, "Map"), Set2 = getNative(root, "Set"), nativeCreate = getNative(Object, "create");
+  function Hash(entries) {
+    var index = -1, length = entries ? entries.length : 0;
+    this.clear();
+    while (++index < length) {
+      var entry = entries[index];
+      this.set(entry[0], entry[1]);
+    }
+  }
+  function hashClear() {
+    this.__data__ = nativeCreate ? nativeCreate(null) : {};
+  }
+  function hashDelete(key) {
+    return this.has(key) && delete this.__data__[key];
+  }
+  function hashGet(key) {
+    var data = this.__data__;
+    if (nativeCreate) {
+      var result = data[key];
+      return result === HASH_UNDEFINED ? void 0 : result;
+    }
+    return hasOwnProperty.call(data, key) ? data[key] : void 0;
+  }
+  function hashHas(key) {
+    var data = this.__data__;
+    return nativeCreate ? data[key] !== void 0 : hasOwnProperty.call(data, key);
+  }
+  function hashSet(key, value) {
+    var data = this.__data__;
+    data[key] = nativeCreate && value === void 0 ? HASH_UNDEFINED : value;
+    return this;
+  }
+  Hash.prototype.clear = hashClear;
+  Hash.prototype["delete"] = hashDelete;
+  Hash.prototype.get = hashGet;
+  Hash.prototype.has = hashHas;
+  Hash.prototype.set = hashSet;
+  function ListCache(entries) {
+    var index = -1, length = entries ? entries.length : 0;
+    this.clear();
+    while (++index < length) {
+      var entry = entries[index];
+      this.set(entry[0], entry[1]);
+    }
+  }
+  function listCacheClear() {
+    this.__data__ = [];
+  }
+  function listCacheDelete(key) {
+    var data = this.__data__, index = assocIndexOf(data, key);
+    if (index < 0) {
+      return false;
+    }
+    var lastIndex = data.length - 1;
+    if (index == lastIndex) {
+      data.pop();
+    } else {
+      splice.call(data, index, 1);
+    }
+    return true;
+  }
+  function listCacheGet(key) {
+    var data = this.__data__, index = assocIndexOf(data, key);
+    return index < 0 ? void 0 : data[index][1];
+  }
+  function listCacheHas(key) {
+    return assocIndexOf(this.__data__, key) > -1;
+  }
+  function listCacheSet(key, value) {
+    var data = this.__data__, index = assocIndexOf(data, key);
+    if (index < 0) {
+      data.push([key, value]);
+    } else {
+      data[index][1] = value;
+    }
+    return this;
+  }
+  ListCache.prototype.clear = listCacheClear;
+  ListCache.prototype["delete"] = listCacheDelete;
+  ListCache.prototype.get = listCacheGet;
+  ListCache.prototype.has = listCacheHas;
+  ListCache.prototype.set = listCacheSet;
+  function MapCache(entries) {
+    var index = -1, length = entries ? entries.length : 0;
+    this.clear();
+    while (++index < length) {
+      var entry = entries[index];
+      this.set(entry[0], entry[1]);
+    }
+  }
+  function mapCacheClear() {
+    this.__data__ = {
+      "hash": new Hash(),
+      "map": new (Map2 || ListCache)(),
+      "string": new Hash()
+    };
+  }
+  function mapCacheDelete(key) {
+    return getMapData(this, key)["delete"](key);
+  }
+  function mapCacheGet(key) {
+    return getMapData(this, key).get(key);
+  }
+  function mapCacheHas(key) {
+    return getMapData(this, key).has(key);
+  }
+  function mapCacheSet(key, value) {
+    getMapData(this, key).set(key, value);
+    return this;
+  }
+  MapCache.prototype.clear = mapCacheClear;
+  MapCache.prototype["delete"] = mapCacheDelete;
+  MapCache.prototype.get = mapCacheGet;
+  MapCache.prototype.has = mapCacheHas;
+  MapCache.prototype.set = mapCacheSet;
+  function SetCache(values) {
+    var index = -1, length = values ? values.length : 0;
+    this.__data__ = new MapCache();
+    while (++index < length) {
+      this.add(values[index]);
+    }
+  }
+  function setCacheAdd(value) {
+    this.__data__.set(value, HASH_UNDEFINED);
+    return this;
+  }
+  function setCacheHas(value) {
+    return this.__data__.has(value);
+  }
+  SetCache.prototype.add = SetCache.prototype.push = setCacheAdd;
+  SetCache.prototype.has = setCacheHas;
+  function assocIndexOf(array2, key) {
+    var length = array2.length;
+    while (length--) {
+      if (eq(array2[length][0], key)) {
+        return length;
+      }
+    }
+    return -1;
+  }
+  function baseIsNative(value) {
+    if (!isObject3(value) || isMasked(value)) {
+      return false;
+    }
+    var pattern = isFunction(value) || isHostObject(value) ? reIsNative : reIsHostCtor;
+    return pattern.test(toSource(value));
+  }
+  function baseUniq(array2, iteratee, comparator) {
+    var index = -1, includes = arrayIncludes, length = array2.length, isCommon = true, result = [], seen = result;
+    if (comparator) {
+      isCommon = false;
+      includes = arrayIncludesWith;
+    } else if (length >= LARGE_ARRAY_SIZE) {
+      var set2 = createSet(array2);
+      if (set2) {
+        return setToArray(set2);
+      }
+      isCommon = false;
+      includes = cacheHas;
+      seen = new SetCache();
+    } else {
+      seen = result;
+    }
+    outer:
+      while (++index < length) {
+        var value = array2[index], computed = value;
+        value = comparator || value !== 0 ? value : 0;
+        if (isCommon && computed === computed) {
+          var seenIndex = seen.length;
+          while (seenIndex--) {
+            if (seen[seenIndex] === computed) {
+              continue outer;
+            }
+          }
+          result.push(value);
+        } else if (!includes(seen, computed, comparator)) {
+          if (seen !== result) {
+            seen.push(computed);
+          }
+          result.push(value);
+        }
+      }
+    return result;
+  }
+  var createSet = !(Set2 && 1 / setToArray(new Set2([, -0]))[1] == INFINITY) ? noop : function(values) {
+    return new Set2(values);
+  };
+  function getMapData(map2, key) {
+    var data = map2.__data__;
+    return isKeyable(key) ? data[typeof key == "string" ? "string" : "hash"] : data.map;
+  }
+  function getNative(object2, key) {
+    var value = getValue(object2, key);
+    return baseIsNative(value) ? value : void 0;
+  }
+  function isKeyable(value) {
+    var type = typeof value;
+    return type == "string" || type == "number" || type == "symbol" || type == "boolean" ? value !== "__proto__" : value === null;
+  }
+  function isMasked(func) {
+    return !!maskSrcKey && maskSrcKey in func;
+  }
+  function toSource(func) {
+    if (func != null) {
+      try {
+        return funcToString.call(func);
+      } catch (e) {
+      }
+      try {
+        return func + "";
+      } catch (e) {
+      }
+    }
+    return "";
+  }
+  function uniqWith(array2, comparator) {
+    return array2 && array2.length ? baseUniq(array2, void 0, comparator) : [];
+  }
+  function eq(value, other) {
+    return value === other || value !== value && other !== other;
+  }
+  function isFunction(value) {
+    var tag = isObject3(value) ? objectToString.call(value) : "";
+    return tag == funcTag || tag == genTag;
+  }
+  function isObject3(value) {
+    var type = typeof value;
+    return !!value && (type == "object" || type == "function");
+  }
+  function noop() {
+  }
+  lodash_uniqwith = uniqWith;
+  return lodash_uniqwith;
+}
+var lodash_sortby = { exports: {} };
+lodash_sortby.exports;
+var hasRequiredLodash_sortby;
+function requireLodash_sortby() {
+  if (hasRequiredLodash_sortby) return lodash_sortby.exports;
+  hasRequiredLodash_sortby = 1;
+  (function(module, exports) {
+    var LARGE_ARRAY_SIZE = 200;
+    var FUNC_ERROR_TEXT = "Expected a function";
+    var HASH_UNDEFINED = "__lodash_hash_undefined__";
+    var UNORDERED_COMPARE_FLAG = 1, PARTIAL_COMPARE_FLAG = 2;
+    var MAX_SAFE_INTEGER = 9007199254740991;
+    var argsTag = "[object Arguments]", arrayTag = "[object Array]", boolTag = "[object Boolean]", dateTag = "[object Date]", errorTag = "[object Error]", funcTag = "[object Function]", genTag = "[object GeneratorFunction]", mapTag = "[object Map]", numberTag = "[object Number]", objectTag = "[object Object]", promiseTag = "[object Promise]", regexpTag = "[object RegExp]", setTag = "[object Set]", stringTag = "[object String]", symbolTag = "[object Symbol]", weakMapTag = "[object WeakMap]";
+    var arrayBufferTag = "[object ArrayBuffer]", dataViewTag = "[object DataView]", float32Tag = "[object Float32Array]", float64Tag = "[object Float64Array]", int8Tag = "[object Int8Array]", int16Tag = "[object Int16Array]", int32Tag = "[object Int32Array]", uint8Tag = "[object Uint8Array]", uint8ClampedTag = "[object Uint8ClampedArray]", uint16Tag = "[object Uint16Array]", uint32Tag = "[object Uint32Array]";
+    var reIsDeepProp = /\.|\[(?:[^[\]]*|(["'])(?:(?!\1)[^\\]|\\.)*?\1)\]/, reIsPlainProp = /^\w*$/, reLeadingDot = /^\./, rePropName = /[^.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|$))/g;
+    var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
+    var reEscapeChar = /\\(\\)?/g;
+    var reIsHostCtor = /^\[object .+?Constructor\]$/;
+    var reIsUint = /^(?:0|[1-9]\d*)$/;
+    var typedArrayTags = {};
+    typedArrayTags[float32Tag] = typedArrayTags[float64Tag] = typedArrayTags[int8Tag] = typedArrayTags[int16Tag] = typedArrayTags[int32Tag] = typedArrayTags[uint8Tag] = typedArrayTags[uint8ClampedTag] = typedArrayTags[uint16Tag] = typedArrayTags[uint32Tag] = true;
+    typedArrayTags[argsTag] = typedArrayTags[arrayTag] = typedArrayTags[arrayBufferTag] = typedArrayTags[boolTag] = typedArrayTags[dataViewTag] = typedArrayTags[dateTag] = typedArrayTags[errorTag] = typedArrayTags[funcTag] = typedArrayTags[mapTag] = typedArrayTags[numberTag] = typedArrayTags[objectTag] = typedArrayTags[regexpTag] = typedArrayTags[setTag] = typedArrayTags[stringTag] = typedArrayTags[weakMapTag] = false;
+    var freeGlobal = typeof commonjsGlobal == "object" && commonjsGlobal && commonjsGlobal.Object === Object && commonjsGlobal;
+    var freeSelf = typeof self == "object" && self && self.Object === Object && self;
+    var root = freeGlobal || freeSelf || Function("return this")();
+    var freeExports = exports && !exports.nodeType && exports;
+    var freeModule = freeExports && true && module && !module.nodeType && module;
+    var moduleExports = freeModule && freeModule.exports === freeExports;
+    var freeProcess = moduleExports && freeGlobal.process;
+    var nodeUtil = (function() {
+      try {
+        return freeProcess && freeProcess.binding("util");
+      } catch (e) {
+      }
+    })();
+    var nodeIsTypedArray = nodeUtil && nodeUtil.isTypedArray;
+    function apply(func, thisArg, args) {
+      switch (args.length) {
+        case 0:
+          return func.call(thisArg);
+        case 1:
+          return func.call(thisArg, args[0]);
+        case 2:
+          return func.call(thisArg, args[0], args[1]);
+        case 3:
+          return func.call(thisArg, args[0], args[1], args[2]);
+      }
+      return func.apply(thisArg, args);
+    }
+    function arrayMap(array2, iteratee) {
+      var index = -1, length = array2 ? array2.length : 0, result = Array(length);
+      while (++index < length) {
+        result[index] = iteratee(array2[index], index, array2);
+      }
+      return result;
+    }
+    function arrayPush(array2, values) {
+      var index = -1, length = values.length, offset = array2.length;
+      while (++index < length) {
+        array2[offset + index] = values[index];
+      }
+      return array2;
+    }
+    function arraySome(array2, predicate) {
+      var index = -1, length = array2 ? array2.length : 0;
+      while (++index < length) {
+        if (predicate(array2[index], index, array2)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    function baseProperty(key) {
+      return function(object2) {
+        return object2 == null ? void 0 : object2[key];
+      };
+    }
+    function baseSortBy(array2, comparer) {
+      var length = array2.length;
+      array2.sort(comparer);
+      while (length--) {
+        array2[length] = array2[length].value;
+      }
+      return array2;
+    }
+    function baseTimes(n, iteratee) {
+      var index = -1, result = Array(n);
+      while (++index < n) {
+        result[index] = iteratee(index);
+      }
+      return result;
+    }
+    function baseUnary(func) {
+      return function(value) {
+        return func(value);
+      };
+    }
+    function getValue(object2, key) {
+      return object2 == null ? void 0 : object2[key];
+    }
+    function isHostObject(value) {
+      var result = false;
+      if (value != null && typeof value.toString != "function") {
+        try {
+          result = !!(value + "");
+        } catch (e) {
+        }
+      }
+      return result;
+    }
+    function mapToArray(map2) {
+      var index = -1, result = Array(map2.size);
+      map2.forEach(function(value, key) {
+        result[++index] = [key, value];
+      });
+      return result;
+    }
+    function overArg(func, transform2) {
+      return function(arg) {
+        return func(transform2(arg));
+      };
+    }
+    function setToArray(set2) {
+      var index = -1, result = Array(set2.size);
+      set2.forEach(function(value) {
+        result[++index] = value;
+      });
+      return result;
+    }
+    var arrayProto = Array.prototype, funcProto = Function.prototype, objectProto = Object.prototype;
+    var coreJsData = root["__core-js_shared__"];
+    var maskSrcKey = (function() {
+      var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || "");
+      return uid ? "Symbol(src)_1." + uid : "";
+    })();
+    var funcToString = funcProto.toString;
+    var hasOwnProperty = objectProto.hasOwnProperty;
+    var objectToString = objectProto.toString;
+    var reIsNative = RegExp(
+      "^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
+    );
+    var Symbol2 = root.Symbol, Uint8Array2 = root.Uint8Array, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, spreadableSymbol = Symbol2 ? Symbol2.isConcatSpreadable : void 0;
+    var nativeKeys = overArg(Object.keys, Object), nativeMax = Math.max;
+    var DataView = getNative(root, "DataView"), Map2 = getNative(root, "Map"), Promise2 = getNative(root, "Promise"), Set2 = getNative(root, "Set"), WeakMap2 = getNative(root, "WeakMap"), nativeCreate = getNative(Object, "create");
+    var dataViewCtorString = toSource(DataView), mapCtorString = toSource(Map2), promiseCtorString = toSource(Promise2), setCtorString = toSource(Set2), weakMapCtorString = toSource(WeakMap2);
+    var symbolProto = Symbol2 ? Symbol2.prototype : void 0, symbolValueOf = symbolProto ? symbolProto.valueOf : void 0, symbolToString = symbolProto ? symbolProto.toString : void 0;
+    function Hash(entries) {
+      var index = -1, length = entries ? entries.length : 0;
+      this.clear();
+      while (++index < length) {
+        var entry = entries[index];
+        this.set(entry[0], entry[1]);
+      }
+    }
+    function hashClear() {
+      this.__data__ = nativeCreate ? nativeCreate(null) : {};
+    }
+    function hashDelete(key) {
+      return this.has(key) && delete this.__data__[key];
+    }
+    function hashGet(key) {
+      var data = this.__data__;
+      if (nativeCreate) {
+        var result = data[key];
+        return result === HASH_UNDEFINED ? void 0 : result;
+      }
+      return hasOwnProperty.call(data, key) ? data[key] : void 0;
+    }
+    function hashHas(key) {
+      var data = this.__data__;
+      return nativeCreate ? data[key] !== void 0 : hasOwnProperty.call(data, key);
+    }
+    function hashSet(key, value) {
+      var data = this.__data__;
+      data[key] = nativeCreate && value === void 0 ? HASH_UNDEFINED : value;
+      return this;
+    }
+    Hash.prototype.clear = hashClear;
+    Hash.prototype["delete"] = hashDelete;
+    Hash.prototype.get = hashGet;
+    Hash.prototype.has = hashHas;
+    Hash.prototype.set = hashSet;
+    function ListCache(entries) {
+      var index = -1, length = entries ? entries.length : 0;
+      this.clear();
+      while (++index < length) {
+        var entry = entries[index];
+        this.set(entry[0], entry[1]);
+      }
+    }
+    function listCacheClear() {
+      this.__data__ = [];
+    }
+    function listCacheDelete(key) {
+      var data = this.__data__, index = assocIndexOf(data, key);
+      if (index < 0) {
+        return false;
+      }
+      var lastIndex = data.length - 1;
+      if (index == lastIndex) {
+        data.pop();
+      } else {
+        splice.call(data, index, 1);
+      }
+      return true;
+    }
+    function listCacheGet(key) {
+      var data = this.__data__, index = assocIndexOf(data, key);
+      return index < 0 ? void 0 : data[index][1];
+    }
+    function listCacheHas(key) {
+      return assocIndexOf(this.__data__, key) > -1;
+    }
+    function listCacheSet(key, value) {
+      var data = this.__data__, index = assocIndexOf(data, key);
+      if (index < 0) {
+        data.push([key, value]);
+      } else {
+        data[index][1] = value;
+      }
+      return this;
+    }
+    ListCache.prototype.clear = listCacheClear;
+    ListCache.prototype["delete"] = listCacheDelete;
+    ListCache.prototype.get = listCacheGet;
+    ListCache.prototype.has = listCacheHas;
+    ListCache.prototype.set = listCacheSet;
+    function MapCache(entries) {
+      var index = -1, length = entries ? entries.length : 0;
+      this.clear();
+      while (++index < length) {
+        var entry = entries[index];
+        this.set(entry[0], entry[1]);
+      }
+    }
+    function mapCacheClear() {
+      this.__data__ = {
+        "hash": new Hash(),
+        "map": new (Map2 || ListCache)(),
+        "string": new Hash()
+      };
+    }
+    function mapCacheDelete(key) {
+      return getMapData(this, key)["delete"](key);
+    }
+    function mapCacheGet(key) {
+      return getMapData(this, key).get(key);
+    }
+    function mapCacheHas(key) {
+      return getMapData(this, key).has(key);
+    }
+    function mapCacheSet(key, value) {
+      getMapData(this, key).set(key, value);
+      return this;
+    }
+    MapCache.prototype.clear = mapCacheClear;
+    MapCache.prototype["delete"] = mapCacheDelete;
+    MapCache.prototype.get = mapCacheGet;
+    MapCache.prototype.has = mapCacheHas;
+    MapCache.prototype.set = mapCacheSet;
+    function SetCache(values) {
+      var index = -1, length = values ? values.length : 0;
+      this.__data__ = new MapCache();
+      while (++index < length) {
+        this.add(values[index]);
+      }
+    }
+    function setCacheAdd(value) {
+      this.__data__.set(value, HASH_UNDEFINED);
+      return this;
+    }
+    function setCacheHas(value) {
+      return this.__data__.has(value);
+    }
+    SetCache.prototype.add = SetCache.prototype.push = setCacheAdd;
+    SetCache.prototype.has = setCacheHas;
+    function Stack(entries) {
+      this.__data__ = new ListCache(entries);
+    }
+    function stackClear() {
+      this.__data__ = new ListCache();
+    }
+    function stackDelete(key) {
+      return this.__data__["delete"](key);
+    }
+    function stackGet(key) {
+      return this.__data__.get(key);
+    }
+    function stackHas(key) {
+      return this.__data__.has(key);
+    }
+    function stackSet(key, value) {
+      var cache = this.__data__;
+      if (cache instanceof ListCache) {
+        var pairs = cache.__data__;
+        if (!Map2 || pairs.length < LARGE_ARRAY_SIZE - 1) {
+          pairs.push([key, value]);
+          return this;
+        }
+        cache = this.__data__ = new MapCache(pairs);
+      }
+      cache.set(key, value);
+      return this;
+    }
+    Stack.prototype.clear = stackClear;
+    Stack.prototype["delete"] = stackDelete;
+    Stack.prototype.get = stackGet;
+    Stack.prototype.has = stackHas;
+    Stack.prototype.set = stackSet;
+    function arrayLikeKeys(value, inherited) {
+      var result = isArray(value) || isArguments(value) ? baseTimes(value.length, String) : [];
+      var length = result.length, skipIndexes = !!length;
+      for (var key in value) {
+        if (hasOwnProperty.call(value, key) && !(skipIndexes && (key == "length" || isIndex(key, length)))) {
+          result.push(key);
+        }
+      }
+      return result;
+    }
+    function assocIndexOf(array2, key) {
+      var length = array2.length;
+      while (length--) {
+        if (eq(array2[length][0], key)) {
+          return length;
+        }
+      }
+      return -1;
+    }
+    var baseEach = createBaseEach(baseForOwn);
+    function baseFlatten(array2, depth, predicate, isStrict, result) {
+      var index = -1, length = array2.length;
+      predicate || (predicate = isFlattenable);
+      result || (result = []);
+      while (++index < length) {
+        var value = array2[index];
+        if (predicate(value)) {
+          {
+            arrayPush(result, value);
+          }
+        } else {
+          result[result.length] = value;
+        }
+      }
+      return result;
+    }
+    var baseFor = createBaseFor();
+    function baseForOwn(object2, iteratee) {
+      return object2 && baseFor(object2, iteratee, keys);
+    }
+    function baseGet(object2, path3) {
+      path3 = isKey(path3, object2) ? [path3] : castPath(path3);
+      var index = 0, length = path3.length;
+      while (object2 != null && index < length) {
+        object2 = object2[toKey(path3[index++])];
+      }
+      return index && index == length ? object2 : void 0;
+    }
+    function baseGetTag(value) {
+      return objectToString.call(value);
+    }
+    function baseHasIn(object2, key) {
+      return object2 != null && key in Object(object2);
+    }
+    function baseIsEqual(value, other, customizer, bitmask, stack) {
+      if (value === other) {
+        return true;
+      }
+      if (value == null || other == null || !isObject3(value) && !isObjectLike(other)) {
+        return value !== value && other !== other;
+      }
+      return baseIsEqualDeep(value, other, baseIsEqual, customizer, bitmask, stack);
+    }
+    function baseIsEqualDeep(object2, other, equalFunc, customizer, bitmask, stack) {
+      var objIsArr = isArray(object2), othIsArr = isArray(other), objTag = arrayTag, othTag = arrayTag;
+      if (!objIsArr) {
+        objTag = getTag(object2);
+        objTag = objTag == argsTag ? objectTag : objTag;
+      }
+      if (!othIsArr) {
+        othTag = getTag(other);
+        othTag = othTag == argsTag ? objectTag : othTag;
+      }
+      var objIsObj = objTag == objectTag && !isHostObject(object2), othIsObj = othTag == objectTag && !isHostObject(other), isSameTag = objTag == othTag;
+      if (isSameTag && !objIsObj) {
+        stack || (stack = new Stack());
+        return objIsArr || isTypedArray(object2) ? equalArrays(object2, other, equalFunc, customizer, bitmask, stack) : equalByTag(object2, other, objTag, equalFunc, customizer, bitmask, stack);
+      }
+      if (!(bitmask & PARTIAL_COMPARE_FLAG)) {
+        var objIsWrapped = objIsObj && hasOwnProperty.call(object2, "__wrapped__"), othIsWrapped = othIsObj && hasOwnProperty.call(other, "__wrapped__");
+        if (objIsWrapped || othIsWrapped) {
+          var objUnwrapped = objIsWrapped ? object2.value() : object2, othUnwrapped = othIsWrapped ? other.value() : other;
+          stack || (stack = new Stack());
+          return equalFunc(objUnwrapped, othUnwrapped, customizer, bitmask, stack);
+        }
+      }
+      if (!isSameTag) {
+        return false;
+      }
+      stack || (stack = new Stack());
+      return equalObjects(object2, other, equalFunc, customizer, bitmask, stack);
+    }
+    function baseIsMatch(object2, source, matchData, customizer) {
+      var index = matchData.length, length = index;
+      if (object2 == null) {
+        return !length;
+      }
+      object2 = Object(object2);
+      while (index--) {
+        var data = matchData[index];
+        if (data[2] ? data[1] !== object2[data[0]] : !(data[0] in object2)) {
+          return false;
+        }
+      }
+      while (++index < length) {
+        data = matchData[index];
+        var key = data[0], objValue = object2[key], srcValue = data[1];
+        if (data[2]) {
+          if (objValue === void 0 && !(key in object2)) {
+            return false;
+          }
+        } else {
+          var stack = new Stack();
+          var result;
+          if (!(result === void 0 ? baseIsEqual(srcValue, objValue, customizer, UNORDERED_COMPARE_FLAG | PARTIAL_COMPARE_FLAG, stack) : result)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+    function baseIsNative(value) {
+      if (!isObject3(value) || isMasked(value)) {
+        return false;
+      }
+      var pattern = isFunction(value) || isHostObject(value) ? reIsNative : reIsHostCtor;
+      return pattern.test(toSource(value));
+    }
+    function baseIsTypedArray(value) {
+      return isObjectLike(value) && isLength(value.length) && !!typedArrayTags[objectToString.call(value)];
+    }
+    function baseIteratee(value) {
+      if (typeof value == "function") {
+        return value;
+      }
+      if (value == null) {
+        return identity;
+      }
+      if (typeof value == "object") {
+        return isArray(value) ? baseMatchesProperty(value[0], value[1]) : baseMatches(value);
+      }
+      return property(value);
+    }
+    function baseKeys(object2) {
+      if (!isPrototype(object2)) {
+        return nativeKeys(object2);
+      }
+      var result = [];
+      for (var key in Object(object2)) {
+        if (hasOwnProperty.call(object2, key) && key != "constructor") {
+          result.push(key);
+        }
+      }
+      return result;
+    }
+    function baseMap(collection, iteratee) {
+      var index = -1, result = isArrayLike(collection) ? Array(collection.length) : [];
+      baseEach(collection, function(value, key, collection2) {
+        result[++index] = iteratee(value, key, collection2);
+      });
+      return result;
+    }
+    function baseMatches(source) {
+      var matchData = getMatchData(source);
+      if (matchData.length == 1 && matchData[0][2]) {
+        return matchesStrictComparable(matchData[0][0], matchData[0][1]);
+      }
+      return function(object2) {
+        return object2 === source || baseIsMatch(object2, source, matchData);
+      };
+    }
+    function baseMatchesProperty(path3, srcValue) {
+      if (isKey(path3) && isStrictComparable(srcValue)) {
+        return matchesStrictComparable(toKey(path3), srcValue);
+      }
+      return function(object2) {
+        var objValue = get(object2, path3);
+        return objValue === void 0 && objValue === srcValue ? hasIn(object2, path3) : baseIsEqual(srcValue, objValue, void 0, UNORDERED_COMPARE_FLAG | PARTIAL_COMPARE_FLAG);
+      };
+    }
+    function baseOrderBy(collection, iteratees, orders) {
+      var index = -1;
+      iteratees = arrayMap(iteratees.length ? iteratees : [identity], baseUnary(baseIteratee));
+      var result = baseMap(collection, function(value, key, collection2) {
+        var criteria = arrayMap(iteratees, function(iteratee) {
+          return iteratee(value);
+        });
+        return { "criteria": criteria, "index": ++index, "value": value };
+      });
+      return baseSortBy(result, function(object2, other) {
+        return compareMultiple(object2, other, orders);
+      });
+    }
+    function basePropertyDeep(path3) {
+      return function(object2) {
+        return baseGet(object2, path3);
+      };
+    }
+    function baseRest(func, start) {
+      start = nativeMax(start === void 0 ? func.length - 1 : start, 0);
+      return function() {
+        var args = arguments, index = -1, length = nativeMax(args.length - start, 0), array2 = Array(length);
+        while (++index < length) {
+          array2[index] = args[start + index];
+        }
+        index = -1;
+        var otherArgs = Array(start + 1);
+        while (++index < start) {
+          otherArgs[index] = args[index];
+        }
+        otherArgs[start] = array2;
+        return apply(func, this, otherArgs);
+      };
+    }
+    function baseToString(value) {
+      if (typeof value == "string") {
+        return value;
+      }
+      if (isSymbol(value)) {
+        return symbolToString ? symbolToString.call(value) : "";
+      }
+      var result = value + "";
+      return result == "0" && 1 / value == -Infinity ? "-0" : result;
+    }
+    function castPath(value) {
+      return isArray(value) ? value : stringToPath(value);
+    }
+    function compareAscending(value, other) {
+      if (value !== other) {
+        var valIsDefined = value !== void 0, valIsNull = value === null, valIsReflexive = value === value, valIsSymbol = isSymbol(value);
+        var othIsDefined = other !== void 0, othIsNull = other === null, othIsReflexive = other === other, othIsSymbol = isSymbol(other);
+        if (!othIsNull && !othIsSymbol && !valIsSymbol && value > other || valIsSymbol && othIsDefined && othIsReflexive && !othIsNull && !othIsSymbol || valIsNull && othIsDefined && othIsReflexive || !valIsDefined && othIsReflexive || !valIsReflexive) {
+          return 1;
+        }
+        if (!valIsNull && !valIsSymbol && !othIsSymbol && value < other || othIsSymbol && valIsDefined && valIsReflexive && !valIsNull && !valIsSymbol || othIsNull && valIsDefined && valIsReflexive || !othIsDefined && valIsReflexive || !othIsReflexive) {
+          return -1;
+        }
+      }
+      return 0;
+    }
+    function compareMultiple(object2, other, orders) {
+      var index = -1, objCriteria = object2.criteria, othCriteria = other.criteria, length = objCriteria.length, ordersLength = orders.length;
+      while (++index < length) {
+        var result = compareAscending(objCriteria[index], othCriteria[index]);
+        if (result) {
+          if (index >= ordersLength) {
+            return result;
+          }
+          var order = orders[index];
+          return result * (order == "desc" ? -1 : 1);
+        }
+      }
+      return object2.index - other.index;
+    }
+    function createBaseEach(eachFunc, fromRight) {
+      return function(collection, iteratee) {
+        if (collection == null) {
+          return collection;
+        }
+        if (!isArrayLike(collection)) {
+          return eachFunc(collection, iteratee);
+        }
+        var length = collection.length, index = -1, iterable = Object(collection);
+        while (++index < length) {
+          if (iteratee(iterable[index], index, iterable) === false) {
+            break;
+          }
+        }
+        return collection;
+      };
+    }
+    function createBaseFor(fromRight) {
+      return function(object2, iteratee, keysFunc) {
+        var index = -1, iterable = Object(object2), props = keysFunc(object2), length = props.length;
+        while (length--) {
+          var key = props[++index];
+          if (iteratee(iterable[key], key, iterable) === false) {
+            break;
+          }
+        }
+        return object2;
+      };
+    }
+    function equalArrays(array2, other, equalFunc, customizer, bitmask, stack) {
+      var isPartial = bitmask & PARTIAL_COMPARE_FLAG, arrLength = array2.length, othLength = other.length;
+      if (arrLength != othLength && !(isPartial && othLength > arrLength)) {
+        return false;
+      }
+      var stacked = stack.get(array2);
+      if (stacked && stack.get(other)) {
+        return stacked == other;
+      }
+      var index = -1, result = true, seen = bitmask & UNORDERED_COMPARE_FLAG ? new SetCache() : void 0;
+      stack.set(array2, other);
+      stack.set(other, array2);
+      while (++index < arrLength) {
+        var arrValue = array2[index], othValue = other[index];
+        if (customizer) {
+          var compared = isPartial ? customizer(othValue, arrValue, index, other, array2, stack) : customizer(arrValue, othValue, index, array2, other, stack);
+        }
+        if (compared !== void 0) {
+          if (compared) {
+            continue;
+          }
+          result = false;
+          break;
+        }
+        if (seen) {
+          if (!arraySome(other, function(othValue2, othIndex) {
+            if (!seen.has(othIndex) && (arrValue === othValue2 || equalFunc(arrValue, othValue2, customizer, bitmask, stack))) {
+              return seen.add(othIndex);
+            }
+          })) {
+            result = false;
+            break;
+          }
+        } else if (!(arrValue === othValue || equalFunc(arrValue, othValue, customizer, bitmask, stack))) {
+          result = false;
+          break;
+        }
+      }
+      stack["delete"](array2);
+      stack["delete"](other);
+      return result;
+    }
+    function equalByTag(object2, other, tag, equalFunc, customizer, bitmask, stack) {
+      switch (tag) {
+        case dataViewTag:
+          if (object2.byteLength != other.byteLength || object2.byteOffset != other.byteOffset) {
+            return false;
+          }
+          object2 = object2.buffer;
+          other = other.buffer;
+        case arrayBufferTag:
+          if (object2.byteLength != other.byteLength || !equalFunc(new Uint8Array2(object2), new Uint8Array2(other))) {
+            return false;
+          }
+          return true;
+        case boolTag:
+        case dateTag:
+        case numberTag:
+          return eq(+object2, +other);
+        case errorTag:
+          return object2.name == other.name && object2.message == other.message;
+        case regexpTag:
+        case stringTag:
+          return object2 == other + "";
+        case mapTag:
+          var convert = mapToArray;
+        case setTag:
+          var isPartial = bitmask & PARTIAL_COMPARE_FLAG;
+          convert || (convert = setToArray);
+          if (object2.size != other.size && !isPartial) {
+            return false;
+          }
+          var stacked = stack.get(object2);
+          if (stacked) {
+            return stacked == other;
+          }
+          bitmask |= UNORDERED_COMPARE_FLAG;
+          stack.set(object2, other);
+          var result = equalArrays(convert(object2), convert(other), equalFunc, customizer, bitmask, stack);
+          stack["delete"](object2);
+          return result;
+        case symbolTag:
+          if (symbolValueOf) {
+            return symbolValueOf.call(object2) == symbolValueOf.call(other);
+          }
+      }
+      return false;
+    }
+    function equalObjects(object2, other, equalFunc, customizer, bitmask, stack) {
+      var isPartial = bitmask & PARTIAL_COMPARE_FLAG, objProps = keys(object2), objLength = objProps.length, othProps = keys(other), othLength = othProps.length;
+      if (objLength != othLength && !isPartial) {
+        return false;
+      }
+      var index = objLength;
+      while (index--) {
+        var key = objProps[index];
+        if (!(isPartial ? key in other : hasOwnProperty.call(other, key))) {
+          return false;
+        }
+      }
+      var stacked = stack.get(object2);
+      if (stacked && stack.get(other)) {
+        return stacked == other;
+      }
+      var result = true;
+      stack.set(object2, other);
+      stack.set(other, object2);
+      var skipCtor = isPartial;
+      while (++index < objLength) {
+        key = objProps[index];
+        var objValue = object2[key], othValue = other[key];
+        if (customizer) {
+          var compared = isPartial ? customizer(othValue, objValue, key, other, object2, stack) : customizer(objValue, othValue, key, object2, other, stack);
+        }
+        if (!(compared === void 0 ? objValue === othValue || equalFunc(objValue, othValue, customizer, bitmask, stack) : compared)) {
+          result = false;
+          break;
+        }
+        skipCtor || (skipCtor = key == "constructor");
+      }
+      if (result && !skipCtor) {
+        var objCtor = object2.constructor, othCtor = other.constructor;
+        if (objCtor != othCtor && ("constructor" in object2 && "constructor" in other) && !(typeof objCtor == "function" && objCtor instanceof objCtor && typeof othCtor == "function" && othCtor instanceof othCtor)) {
+          result = false;
+        }
+      }
+      stack["delete"](object2);
+      stack["delete"](other);
+      return result;
+    }
+    function getMapData(map2, key) {
+      var data = map2.__data__;
+      return isKeyable(key) ? data[typeof key == "string" ? "string" : "hash"] : data.map;
+    }
+    function getMatchData(object2) {
+      var result = keys(object2), length = result.length;
+      while (length--) {
+        var key = result[length], value = object2[key];
+        result[length] = [key, value, isStrictComparable(value)];
+      }
+      return result;
+    }
+    function getNative(object2, key) {
+      var value = getValue(object2, key);
+      return baseIsNative(value) ? value : void 0;
+    }
+    var getTag = baseGetTag;
+    if (DataView && getTag(new DataView(new ArrayBuffer(1))) != dataViewTag || Map2 && getTag(new Map2()) != mapTag || Promise2 && getTag(Promise2.resolve()) != promiseTag || Set2 && getTag(new Set2()) != setTag || WeakMap2 && getTag(new WeakMap2()) != weakMapTag) {
+      getTag = function(value) {
+        var result = objectToString.call(value), Ctor = result == objectTag ? value.constructor : void 0, ctorString = Ctor ? toSource(Ctor) : void 0;
+        if (ctorString) {
+          switch (ctorString) {
+            case dataViewCtorString:
+              return dataViewTag;
+            case mapCtorString:
+              return mapTag;
+            case promiseCtorString:
+              return promiseTag;
+            case setCtorString:
+              return setTag;
+            case weakMapCtorString:
+              return weakMapTag;
+          }
+        }
+        return result;
+      };
+    }
+    function hasPath(object2, path3, hasFunc) {
+      path3 = isKey(path3, object2) ? [path3] : castPath(path3);
+      var result, index = -1, length = path3.length;
+      while (++index < length) {
+        var key = toKey(path3[index]);
+        if (!(result = object2 != null && hasFunc(object2, key))) {
+          break;
+        }
+        object2 = object2[key];
+      }
+      if (result) {
+        return result;
+      }
+      var length = object2 ? object2.length : 0;
+      return !!length && isLength(length) && isIndex(key, length) && (isArray(object2) || isArguments(object2));
+    }
+    function isFlattenable(value) {
+      return isArray(value) || isArguments(value) || !!(spreadableSymbol && value && value[spreadableSymbol]);
+    }
+    function isIndex(value, length) {
+      length = length == null ? MAX_SAFE_INTEGER : length;
+      return !!length && (typeof value == "number" || reIsUint.test(value)) && (value > -1 && value % 1 == 0 && value < length);
+    }
+    function isIterateeCall(value, index, object2) {
+      if (!isObject3(object2)) {
+        return false;
+      }
+      var type = typeof index;
+      if (type == "number" ? isArrayLike(object2) && isIndex(index, object2.length) : type == "string" && index in object2) {
+        return eq(object2[index], value);
+      }
+      return false;
+    }
+    function isKey(value, object2) {
+      if (isArray(value)) {
+        return false;
+      }
+      var type = typeof value;
+      if (type == "number" || type == "symbol" || type == "boolean" || value == null || isSymbol(value)) {
+        return true;
+      }
+      return reIsPlainProp.test(value) || !reIsDeepProp.test(value) || object2 != null && value in Object(object2);
+    }
+    function isKeyable(value) {
+      var type = typeof value;
+      return type == "string" || type == "number" || type == "symbol" || type == "boolean" ? value !== "__proto__" : value === null;
+    }
+    function isMasked(func) {
+      return !!maskSrcKey && maskSrcKey in func;
+    }
+    function isPrototype(value) {
+      var Ctor = value && value.constructor, proto = typeof Ctor == "function" && Ctor.prototype || objectProto;
+      return value === proto;
+    }
+    function isStrictComparable(value) {
+      return value === value && !isObject3(value);
+    }
+    function matchesStrictComparable(key, srcValue) {
+      return function(object2) {
+        if (object2 == null) {
+          return false;
+        }
+        return object2[key] === srcValue && (srcValue !== void 0 || key in Object(object2));
+      };
+    }
+    var stringToPath = memoize(function(string4) {
+      string4 = toString(string4);
+      var result = [];
+      if (reLeadingDot.test(string4)) {
+        result.push("");
+      }
+      string4.replace(rePropName, function(match, number4, quote, string5) {
+        result.push(quote ? string5.replace(reEscapeChar, "$1") : number4 || match);
+      });
+      return result;
+    });
+    function toKey(value) {
+      if (typeof value == "string" || isSymbol(value)) {
+        return value;
+      }
+      var result = value + "";
+      return result == "0" && 1 / value == -Infinity ? "-0" : result;
+    }
+    function toSource(func) {
+      if (func != null) {
+        try {
+          return funcToString.call(func);
+        } catch (e) {
+        }
+        try {
+          return func + "";
+        } catch (e) {
+        }
+      }
+      return "";
+    }
+    var sortBy = baseRest(function(collection, iteratees) {
+      if (collection == null) {
+        return [];
+      }
+      var length = iteratees.length;
+      if (length > 1 && isIterateeCall(collection, iteratees[0], iteratees[1])) {
+        iteratees = [];
+      } else if (length > 2 && isIterateeCall(iteratees[0], iteratees[1], iteratees[2])) {
+        iteratees = [iteratees[0]];
+      }
+      return baseOrderBy(collection, baseFlatten(iteratees), []);
+    });
+    function memoize(func, resolver) {
+      if (typeof func != "function" || resolver && typeof resolver != "function") {
+        throw new TypeError(FUNC_ERROR_TEXT);
+      }
+      var memoized = function() {
+        var args = arguments, key = resolver ? resolver.apply(this, args) : args[0], cache = memoized.cache;
+        if (cache.has(key)) {
+          return cache.get(key);
+        }
+        var result = func.apply(this, args);
+        memoized.cache = cache.set(key, result);
+        return result;
+      };
+      memoized.cache = new (memoize.Cache || MapCache)();
+      return memoized;
+    }
+    memoize.Cache = MapCache;
+    function eq(value, other) {
+      return value === other || value !== value && other !== other;
+    }
+    function isArguments(value) {
+      return isArrayLikeObject(value) && hasOwnProperty.call(value, "callee") && (!propertyIsEnumerable.call(value, "callee") || objectToString.call(value) == argsTag);
+    }
+    var isArray = Array.isArray;
+    function isArrayLike(value) {
+      return value != null && isLength(value.length) && !isFunction(value);
+    }
+    function isArrayLikeObject(value) {
+      return isObjectLike(value) && isArrayLike(value);
+    }
+    function isFunction(value) {
+      var tag = isObject3(value) ? objectToString.call(value) : "";
+      return tag == funcTag || tag == genTag;
+    }
+    function isLength(value) {
+      return typeof value == "number" && value > -1 && value % 1 == 0 && value <= MAX_SAFE_INTEGER;
+    }
+    function isObject3(value) {
+      var type = typeof value;
+      return !!value && (type == "object" || type == "function");
+    }
+    function isObjectLike(value) {
+      return !!value && typeof value == "object";
+    }
+    function isSymbol(value) {
+      return typeof value == "symbol" || isObjectLike(value) && objectToString.call(value) == symbolTag;
+    }
+    var isTypedArray = nodeIsTypedArray ? baseUnary(nodeIsTypedArray) : baseIsTypedArray;
+    function toString(value) {
+      return value == null ? "" : baseToString(value);
+    }
+    function get(object2, path3, defaultValue) {
+      var result = object2 == null ? void 0 : baseGet(object2, path3);
+      return result === void 0 ? defaultValue : result;
+    }
+    function hasIn(object2, path3) {
+      return object2 != null && hasPath(object2, path3, baseHasIn);
+    }
+    function keys(object2) {
+      return isArrayLike(object2) ? arrayLikeKeys(object2) : baseKeys(object2);
+    }
+    function identity(value) {
+      return value;
+    }
+    function property(path3) {
+      return isKey(path3) ? baseProperty(toKey(path3)) : basePropertyDeep(path3);
+    }
+    module.exports = sortBy;
+  })(lodash_sortby, lodash_sortby.exports);
+  return lodash_sortby.exports;
+}
+var escapeStringRegexp;
+var hasRequiredEscapeStringRegexp;
+function requireEscapeStringRegexp() {
+  if (hasRequiredEscapeStringRegexp) return escapeStringRegexp;
+  hasRequiredEscapeStringRegexp = 1;
+  escapeStringRegexp = (string4) => {
+    if (typeof string4 !== "string") {
+      throw new TypeError("Expected a string");
+    }
+    return string4.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&").replace(/-/g, "\\x2d");
+  };
+  return escapeStringRegexp;
+}
+var regexpParse = {};
+var hasRequiredRegexpParse;
+function requireRegexpParse() {
+  if (hasRequiredRegexpParse) return regexpParse;
+  hasRequiredRegexpParse = 1;
+  Object.defineProperty(regexpParse, "__esModule", { value: true });
+  regexpParse.isRegExpString = regexpParse.parseRegExpString = void 0;
+  var REGEXP_LITERAL_PATTERN = /^\/(.+)\/([guimysd]*)$/;
+  var parseRegExpString = function(str) {
+    var result = str.match(REGEXP_LITERAL_PATTERN);
+    if (!result) {
+      return null;
+    }
+    return {
+      source: result[1],
+      flagString: result[2]
+    };
+  };
+  regexpParse.parseRegExpString = parseRegExpString;
+  var isRegExpString = function(str) {
+    return REGEXP_LITERAL_PATTERN.test(str);
+  };
+  regexpParse.isRegExpString = isRegExpString;
+  return regexpParse;
+}
+var hasRequiredRegexpStringMatcher;
+function requireRegexpStringMatcher() {
+  if (hasRequiredRegexpStringMatcher) return regexpStringMatcher;
+  hasRequiredRegexpStringMatcher = 1;
+  (function(exports) {
+    var __importDefault = regexpStringMatcher && regexpStringMatcher.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.matchPatterns = exports.createRegExp = void 0;
+    var lodash_uniq_1 = __importDefault(requireLodash_uniq());
+    var lodash_uniqwith_1 = __importDefault(requireLodash_uniqwith());
+    var lodash_sortby_1 = __importDefault(requireLodash_sortby());
+    var escape_string_regexp_1 = __importDefault(requireEscapeStringRegexp());
+    var regexp_parse_1 = requireRegexpParse();
+    var DEFAULT_FLAGS = "ug";
+    var defaultFlags = function(flagsString) {
+      if (flagsString.length === 0) {
+        return DEFAULT_FLAGS;
+      }
+      return (0, lodash_uniq_1.default)((flagsString + DEFAULT_FLAGS).split("")).join("");
+    };
+    var createRegExp = function(patternString, defaultFlag) {
+      if (defaultFlag === void 0) {
+        defaultFlag = DEFAULT_FLAGS;
+      }
+      if (patternString.length === 0) {
+        throw new Error("Empty string can not handled");
+      }
+      if ((0, regexp_parse_1.isRegExpString)(patternString)) {
+        var regExpStructure = (0, regexp_parse_1.parseRegExpString)(patternString);
+        if (regExpStructure) {
+          return new RegExp(regExpStructure.source, defaultFlags(regExpStructure.flagString));
+        }
+        throw new Error('"'.concat(patternString, '" can not parse as RegExp.'));
+      } else {
+        return new RegExp((0, escape_string_regexp_1.default)(patternString), defaultFlag);
+      }
+    };
+    exports.createRegExp = createRegExp;
+    var isEqualMatchPatternResult = function(a, b) {
+      return a.startIndex === b.startIndex && a.endIndex === b.endIndex && a.match === b.match;
+    };
+    var matchPatterns = function(text, regExpLikeStrings) {
+      var matchPatternResults = [];
+      regExpLikeStrings.map(function(patternString) {
+        return (0, exports.createRegExp)(patternString);
+      }).forEach(function(regExp) {
+        var results = text.matchAll(regExp);
+        Array.from(results).forEach(function(result) {
+          if (result.index === void 0) {
+            return;
+          }
+          var match = result[0];
+          var index = result.index;
+          matchPatternResults.push({
+            match,
+            captures: result.slice(1),
+            startIndex: index,
+            endIndex: index + match.length
+          });
+        });
+      });
+      var uniqResults = (0, lodash_uniqwith_1.default)(matchPatternResults, isEqualMatchPatternResult);
+      return (0, lodash_sortby_1.default)(uniqResults, ["startIndex", "endIndex"]);
+    };
+    exports.matchPatterns = matchPatterns;
+  })(regexpStringMatcher);
+  return regexpStringMatcher;
+}
+var regexpStringMatcherExports = requireRegexpStringMatcher();
+var BUILTIN_IGNORED = {
+  AWSAccountID: ["AKIAIOSFODNN7EXAMPLE"],
+  AWSSecretAccessKey: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+};
+var messages$r = {
+  AWSAccountID: {
+    en: (props) => `found AWS Account ID: ${props.ID}`,
+    ja: (props) => `AWS Account ID: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  AWSSecretAccessKey: {
+    en: (props) => `found AWS Secret Access Key: ${props.KEY}`,
+    ja: (props) => `AWS Secret Access Key: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  AWSAccessKeyID: {
+    en: (props) => `found AWS Access Key ID: ${props.ID}`,
+    ja: (props) => `AWS Access Key Id: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var reportAWSAccessKey = ({ t, source, context, options }) => {
+  const AWSAccessKeyIDPattern = /\b(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\b/g;
+  const results = source.content.matchAll(AWSAccessKeyIDPattern);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    const range = [index, index + match.length];
+    if (BUILTIN_IGNORED.AWSAccountID.includes(match)) {
+      continue;
+    }
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("AWSAccessKeyID", {
+        ID: match
+      }),
+      range
+    });
+  }
+};
+var reportAWSSecretAccessKey = ({ t, source, context, options }) => {
+  const AWS = "(?:AWS|aws|Aws)?_?";
+  const QUOTE = `["']?`;
+  const CONNECT = "\\s*(?::|=>|=)\\s*";
+  const AWSSecretPatten = new RegExp(String.raw`${QUOTE}${AWS}(?:SECRET|secret|Secret)_?(?:ACCESS|access|Access)_?(?:KEY|key|Key)${QUOTE}${CONNECT}${QUOTE}([A-Za-z0-9/\+=]{40})${QUOTE}\b`, "g");
+  const results = source.content.matchAll(AWSSecretPatten);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[1] || "";
+    const range = [index, index + match.length];
+    if (BUILTIN_IGNORED.AWSSecretAccessKey.includes(match)) {
+      continue;
+    }
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("AWSSecretAccessKey", {
+        KEY: match
+      }),
+      range
+    });
+  }
+};
+var reportAWSAccountID = ({ t, source, context, options }) => {
+  const AWS = "(AWS|aws|Aws)?_?";
+  const QUOTE = `("|')?`;
+  const CONNECT = "\\s*(:|=>|=)\\s*";
+  const AWSSecretPatten = new RegExp(String.raw`${QUOTE}${AWS}(ACCOUNT|account|Account)_?(ID|id|Id)?${QUOTE}${CONNECT}${QUOTE}[0-9]{4}\-?[0-9]{4}\-?[0-9]{4}${QUOTE}\b`, "g");
+  const results = source.content.matchAll(AWSSecretPatten);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("AWSAccountID", {
+        ID: match
+      }),
+      range
+    });
+  }
+};
+var creator$s = {
+  messages: messages$r,
+  meta: {
+    id: "@secretlint/secretlint-rule-aws",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-aws/README.md"
+    }
+  },
+  create(context, options) {
+    const normalizedOptions = {
+      allows: options.allows || [],
+      enableIDScanRule: options.enableIDScanRule ?? false
+    };
+    const t = context.createTranslator(messages$r);
+    return {
+      file(source) {
+        if (normalizedOptions.enableIDScanRule) {
+          reportAWSAccessKey({ t, source, context, options: normalizedOptions });
+          reportAWSAccountID({ t, source, context, options: normalizedOptions });
+        }
+        reportAWSSecretAccessKey({ t, source, context, options: normalizedOptions });
+      }
+    };
+  }
+};
+var TAG_INTEGER = 2;
+var TAG_OCTET_STRING = 4;
+var TAG_NULL = 5;
+var TAG_OID = 6;
+var TAG_SEQUENCE = 48;
+var TAG_CONTEXT_0 = 160;
+function readTlv(buf, offset) {
+  if (offset + 2 > buf.length) {
+    throw new Error("PKCS12: truncated TLV header");
+  }
+  const tag = buf[offset];
+  const lenByte = buf[offset + 1];
+  let length;
+  let contentStart;
+  if (lenByte < 128) {
+    length = lenByte;
+    contentStart = offset + 2;
+  } else {
+    const lenBytes = lenByte & 127;
+    if (lenBytes === 0 || lenBytes > 4) {
+      throw new Error("PKCS12: unsupported ASN.1 length encoding");
+    }
+    if (offset + 2 + lenBytes > buf.length) {
+      throw new Error("PKCS12: truncated ASN.1 length");
+    }
+    length = 0;
+    for (let i = 0; i < lenBytes; i++) {
+      length = length * 256 + buf[offset + 2 + i];
+    }
+    contentStart = offset + 2 + lenBytes;
+  }
+  const end = contentStart + length;
+  if (end > buf.length) {
+    throw new Error("PKCS12: TLV extends past buffer");
+  }
+  return { tag, content: buf.subarray(contentStart, end), end };
+}
+function expectTag(tlv, tag, label) {
+  if (tlv.tag !== tag) {
+    throw new Error(`PKCS12: expected ${label} tag 0x${tag.toString(16)} but got 0x${tlv.tag.toString(16)}`);
+  }
+}
+function readInteger(tlv) {
+  expectTag(tlv, TAG_INTEGER, "INTEGER");
+  let value = 0;
+  for (const byte of tlv.content) {
+    value = value * 256 + byte;
+  }
+  return value;
+}
+function bytesEqual(a, b) {
+  if (a.length !== b.length)
+    return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a[i] ^ b[i];
+  }
+  return diff === 0;
+}
+var OID_DATA = new Uint8Array([42, 134, 72, 134, 247, 13, 1, 7, 1]);
+var OID_SHA1 = new Uint8Array([43, 14, 3, 2, 26]);
+var OID_SHA256 = new Uint8Array([96, 134, 72, 1, 101, 3, 4, 2, 1]);
+var OID_SHA384 = new Uint8Array([96, 134, 72, 1, 101, 3, 4, 2, 2]);
+var OID_SHA512 = new Uint8Array([96, 134, 72, 1, 101, 3, 4, 2, 3]);
+var MAC_HASHES = [
+  { oid: OID_SHA1, hash: { name: "SHA-1", outputSize: 20, blockSize: 64 } },
+  { oid: OID_SHA256, hash: { name: "SHA-256", outputSize: 32, blockSize: 64 } },
+  { oid: OID_SHA384, hash: { name: "SHA-384", outputSize: 48, blockSize: 128 } },
+  { oid: OID_SHA512, hash: { name: "SHA-512", outputSize: 64, blockSize: 128 } }
+];
+function matchHash(oidBytes) {
+  for (const { oid, hash: hash2 } of MAC_HASHES) {
+    if (bytesEqual(oidBytes, oid))
+      return hash2;
+  }
+  return void 0;
+}
+var MAX_MAC_ITERATIONS = 1e5;
+function parsePkcs12(buf) {
+  const pfx = readTlv(buf, 0);
+  expectTag(pfx, TAG_SEQUENCE, "PFX SEQUENCE");
+  const version2 = readTlv(pfx.content, 0);
+  if (readInteger(version2) !== 3) {
+    throw new Error("PKCS12: unsupported version");
+  }
+  const authSafeInfo = readTlv(pfx.content, version2.end);
+  expectTag(authSafeInfo, TAG_SEQUENCE, "ContentInfo SEQUENCE");
+  const contentType = readTlv(authSafeInfo.content, 0);
+  expectTag(contentType, TAG_OID, "contentType OID");
+  if (!bytesEqual(contentType.content, OID_DATA)) {
+    throw new Error("PKCS12: unsupported authSafe contentType");
+  }
+  const explicit0 = readTlv(authSafeInfo.content, contentType.end);
+  expectTag(explicit0, TAG_CONTEXT_0, "[0] EXPLICIT");
+  const authSafeOctet = readTlv(explicit0.content, 0);
+  expectTag(authSafeOctet, TAG_OCTET_STRING, "authSafe OCTET STRING");
+  const macData = readTlv(pfx.content, authSafeInfo.end);
+  expectTag(macData, TAG_SEQUENCE, "MacData SEQUENCE");
+  const digestInfo = readTlv(macData.content, 0);
+  expectTag(digestInfo, TAG_SEQUENCE, "DigestInfo SEQUENCE");
+  const alg = readTlv(digestInfo.content, 0);
+  expectTag(alg, TAG_SEQUENCE, "AlgorithmIdentifier SEQUENCE");
+  const algOid = readTlv(alg.content, 0);
+  expectTag(algOid, TAG_OID, "algorithm OID");
+  const macHash = matchHash(algOid.content);
+  if (!macHash) {
+    throw new Error("PKCS12: unsupported MAC digest algorithm");
+  }
+  if (algOid.end < alg.content.length) {
+    const params = readTlv(alg.content, algOid.end);
+    if (params.tag !== TAG_NULL) {
+      throw new Error("PKCS12: unexpected MAC algorithm parameters");
+    }
+  }
+  const digest = readTlv(digestInfo.content, alg.end);
+  expectTag(digest, TAG_OCTET_STRING, "digest OCTET STRING");
+  const salt = readTlv(macData.content, digestInfo.end);
+  expectTag(salt, TAG_OCTET_STRING, "macSalt OCTET STRING");
+  let iterations = 1;
+  if (salt.end < macData.content.length) {
+    const iter = readTlv(macData.content, salt.end);
+    iterations = readInteger(iter);
+  }
+  if (iterations < 1 || iterations > MAX_MAC_ITERATIONS) {
+    throw new Error("PKCS12: MAC iteration count out of range");
+  }
+  return {
+    authSafe: authSafeOctet.content,
+    macHash,
+    macSalt: salt.content,
+    macDigest: digest.content,
+    iterations
+  };
+}
+function toBufferSource(data) {
+  const copy = new Uint8Array(data.length);
+  copy.set(data);
+  return copy;
+}
+var NODE_HASH_NAMES = {
+  "SHA-1": "sha1",
+  "SHA-256": "sha256",
+  "SHA-384": "sha384",
+  "SHA-512": "sha512"
+};
+async function createDigest(hash2) {
+  try {
+    const { createHash: createHash4 } = await import("crypto");
+    const algorithm = NODE_HASH_NAMES[hash2.name];
+    return (data) => new Uint8Array(createHash4(algorithm).update(data).digest());
+  } catch {
+    return async (data) => new Uint8Array(await globalThis.crypto.subtle.digest(hash2.name, toBufferSource(data)));
+  }
+}
+function padToMultipleOf(src, blockSize) {
+  if (src.length === 0)
+    return new Uint8Array(0);
+  const padded = new Uint8Array(Math.ceil(src.length / blockSize) * blockSize);
+  for (let i = 0; i < padded.length; i++) {
+    padded[i] = src[i % src.length];
+  }
+  return padded;
+}
+function encodePasswordAsBmpString(password) {
+  if (password.length === 0)
+    return new Uint8Array(0);
+  const bytes = new Uint8Array(password.length * 2 + 2);
+  for (let i = 0; i < password.length; i++) {
+    const code = password.charCodeAt(i);
+    bytes[i * 2] = code >> 8 & 255;
+    bytes[i * 2 + 1] = code & 255;
+  }
+  return bytes;
+}
+async function deriveMacKey(hash2, password, salt, iterations) {
+  const v = hash2.blockSize;
+  const u = hash2.outputSize;
+  const ID_MAC = 3;
+  const D = new Uint8Array(v).fill(ID_MAC);
+  const P = padToMultipleOf(encodePasswordAsBmpString(password), v);
+  const S = padToMultipleOf(salt, v);
+  const DI = new Uint8Array(D.length + S.length + P.length);
+  DI.set(D, 0);
+  DI.set(S, D.length);
+  DI.set(P, D.length + S.length);
+  const digest = await createDigest(hash2);
+  let A = await digest(DI);
+  for (let i = 1; i < iterations; i++) {
+    A = await digest(A);
+  }
+  return A.subarray(0, u);
+}
+async function verifyPkcs12Mac(pfxBytes, password) {
+  let parsed;
+  try {
+    parsed = parsePkcs12(pfxBytes);
+  } catch {
+    return false;
+  }
+  try {
+    const key = await deriveMacKey(parsed.macHash, password, parsed.macSalt, parsed.iterations);
+    const cryptoKey = await globalThis.crypto.subtle.importKey("raw", toBufferSource(key), { name: "HMAC", hash: parsed.macHash.name }, false, ["sign"]);
+    const mac3 = new Uint8Array(await globalThis.crypto.subtle.sign("HMAC", cryptoKey, toBufferSource(parsed.authSafe)));
+    return bytesEqual(mac3, parsed.macDigest);
+  } catch {
+    return false;
+  }
+}
+var GCP_SERVICE_ACCOUNT_P12_PASSWORD = "notasecret";
+async function reportIfFoundPrivateKeyP12Format({ source, options, context, t }) {
+  if (!source.filePath) {
+    return;
+  }
+  try {
+    const fs = await import("fs");
+    const path3 = await import("path");
+    const fileName = path3.basename(source.filePath);
+    if (regexpStringMatcherExports.matchPatterns(fileName, options.allows).length > 0) {
+      return;
+    }
+    const pfxBytes = new Uint8Array(fs.readFileSync(source.filePath));
+    const isGcpServiceAccountP12 = await verifyPkcs12Mac(pfxBytes, GCP_SERVICE_ACCOUNT_P12_PASSWORD);
+    if (!isGcpServiceAccountP12) {
+      return;
+    }
+    context.report({
+      message: t("PrivateKeyP12", {
+        FILE_NAME: fileName
+      }),
+      range: [0, source.content.length]
+    });
+  } catch {
+  }
+}
+var messages$q = {
+  PrivateKeyP12: {
+    en: (props) => `found GCP Service Account's private key(p12): ${props.FILE_NAME}`,
+    ja: (props) => `GCP\u30B5\u30FC\u30D3\u30B9\u30A2\u30AB\u30A6\u30F3\u30C8\u306E\u79D8\u5BC6\u9375(p12) ${props.FILE_NAME} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  PrivateKeyJSON: {
+    en: (props) => `found GCP Service Account's private key(json): ${props.FILE_NAME}`,
+    ja: (props) => `GCP\u30B5\u30FC\u30D3\u30B9\u30A2\u30AB\u30A6\u30F3\u30C8\u306E\u79D8\u5BC6\u9375(json): ${props.FILE_NAME} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+function reportIfFoundPrivateKeyJSONFormat({ source, options, context, t }) {
+  try {
+    const credentialObject = JSON.parse(source.content);
+    const PRIVATE_KEY_PATTERN = /-----BEGIN\s?(DSA|RSA|EC|PGP|OPENSSH)?\s?PRIVATE KEY/gm;
+    const isGCPServiceAccountPrivateKeyJSON = "private_key_id" in credentialObject && "private_key" in credentialObject && PRIVATE_KEY_PATTERN.test(credentialObject["private_key"]);
+    if (!isGCPServiceAccountPrivateKeyJSON) {
+      return;
+    }
+    const allowCandidates = [credentialObject["private_key_id"], credentialObject["private_key"]].filter((value) => typeof value === "string");
+    if (allowCandidates.some((value) => regexpStringMatcherExports.matchPatterns(value, options.allows).length > 0)) {
+      return;
+    }
+    context.report({
+      message: t("PrivateKeyJSON", {
+        FILE_NAME: source.filePath ? path.basename(source.filePath) : ""
+      }),
+      range: [0, source.content.length]
+    });
+  } catch {
+  }
+}
+var creator$r = {
+  messages: messages$q,
+  meta: {
+    id: "@secretlint/secretlint-rule-gcp",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["all"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-gcp/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$q);
+    const normalizedOptions = {
+      allows: options?.allows ?? []
+    };
+    return {
+      file(source) {
+        if (source.ext === ".p12") {
+          return reportIfFoundPrivateKeyP12Format({ source, options: normalizedOptions, context, t });
+        } else if (source.ext === ".json") {
+          return reportIfFoundPrivateKeyJSONFormat({ source, options: normalizedOptions, context, t });
+        }
+      }
+    };
+  }
+};
+var messages$p = {
+  PackageJSON_xOauthToken: {
+    en: (props) => `found GitHub Token: ${props.TOKEN}`,
+    ja: (props) => `GitHub Token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  Npmrc_authToken: {
+    en: (props) => `found npmrc authToken: ${props.TOKEN}`,
+    ja: (props) => `npmrc authToken: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  NPM_ACCESS_TOKEN: {
+    en: (props) => `found npm access token: ${props.TOKEN}`,
+    ja: (props) => `npm access token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+function reportIfFoundXOauthGitHubToken({ source, options, context, t }) {
+  const XOAuthPattern = /https?:\/\/(.{1,256}):x-oauth-basic@github.com\//g;
+  const results = source.content.matchAll(XOAuthPattern);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[1] || "";
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("PackageJSON_xOauthToken", {
+        TOKEN: match
+      }),
+      range
+    });
+  }
+}
+function reportIfFound_AuthTokenInNpmrc({ source, options, context, t }) {
+  const AuthTokenPattern = /_authToken=([^$].*)/g;
+  const results = source.content.matchAll(AuthTokenPattern);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[1] || "";
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("Npmrc_authToken", {
+        TOKEN: match
+      }),
+      range
+    });
+  }
+}
+function reportIfFound_NPM_ACCESS_TOKEN({ source, options, context, t }) {
+  const NPM_ACCESS_TOKEN_PATTERN = new RegExp("(?<!\\p{L})npm_[A-Za-z0-9_]{36}(?![A-Za-z0-9_])", "gu");
+  const results = source.content.matchAll(NPM_ACCESS_TOKEN_PATTERN);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("NPM_ACCESS_TOKEN", {
+        TOKEN: match
+      }),
+      range
+    });
+  }
+}
+var isPackageFile = (filePath) => {
+  if (!filePath) {
+    return true;
+  }
+  return filePath.endsWith("package.json") || filePath.endsWith("package-lock.json");
+};
+var isNpmrc = (filePath) => {
+  if (!filePath) {
+    return true;
+  }
+  return filePath.endsWith(".npmrc");
+};
+var creator$q = {
+  messages: messages$p,
+  meta: {
+    id: "@secretlint/secretlint-rule-npm",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-npm/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$p);
+    const normalizedOptions = {
+      allows: options.allows || []
+    };
+    return {
+      file(source) {
+        if (isPackageFile(source.filePath)) {
+          reportIfFoundXOauthGitHubToken({ source, options: normalizedOptions, context, t });
+        } else if (isNpmrc(source.filePath)) {
+          reportIfFound_AuthTokenInNpmrc({ source, options: normalizedOptions, context, t });
+        }
+        reportIfFound_NPM_ACCESS_TOKEN({ source, options: normalizedOptions, context, t });
+      }
+    };
+  }
+};
+var messages$o = {
+  SLACK_TOKEN: {
+    en: (props) => `found slack token: ${props.TOKEN}`,
+    ja: (props) => `Slack\u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  IncomingWebhook: {
+    en: (props) => `found Slack Incoming Webhook: ${props.URL}`,
+    ja: (props) => `Slack\u306EIncoming Webhooks: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+function reportIfFoundRawPrivateKey$1({ source, options, context, t }) {
+  const SLACK_TOKEN_PATTERN = /\b(?:xoxb|xoxp|xapp|xoxa|xoxo|xoxr)-(?:\d-)?(?:[a-zA-Z0-9]{1,40}-)+[a-zA-Z0-9]{1,40}\b/g;
+  const results = source.content.matchAll(SLACK_TOKEN_PATTERN);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("SLACK_TOKEN", {
+        TOKEN: match
+      }),
+      range
+    });
+  }
+}
+function reportIfFoundIncomingWebhook({ source, options, context, t }) {
+  const IncomingWebhooksPattern = /https:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9]{1,40}\/B[a-zA-Z0-9]{1,40}\/[a-zA-Z0-9]{1,40}/gi;
+  const results = source.content.matchAll(IncomingWebhooksPattern);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("IncomingWebhook", {
+        URL: match
+      }),
+      range
+    });
+  }
+}
+var creator$p = {
+  messages: messages$o,
+  meta: {
+    id: "@secretlint/secretlint-rule-slack",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-slack/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$o);
+    const normalizedOptions = {
+      allows: options.allows || []
+    };
+    return {
+      file(source) {
+        reportIfFoundRawPrivateKey$1({ source, options: normalizedOptions, context, t });
+        reportIfFoundIncomingWebhook({ source, options: normalizedOptions, context, t });
+      }
+    };
+  }
+};
+var messages$n = {
+  BasicAuth: {
+    en: (props) => `found basic auth credential: ${props.CREDENTIAL}`,
+    ja: (props) => `\u30D9\u30FC\u30B7\u30C3\u30AF\u8A8D\u8A3C\u60C5\u5831: ${props.CREDENTIAL} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var BUILTIN_IGNORED_PATTERNS$1 = [
+  "localhost",
+  "127.0.0.1",
+  "password",
+  "mypassword",
+  "myusername",
+  "{password}",
+  "${password}",
+  "{{password}}",
+  "{username}",
+  "${username}",
+  "{{username}}",
+  "YOUR_PASSWORD",
+  "YOUR_USERNAME",
+  "REPLACE_WITH_PASSWORD",
+  "REPLACE_WITH_USERNAME"
+];
+function isVariableLikeString$1(str) {
+  const variablePatterns = [
+    /\$\{[^}]{1,50}\}/,
+    // ${var}
+    /\{\{[^}]{1,50}\}\}/,
+    // {{var}}
+    /\{[^}]{1,50}\}/,
+    // {var}
+    /%[A-Z_]{1,30}%/,
+    // %VAR%
+    /\$[A-Z_]{1,30}/
+    // $VAR
+  ];
+  return variablePatterns.some((pattern) => pattern.test(str));
+}
+function isLikelyRealUsername(username) {
+  if (username.length < 2)
+    return false;
+  if (isVariableLikeString$1(username))
+    return false;
+  if (BUILTIN_IGNORED_PATTERNS$1.some((pattern) => username.toLowerCase().includes(pattern.toLowerCase()))) {
+    return false;
+  }
+  return true;
+}
+function isLikelyRealPassword(password) {
+  if (password.length < 4)
+    return false;
+  if (isVariableLikeString$1(password))
+    return false;
+  if (BUILTIN_IGNORED_PATTERNS$1.some((pattern) => password.toLowerCase().includes(pattern.toLowerCase()))) {
+    return false;
+  }
+  if (/^(.)\1{3,}$/.test(password))
+    return false;
+  return true;
+}
+function reportIfFoundBasicAuth({ source, options, context, t }) {
+  const URL_PATTERN = /(?<protocol>(?:https?|ftp|ftps)):\/\/(?<user>[-a-zA-Z0-9_]{1,256}):(?<password>[-a-zA-Z0-9_]{1,256})@[-a-zA-Z0-9%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b/g;
+  const results = source.content.matchAll(URL_PATTERN);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    const username = result.groups?.user;
+    const password = result.groups?.password;
+    if (!username || !password)
+      continue;
+    if (!isLikelyRealUsername(username))
+      continue;
+    if (!isLikelyRealPassword(password))
+      continue;
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("BasicAuth", {
+        CREDENTIAL: match
+      }),
+      range
+    });
+  }
+}
+var creator$o = {
+  messages: messages$n,
+  meta: {
+    id: "@secretlint/secretlint-rule-basicauth",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-basicauth/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$n);
+    const normalizedOptions = {
+      allows: options.allows || []
+    };
+    return {
+      file(source) {
+        reportIfFoundBasicAuth({ source, options: normalizedOptions, context, t });
+      }
+    };
+  }
+};
+var messages$m = {
+  OPENAI_TOKEN: {
+    en: (props) => `found OpenAI API token: ${props.TOKEN}`,
+    ja: (props) => `OpenAI API \u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator$n = {
+  messages: messages$m,
+  meta: {
+    id: "@secretlint/secretlint-rule-openai",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-openai/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$m);
+    const normalizedOptions = {
+      allows: options?.allows ?? []
+    };
+    return {
+      file(source) {
+        const pattern = /sk-(?:proj|svcacct|admin)-(?:[A-Za-z0-9_-]{74}|[A-Za-z0-9_-]{58})T3BlbkFJ(?:[A-Za-z0-9_-]{74}|[A-Za-z0-9_-]{58})\b|sk-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20}/g;
+        const matches2 = source.content.matchAll(pattern);
+        for (const match of matches2) {
+          const index = match.index ?? 0;
+          const matchString = match[0] ?? "";
+          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
+          if (allowedResults.length > 0) {
+            continue;
+          }
+          const range = [index, index + matchString.length];
+          context.report({
+            message: t("OPENAI_TOKEN", {
+              TOKEN: matchString
+            }),
+            range
+          });
+        }
+      }
+    };
+  }
+};
+var messages$l = {
+  ANTHROPIC_API_KEY: {
+    en: (props) => `found Anthropic Claude API key: ${props.KEY}`,
+    ja: (props) => `Anthropic Claude API \u30AD\u30FC: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator$m = {
+  messages: messages$l,
+  meta: {
+    id: "@secretlint/secretlint-rule-anthropic",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-anthropic/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$l);
+    const normalizedOptions = {
+      allows: options?.allows ?? []
+    };
+    return {
+      file(source) {
+        const pattern = new RegExp("(?<!\\p{L})sk-ant-api0\\d-[A-Za-z0-9_-]{90,128}AA(?![A-Za-z0-9_-])", "gu");
+        const matches2 = source.content.matchAll(pattern);
+        for (const match of matches2) {
+          const index = match.index ?? 0;
+          const matchString = match[0] ?? "";
+          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
+          if (allowedResults.length > 0) {
+            continue;
+          }
+          const range = [index, index + matchString.length];
+          context.report({
+            message: t("ANTHROPIC_API_KEY", {
+              KEY: matchString
+            }),
+            range
+          });
+        }
+      }
+    };
+  }
+};
+var messages$k = {
+  GROQ_API_KEY: {
+    en: (props) => `found Groq API key: ${props.KEY}`,
+    ja: (props) => `Groq API \u30AD\u30FC: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator$l = {
+  messages: messages$k,
+  meta: {
+    id: "@secretlint/secretlint-rule-groq",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-groq/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$k);
+    const normalizedOptions = {
+      allows: options?.allows ?? []
+    };
+    return {
+      file(source) {
+        const pattern = new RegExp("(?<!\\p{L})gsk_[a-zA-Z0-9]{52}(?![a-zA-Z0-9])", "gu");
+        const matches2 = source.content.matchAll(pattern);
+        for (const match of matches2) {
+          const index = match.index ?? 0;
+          const matchString = match[0] ?? "";
+          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
+          if (allowedResults.length > 0) {
+            continue;
+          }
+          const range = [index, index + matchString.length];
+          context.report({
+            message: t("GROQ_API_KEY", {
+              KEY: matchString
+            }),
+            range
+          });
+        }
+      }
+    };
+  }
+};
+var messages$j = {
+  HUGGINGFACE_USER_ACCESS_TOKEN: {
+    en: (props) => `found Hugging Face User Access Token: ${props.TOKEN}`,
+    ja: (props) => `Hugging Face User Access Token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator$k = {
+  messages: messages$j,
+  meta: {
+    id: "@secretlint/secretlint-rule-huggingface",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-huggingface/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$j);
+    const normalizedOptions = {
+      allows: options?.allows ?? []
+    };
+    return {
+      file(source) {
+        const pattern = new RegExp("(?<!\\p{L})hf_[a-zA-Z]{34}(?![a-zA-Z])", "gu");
+        const matches2 = source.content.matchAll(pattern);
+        for (const match of matches2) {
+          const index = match.index ?? 0;
+          const matchString = match[0] ?? "";
+          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
+          if (allowedResults.length > 0) {
+            continue;
+          }
+          const range = [index, index + matchString.length];
+          context.report({
+            message: t("HUGGINGFACE_USER_ACCESS_TOKEN", {
+              TOKEN: matchString
+            }),
+            range
+          });
+        }
+      }
+    };
+  }
+};
+var messages$i = {
+  LINEAR_API_TOKEN: {
+    en: (props) => `found linear api token: ${props.ID}`,
+    ja: (props) => `linear api token: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator$j = {
+  messages: messages$i,
+  meta: {
+    id: "@secretlint/secretlint-rule-linear",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-linear/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$i);
+    const normalizedOptions = {
+      allows: options?.allows ?? []
+    };
+    return {
+      file(source) {
+        const pattern = new RegExp("(?<!\\p{L})lin_api_[a-zA-Z0-9_]{32,128}(?![a-zA-Z0-9_])", "gu");
+        const matches2 = source.content.matchAll(pattern);
+        for (const match of matches2) {
+          const index = match.index ?? 0;
+          const matchString = match[0] ?? "";
+          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
+          if (allowedResults.length > 0) {
+            continue;
+          }
+          const range = [index, index + matchString.length];
+          context.report({
+            message: t("LINEAR_API_TOKEN", {
+              ID: matchString
+            }),
+            range
+          });
+        }
+      }
+    };
+  }
+};
+var messages$h = {
+  NOTION_INTEGRATION_TOKEN: {
+    en: (props) => `found Notion integration token: ${props.TOKEN}`,
+    ja: (props) => `Notion integration \u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+function reportIfFoundToken({ source, options, context, t }) {
+  const NOTION_INTEGRATION_TOKEN_PATTERN = new RegExp("(?<!\\p{L})ntn_[0-9]{11}[A-Za-z0-9]{35}(?![A-Za-z0-9])", "gu");
+  const results = source.content.matchAll(NOTION_INTEGRATION_TOKEN_PATTERN);
+  for (const result of results) {
+    const index = result.index ?? 0;
+    const match = result[0] ?? "";
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("NOTION_INTEGRATION_TOKEN", {
+        TOKEN: match
+      }),
+      range
+    });
+  }
+}
+var creator$i = {
+  messages: messages$h,
+  meta: {
+    id: "@secretlint/secretlint-rule-notion",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-notion/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$h);
+    const normalizedOptions = {
+      allows: options.allows ?? []
+    };
+    return {
+      file(source) {
+        reportIfFoundToken({ source, options: normalizedOptions, context, t });
+      }
+    };
+  }
+};
+var messages$g = {
+  PrivateKey: {
+    en: (props) => `found private key: ${props.KEY}`,
+    ja: (props) => `\u79D8\u5BC6\u9375: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var PEM_CONTENT_PATTERN = /-----BEGIN[ ]?(?:(?:RSA|DSA|EC|OPENSSH|PGP) )?PRIVATE KEY(?: BLOCK)?-----\n?([A-Za-z0-9+/=\s\\]{100,10000})\n?-----END[ ]?(?:(?:RSA|DSA|EC|OPENSSH|PGP) )?PRIVATE KEY(?: BLOCK)?-----/gm;
+function validateBase64KeyContent(base64Content) {
+  if (!/^[A-Za-z0-9+/]+=*$/.test(base64Content)) {
+    return false;
+  }
+  if (base64Content.length < 100) {
+    return false;
+  }
+  const validMagicBytes = /^(MI|b3BlbnNzaC1rZXktdjE)/;
+  if (!validMagicBytes.test(base64Content)) {
+    return false;
+  }
+  return true;
+}
+function reportIfFoundRawPrivateKey({ source, options, context, t }) {
+  const results = source.content.matchAll(PEM_CONTENT_PATTERN);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    const base64Raw = result[1] || "";
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    const base64Content = base64Raw.replace(/\s|\\n/g, "");
+    if (!validateBase64KeyContent(base64Content)) {
+      continue;
+    }
+    context.report({
+      message: t("PrivateKey", {
+        KEY: match
+      }),
+      range
+    });
+  }
+}
+var creator$h = {
+  messages: messages$g,
+  meta: {
+    id: "@secretlint/secretlint-rule-privatekey",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-privatekey/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$g);
+    const normalizedOptions = {
+      allows: options.allows || []
+    };
+    return {
+      file(source) {
+        reportIfFoundRawPrivateKey({ source, options: normalizedOptions, context, t });
+      }
+    };
+  }
+};
+var messages$f = {
+  SENDGRID_KEY: {
+    en: (props) => `found Sendgrid api key: ${props.KEY}`,
+    ja: (props) => `Sendgrid API\u30AD\u30FC\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F\uFF1A ${props.KEY}`
+  }
+};
+function reportIfFoundKey$3({ source, options, context, t }) {
+  const SENDGRID_KEY_PATTERN = new RegExp("(?<!\\p{L})SG\\.\\w{1,128}\\.\\w{1,128}([-_]?)\\w{1,128}(?!\\w)", "gu");
+  const results = source.content.matchAll(SENDGRID_KEY_PATTERN);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    if (match.length !== 69) {
+      continue;
+    }
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("SENDGRID_KEY", {
+        KEY: match
+      }),
+      range
+    });
+  }
+}
+var creator$g = {
+  messages: messages$f,
+  meta: {
+    id: "@secretlint/secretlint-rule-sendgrid",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-sendgrid/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$f);
+    const normalizedOptions = {
+      allows: options.allows || []
+    };
+    return {
+      file(source) {
+        reportIfFoundKey$3({ source, options: normalizedOptions, context, t });
+      }
+    };
+  }
+};
+var messages$e = {
+  SHOPIFY_KEY: {
+    en: (props) => `found Shopify api key: ${props.KEY}`,
+    ja: (props) => `Shopify API\u30AD\u30FC\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F\uFF1A ${props.KEY}`
+  }
+};
+function reportIfFoundKey$2({ source, options, context, t }) {
+  const SHOPIFY_KEY_PATTERN = new RegExp("(?<!\\p{L})(shppa|shpca|shpat|shpss)_[a-zA-Z0-9]{32,64}(?![a-zA-Z0-9])", "gu");
+  const results = source.content.matchAll(SHOPIFY_KEY_PATTERN);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("SHOPIFY_KEY", {
+        KEY: match
+      }),
+      range
+    });
+  }
+}
+var creator$f = {
+  messages: messages$e,
+  meta: {
+    id: "@secretlint/secretlint-rule-shopify",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-shopify/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$e);
+    const normalizedOptions = {
+      allows: options.allows || []
+    };
+    return {
+      file(source) {
+        reportIfFoundKey$2({ source, options: normalizedOptions, context, t });
+      }
+    };
+  }
+};
+var messages$d = {
+  STRIPE_SECRET_KEY_LIVE: {
+    en: (props) => `found Stripe Live Secret Key: ${props.KEY}`,
+    ja: (props) => `Stripe Live Secret Key\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.KEY}`
+  },
+  STRIPE_SECRET_KEY_TEST: {
+    en: (props) => `found Stripe Test Secret Key: ${props.KEY}`,
+    ja: (props) => `Stripe Test Secret Key\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.KEY}`
+  },
+  STRIPE_RESTRICTED_KEY_LIVE: {
+    en: (props) => `found Stripe Live Restricted Key: ${props.KEY}`,
+    ja: (props) => `Stripe Live Restricted Key\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.KEY}`
+  },
+  STRIPE_RESTRICTED_KEY_TEST: {
+    en: (props) => `found Stripe Test Restricted Key: ${props.KEY}`,
+    ja: (props) => `Stripe Test Restricted Key\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.KEY}`
+  }
+};
+var messageIdMap$1 = {
+  sk_live: "STRIPE_SECRET_KEY_LIVE",
+  sk_test: "STRIPE_SECRET_KEY_TEST",
+  rk_live: "STRIPE_RESTRICTED_KEY_LIVE",
+  rk_test: "STRIPE_RESTRICTED_KEY_TEST"
+};
+var STRIPE_KEY_PATTERN = new RegExp("(?<!\\p{L})(?<prefix>sk_live|sk_test|rk_live|rk_test)_[a-zA-Z0-9]{24,99}(?![a-zA-Z0-9])", "gu");
+function reportIfFound$2({ source, options, context, t }) {
+  const results = source.content.matchAll(STRIPE_KEY_PATTERN);
+  for (const result of results) {
+    const index = result.index ?? 0;
+    const match = result[0] ?? "";
+    const prefix = result.groups?.["prefix"];
+    if (!prefix) {
+      continue;
+    }
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t(messageIdMap$1[prefix], {
+        KEY: match
+      }),
+      range
+    });
+  }
+}
+var creator$e = {
+  messages: messages$d,
+  meta: {
+    id: "@secretlint/secretlint-rule-stripe",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-stripe/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$d);
+    const normalizedOptions = {
+      allows: options.allows ?? []
+    };
+    return {
+      file(source) {
+        reportIfFound$2({ source, options: normalizedOptions, context, t });
+      }
+    };
+  }
+};
+var messages$c = {
+  GITHUB_TOKEN: {
+    en: (props) => `found GitHub Token(${props.typeName}): ${props.KEY}`,
+    ja: (props) => `GitHub Token(${props.typeName})\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F\uFF1A ${props.KEY}`
+  }
+};
+var typeMap = /* @__PURE__ */ new Map([
+  ["ghp", "GitHub personal access tokens"],
+  ["gho", "OAuth access tokens"],
+  ["ghu", "GitHub user-to-server tokens"],
+  ["ghs", "GitHub server-to-server tokens"],
+  ["ghr", "refresh tokens"],
+  ["github_pat", "fine-grained personal access tokens"]
+]);
+function reportIfFoundKey$1({ pattern, source, options, context, t }) {
+  const results = source.content.matchAll(pattern);
+  for (const result of results) {
+    const index = result.index || 0;
+    const type = result.groups?.type;
+    const typeName = typeMap.get(type);
+    if (!typeName) {
+      throw new Error("Unknown type:" + typeName);
+    }
+    const match = result[0] || "";
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("GITHUB_TOKEN", {
+        KEY: match,
+        typeName
+      }),
+      range
+    });
+  }
+}
+var creator$d = {
+  messages: messages$c,
+  meta: {
+    id: "@secretlint/secretlint-rule-github",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-github/README.md"
+    }
+  },
+  create(context, options) {
+    const CLASSIC_GITHUB_TOKEN_PATTERN = new RegExp("(?<!\\p{L})(?<type>ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36}(?![A-Za-z0-9_])", "gu");
+    const FINE_GRAINED_GITHUB_TOKEN_PATTERN = new RegExp("(?<!\\p{L})(?<type>github_pat)_[A-Za-z0-9_]{82}(?![A-Za-z0-9_])", "gu");
+    const GITHUB_APP_INSTALLATION_TOKEN_PATTERN = new RegExp("(?<!\\p{L})(?<type>ghs)_[0-9]{1,20}_[A-Za-z0-9_-]{1,1000}\\.[A-Za-z0-9_-]{1,10000}\\.[A-Za-z0-9_-]{1,1000}(?![A-Za-z0-9_-])", "gu");
+    const patterns = [
+      CLASSIC_GITHUB_TOKEN_PATTERN,
+      FINE_GRAINED_GITHUB_TOKEN_PATTERN,
+      GITHUB_APP_INSTALLATION_TOKEN_PATTERN
+    ];
+    const t = context.createTranslator(messages$c);
+    const normalizedOptions = {
+      allows: options.allows || []
+    };
+    return {
+      file(source) {
+        for (const pattern of patterns) {
+          reportIfFoundKey$1({ pattern, source, options: normalizedOptions, context, t });
+        }
+      }
+    };
+  }
+};
+var messages$b = {
+  GITLAB_PERSONAL_ACCESS_TOKEN: {
+    en: (props) => `found GitLab Personal Access Token: ${props.KEY}`,
+    ja: (props) => `GitLab Personal Access Token\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.KEY}`
+  }
+};
+function reportIfFoundKey({ pattern, source, options, context, t }) {
+  const results = source.content.matchAll(pattern);
+  for (const result of results) {
+    const index = result.index ?? 0;
+    const match = result[0] ?? "";
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("GITLAB_PERSONAL_ACCESS_TOKEN", {
+        KEY: match
+      }),
+      range
+    });
+  }
+}
+var creator$c = {
+  messages: messages$b,
+  meta: {
+    id: "@secretlint/secretlint-rule-gitlab",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-gitlab/README.md"
+    }
+  },
+  create(context, options) {
+    const GITLAB_PERSONAL_ACCESS_TOKEN_PATTERN = new RegExp("(?<!\\p{L})glpat-[A-Za-z0-9_-]{20,128}(?![A-Za-z0-9_-])", "gu");
+    const patterns = [GITLAB_PERSONAL_ACCESS_TOKEN_PATTERN];
+    const t = context.createTranslator(messages$b);
+    const normalizedOptions = {
+      allows: options.allows ?? []
+    };
+    return {
+      file(source) {
+        for (const pattern of patterns) {
+          reportIfFoundKey({ pattern, source, options: normalizedOptions, context, t });
+        }
+      }
+    };
+  }
+};
+var messages$a = {
+  GRAFANA_CLOUD_API_TOKEN: {
+    en: (props) => `found Grafana Cloud API token: ${props.TOKEN}`,
+    ja: (props) => `Grafana Cloud API \u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  GRAFANA_SERVICE_ACCOUNT_TOKEN: {
+    en: (props) => `found Grafana Service Account token: ${props.TOKEN}`,
+    ja: (props) => `Grafana Service Account \u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+function reportIfFound$1({ pattern, messageId, source, options, context, t }) {
+  const results = source.content.matchAll(pattern);
+  for (const result of results) {
+    const index = result.index ?? 0;
+    const match = result[0] ?? "";
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    const range = [index, index + match.length];
+    context.report({
+      message: t(messageId, {
+        TOKEN: match
+      }),
+      range
+    });
+  }
+}
+var creator$b = {
+  messages: messages$a,
+  meta: {
+    id: "@secretlint/secretlint-rule-grafana",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-grafana/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$a);
+    const normalizedOptions = {
+      allows: options?.allows ?? []
+    };
+    const GRAFANA_CLOUD_API_TOKEN_PATTERN = new RegExp("(?<!\\p{L})glc_[A-Za-z0-9+/]{32,400}={0,2}(?![A-Za-z0-9+/=])", "gu");
+    const GRAFANA_SERVICE_ACCOUNT_TOKEN_PATTERN = new RegExp("(?<!\\p{L})glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}(?![A-Fa-f0-9])", "gu");
+    return {
+      file(source) {
+        reportIfFound$1({
+          pattern: GRAFANA_CLOUD_API_TOKEN_PATTERN,
+          messageId: "GRAFANA_CLOUD_API_TOKEN",
+          source,
+          options: normalizedOptions,
+          context,
+          t
+        });
+        reportIfFound$1({
+          pattern: GRAFANA_SERVICE_ACCOUNT_TOKEN_PATTERN,
+          messageId: "GRAFANA_SERVICE_ACCOUNT_TOKEN",
+          source,
+          options: normalizedOptions,
+          context,
+          t
+        });
+      }
+    };
+  }
+};
+var messages$9 = {
+  OPS_TOKEN: {
+    en: (props) => `found 1Password Service Account token: ${props.TOKEN}`,
+    ja: (props) => `1Password Service Account: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var is1PasswordServiceAccountToken = (base64String) => {
+  try {
+    const jsonString = atob(base64String.replace(/-/g, "+").replace(/_/g, "/"));
+    const json2 = JSON.parse(jsonString);
+    return typeof json2 === "object" && json2 !== null;
+  } catch (error62) {
+    return false;
+  }
+};
+var creator$a = {
+  messages: messages$9,
+  meta: {
+    id: "@secretlint/secretlint-rule-1password",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-1password/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$9);
+    const normalizedOptions = {
+      allows: options?.allows ?? []
+    };
+    return {
+      file(source) {
+        const pattern = new RegExp("(?<!\\p{L})ops_(ey[A-Za-z0-9+/=]{100,1280}fQ={0,2})(?![A-Za-z0-9+/=])", "gu");
+        const matches2 = source.content.matchAll(pattern);
+        for (const match of matches2) {
+          const index = match.index ?? 0;
+          const matchString = match[0] ?? "";
+          const base64String = match[1] ?? "";
+          if (!is1PasswordServiceAccountToken(base64String)) {
+            continue;
+          }
+          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
+          if (allowedResults.length > 0) {
+            continue;
+          }
+          const range = [index, index + matchString.length];
+          context.report({
+            message: t("OPS_TOKEN", {
+              TOKEN: matchString
+            }),
+            range
+          });
+        }
+      }
+    };
+  }
+};
+var messages$8 = {
+  MongoDBConnection: {
+    en: (props) => `found MongoDB connection string: ${props.URI}`,
+    ja: (props) => `MongoDB\u63A5\u7D9A\u6587\u5B57\u5217: ${props.URI} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  MySQLConnection: {
+    en: (props) => `found MySQL connection string: ${props.URI}`,
+    ja: (props) => `MySQL\u63A5\u7D9A\u6587\u5B57\u5217: ${props.URI} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  PostgreSQLConnection: {
+    en: (props) => `found PostgreSQL connection string: ${props.URI}`,
+    ja: (props) => `PostgreSQL\u63A5\u7D9A\u6587\u5B57\u5217: ${props.URI} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var BUILTIN_IGNORED_PATTERNS = [
+  "localhost",
+  "127.0.0.1",
+  "example.com",
+  "example.org",
+  "test.com",
+  "password",
+  "username",
+  "secret",
+  "mypassword",
+  "myusername",
+  "root",
+  "admin",
+  "user",
+  "pass",
+  "{password}",
+  "${password}",
+  "{{password}}",
+  "{username}",
+  "${username}",
+  "{{username}}",
+  "YOUR_PASSWORD",
+  "YOUR_USERNAME",
+  "REPLACE_WITH_PASSWORD"
+];
+function isVariableLikeString(str) {
+  const variablePatterns = [
+    /\$\{[^}]{1,50}\}/,
+    // ${var}
+    /\{\{[^}]{1,50}\}\}/,
+    // {{var}}
+    /\{[^}]{1,50}\}/,
+    // {var}
+    /%[A-Z_]{1,30}%/,
+    // %VAR%
+    /\$[A-Z_]{1,30}/,
+    // $VAR
+    /\$\([^)]{1,50}\)/
+    // $(var)
+  ];
+  return variablePatterns.some((pattern) => pattern.test(str));
+}
+function isLikelyRealCredential(username, password) {
+  if (username === password)
+    return false;
+  if (password.length < 4)
+    return false;
+  if (isVariableLikeString(password))
+    return false;
+  const passwordLower = password.toLowerCase();
+  if (BUILTIN_IGNORED_PATTERNS.some((pattern) => passwordLower === pattern.toLowerCase())) {
+    return false;
+  }
+  if (/^(.)\1{3,}$/.test(password))
+    return false;
+  return true;
+}
+function reportMongoDBConnectionString({ source, options, context, t }) {
+  const MONGODB_PATTERN = /mongodb(?:\+srv)?:\/\/(?:(?<username>[^:\/\s]{1,100}):(?<password>[^@\/\s]{1,200})@)?(?<host>[^\/\s?]{1,100})(?:\/(?<database>[^?\s]{0,100}))?(?:\?(?<options>[^\s]{0,500}))?/gi;
+  const results = source.content.matchAll(MONGODB_PATTERN);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    const username = result.groups?.username;
+    const password = result.groups?.password;
+    if (!username || !password)
+      continue;
+    if (!isLikelyRealCredential(username, password))
+      continue;
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("MongoDBConnection", {
+        URI: match
+      }),
+      range
+    });
+  }
+}
+function reportMySQLConnectionString({ source, options, context, t }) {
+  const MYSQL_URI_PATTERN = /(?:jdbc:)?mysql(?:x)?:\/\/(?:(?<username>[^:\/\s]{1,100}):(?<password>[^@\/\s]{1,200})@)?(?<host>[^\/\s?]{1,100})(?:\/(?<database>[^?\s]{0,100}))?(?:\?(?<options>[^\s]{0,500}))?/gi;
+  const results = source.content.matchAll(MYSQL_URI_PATTERN);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    const username = result.groups?.username;
+    const password = result.groups?.password;
+    if (!username || !password)
+      continue;
+    if (!isLikelyRealCredential(username, password))
+      continue;
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("MySQLConnection", {
+        URI: match
+      }),
+      range
+    });
+  }
+}
+function reportPostgreSQLConnectionString({ source, options, context, t }) {
+  const POSTGRESQL_URI_PATTERN = /postgres(?:ql)?:\/\/(?:(?<username>[^:\/\s]{1,100}):(?<password>[^@\/\s]{1,200})@)?(?<host>[^\/\s?]{1,100})(?:\/(?<database>[^?\s]{0,100}))?(?:\?(?<options>[^\s]{0,500}))?/gi;
+  const results = source.content.matchAll(POSTGRESQL_URI_PATTERN);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    const username = result.groups?.username;
+    const password = result.groups?.password;
+    if (!username || !password)
+      continue;
+    if (!isLikelyRealCredential(username, password))
+      continue;
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("PostgreSQLConnection", {
+        URI: match
+      }),
+      range
+    });
+  }
+}
+var creator$9 = {
+  messages: messages$8,
+  meta: {
+    id: "@secretlint/secretlint-rule-database-connection-string",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-database-connection-string/README.md"
+    }
+  },
+  create(context, options) {
+    const normalizedOptions = {
+      allows: options.allows || []
+    };
+    const t = context.createTranslator(messages$8);
+    return {
+      file(source) {
+        reportMongoDBConnectionString({ source, options: normalizedOptions, context, t });
+        reportMySQLConnectionString({ source, options: normalizedOptions, context, t });
+        reportPostgreSQLConnectionString({ source, options: normalizedOptions, context, t });
+      }
+    };
+  }
+};
+var messages$7 = {
+  HASHICORP_VAULT_SERVICE_TOKEN: {
+    en: (props) => `found HashiCorp Vault service token: ${props.TOKEN}`,
+    ja: (props) => `HashiCorp Vault service token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  HASHICORP_VAULT_BATCH_TOKEN: {
+    en: (props) => `found HashiCorp Vault batch token: ${props.TOKEN}`,
+    ja: (props) => `HashiCorp Vault batch token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  HASHICORP_VAULT_RECOVERY_TOKEN: {
+    en: (props) => `found HashiCorp Vault recovery token: ${props.TOKEN}`,
+    ja: (props) => `HashiCorp Vault recovery token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var serviceTokenPattern = new RegExp("(?<!\\p{L})hvs\\.[A-Za-z0-9_-]{90,120}(?![A-Za-z0-9_-])", "gu");
+var batchTokenPattern = new RegExp("(?<!\\p{L})hvb\\.[A-Za-z0-9_-]{138,300}(?![A-Za-z0-9_-])", "gu");
+var recoveryTokenPattern = new RegExp("(?<!\\p{L})hvr\\.[A-Za-z0-9_-]{90,120}(?![A-Za-z0-9_-])", "gu");
+var creator$8 = {
+  messages: messages$7,
+  meta: {
+    id: "@secretlint/secretlint-rule-hashicorp-vault",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-hashicorp-vault/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$7);
+    const normalizedOptions = {
+      allows: options?.allows ?? []
+    };
+    const reportMatches = (source, pattern, messageId) => {
+      const matches2 = source.content.matchAll(pattern);
+      for (const match of matches2) {
+        const index = match.index ?? 0;
+        const matchString = match[0] ?? "";
+        const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
+        if (allowedResults.length > 0) {
+          continue;
+        }
+        const range = [index, index + matchString.length];
+        context.report({
+          message: t(messageId, {
+            TOKEN: matchString
+          }),
+          range
+        });
+      }
+    };
+    return {
+      file(source) {
+        reportMatches(source, serviceTokenPattern, "HASHICORP_VAULT_SERVICE_TOKEN");
+        reportMatches(source, batchTokenPattern, "HASHICORP_VAULT_BATCH_TOKEN");
+        reportMatches(source, recoveryTokenPattern, "HASHICORP_VAULT_RECOVERY_TOKEN");
+      }
+    };
+  }
+};
+var messages$6 = {
+  VERCEL_PERSONAL_ACCESS_TOKEN: {
+    en: (props) => `found Vercel personal access token: ${props.ID}`,
+    ja: (props) => `Vercel personal access token: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  VERCEL_INTEGRATION_TOKEN: {
+    en: (props) => `found Vercel integration token: ${props.ID}`,
+    ja: (props) => `Vercel integration token: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  VERCEL_APP_ACCESS_TOKEN: {
+    en: (props) => `found Vercel app access token: ${props.ID}`,
+    ja: (props) => `Vercel app access token: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  VERCEL_APP_REFRESH_TOKEN: {
+    en: (props) => `found Vercel app refresh token: ${props.ID}`,
+    ja: (props) => `Vercel app refresh token: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  VERCEL_AI_GATEWAY_API_KEY: {
+    en: (props) => `found Vercel AI Gateway API key: ${props.ID}`,
+    ja: (props) => `Vercel AI Gateway API key: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var prefixToMessageId = {
+  vcp: "VERCEL_PERSONAL_ACCESS_TOKEN",
+  vci: "VERCEL_INTEGRATION_TOKEN",
+  vca: "VERCEL_APP_ACCESS_TOKEN",
+  vcr: "VERCEL_APP_REFRESH_TOKEN",
+  vck: "VERCEL_AI_GATEWAY_API_KEY"
+};
+var creator$7 = {
+  messages: messages$6,
+  meta: {
+    id: "@secretlint/secretlint-rule-vercel",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-vercel/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$6);
+    const normalizedOptions = {
+      allows: options?.allows ?? []
+    };
+    return {
+      file(source) {
+        const pattern = new RegExp("(?<!\\p{L})(?<prefix>vcp|vci|vca|vcr|vck)_[A-Za-z0-9]{20,60}(?![A-Za-z0-9])", "gu");
+        const matches2 = source.content.matchAll(pattern);
+        for (const match of matches2) {
+          const index = match.index ?? 0;
+          const matchString = match[0] ?? "";
+          const prefix = match.groups?.prefix;
+          const messageId = prefixToMessageId[prefix];
+          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
+          if (allowedResults.length > 0) {
+            continue;
+          }
+          const range = [index, index + matchString.length];
+          context.report({
+            message: t(messageId, {
+              ID: matchString
+            }),
+            range
+          });
+        }
+      }
+    };
+  }
+};
+var messages$5 = {
+  DATABRICKS_PERSONAL_ACCESS_TOKEN: {
+    en: (props) => `found Databricks personal access token: ${props.ID}`,
+    ja: (props) => `Databricks personal access token: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator$6 = {
+  messages: messages$5,
+  meta: {
+    id: "@secretlint/secretlint-rule-databricks",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-databricks/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$5);
+    const normalizedOptions = {
+      allows: options?.allows ?? []
+    };
+    return {
+      file(source) {
+        const pattern = new RegExp("(?<!\\p{L})dapi[A-Fa-f0-9]{32}(?:-[0-9])?(?![A-Fa-f0-9])", "gu");
+        const matches2 = source.content.matchAll(pattern);
+        for (const match of matches2) {
+          const index = match.index ?? 0;
+          const matchString = match[0] ?? "";
+          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
+          if (allowedResults.length > 0) {
+            continue;
+          }
+          const range = [index, index + matchString.length];
+          context.report({
+            message: t("DATABRICKS_PERSONAL_ACCESS_TOKEN", {
+              ID: matchString
+            }),
+            range
+          });
+        }
+      }
+    };
+  }
+};
+var messages$4 = {
+  DOCKER_PERSONAL_ACCESS_TOKEN: {
+    en: (props) => `found Docker Personal Access Token: ${props.TOKEN}`,
+    ja: (props) => `Docker Personal Access Token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+function reportIfFoundDockerPAT({ source, options, context, t }) {
+  const DOCKER_PAT_PATTERN = new RegExp("(?<!\\p{L})dckr_pat_[a-zA-Z0-9_-]{27}(?![a-zA-Z0-9_-])", "gu");
+  const results = source.content.matchAll(DOCKER_PAT_PATTERN);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[0] || "";
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("DOCKER_PERSONAL_ACCESS_TOKEN", {
+        TOKEN: match
+      }),
+      range
+    });
+  }
+}
+var creator$5 = {
+  messages: messages$4,
+  meta: {
+    id: "@secretlint/secretlint-rule-docker",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-docker/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$4);
+    const normalizedOptions = {
+      allows: options.allows || []
+    };
+    return {
+      file(source) {
+        reportIfFoundDockerPAT({ source, options: normalizedOptions, context, t });
+      }
+    };
+  }
+};
+var messages$3 = {
+  FIGMA_PERSONAL_ACCESS_TOKEN: {
+    en: (props) => `found Figma Personal Access Token: ${props.ID}`,
+    ja: (props) => `Figma Personal Access Token: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator$4 = {
+  messages: messages$3,
+  meta: {
+    id: "@secretlint/secretlint-rule-figma",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-figma/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$3);
+    const normalizedOptions = {
+      allows: options?.allows ?? []
+    };
+    return {
+      file(source) {
+        const pattern = new RegExp("(?<!\\p{L})figd_[A-Za-z0-9_-]{40,200}(?![A-Za-z0-9_-])", "gu");
+        const matches2 = source.content.matchAll(pattern);
+        for (const match of matches2) {
+          const index = match.index ?? 0;
+          const matchString = match[0] ?? "";
+          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
+          if (allowedResults.length > 0) {
+            continue;
+          }
+          const range = [index, index + matchString.length];
+          context.report({
+            message: t("FIGMA_PERSONAL_ACCESS_TOKEN", {
+              ID: matchString
+            }),
+            range
+          });
+        }
+      }
+    };
+  }
+};
+var messages$2 = {
+  CLOUDFLARE_GLOBAL_API_KEY: {
+    en: (props) => `found Cloudflare Global API Key: ${props.TOKEN}`,
+    ja: (props) => `Cloudflare Global API Key\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.TOKEN}`
+  },
+  CLOUDFLARE_USER_API_TOKEN: {
+    en: (props) => `found Cloudflare User API Token: ${props.TOKEN}`,
+    ja: (props) => `Cloudflare User API Token\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.TOKEN}`
+  },
+  CLOUDFLARE_ACCOUNT_API_TOKEN: {
+    en: (props) => `found Cloudflare Account API Token: ${props.TOKEN}`,
+    ja: (props) => `Cloudflare Account API Token\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.TOKEN}`
+  }
+};
+var messageIdMap = {
+  cfk: "CLOUDFLARE_GLOBAL_API_KEY",
+  cfut: "CLOUDFLARE_USER_API_TOKEN",
+  cfat: "CLOUDFLARE_ACCOUNT_API_TOKEN"
+};
+var CLOUDFLARE_TOKEN_PATTERN = new RegExp("(?<!\\p{L})(?<prefix>cfk|cfut|cfat)_[A-Za-z0-9]{40}[0-9a-f]{8}(?![A-Za-z0-9])", "gu");
+function reportIfFound({ source, options, context, t }) {
+  const results = source.content.matchAll(CLOUDFLARE_TOKEN_PATTERN);
+  for (const result of results) {
+    const index = result.index ?? 0;
+    const match = result[0] ?? "";
+    const prefix = result.groups?.["prefix"];
+    if (!prefix) {
+      continue;
+    }
+    const range = [index, index + match.length];
+    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t(messageIdMap[prefix], {
+        TOKEN: match
+      }),
+      range
+    });
+  }
+}
+var creator$3 = {
+  messages: messages$2,
+  meta: {
+    id: "@secretlint/secretlint-rule-cloudflare",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-cloudflare/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$2);
+    const normalizedOptions = {
+      allows: options.allows ?? []
+    };
+    return {
+      file(source) {
+        reportIfFound({ source, options: normalizedOptions, context, t });
+      }
+    };
+  }
+};
+var messages$1 = {
+  TAILSCALE_API_KEY: {
+    en: (props) => `found Tailscale API access token: ${props.KEY}`,
+    ja: (props) => `Tailscale API \u30A2\u30AF\u30BB\u30B9\u30C8\u30FC\u30AF\u30F3: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  TAILSCALE_AUTH_KEY: {
+    en: (props) => `found Tailscale pre-authentication key: ${props.KEY}`,
+    ja: (props) => `Tailscale \u4E8B\u524D\u8A8D\u8A3C\u30AD\u30FC: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  TAILSCALE_CLIENT_KEY: {
+    en: (props) => `found Tailscale OAuth client key: ${props.KEY}`,
+    ja: (props) => `Tailscale OAuth \u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u30AD\u30FC: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  TAILSCALE_SCIM_KEY: {
+    en: (props) => `found Tailscale SCIM key: ${props.KEY}`,
+    ja: (props) => `Tailscale SCIM \u30AD\u30FC: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  TAILSCALE_WEBHOOK_KEY: {
+    en: (props) => `found Tailscale webhook key: ${props.KEY}`,
+    ja: (props) => `Tailscale Webhook \u30AD\u30FC: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  TAILSCALE_KEY: {
+    en: (props) => `found Tailscale key: ${props.KEY}`,
+    ja: (props) => `Tailscale \u30AD\u30FC: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var messageIdByType = {
+  api: "TAILSCALE_API_KEY",
+  auth: "TAILSCALE_AUTH_KEY",
+  client: "TAILSCALE_CLIENT_KEY",
+  scim: "TAILSCALE_SCIM_KEY",
+  webhook: "TAILSCALE_WEBHOOK_KEY"
+};
+var creator$2 = {
+  messages: messages$1,
+  meta: {
+    id: "@secretlint/secretlint-rule-tailscale",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-tailscale/README.md"
+    }
+  },
+  create(context, options) {
+    const t = context.createTranslator(messages$1);
+    const normalizedOptions = {
+      allows: options.allows ?? []
+    };
+    return {
+      file(source) {
+        const pattern = new RegExp("(?<!\\p{L})tskey-(?<type>[a-z]{2,20})-[0-9A-Za-z_]{8,40}-[0-9A-Za-z_]{16,60}(?![0-9A-Za-z_])", "gu");
+        const matches2 = source.content.matchAll(pattern);
+        for (const match of matches2) {
+          const index = match.index ?? 0;
+          const matchString = match[0] ?? "";
+          const type = match.groups?.type ?? "";
+          const range = [index, index + matchString.length];
+          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
+          if (allowedResults.length > 0) {
+            continue;
+          }
+          const messageId = messageIdByType[type] ?? "TAILSCALE_KEY";
+          context.report({
+            message: t(messageId, {
+              KEY: matchString
+            }),
+            range
+          });
+        }
+      }
+    };
+  }
+};
+var HTML_COMMENT_REGEXP = /(?<type>secretlint-(?:disable-next-line|disable-line|disable|enable))(?<options>.*)/g;
+var parseComments = (source) => {
+  const matches2 = source.content.matchAll(HTML_COMMENT_REGEXP);
+  return Array.from(matches2).map((match) => {
+    const type = match.groups?.type;
+    const index = match.index;
+    if (type === "secretlint-disable-line") {
+      return {
+        type,
+        options: parseComment(match.groups?.options),
+        line: source.indexToPosition(index).line
+      };
+    }
+    if (type === "secretlint-disable-next-line") {
+      return {
+        type,
+        options: parseComment(match.groups?.options),
+        line: source.indexToPosition(index).line + 1
+      };
+    }
+    return {
+      type,
+      options: parseComment(match.groups?.options),
+      index
+    };
+  });
+};
+function parseComment(options) {
+  if (!options) {
+    return [];
+  }
+  const commentStart = options.indexOf("--");
+  const ruleIdString = commentStart === -1 ? options : options.slice(0, commentStart);
+  return ruleIdString.split(/,/).map((arg) => arg.trim()).filter((arg) => arg !== "") ?? [];
+}
+var CommentState = class {
+  source;
+  reportingConfig;
+  endIndex;
+  constructor(source) {
+    this.source = source;
+    this.reportingConfig = [];
+    this.endIndex = source.content.length;
+  }
+  getIgnoringMessages() {
+    const isFilledMessage = (message) => {
+      return message.startIndex !== null && message.endIndex !== null && message.ruleId !== null;
+    };
+    return this.reportingConfig.map((reporting) => {
+      if (reporting.endIndex === null) {
+        reporting.endIndex = this.endIndex;
+      }
+      return reporting;
+    }).filter(isFilledMessage);
+  }
+  disableLine(lineNumber, rulesToDisable) {
+    const reportingConfig = this.reportingConfig;
+    const range = this.source.locationToRange({
+      start: {
+        line: lineNumber,
+        column: 0
+      },
+      end: {
+        line: lineNumber + 1,
+        column: 0
+      }
+    });
+    if (rulesToDisable.length) {
+      rulesToDisable.forEach((ruleId) => {
+        reportingConfig.push({
+          startIndex: range[0],
+          endIndex: range[1] - 1,
+          ruleId
+        });
+      });
+    } else {
+      reportingConfig.push({
+        startIndex: range[0],
+        endIndex: range[1] - 1,
+        ruleId: "*"
+      });
+    }
+  }
+  /**
+   * Add data to reporting configuration to disable reporting for list of rules
+   * starting from start location
+   * @returns {void}
+   */
+  disableReporting(startIndex, rulesToDisable) {
+    const reportingConfig = this.reportingConfig;
+    if (rulesToDisable.length) {
+      rulesToDisable.forEach(function(ruleId) {
+        reportingConfig.push({
+          startIndex,
+          endIndex: null,
+          ruleId
+        });
+      });
+    } else {
+      reportingConfig.push({
+        startIndex,
+        endIndex: null,
+        ruleId: "*"
+      });
+    }
+  }
+  /**
+   * Add data to reporting configuration to enable reporting for list of rules
+   * starting from start location
+   */
+  enableReporting(endIndex, rulesToEnable) {
+    const reportingConfig = this.reportingConfig;
+    if (rulesToEnable.length) {
+      rulesToEnable.forEach(function(ruleId) {
+        for (let i = reportingConfig.length - 1; i >= 0; i--) {
+          if (reportingConfig[i].endIndex === null && reportingConfig[i].ruleId === ruleId) {
+            reportingConfig[i].endIndex = endIndex;
+            break;
+          }
+        }
+      });
+    } else {
+      for (const config2 of reportingConfig) {
+        if (config2.endIndex === null) {
+          config2.endIndex = endIndex;
+        }
+      }
+    }
+  }
+};
+var messages = {
+  IGNORE_MESSAGE: {
+    en: () => `disable by secretlint-disable comment`
+  }
+};
+var creator$1 = {
+  messages,
+  meta: {
+    id: "@secretlint/secretlint-rule-filter-comments",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-filter-comments/README.md"
+    }
+  },
+  create(context) {
+    const t = context.createTranslator(messages);
+    return {
+      file(source) {
+        const state = new CommentState(source);
+        const comments = parseComments(source);
+        for (const comment of comments) {
+          if (comment.type === "secretlint-disable") {
+            state.disableReporting(comment.index, comment.options);
+          } else if (comment.type === "secretlint-enable") {
+            state.enableReporting(comment.index, comment.options);
+          } else if (comment.type === "secretlint-disable-line") {
+            state.disableLine(comment.line, comment.options);
+          } else if (comment.type === "secretlint-disable-next-line") {
+            state.disableLine(comment.line, comment.options);
+          }
+        }
+        state.getIgnoringMessages().forEach((message) => {
+          context.ignore({
+            message: t("IGNORE_MESSAGE"),
+            range: [message.startIndex, message.endIndex],
+            targetRuleId: message.ruleId
+          });
+        });
+      }
+    };
+  }
+};
+var rules = [
+  creator$s,
+  creator$r,
+  creator$h,
+  creator$q,
+  creator$o,
+  creator$p,
+  creator$g,
+  creator$f,
+  creator$e,
+  creator$d,
+  creator$c,
+  creator$b,
+  creator$n,
+  creator$m,
+  creator$l,
+  creator$k,
+  creator$j,
+  creator$i,
+  creator$a,
+  creator$9,
+  creator$8,
+  creator$7,
+  creator$6,
+  creator$5,
+  creator$4,
+  creator$3,
+  creator$2,
+  creator$1
+];
+var creator = {
+  meta: {
+    id: "@secretlint/secretlint-rule-preset-recommend",
+    recommended: true,
+    type: "preset"
+  },
+  rules,
+  create(context, _options) {
+    rules.forEach((rule) => {
+      context.registerRule(rule);
+    });
+  }
+};
+
+// src/redact.ts
+var MASK = "[REDACTED]";
+var PATTERNS = [
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+  /\bsk-ant-[A-Za-z0-9_-]{20,}/g,
+  // Anthropic
+  /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}/g,
+  // OpenAI-style
+  /\bgh[pousr]_[A-Za-z0-9]{30,}/g,
+  // GitHub tokens
+  /\bgithub_pat_[A-Za-z0-9_]{22,}/g,
+  /\bglpat-[A-Za-z0-9_-]{20,}/g,
+  // GitLab
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g,
+  // AWS access key id
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/g,
+  // Slack
+  /\bnpm_[A-Za-z0-9]{36}\b/g,
+  // npm
+  /\bAIza[0-9A-Za-z_-]{35}\b/g,
+  // Google API key
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g
+  // JWT
+];
+var ASSIGNMENT = /\b(\w*?(?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key)(?:_access_key)?\s*[:=]\s*)(["']?)(?=[^\s"',;]*[0-9_\-+/!@#$%^&*])[^\s"',;]{8,}\2/gi;
+var BEARER = /\b(Bearer\s+)[A-Za-z0-9._~+/-]{16,}=*/g;
+var BASIC = /\b(Authorization:\s*Basic\s+)[A-Za-z0-9+/]{8,}={0,2}/gi;
+var VALUE = String.raw`(?:(["'])[^"'\n]+\2|[^\s"']+)`;
+var CREDENTIAL = String.raw`(?:(["'])[^"'\n]+\2|(?=[^\s"']*[0-9_\-+/!@#$%^&*])[^\s"']{6,})`;
+var SAME_COMMAND = String.raw`(?:\s+[^\s;&|]+){0,8}?`;
+var COMMAND_LINE = [
+  // `mysql -pSECRET`; with a space after -p, mysql asks instead.
+  new RegExp(
+    String.raw`(\b(?:mysql|mariadb|mysqldump|mysqladmin|mysqlimport|mysqlshow)${SAME_COMMAND}\s-p)${VALUE}`,
+    "g"
+  ),
+  new RegExp(String.raw`(\bsshpass\s+-p\s*)${VALUE}`, "g"),
+  new RegExp(
+    String.raw`((?:\s--(?:password|passwd|token|secret|api-key|access-token|client-secret)|\baws_secret_access_key)\s+)${CREDENTIAL}`,
+    "gi"
+  )
+];
+var CURL_USER = new RegExp(
+  String.raw`(\bcurl${SAME_COMMAND}\s(?:-u|--user)\s*)(?:(["'])([^:"'\n]+:)[^"'\n]+\2|([^\s:"']+:)[^\s"']+)`,
+  "g"
+);
+var URL_CREDENTIALS = /(\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)[^\s@/]+@/gi;
+function redactText(text) {
+  let count = 0;
+  const hit = () => {
+    count++;
+    return MASK;
+  };
+  let out = text;
+  for (const re of PATTERNS) out = out.replace(re, hit);
+  out = out.replace(ASSIGNMENT, (_m, label, q) => `${label}${q}${hit()}${q}`);
+  out = out.replace(BEARER, (_m, label) => `${label}${hit()}`);
+  out = out.replace(BASIC, (_m, label) => `${label}${hit()}`);
+  for (const re of COMMAND_LINE)
+    out = out.replace(
+      re,
+      (_m, prefix, q) => q === void 0 ? `${prefix}${hit()}` : `${prefix}${q}${hit()}${q}`
+    );
+  out = out.replace(
+    CURL_USER,
+    (_m, prefix, q, quotedUser, bareUser) => q === void 0 ? `${prefix}${bareUser}${hit()}` : `${prefix}${q}${quotedUser}${hit()}${q}`
+  );
+  out = out.replace(URL_CREDENTIALS, (_m, prefix) => `${prefix}${hit()}@`);
+  return { text: out, count };
+}
+function mapStrings(value, f) {
+  if (typeof value === "string") return f(value);
+  if (Array.isArray(value)) return value.map((v) => mapStrings(v, f));
+  if (value !== null && typeof value === "object")
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, mapStrings(v, f)]));
+  return value;
+}
+var SECRETLINT = {
+  rules: [{ id: "@secretlint/secretlint-rule-preset-recommend", rule: creator }]
+};
+var OURS = /* @__PURE__ */ new Set([
+  "@secretlint/secretlint-rule-basicauth",
+  "@secretlint/secretlint-rule-database-connection-string"
+]);
+var SEPARATOR = "\n\0\n";
+async function maskProviderTokens(texts) {
+  if (texts.length === 0) return { texts, count: 0 };
+  const result = await lintSource({
+    source: { filePath: "record.txt", content: texts.join(SEPARATOR), contentType: "text" },
+    options: { config: SECRETLINT }
+  });
+  const ranges = result.messages.filter((m) => !OURS.has(m.ruleId)).map((m) => m.range);
+  if (ranges.length === 0) return { texts, count: 0 };
+  let count = 0;
+  let start = 0;
+  const out = texts.map((text) => {
+    const end = start + text.length;
+    const inside = ranges.filter(([a, b]) => a >= start && b <= end).sort((x, y) => y[0] - x[0]);
+    let masked = text;
+    let before = Number.POSITIVE_INFINITY;
+    for (const [a, b] of inside) {
+      if (b > before) continue;
+      masked = `${masked.slice(0, a - start)}${MASK}${masked.slice(b - start)}`;
+      before = a;
+      count++;
+    }
+    start = end + SEPARATOR.length;
+    return masked;
+  });
+  return { texts: out, count };
+}
+async function redactDeep(value) {
+  let count = 0;
+  const texts = [];
+  const ours = mapStrings(value, (text) => {
+    const r = redactText(text);
+    count += r.count;
+    texts.push(r.text);
+    return r.text;
+  });
+  const providers = await maskProviderTokens(texts);
+  let i = 0;
+  const masked = mapStrings(ours, () => providers.texts[i++]);
+  return { value: masked, count: count + providers.count };
+}
+
+// src/store/conversations.ts
+function isStoredTurn(value) {
+  if (value === null || typeof value !== "object") return false;
+  const turn = value;
+  return typeof turn.uuid === "string" && turn.uuid !== "" && typeof turn.at === "string" && typeof turn.text === "string" && Array.isArray(turn.replies) && turn.replies.every((reply) => typeof reply === "string") && turn.tools !== null && typeof turn.tools === "object";
+}
+function answerSize(turn) {
+  return turn.replies.reduce((sum, reply) => sum + reply.length, 0) + JSON.stringify(turn.tools).length;
+}
+async function readConversationStore(root, sessionId) {
+  let text;
+  try {
+    text = gunzipSync(await readFile7(projectPaths(root).conversation(sessionId)), {
+      finishFlush: constants2.Z_SYNC_FLUSH
+    }).toString("utf8");
+  } catch {
+    return [];
+  }
+  const byUuid = /* @__PURE__ */ new Map();
+  const order = [];
+  for (const line of text.split("\n")) {
+    if (line.trim() === "") continue;
+    let value;
+    try {
+      value = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!isStoredTurn(value)) continue;
+    const prev = byUuid.get(value.uuid);
+    if (!prev) {
+      byUuid.set(value.uuid, value);
+      order.push(value.uuid);
+      continue;
+    }
+    const fuller = answerSize(value) > answerSize(prev) ? value : prev;
+    const hash2 = prev.hash ?? value.hash;
+    byUuid.set(value.uuid, {
+      ...prev,
+      ...hash2 === void 0 ? {} : { hash: hash2 },
+      replies: fuller.replies,
+      tools: fuller.tools
+    });
+  }
+  return order.map((uuid3) => byUuid.get(uuid3));
+}
+async function appendConversationTurns(root, sessionId, turns) {
+  const stored = new Map(
+    (await readConversationStore(root, sessionId)).map((turn) => [turn.uuid, turn])
+  );
+  const seen = /* @__PURE__ */ new Set();
+  const fresh = [];
+  for (const turn of turns) {
+    if (turn.uuid === void 0 || seen.has(turn.uuid)) continue;
+    seen.add(turn.uuid);
+    const held = stored.get(turn.uuid);
+    if (held && answerSize(turn) <= answerSize(held)) continue;
+    fresh.push({
+      uuid: turn.uuid,
+      ...turn.hash === void 0 ? {} : { hash: turn.hash },
+      at: turn.at,
+      text: turn.text,
+      replies: turn.replies,
+      tools: turn.tools
+    });
+  }
+  if (fresh.length === 0) return 0;
+  const value = (await redactDeep(fresh)).value.filter((turn) => {
+    const held = stored.get(turn.uuid);
+    return !held || answerSize(turn) > answerSize(held);
+  });
+  if (value.length === 0) return 0;
+  const chunk = `${value.map((turn) => JSON.stringify(turn)).join("\n")}
+`;
+  const file2 = projectPaths(root).conversation(sessionId);
+  await mkdir5(dirname6(file2), { recursive: true });
+  await appendFile(file2, gzipSync(Buffer.from(chunk, "utf8")));
+  return value.length;
+}
+async function appendConversationHashes(root, sessionId, hashes) {
+  if (hashes.size === 0) return 0;
+  const stored = await readConversationStore(root, sessionId);
+  const fresh = stored.filter((turn) => turn.hash === void 0 && hashes.has(turn.uuid)).map((turn) => ({ ...turn, hash: hashes.get(turn.uuid) }));
+  if (fresh.length === 0) return 0;
+  const chunk = `${fresh.map((turn) => JSON.stringify(turn)).join("\n")}
+`;
+  const file2 = projectPaths(root).conversation(sessionId);
+  await mkdir5(dirname6(file2), { recursive: true });
+  await appendFile(file2, gzipSync(Buffer.from(chunk, "utf8")));
+  return fresh.length;
+}
+
+// src/messages.ts
+var MESSAGE_HASH = /^h[0-9a-f]{12}$/;
+function canonicalMessage(sessionId, message) {
+  return JSON.stringify({
+    sessionId,
+    uuid: message.uuid ?? "",
+    at: message.at,
+    text: message.text
+  });
+}
+function messageHash(sessionId, message) {
+  return `h${createHash2("sha256").update(canonicalMessage(sessionId, message)).digest("hex").slice(0, 12)}`;
+}
+function messageLabel(index) {
+  return `m${index + 1}`;
+}
+function hashTurns(sessionId, turns) {
+  return turns.map((turn, index) => ({
+    ...turn,
+    label: messageLabel(index),
+    hash: messageHash(sessionId, turn)
+  }));
+}
+async function readSessionMessages(root, sessionId, env = process.env) {
+  const agent = defaultAgent();
+  const file2 = await agent.findTranscript(sessionId, env);
+  if (file2) {
+    try {
+      const turns = await agent.readConversation(file2);
+      if (turns.length > 0) return hashTurns(sessionId, turns);
+      const stored2 = await readConversationStore(root, sessionId);
+      if (stored2.length > 0) return storedMessages(sessionId, stored2);
+      return [];
+    } catch {
+    }
+  }
+  const stored = await readConversationStore(root, sessionId);
+  return stored.length > 0 ? storedMessages(sessionId, stored) : null;
+}
+function storedMessages(sessionId, stored) {
+  return stored.map((turn, index) => ({
+    id: messageLabel(index),
+    label: messageLabel(index),
+    hash: turn.hash ?? messageHash(sessionId, turn),
+    uuid: turn.uuid,
+    at: turn.at,
+    text: turn.text,
+    replies: turn.replies,
+    tools: turn.tools
+  }));
+}
+function isRecorded(recorded, message) {
+  return recorded.has(message.hash) || recorded.has(message.label);
+}
+function messageOrder(messages2) {
+  return new Map((messages2 ?? []).map((message, index) => [message.hash, index]));
+}
+function labelsToHashes(messages2) {
+  return new Map((messages2 ?? []).map((message) => [message.label, message.hash]));
+}
+function hashesToLabels(messages2) {
+  return new Map((messages2 ?? []).map((message) => [message.hash, message.label]));
+}
+function upgradeSessionIds(session, messages2) {
+  const byLabel = labelsToHashes(messages2);
+  const rename4 = (id) => byLabel.get(id) ?? id;
+  const byId = /* @__PURE__ */ new Map();
+  const stable = /* @__PURE__ */ new Set();
+  for (const node2 of session.nodes) {
+    if (node2.kind !== "message") {
+      byId.set(node2.id, node2);
+      continue;
+    }
+    const id = rename4(node2.id);
+    const next = {
+      ...node2,
+      id,
+      ...node2.parent === void 0 || node2.parent === null ? {} : { parent: rename4(node2.parent) },
+      ...node2.links === void 0 ? {} : { links: node2.links.map(rename4) }
+    };
+    if (!byId.has(id)) {
+      byId.set(id, next);
+      if (node2.id === id) stable.add(id);
+      continue;
+    }
+    if (node2.id === id && !stable.has(id)) {
+      byId.set(id, next);
+      stable.add(id);
+    }
+  }
+  return { ...session, nodes: [...byId.values()] };
+}
+
+// src/hooks/sessionend.ts
+async function onSessionEnd(ctx) {
+  if (!ctx.initialized) return void 0;
+  const config2 = await loadConfig(ctx.env);
+  if (!config2.sessionEndCatchUp) return void 0;
+  const messages2 = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
+  if (!messages2 || messages2.length === 0) return void 0;
+  const review = config2.recorder === "mixed" ? ["--review"] : [];
+  ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "--close", ...review, "-C", ctx.root]);
+  return void 0;
+}
+
+// package.json
+var package_default = {
+  name: "@cogit/cli",
+  version: "1.4.0",
+  description: "Git for the intent behind agent-written code.",
+  license: "MIT",
+  keywords: [
+    "git",
+    "ai",
+    "coding-agent",
+    "claude-code",
+    "history",
+    "lineage",
+    "commit",
+    "context"
+  ],
+  repository: {
+    type: "git",
+    url: "git+https://github.com/erensrtky/cogit.git"
+  },
+  homepage: "https://github.com/erensrtky/cogit#readme",
+  bugs: {
+    url: "https://github.com/erensrtky/cogit/issues"
+  },
+  type: "module",
+  bin: {
+    cogit: "dist/cli.js"
+  },
+  files: [
+    "dist",
+    ".claude-plugin",
+    "skills",
+    "hooks"
+  ],
+  publishConfig: {
+    access: "public"
+  },
+  engines: {
+    node: ">=22.13.0"
+  },
+  scripts: {
+    prebuild: "node ../../scripts/sync-version.mjs",
+    build: "tsup",
+    prepack: "npm --prefix ../.. run build && node ../../scripts/copy-docs.mjs"
+  },
+  devDependencies: {
+    "@inquirer/prompts": "^8.7.5",
+    "@secretlint/core": "^13.1.0",
+    "@secretlint/secretlint-rule-preset-recommend": "^13.1.0",
+    commander: "^15.1.0",
+    mermaid: "^11.17.2",
+    tsup: "^9.0.0",
+    zod: "^4.6.7"
+  }
+};
+
+// src/cli-version.ts
+import { readFile as readFile8, realpath, stat as stat9 } from "fs/promises";
+import { delimiter, dirname as dirname7, join as join11 } from "path";
+var PACKAGE = "@cogit/cli";
+async function installedCliVersion(env) {
+  for (const dir of (env.PATH ?? "").split(delimiter)) {
+    if (dir === "") continue;
+    const bin = join11(dir, "cogit");
+    try {
+      if (!(await stat9(bin)).isFile()) continue;
+    } catch {
+      continue;
+    }
+    const manifests = [
+      // npm links bin/cogit to <package>/dist/cli.js...
+      async () => join11(dirname7(dirname7(await realpath(bin))), "package.json"),
+      // ...and on Windows writes shims beside <prefix>/node_modules instead.
+      async () => join11(dir, "node_modules", ...PACKAGE.split("/"), "package.json")
+    ];
+    for (const manifest of manifests) {
+      try {
+        const pkg = JSON.parse(await readFile8(await manifest(), "utf8"));
+        if (pkg.name === PACKAGE && typeof pkg.version === "string") return pkg.version;
+      } catch {
+      }
+    }
+    return void 0;
+  }
+  return void 0;
+}
+function compareVersions(a, b) {
+  const parts = (v) => (v.split("-")[0] ?? "").split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const [x, y] = [parts(a), parts(b)];
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0);
+    if (d !== 0) return Math.sign(d);
+  }
+  return 0;
+}
+function versionNotice(running, installed) {
+  if (installed === void 0) return void 0;
+  const order = compareVersions(running, installed);
+  if (order > 0)
+    return `cogit: the cogit command is ${installed}, the plugin ${running}. Update the command with \`npm install -g ${PACKAGE}\`.`;
+  if (order < 0)
+    return `cogit: the plugin is ${running}, the cogit command ${installed}. Update the plugin with \`claude plugin update cogit@cogit\`, or turn on auto-update in /plugin \u2192 Marketplaces \u2192 cogit.`;
+  return void 0;
+}
 
 // ../../node_modules/@inquirer/core/dist/lib/key.js
 var keybindings = ["emacs", "vim"];
@@ -22931,17 +28986,17 @@ import { AsyncResource as AsyncResource3 } from "async_hooks";
 
 // ../../node_modules/@inquirer/type/dist/utils.js
 function withResolver() {
-  let resolve8;
+  let resolve5;
   let reject;
   const promise2 = new Promise((res, rej) => {
-    resolve8 = res;
+    resolve5 = res;
     reject = rej;
   });
-  return { promise: promise2, resolve: resolve8, reject };
+  return { promise: promise2, resolve: resolve5, reject };
 }
 
 // ../../node_modules/@inquirer/core/dist/lib/create-prompt.js
-var import_mute_stream = __toESM(require_lib(), 1);
+var import_mute_stream = __toESM(require_lib2(), 1);
 
 // ../../node_modules/signal-exit/dist/mjs/signals.js
 var signals = [];
@@ -22970,7 +29025,7 @@ if (process.platform === "linux") {
 // ../../node_modules/signal-exit/dist/mjs/index.js
 var processOk = (process4) => !!process4 && typeof process4 === "object" && typeof process4.removeListener === "function" && typeof process4.emit === "function" && typeof process4.reallyExit === "function" && typeof process4.listeners === "function" && typeof process4.kill === "function" && typeof process4.pid === "number" && typeof process4.on === "function";
 var kExitEmitter = /* @__PURE__ */ Symbol.for("signal-exit emitter");
-var global = globalThis;
+var global2 = globalThis;
 var ObjectDefineProperty = Object.defineProperty.bind(Object);
 var Emitter = class {
   emitted = {
@@ -22984,10 +29039,10 @@ var Emitter = class {
   count = 0;
   id = Math.random();
   constructor() {
-    if (global[kExitEmitter]) {
-      return global[kExitEmitter];
+    if (global2[kExitEmitter]) {
+      return global2[kExitEmitter];
     }
-    ObjectDefineProperty(global, kExitEmitter, {
+    ObjectDefineProperty(global2, kExitEmitter, {
       value: this,
       writable: false,
       enumerable: false,
@@ -23275,7 +29330,7 @@ var ScreenManager = class {
 };
 
 // ../../node_modules/@inquirer/core/dist/lib/create-prompt.js
-import path from "path";
+import path2 from "path";
 var nativeSetImmediate = globalThis.setImmediate;
 var nativeClearImmediate = globalThis.clearImmediate;
 function listenTo(target, event, listener) {
@@ -23316,7 +29371,7 @@ function createPrompt(view) {
     });
     output2.mute();
     const screen = new ScreenManager(rl);
-    const { promise: promise2, resolve: resolve8, reject } = withResolver();
+    const { promise: promise2, resolve: resolve5, reject } = withResolver();
     return withHooks(rl, (cycle) => {
       const clearEffects = AsyncResource3.bind(() => effectScheduler.clearAll());
       const settlePrompt = (settle2) => {
@@ -23327,7 +29382,7 @@ function createPrompt(view) {
           reject(error62);
         }
       };
-      const resolvePrompt = (value) => settlePrompt(() => resolve8(value));
+      const resolvePrompt = (value) => settlePrompt(() => resolve5(value));
       const rejectPrompt = (error62) => settlePrompt(() => reject(error62));
       const promptPromise = Object.assign(promise2.finally(() => {
         cleanups.forEach((cleanup) => cleanup());
@@ -23363,7 +29418,7 @@ function createPrompt(view) {
             if (nextView === void 0) {
               let callerFilename = callSites[1]?.getFileName();
               if (callerFilename && !callerFilename.startsWith("file://")) {
-                callerFilename = path.resolve(callerFilename);
+                callerFilename = path2.resolve(callerFilename);
               }
               throw new Error(`Prompt functions must return a string.
     at ${callerFilename}`);
@@ -23382,7 +29437,7 @@ function createPrompt(view) {
           }
         });
       };
-      if ("readableFlowing" in input2) {
+      if ("readableFlowing" in input2 && input2.isTTY) {
         const immediate = nativeSetImmediate(startCycle);
         cleanups.add(() => nativeClearImmediate(immediate));
       } else {
@@ -23781,100 +29836,34 @@ function exitOnClosedPipe(stream = process.stdout, exit = process.exit) {
   });
 }
 
-// src/commands/blame.ts
-import { stat as stat8 } from "fs/promises";
-import { isAbsolute as isAbsolute3, relative as relative4, resolve as resolve4, sep as sep3 } from "path";
-import { pathToFileURL } from "url";
+// src/store/events.ts
+import { appendFile as appendFile2, mkdir as mkdir6, readFile as readFile9 } from "fs/promises";
+import { dirname as dirname8 } from "path";
 
-// src/thought.ts
-import { execFile as execFile2 } from "child_process";
-import { access as access2, realpath } from "fs/promises";
-import { isAbsolute as isAbsolute2, relative as relative3, resolve as resolve3 } from "path";
-import { promisify as promisify2 } from "util";
+// src/schema/events.ts
+var SessionEvent = external_exports.object({
+  /** When the change was recorded. */
+  at: IsoDate,
+  type: external_exports.enum(["parent", "link", "unlink"]),
+  /** The message the event is about, by its stable id. */
+  msg: Slug,
+  /** The parent for `parent` (null = a new root), the other message for link/unlink. */
+  target: MessageRef.nullable(),
+  /** Who made the change: the agent's record, the side model, or the user. */
+  by: external_exports.enum(["agent", "user", "side"]).default("agent")
+});
 
-// src/messages.ts
-import { createHash } from "crypto";
-
-// src/store/conversations.ts
-import { appendFile, mkdir as mkdir4, readFile as readFile6 } from "fs/promises";
-import { dirname as dirname6 } from "path";
-import { constants as constants2, gunzipSync, gzipSync } from "zlib";
-
-// src/redact.ts
-var MASK = "[REDACTED]";
-var PATTERNS = [
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
-  /\bsk-ant-[A-Za-z0-9_-]{20,}/g,
-  // Anthropic
-  /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}/g,
-  // OpenAI-style
-  /\bgh[pousr]_[A-Za-z0-9]{30,}/g,
-  // GitHub tokens
-  /\bgithub_pat_[A-Za-z0-9_]{22,}/g,
-  /\bglpat-[A-Za-z0-9_-]{20,}/g,
-  // GitLab
-  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g,
-  // AWS access key id
-  /\bxox[abprs]-[A-Za-z0-9-]{10,}/g,
-  // Slack
-  /\bAIza[0-9A-Za-z_-]{35}\b/g,
-  // Google API key
-  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g
-  // JWT
-];
-var ASSIGNMENT = /\b((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|client[_-]?secret)\s*[:=]\s*)(["']?)(?=[^\s"',;]*[0-9_\-+/!@#$%^&*])[^\s"',;]{8,}\2/gi;
-var BEARER = /\b(Bearer\s+)[A-Za-z0-9._~+/-]{16,}=*/g;
-var URL_CREDENTIALS = /(\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)[^\s@/]+@/gi;
-function redactText(text) {
-  let count = 0;
-  const hit = () => {
-    count++;
-    return MASK;
-  };
-  let out = text;
-  for (const re of PATTERNS) out = out.replace(re, hit);
-  out = out.replace(ASSIGNMENT, (_m, label, q) => `${label}${q}${hit()}${q}`);
-  out = out.replace(BEARER, (_m, label) => `${label}${hit()}`);
-  out = out.replace(URL_CREDENTIALS, (_m, prefix) => `${prefix}${hit()}@`);
-  return { text: out, count };
-}
-function redactDeep(value) {
-  let count = 0;
-  const walk = (v) => {
-    if (typeof v === "string") {
-      const r = redactText(v);
-      count += r.count;
-      return r.text;
-    }
-    if (Array.isArray(v)) return v.map(walk);
-    if (v !== null && typeof v === "object") {
-      return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
-    }
-    return v;
-  };
-  return { value: walk(value), count };
-}
-
-// src/store/conversations.ts
-function isStoredTurn(value) {
-  if (value === null || typeof value !== "object") return false;
-  const turn = value;
-  return typeof turn.uuid === "string" && turn.uuid !== "" && typeof turn.at === "string" && typeof turn.text === "string" && Array.isArray(turn.replies) && turn.replies.every((reply) => typeof reply === "string") && turn.tools !== null && typeof turn.tools === "object";
-}
-function answerSize(turn) {
-  return turn.replies.reduce((sum, reply) => sum + reply.length, 0) + JSON.stringify(turn.tools).length;
-}
-async function readConversationStore(root, sessionId) {
+// src/store/events.ts
+async function readEvents(root, sessionId) {
   let text;
   try {
-    text = gunzipSync(await readFile6(projectPaths(root).conversation(sessionId)), {
-      finishFlush: constants2.Z_SYNC_FLUSH
-    }).toString("utf8");
-  } catch {
-    return [];
+    text = await readFile9(projectPaths(root).events(sessionId), "utf8");
+  } catch (err) {
+    const code = err.code;
+    if (code === "ENOENT" || code === "ENOTDIR") return [];
+    throw err;
   }
-  const byUuid = /* @__PURE__ */ new Map();
-  const order = [];
+  const events = [];
   for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
     let value;
@@ -23883,162 +29872,82 @@ async function readConversationStore(root, sessionId) {
     } catch {
       continue;
     }
-    if (!isStoredTurn(value)) continue;
-    const prev = byUuid.get(value.uuid);
-    if (!prev) {
-      byUuid.set(value.uuid, value);
-      order.push(value.uuid);
-      continue;
+    const parsed = SessionEvent.safeParse(value);
+    if (parsed.success) events.push(parsed.data);
+  }
+  return events;
+}
+async function appendEvents(root, sessionId, events) {
+  if (events.length === 0) return 0;
+  const file2 = projectPaths(root).events(sessionId);
+  await mkdir6(dirname8(file2), { recursive: true });
+  await appendFile2(file2, `${events.map((event) => JSON.stringify(event)).join("\n")}
+`);
+  return events.length;
+}
+function sideOwnedParents(events, nodes = []) {
+  const owners = /* @__PURE__ */ new Map();
+  for (const event of events) {
+    if (event.type === "parent") owners.set(event.msg, event.by);
+  }
+  const owned = /* @__PURE__ */ new Set();
+  for (const [msg, by] of owners) if (by === "side") owned.add(msg);
+  for (const node2 of nodes)
+    if (node2.kind === "message" && !owners.has(node2.id) && node2.by?.title === "side")
+      owned.add(node2.id);
+  return owned;
+}
+function replayEvents(events) {
+  const structure = /* @__PURE__ */ new Map();
+  const get = (id) => {
+    const found = structure.get(id);
+    if (found) return found;
+    const fresh = { parent: null, links: [] };
+    structure.set(id, fresh);
+    return fresh;
+  };
+  for (const event of events) {
+    const entry = get(event.msg);
+    if (event.type === "parent") {
+      entry.parent = event.target;
+    } else if (event.type === "link") {
+      if (event.target !== null && !entry.links.includes(event.target))
+        entry.links.push(event.target);
+    } else if (event.target !== null) {
+      entry.links = entry.links.filter((link) => link !== event.target);
     }
-    const fuller = answerSize(value) > answerSize(prev) ? value : prev;
-    const hash2 = prev.hash ?? value.hash;
-    byUuid.set(value.uuid, {
-      ...prev,
-      ...hash2 === void 0 ? {} : { hash: hash2 },
-      replies: fuller.replies,
-      tools: fuller.tools
-    });
   }
-  return order.map((uuid3) => byUuid.get(uuid3));
+  return structure;
 }
-async function appendConversationTurns(root, sessionId, turns) {
-  const stored = new Map(
-    (await readConversationStore(root, sessionId)).map((turn) => [turn.uuid, turn])
-  );
-  const seen = /* @__PURE__ */ new Set();
-  const fresh = [];
-  for (const turn of turns) {
-    if (turn.uuid === void 0 || seen.has(turn.uuid)) continue;
-    seen.add(turn.uuid);
-    const held = stored.get(turn.uuid);
-    if (held && answerSize(turn) <= answerSize(held)) continue;
-    fresh.push({
-      uuid: turn.uuid,
-      ...turn.hash === void 0 ? {} : { hash: turn.hash },
-      at: turn.at,
-      text: turn.text,
-      replies: turn.replies,
-      tools: turn.tools
-    });
-  }
-  if (fresh.length === 0) return 0;
-  const value = redactDeep(fresh).value.filter((turn) => {
-    const held = stored.get(turn.uuid);
-    return !held || answerSize(turn) > answerSize(held);
+function applyEvents(nodes, events) {
+  if (events.length === 0) return nodes;
+  const structure = replayEvents(events);
+  return nodes.map((node2) => {
+    if (node2.kind !== "message") return node2;
+    const entry = structure.get(node2.id);
+    return {
+      ...node2,
+      parent: entry?.parent ?? null,
+      ...entry && entry.links.length > 0 ? { links: entry.links } : { links: void 0 }
+    };
   });
-  if (value.length === 0) return 0;
-  const chunk = `${value.map((turn) => JSON.stringify(turn)).join("\n")}
-`;
-  const file2 = projectPaths(root).conversation(sessionId);
-  await mkdir4(dirname6(file2), { recursive: true });
-  await appendFile(file2, gzipSync(Buffer.from(chunk, "utf8")));
-  return value.length;
 }
-async function appendConversationHashes(root, sessionId, hashes) {
-  if (hashes.size === 0) return 0;
-  const stored = await readConversationStore(root, sessionId);
-  const fresh = stored.filter((turn) => turn.hash === void 0 && hashes.has(turn.uuid)).map((turn) => ({ ...turn, hash: hashes.get(turn.uuid) }));
-  if (fresh.length === 0) return 0;
-  const chunk = `${fresh.map((turn) => JSON.stringify(turn)).join("\n")}
-`;
-  const file2 = projectPaths(root).conversation(sessionId);
-  await mkdir4(dirname6(file2), { recursive: true });
-  await appendFile(file2, gzipSync(Buffer.from(chunk, "utf8")));
-  return fresh.length;
+function seedEvents(nodes, at) {
+  const events = [];
+  for (const node2 of nodes) {
+    if (node2.kind !== "message") continue;
+    events.push({ at, type: "parent", msg: node2.id, target: node2.parent ?? null, by: "agent" });
+    for (const link of node2.links ?? [])
+      events.push({ at, type: "link", msg: node2.id, target: link, by: "agent" });
+  }
+  return events;
 }
 
-// src/messages.ts
-var MESSAGE_HASH = /^h[0-9a-f]{12}$/;
-function canonicalMessage(sessionId, message) {
-  return JSON.stringify({
-    sessionId,
-    uuid: message.uuid ?? "",
-    at: message.at,
-    text: message.text
-  });
-}
-function messageHash(sessionId, message) {
-  return `h${createHash("sha256").update(canonicalMessage(sessionId, message)).digest("hex").slice(0, 12)}`;
-}
-function messageLabel(index) {
-  return `m${index + 1}`;
-}
-function hashTurns(sessionId, turns) {
-  return turns.map((turn, index) => ({
-    ...turn,
-    label: messageLabel(index),
-    hash: messageHash(sessionId, turn)
-  }));
-}
-async function readSessionMessages(root, sessionId, env = process.env) {
-  const agent = defaultAgent();
-  const file2 = await agent.findTranscript(sessionId, env);
-  if (file2) {
-    try {
-      const turns = await agent.readConversation(file2);
-      if (turns.length > 0) return hashTurns(sessionId, turns);
-      const stored2 = await readConversationStore(root, sessionId);
-      if (stored2.length > 0) return storedMessages(sessionId, stored2);
-      return [];
-    } catch {
-    }
-  }
-  const stored = await readConversationStore(root, sessionId);
-  return stored.length > 0 ? storedMessages(sessionId, stored) : null;
-}
-function storedMessages(sessionId, stored) {
-  return stored.map((turn, index) => ({
-    id: messageLabel(index),
-    label: messageLabel(index),
-    hash: turn.hash ?? messageHash(sessionId, turn),
-    uuid: turn.uuid,
-    at: turn.at,
-    text: turn.text,
-    replies: turn.replies,
-    tools: turn.tools
-  }));
-}
-function isRecorded(recorded, message) {
-  return recorded.has(message.hash) || recorded.has(message.label);
-}
-function messageOrder(messages) {
-  return new Map((messages ?? []).map((message, index) => [message.hash, index]));
-}
-function labelsToHashes(messages) {
-  return new Map((messages ?? []).map((message) => [message.label, message.hash]));
-}
-function hashesToLabels(messages) {
-  return new Map((messages ?? []).map((message) => [message.hash, message.label]));
-}
-function upgradeSessionIds(session, messages) {
-  const byLabel = labelsToHashes(messages);
-  const rename3 = (id) => byLabel.get(id) ?? id;
-  const byId = /* @__PURE__ */ new Map();
-  const stable = /* @__PURE__ */ new Set();
-  for (const node2 of session.nodes) {
-    if (node2.kind !== "message") {
-      byId.set(node2.id, node2);
-      continue;
-    }
-    const id = rename3(node2.id);
-    const next = {
-      ...node2,
-      id,
-      ...node2.parent === void 0 || node2.parent === null ? {} : { parent: rename3(node2.parent) },
-      ...node2.links === void 0 ? {} : { links: node2.links.map(rename3) }
-    };
-    if (!byId.has(id)) {
-      byId.set(id, next);
-      if (node2.id === id) stable.add(id);
-      continue;
-    }
-    if (node2.id === id && !stable.has(id)) {
-      byId.set(id, next);
-      stable.add(id);
-    }
-  }
-  return { ...session, nodes: [...byId.values()] };
-}
+// src/thought.ts
+import { execFile as execFile2 } from "child_process";
+import { access as access2, realpath as realpath2 } from "fs/promises";
+import { isAbsolute as isAbsolute3, relative as relative4, resolve as resolve3 } from "path";
+import { promisify as promisify2 } from "util";
 
 // src/session-git.ts
 var SessionHead = external_exports.object({
@@ -24061,14 +29970,14 @@ var FULL_HASH = /^[0-9a-f]{40}$/;
 var THOUGHT_LINE = new RegExp(`^[ \\t]*${THOUGHT_TRAILER}:[ \\t]*(h[0-9a-f]{12})[ \\t]*$`, "gim");
 var COMMIT_MARK = "";
 var LOG_MAX_BUFFER = 256 * 1024 * 1024;
-async function readable(path2) {
-  return access2(path2).then(
+async function readable(path3) {
+  return access2(path3).then(
     () => true,
     () => false
   );
 }
 function messagePath(file2) {
-  return isAbsolute2(file2) ? file2 : resolve3(process.cwd(), file2);
+  return isAbsolute3(file2) ? file2 : resolve3(process.cwd(), file2);
 }
 async function sessionRunsIn(agent, transcript, dir) {
   const cwd = await agent.readSessionCwd(transcript);
@@ -24076,13 +29985,13 @@ async function sessionRunsIn(agent, transcript, dir) {
   const session = await realOrSame(cwd);
   for (const place of [dir, process.cwd()]) {
     const root = await realOrSame(await findGitRoot(place) ?? place);
-    const inside = relative3(root, session);
-    if (inside === "" || !inside.startsWith("..") && !isAbsolute2(inside)) return true;
+    const inside = relative4(root, session);
+    if (inside === "" || !inside.startsWith("..") && !isAbsolute3(inside)) return true;
   }
   return false;
 }
-async function realOrSame(path2) {
-  return realpath(path2).catch(() => resolve3(path2));
+async function realOrSame(path3) {
+  return realpath2(path3).catch(() => resolve3(path3));
 }
 async function newestThought(agent, transcript, sessionId) {
   const turns = await agent.readConversation(transcript);
@@ -24255,6 +30164,67 @@ function attachThoughtTrailers(sessions, trailers) {
   });
 }
 
+// src/view/files.ts
+function timeOf(at) {
+  if (at === void 0) return Number.NEGATIVE_INFINITY;
+  const time3 = Date.parse(at);
+  return Number.isNaN(time3) ? Number.NEGATIVE_INFINITY : time3;
+}
+function byNewest(a, b) {
+  return timeOf(b.at) - timeOf(a.at) || a.sessionId.localeCompare(b.sessionId) || a.messageId.localeCompare(b.messageId);
+}
+function buildFileHistory(sessions, commitFiles = /* @__PURE__ */ new Map()) {
+  const byPath = /* @__PURE__ */ new Map();
+  for (const session of sessions) {
+    const sessionTitle2 = session.title.trim() === "" ? session.sessionId : session.title;
+    let branchTitle;
+    for (const message of session.messages) {
+      if (message.branch !== void 0) branchTitle = message.branch.title;
+      const commits = message.commits ?? [];
+      const fromCommits = /* @__PURE__ */ new Map();
+      for (const hash2 of commits) {
+        for (const path3 of commitFiles.get(hash2) ?? []) {
+          const list = fromCommits.get(path3) ?? [];
+          list.push(hash2);
+          fromCommits.set(path3, list);
+        }
+      }
+      const paths = /* @__PURE__ */ new Set([...message.files ?? [], ...fromCommits.keys()]);
+      const unknown2 = commits.filter((hash2) => !commitFiles.has(hash2));
+      for (const path3 of paths) {
+        const touching = [...fromCommits.get(path3) ?? [], ...unknown2];
+        const hit = {
+          sessionId: session.sessionId,
+          sessionTitle: sessionTitle2,
+          messageId: message.id,
+          label: message.label ?? message.id,
+          ...message.at === void 0 ? {} : { at: message.at },
+          title: message.title,
+          ...branchTitle === void 0 ? {} : { branch: branchTitle },
+          commits: [...new Set(touching)]
+        };
+        const list = byPath.get(path3) ?? [];
+        list.push(hit);
+        byPath.set(path3, list);
+      }
+    }
+  }
+  const files = [...byPath].map(([path3, hits]) => {
+    hits.sort(byNewest);
+    const newest = hits[0];
+    return {
+      path: path3,
+      hits,
+      count: hits.length,
+      ...newest?.at === void 0 ? {} : { lastAt: newest.at }
+    };
+  });
+  return files.sort((a, b) => timeOf(b.lastAt) - timeOf(a.lastAt) || a.path.localeCompare(b.path));
+}
+function modelSessions(model) {
+  return model.sessions;
+}
+
 // src/author.ts
 import { userInfo } from "os";
 
@@ -24301,9 +30271,10 @@ var PANEL_EDITABLE_KEYS = [
   "messageSummaries",
   "startupContext",
   "recordHeadless",
-  "tryBeforeNotes",
   "shapes",
   "captures",
+  "inbox",
+  "semanticSearch",
   "language",
   "shareConversations"
 ];
@@ -24567,280 +30538,6 @@ function embedViewModel(template, model) {
   return template.replace(EMPTY_DATA_ELEMENT, () => data);
 }
 
-// src/commands/blame.ts
-function parseBlameTarget(target) {
-  const match = /^(.*):([1-9][0-9]*)$/.exec(target);
-  if (match === null) return { file: target };
-  return { file: match[1], line: Number(match[2]) };
-}
-function sameCommit2(recorded, blamed) {
-  return blamed.startsWith(recorded) || recorded.startsWith(blamed);
-}
-function gitMessage(err) {
-  const stderr = err.stderr;
-  const text = typeof stderr === "string" && stderr.trim() !== "" ? stderr : String(err);
-  return text.trim().split("\n")[0] ?? "unknown git error";
-}
-function oneLine2(text) {
-  return text.replace(/\s+/g, " ").trim();
-}
-async function thoughtsForCommits(root, commits, env, warn2) {
-  const loaded = [...await loadAllSessions(root, warn2 ?? (() => {
-  }))].sort(
-    (a, b) => a.startedAt.localeCompare(b.startedAt) || a.sessionId.localeCompare(b.sessionId)
-  );
-  const trailers = await readThoughtTrailers(root, {
-    ...env === void 0 ? {} : { env },
-    since: earliestSessionStart(loaded)
-  });
-  const sessions = attachThoughtTrailers(loaded, trailers);
-  const thoughts = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const commit of commits) {
-    for (const session of sessions) {
-      const sessionTitle2 = session.title.trim() === "" ? session.sessionId : session.title;
-      for (const message of buildMessages(session.nodes)) {
-        const recorded = (message.commits ?? []).find((hash2) => sameCommit2(hash2, commit));
-        if (recorded === void 0) continue;
-        const key = `${commit}:${message.id}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        thoughts.push({
-          commit,
-          sessionId: session.sessionId,
-          sessionTitle: sessionTitle2,
-          messageId: message.id,
-          label: message.label ?? message.id,
-          title: message.title,
-          ...message.summary === void 0 ? {} : { summary: message.summary },
-          at: message.at ?? session.startedAt,
-          node: message
-        });
-      }
-    }
-  }
-  return thoughts;
-}
-async function blame(opts) {
-  const { io } = opts;
-  const { root } = await resolveProjectRoot(opts.dir);
-  const project = await loadProject(root);
-  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
-  if (!project.ok) throw new CliError(project.error);
-  const gitRoot = await findGitRoot(root);
-  if (gitRoot === void 0)
-    throw new CliError(`${root} is not inside a git repository; blame needs one`);
-  const { file: file2, line } = parseBlameTarget(opts.target);
-  const absolute = resolve4(root, file2);
-  const path2 = relative4(gitRoot, absolute);
-  if (path2 === "" || path2.startsWith("..") || isAbsolute3(path2))
-    throw new CliError(`${file2} is outside ${gitRoot}`);
-  const exists = await stat8(absolute).then(
-    (info) => info.isFile(),
-    () => false
-  );
-  if (!exists) throw new CliError(`${file2} does not exist`);
-  const repoPath = path2.split(sep3).join("/");
-  let commits;
-  try {
-    commits = await blameCommitHashes(gitRoot, repoPath, line);
-  } catch (err) {
-    throw new CliError(`git could not read ${opts.target}: ${gitMessage(err)}`);
-  }
-  const thoughts = await thoughtsForCommits(root, commits, io.env, io.warn);
-  const mapUrl = pathToFileURL(projectPaths(root).html).href;
-  const hits = thoughts.map((thought) => ({
-    commit: thought.commit.slice(0, 7),
-    sessionId: thought.sessionId,
-    sessionTitle: thought.sessionTitle,
-    messageId: thought.messageId,
-    label: thought.label,
-    title: thought.title,
-    ...thought.summary === void 0 ? {} : { summary: thought.summary },
-    url: `${mapUrl}#s=${encodeURIComponent(thought.sessionId)}&m=${encodeURIComponent(
-      thought.messageId
-    )}`
-  }));
-  for (const hit of hits) {
-    io.out(`${hit.commit}  ${hit.sessionTitle} \xB7 ${hit.label} ${hit.title}`);
-    if (hit.summary !== void 0 && hit.summary.trim() !== "") io.out(`  ${oneLine2(hit.summary)}`);
-    io.out(`  ${hit.url}`);
-  }
-  if (hits.length === 0) {
-    const what = line === void 0 ? file2 : `${file2}:${line}`;
-    io.out(`No recorded message lists a commit that touched ${what}.`);
-  }
-  return hits;
-}
-
-// src/store/events.ts
-import { appendFile as appendFile2, mkdir as mkdir5, readFile as readFile7 } from "fs/promises";
-import { dirname as dirname7 } from "path";
-
-// src/schema/events.ts
-var SessionEvent = external_exports.object({
-  /** When the change was recorded. */
-  at: IsoDate,
-  type: external_exports.enum(["parent", "link", "unlink"]),
-  /** The message the event is about, by its stable id. */
-  msg: Slug,
-  /** The parent for `parent` (null = a new root), the other message for link/unlink. */
-  target: MessageRef.nullable(),
-  /** Who made the change: the agent's record, the side model, or the user. */
-  by: external_exports.enum(["agent", "user", "side"]).default("agent")
-});
-
-// src/store/events.ts
-async function readEvents(root, sessionId) {
-  let text;
-  try {
-    text = await readFile7(projectPaths(root).events(sessionId), "utf8");
-  } catch (err) {
-    const code = err.code;
-    if (code === "ENOENT" || code === "ENOTDIR") return [];
-    throw err;
-  }
-  const events = [];
-  for (const line of text.split("\n")) {
-    if (line.trim() === "") continue;
-    let value;
-    try {
-      value = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    const parsed = SessionEvent.safeParse(value);
-    if (parsed.success) events.push(parsed.data);
-  }
-  return events;
-}
-async function appendEvents(root, sessionId, events) {
-  if (events.length === 0) return 0;
-  const file2 = projectPaths(root).events(sessionId);
-  await mkdir5(dirname7(file2), { recursive: true });
-  await appendFile2(file2, `${events.map((event) => JSON.stringify(event)).join("\n")}
-`);
-  return events.length;
-}
-function sideOwnedParents(events, nodes = []) {
-  const owners = /* @__PURE__ */ new Map();
-  for (const event of events) {
-    if (event.type === "parent") owners.set(event.msg, event.by);
-  }
-  const owned = /* @__PURE__ */ new Set();
-  for (const [msg, by] of owners) if (by === "side") owned.add(msg);
-  for (const node2 of nodes)
-    if (node2.kind === "message" && !owners.has(node2.id) && node2.by?.title === "side")
-      owned.add(node2.id);
-  return owned;
-}
-function replayEvents(events) {
-  const structure = /* @__PURE__ */ new Map();
-  const get = (id) => {
-    const found = structure.get(id);
-    if (found) return found;
-    const fresh = { parent: null, links: [] };
-    structure.set(id, fresh);
-    return fresh;
-  };
-  for (const event of events) {
-    const entry = get(event.msg);
-    if (event.type === "parent") {
-      entry.parent = event.target;
-    } else if (event.type === "link") {
-      if (event.target !== null && !entry.links.includes(event.target))
-        entry.links.push(event.target);
-    } else if (event.target !== null) {
-      entry.links = entry.links.filter((link) => link !== event.target);
-    }
-  }
-  return structure;
-}
-function applyEvents(nodes, events) {
-  if (events.length === 0) return nodes;
-  const structure = replayEvents(events);
-  return nodes.map((node2) => {
-    if (node2.kind !== "message") return node2;
-    const entry = structure.get(node2.id);
-    return {
-      ...node2,
-      parent: entry?.parent ?? null,
-      ...entry && entry.links.length > 0 ? { links: entry.links } : { links: void 0 }
-    };
-  });
-}
-function seedEvents(nodes, at) {
-  const events = [];
-  for (const node2 of nodes) {
-    if (node2.kind !== "message") continue;
-    events.push({ at, type: "parent", msg: node2.id, target: node2.parent ?? null, by: "agent" });
-    for (const link of node2.links ?? [])
-      events.push({ at, type: "link", msg: node2.id, target: link, by: "agent" });
-  }
-  return events;
-}
-
-// src/view/files.ts
-function timeOf(at) {
-  if (at === void 0) return Number.NEGATIVE_INFINITY;
-  const time3 = Date.parse(at);
-  return Number.isNaN(time3) ? Number.NEGATIVE_INFINITY : time3;
-}
-function byNewest(a, b) {
-  return timeOf(b.at) - timeOf(a.at) || a.sessionId.localeCompare(b.sessionId) || a.messageId.localeCompare(b.messageId);
-}
-function buildFileHistory(sessions, commitFiles = /* @__PURE__ */ new Map()) {
-  const byPath = /* @__PURE__ */ new Map();
-  for (const session of sessions) {
-    const sessionTitle2 = session.title.trim() === "" ? session.sessionId : session.title;
-    let branchTitle;
-    for (const message of session.messages) {
-      if (message.branch !== void 0) branchTitle = message.branch.title;
-      const commits = message.commits ?? [];
-      const fromCommits = /* @__PURE__ */ new Map();
-      for (const hash2 of commits) {
-        for (const path2 of commitFiles.get(hash2) ?? []) {
-          const list = fromCommits.get(path2) ?? [];
-          list.push(hash2);
-          fromCommits.set(path2, list);
-        }
-      }
-      const paths = /* @__PURE__ */ new Set([...message.files ?? [], ...fromCommits.keys()]);
-      const unknown2 = commits.filter((hash2) => !commitFiles.has(hash2));
-      for (const path2 of paths) {
-        const touching = [...fromCommits.get(path2) ?? [], ...unknown2];
-        const hit = {
-          sessionId: session.sessionId,
-          sessionTitle: sessionTitle2,
-          messageId: message.id,
-          label: message.label ?? message.id,
-          ...message.at === void 0 ? {} : { at: message.at },
-          title: message.title,
-          ...branchTitle === void 0 ? {} : { branch: branchTitle },
-          commits: [...new Set(touching)]
-        };
-        const list = byPath.get(path2) ?? [];
-        list.push(hit);
-        byPath.set(path2, list);
-      }
-    }
-  }
-  const files = [...byPath].map(([path2, hits]) => {
-    hits.sort(byNewest);
-    const newest = hits[0];
-    return {
-      path: path2,
-      hits,
-      count: hits.length,
-      ...newest?.at === void 0 ? {} : { lastAt: newest.at }
-    };
-  });
-  return files.sort((a, b) => timeOf(b.lastAt) - timeOf(a.lastAt) || a.path.localeCompare(b.path));
-}
-function modelSessions(model) {
-  return model.sessions;
-}
-
 // src/commands/log.ts
 async function loadEffectiveSessions(root, io) {
   const sessions = await loadAllSessions(root, io.warn);
@@ -24891,17 +30588,17 @@ function clock(iso) {
 function shortHash(id) {
   return /^h[0-9a-f]{12}$/.test(id) ? id.slice(0, 8) : id;
 }
-function oneLine3(text) {
+function oneLine2(text) {
   return text.replace(/\s+/g, " ").trim();
 }
-function branchesOf(sessionId, messages) {
-  const starts = messages.flatMap(
+function branchesOf(sessionId, messages2) {
+  const starts = messages2.flatMap(
     (message, index) => message.branch === void 0 ? [] : [{ index, branch: message.branch }]
   );
   return starts.map(({ index, branch }, position) => {
-    const end = (starts[position + 1]?.index ?? messages.length) - 1;
-    const first = messages[index];
-    const last = messages[end];
+    const end = (starts[position + 1]?.index ?? messages2.length) - 1;
+    const first = messages2[index];
+    const last = messages2[end];
     return {
       sessionId,
       title: branch.title,
@@ -24915,9 +30612,9 @@ function branchesOf(sessionId, messages) {
   });
 }
 function toLogSession(effective) {
-  const { session, messages } = effective;
-  const labels = new Map(messages.map((message) => [message.id, message.label ?? message.id]));
-  const logMessages = [...messages].reverse().map((message) => {
+  const { session, messages: messages2 } = effective;
+  const labels = new Map(messages2.map((message) => [message.id, message.label ?? message.id]));
+  const logMessages = [...messages2].reverse().map((message) => {
     const parentLabel = typeof message.parent === "string" ? labels.get(message.parent) : void 0;
     return {
       id: message.id,
@@ -24940,7 +30637,7 @@ function toLogSession(effective) {
     startedAt: session.startedAt,
     updatedAt: session.updatedAt,
     messages: logMessages,
-    branches: branchesOf(session.sessionId, messages)
+    branches: branchesOf(session.sessionId, messages2)
   };
 }
 function selectSessions(sessions, prefix) {
@@ -24968,9 +30665,9 @@ function buildLog(sessions, opts = {}) {
         left -= branches.length;
         return branches.length === 0 ? [] : [{ ...session, messages: [], branches }];
       }
-      const messages = session.messages.slice(0, left);
-      left -= messages.length;
-      return messages.length === 0 ? [] : [{ ...session, messages }];
+      const messages2 = session.messages.slice(0, left);
+      left -= messages2.length;
+      return messages2.length === 0 ? [] : [{ ...session, messages: messages2 }];
     });
   }
   if (opts.branchesOnly === true) {
@@ -24979,7 +30676,7 @@ function buildLog(sessions, opts = {}) {
   return model;
 }
 function sessionHeading(session) {
-  const title = session.title.trim() === "" ? session.sessionId : `${oneLine3(session.title)} (${session.sessionId})`;
+  const title = session.title.trim() === "" ? session.sessionId : `${oneLine2(session.title)} (${session.sessionId})`;
   const author = session.author === void 0 ? "" : ` \xB7 by ${session.author}`;
   return `## ${title}${author} \xB7 ${stamp(session.startedAt)} \u2192 ${stamp(session.updatedAt)}`;
 }
@@ -24994,7 +30691,7 @@ function branchLines(branch) {
 }
 function messageLine(message) {
   const parts = [
-    `  ${shortHash(message.id)}  ${message.label}  ${clock(message.at)}  ${message.branch === void 0 ? "" : `\u256D ${message.branch.title} \xB7 `}${oneLine3(message.title)}`
+    `  ${shortHash(message.id)}  ${message.label}  ${clock(message.at)}  ${message.branch === void 0 ? "" : `\u256D ${message.branch.title} \xB7 `}${oneLine2(message.title)}`
   ];
   if (message.linkLabels.length > 0) parts.push(`  \u21A9 ${message.linkLabels.join(", ")}`);
   if (message.commits.length > 0)
@@ -25022,7 +30719,7 @@ function formatLog(model, branchesOnly = false) {
 var HASH_REF = /^h[0-9a-f]{6,12}$/;
 var SESSION_LABEL_REF = /^([A-Za-z0-9][A-Za-z0-9_.-]{0,127}):m([1-9][0-9]*)$/;
 var COMMIT_REF = /^[0-9a-f]{7,40}$/;
-function sameCommit3(recorded, commit) {
+function sameCommit2(recorded, commit) {
   return commit.startsWith(recorded) || recorded.startsWith(commit);
 }
 function resolveRef2(sessions, ref) {
@@ -25050,7 +30747,7 @@ function resolveRef2(sessions, ref) {
   }
   if (COMMIT_REF.test(ref)) {
     const hits = sessions.flatMap(
-      (entry2) => entry2.messages.filter((message2) => (message2.commits ?? []).some((hash2) => sameCommit3(hash2, ref))).map((message2) => ({ entry: entry2, message: message2 }))
+      (entry2) => entry2.messages.filter((message2) => (message2.commits ?? []).some((hash2) => sameCommit2(hash2, ref))).map((message2) => ({ entry: entry2, message: message2 }))
     );
     if (hits.length === 0)
       return { kind: "unknown", reason: `no recorded thought for commit ${ref}` };
@@ -25102,9 +30799,9 @@ function resolveRef2(sessions, ref) {
     };
   return { kind: "ok", hit: { session: entry.session, messages: entry.messages, message } };
 }
-function refOf(sessions, ref, self) {
+function refOf(sessions, ref, self2) {
   const colon = ref.indexOf(":");
-  const sessionId = colon === -1 ? self : ref.slice(0, colon);
+  const sessionId = colon === -1 ? self2 : ref.slice(0, colon);
   const id = colon === -1 ? ref : ref.slice(colon + 1);
   const entry = sessions.find((candidate) => candidate.session.sessionId === sessionId);
   const message = entry?.messages.find((candidate) => candidate.id === id);
@@ -25115,18 +30812,18 @@ function refOf(sessions, ref, self) {
     ...message?.title === void 0 ? {} : { title: message.title }
   };
 }
-function branchAround(sessionId, messages, id) {
+function branchAround(sessionId, messages2, id) {
   let start = null;
-  for (const message of messages) {
+  for (const message of messages2) {
     if (message.branch !== void 0) start = message;
     if (message.id === id) break;
   }
   if (start === null) return null;
-  const branches = branchesOf(sessionId, messages);
+  const branches = branchesOf(sessionId, messages2);
   return branches.find((branch) => branch.start.id === start?.id) ?? null;
 }
-function conversationTurn(messages, message) {
-  const turn = messages?.find(
+function conversationTurn(messages2, message) {
+  const turn = messages2?.find(
     (candidate) => candidate.hash === message.id || candidate.label === message.label
   );
   if (turn === void 0) return null;
@@ -25159,7 +30856,7 @@ async function show(opts) {
       COMMIT_REF.test(opts.ref) ? `commit ${opts.ref} comes from several thoughts; open one by its message hash` : `"${opts.ref}" is ambiguous; use a longer prefix`
     );
   }
-  const { session, messages, message } = result.hit;
+  const { session, messages: messages2, message } = result.hit;
   const sessionId = session.sessionId;
   const children = [];
   const seen = /* @__PURE__ */ new Set();
@@ -25176,7 +30873,7 @@ async function show(opts) {
     }
   }
   const subjects = message.commits === void 0 || message.commits.length === 0 ? /* @__PURE__ */ new Map() : await readCommitSubjects(root, message.commits);
-  const branch = branchAround(sessionId, messages, message.id);
+  const branch = branchAround(sessionId, messages2, message.id);
   const turn = opts.chat === false ? null : await readSessionMessages(root, sessionId, opts.io.env);
   return {
     id: message.id,
@@ -25208,7 +30905,7 @@ function refText(ref, selfSessionId) {
   return selfSessionId !== void 0 && ref.sessionId === selfSessionId ? label : `${ref.sessionId}:${label}`;
 }
 function formatShow(model) {
-  const title = oneLine3(model.sessionTitle) || model.sessionId;
+  const title = oneLine2(model.sessionTitle) || model.sessionId;
   const lines = [
     `${model.id}  ${model.label}  ${model.title}`,
     `Session: ${title} (${model.sessionId}) \xB7 ${stamp(model.at)}`
@@ -25292,10 +30989,10 @@ function formatFileHistory(file2) {
   const lines = [`${file2.path}  ${count}  (newest first)`];
   for (const hit of file2.hits) {
     const parts = [
-      `  ${stamp(hit.at)}  ${shortHash(hit.messageId)}  ${hit.label}  ${oneLine3(hit.title)}`
+      `  ${stamp(hit.at)}  ${shortHash(hit.messageId)}  ${hit.label}  ${oneLine2(hit.title)}`
     ];
-    parts.push(`  \xB7 ${oneLine3(hit.sessionTitle)}`);
-    if (hit.branch !== void 0) parts.push(` \u256D ${oneLine3(hit.branch)}`);
+    parts.push(`  \xB7 ${oneLine2(hit.sessionTitle)}`);
+    if (hit.branch !== void 0) parts.push(` \u256D ${oneLine2(hit.branch)}`);
     if (hit.commits.length > 0)
       parts.push(`  [${hit.commits.map((hash2) => hash2.slice(0, 7)).join(" ")}]`);
     lines.push(parts.join(""));
@@ -25314,10 +31011,10 @@ async function logFile(opts) {
     if (gitRoot !== void 0)
       commitFiles = projectFiles(gitRoot, root, await readCommitFiles(gitRoot, hashes));
   }
-  const sources = sessions.map(({ session, messages }) => ({
+  const sources = sessions.map(({ session, messages: messages2 }) => ({
     sessionId: session.sessionId,
     title: session.title,
-    messages
+    messages: messages2
   }));
   const wanted = normalizeFilePath(opts.file);
   const found = buildFileHistory(sources, commitFiles).find((file2) => file2.path === wanted);
@@ -25333,387 +31030,12 @@ async function logFile(opts) {
   return found;
 }
 
-// src/commands/why.ts
-var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-function dayStamp(iso) {
-  const date5 = new Date(iso);
-  if (Number.isNaN(date5.getTime())) return iso;
-  return `${date5.getDate()} ${MONTHS[date5.getMonth()]}`;
-}
-function oneLine4(text) {
-  return text.replace(/\s+/g, " ").trim();
-}
-function repositoryPath(gitRoot, root, file2) {
-  const rel = relative5(gitRoot, resolve5(root, file2));
-  if (rel === "" || rel.startsWith("..") || isAbsolute4(rel)) return void 0;
-  return rel.split(sep4).join("/");
-}
-function decisionsOf(message) {
-  const decisions = [];
-  const alternatives = message.alternatives ?? [];
-  if (alternatives.length > 0 || (message.why ?? "").trim() !== "") {
-    decisions.push({ title: message.title, why: message.why ?? "", alternatives });
-  }
-  for (const decision of message.agentDecisions ?? []) {
-    decisions.push({
-      title: decision.title,
-      why: decision.why,
-      alternatives: decision.alternatives ?? []
-    });
-  }
-  return decisions;
-}
-async function collectWhy(root, file2, env) {
-  return collect(root, file2, void 0, env, false);
-}
-async function collectWhyLine(root, file2, line, env) {
-  return collect(root, file2, line, env, true);
-}
-async function collect(root, file2, line, env, strict) {
-  const gitRoot = await findGitRoot(root);
-  if (gitRoot === void 0) return [];
-  const repoPath = repositoryPath(gitRoot, root, file2);
-  if (repoPath === void 0) return [];
-  let commits;
-  try {
-    commits = await blameCommitHashes(gitRoot, repoPath, line);
-  } catch (err) {
-    if (strict) throw err;
-    return [];
-  }
-  if (commits.length === 0) return [];
-  return hitsFromThoughts(await thoughtsForCommits(root, commits, env));
-}
-function hitsFromThoughts(thoughts) {
-  const hits = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const thought of thoughts) {
-    const decisions = decisionsOf(thought.node);
-    if (decisions.length === 0) continue;
-    const key = `${thought.sessionId}:${thought.messageId}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    hits.push({
-      sessionId: thought.sessionId,
-      sessionTitle: thought.sessionTitle,
-      messageId: thought.messageId,
-      label: thought.label,
-      at: thought.at,
-      title: thought.title,
-      decisions
-    });
-  }
-  const time3 = (hit) => {
-    const parsed = Date.parse(hit.at);
-    return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
-  };
-  return hits.sort(
-    (a, b) => time3(b) - time3(a) || a.sessionId.localeCompare(b.sessionId) || a.messageId.localeCompare(b.messageId)
-  );
-}
-function formatWhy(hits) {
-  const lines = [];
-  for (const hit of hits) {
-    if (lines.length > 0) lines.push("");
-    lines.push(
-      `${shortHash(hit.messageId)}  ${hit.label}  ${stamp(hit.at)} \xB7 ${oneLine4(hit.title)}`
-    );
-    lines.push(`  ${oneLine4(hit.sessionTitle)} (${hit.sessionId})`);
-    for (const decision of hit.decisions) {
-      const why2 = oneLine4(decision.why);
-      lines.push(`  decision: ${oneLine4(decision.title)}${why2 === "" ? "" : ` \u2014 ${why2}`}`);
-      for (const alt of decision.alternatives) {
-        const reason = oneLine4(alt.why);
-        lines.push(`    not: ${oneLine4(alt.option)}${reason === "" ? "" : ` \u2014 ${reason}`}`);
-      }
-    }
-  }
-  return lines;
-}
-async function nearestProjectDir(start) {
-  for (let dir = resolve5(start); ; dir = dirname8(dir)) {
-    if (existsSync3(projectPaths(dir).project) || existsSync3(join10(dir, ".git"))) return dir;
-    if (dirname8(dir) === dir) return void 0;
-  }
-}
-async function why(opts) {
-  const { io } = opts;
-  if (opts.line !== void 0 && (!Number.isInteger(opts.line) || opts.line < 1))
-    throw new CliError("--line needs a positive line number");
-  let start = opts.dir ?? ".";
-  let target = opts.file;
-  if (opts.cwd !== void 0) {
-    start = await nearestProjectDir(opts.cwd) ?? opts.cwd;
-    target = relative5(start, resolve5(opts.cwd, opts.file));
-  }
-  const parsed = parseBlameTarget(target);
-  const file2 = parsed.file;
-  const line = opts.line ?? parsed.line;
-  const { root } = await resolveProjectRoot(start);
-  const project = await loadProject(root);
-  if (!project.found) throw new CliError(`${root} is not initialized; run \`cogit init\` first`);
-  if (!project.ok) throw new CliError(project.error);
-  if (await findGitRoot(root) === void 0)
-    throw new CliError(`${root} is not inside a git repository; why needs one`);
-  const exists = await stat9(resolve5(root, file2)).then(
-    (info) => info.isFile(),
-    () => false
-  );
-  if (!exists) throw new CliError(`${opts.file} does not exist`);
-  if (line !== void 0) {
-    let lineHits;
-    try {
-      lineHits = await collectWhyLine(root, file2, line, io.env);
-    } catch (err) {
-      throw new CliError(`git could not read ${opts.file}: ${gitMessage(err)}`);
-    }
-    if (lineHits.length > 0) {
-      printHits(io, lineHits);
-      return lineHits;
-    }
-    const fileHits = await collectWhy(root, file2, io.env);
-    if (fileHits.length === 0) {
-      io.out(`No decisions or rejected alternatives recorded for ${file2}.`);
-      return fileHits;
-    }
-    io.out(`No thought recorded for ${file2}:${line}.`);
-    io.out("");
-    io.out("Thoughts behind the rest of the file:");
-    io.out("");
-    printHits(io, fileHits);
-    return fileHits;
-  }
-  const hits = await collectWhy(root, file2, io.env);
-  if (hits.length === 0) {
-    io.out(`No decisions or rejected alternatives recorded for ${file2}.`);
-    return hits;
-  }
-  printHits(io, hits);
-  return hits;
-}
-function printHits(io, hits) {
-  for (const line of formatWhy(hits)) io.out(line);
-  io.out("");
-  io.out("`cogit show <hash>` opens the thought; the record is the agent's summary.");
-}
-var TRY_BEFORE_MAX_ITEMS = 5;
-var TRY_BEFORE_MAX_CHARS = 600;
-function rejectedItems(hits) {
-  const items = [];
-  for (const hit of hits) {
-    for (const decision of hit.decisions) {
-      for (const alt of decision.alternatives) {
-        items.push({ ...alt, messageId: hit.messageId, at: hit.at });
-      }
-    }
-  }
-  return items;
-}
-function tryBeforeNote(file2, hits) {
-  const items = rejectedItems(hits);
-  if (items.length === 0) return void 0;
-  const header = "Earlier, for this file:";
-  const footer = "Decide knowingly.";
-  const more = `See \`cogit why ${file2}\` for more.`;
-  const lines = [];
-  for (const item of items.slice(0, TRY_BEFORE_MAX_ITEMS)) {
-    const reason = oneLine4(item.why) === "" ? "no reason recorded" : oneLine4(item.why);
-    const line = `- "${oneLine4(item.option)}" was considered and rejected (${shortHash(item.messageId)}, ${dayStamp(item.at)}): ${reason}`;
-    const truncated2 = lines.length + 1 < items.length;
-    const total = [header, ...lines, line, footer, ...truncated2 ? [more] : []].join("\n");
-    if (total.length <= TRY_BEFORE_MAX_CHARS) {
-      lines.push(line);
-      continue;
-    }
-    break;
-  }
-  if (lines.length === 0) {
-    const first = items[0];
-    if (first === void 0) return void 0;
-    const reason = oneLine4(first.why) === "" ? "no reason recorded" : oneLine4(first.why);
-    const full = `- "${oneLine4(first.option)}" was considered and rejected (${shortHash(first.messageId)}, ${dayStamp(first.at)}): ${reason}`;
-    const tail = [footer, ...items.length > 1 ? [more] : []].join("\n");
-    const room = TRY_BEFORE_MAX_CHARS - header.length - tail.length - 3;
-    if (room < 40) return void 0;
-    lines.push(full.length <= room ? full : `${full.slice(0, room - 1).trimEnd()}\u2026`);
-  }
-  const truncated = lines.length < items.length;
-  return [header, ...lines, footer, ...truncated ? [more] : []].join("\n");
-}
-
-// src/hooks/pretooluse.ts
-var WRITE_TOOLS = /* @__PURE__ */ new Set(["Edit", "Write", "MultiEdit"]);
-async function onPreToolUse(ctx) {
-  const tool = ctx.input.tool_name;
-  if (tool === void 0 || !WRITE_TOOLS.has(tool)) return void 0;
-  const filePath = ctx.input.tool_input?.file_path;
-  if (typeof filePath !== "string" || filePath.trim() === "") return void 0;
-  const config2 = await loadConfig(ctx.env);
-  if (!config2.tryBeforeNotes) return void 0;
-  const absolute = isAbsolute5(filePath) ? filePath : resolve6(ctx.input.cwd ?? ctx.root, filePath);
-  const rel = relative6(ctx.root, absolute);
-  if (rel === "" || rel.startsWith("..") || isAbsolute5(rel)) return void 0;
-  const key = rel.split(sep5).join("/");
-  let firstLook = false;
-  await updateState(
-    ctx.root,
-    ctx.sessionId,
-    (cur) => {
-      const noted = cur?.notedFiles ?? [];
-      if (noted.includes(key)) return cur ?? emptyState();
-      firstLook = true;
-      return { ...cur ?? emptyState(), notedFiles: [...noted, key].sort() };
-    },
-    { timeoutMs: 1500 }
-  );
-  if (!firstLook) return void 0;
-  const hits = await collectWhy(ctx.root, key, ctx.env);
-  const note = tryBeforeNote(key, hits);
-  return note === void 0 ? void 0 : ctx.agent.additionalContext("PreToolUse", note);
-}
-function emptyState() {
-  return {
-    schema: STATE_SCHEMA,
-    turns: 0,
-    turnsSinceUpdate: 0,
-    recordUpdatedAt: null,
-    turnsSinceSide: 0,
-    agentWroteAt: null,
-    notedFiles: []
-  };
-}
-
-// src/hooks/promptsubmit.ts
-async function onPromptSubmit(ctx) {
-  if (!ctx.initialized) return void 0;
-  await atomicWriteJson(projectPaths(ctx.root).head, {
-    sessionId: ctx.sessionId,
-    ...ctx.input.transcript_path === void 0 ? {} : { transcriptPath: ctx.input.transcript_path },
-    at: ctx.now
-  });
-  await updateState(
-    ctx.root,
-    ctx.sessionId,
-    (cur) => cur ?? HookState.parse({ schema: STATE_SCHEMA }),
-    {
-      timeoutMs: 1500
-    }
-  );
-  await refreshGitHooks(ctx.root).catch(() => void 0);
-  return void 0;
-}
-
-// src/hooks/sessionend.ts
-async function onSessionEnd(ctx) {
-  if (!ctx.initialized) return void 0;
-  const config2 = await loadConfig(ctx.env);
-  if (!config2.sessionEndCatchUp) return void 0;
-  const messages = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
-  if (!messages || messages.length === 0) return void 0;
-  const review = config2.recorder === "mixed" ? ["--review"] : [];
-  ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "--close", ...review, "-C", ctx.root]);
-  return void 0;
-}
-
-// package.json
-var package_default = {
-  name: "@cogit/cli",
-  version: "1.3.1",
-  description: "Git for the intent behind agent-written code.",
-  license: "MIT",
-  keywords: [
-    "git",
-    "ai",
-    "coding-agent",
-    "claude-code",
-    "history",
-    "lineage",
-    "commit",
-    "context"
-  ],
-  repository: {
-    type: "git",
-    url: "git+https://github.com/erensrtky/cogit.git"
-  },
-  homepage: "https://github.com/erensrtky/cogit#readme",
-  bugs: {
-    url: "https://github.com/erensrtky/cogit/issues"
-  },
-  type: "module",
-  bin: {
-    cogit: "dist/cli.js"
-  },
-  files: [
-    "dist",
-    ".claude-plugin",
-    "skills",
-    "hooks"
-  ],
-  publishConfig: {
-    access: "public"
-  },
-  engines: {
-    node: ">=22.13.0"
-  },
-  scripts: {
-    prebuild: "node ../../scripts/sync-version.mjs",
-    build: "tsup",
-    prepack: "npm --prefix ../.. run build && node ../../scripts/copy-docs.mjs"
-  },
-  devDependencies: {
-    "@inquirer/prompts": "^8.7.4",
-    commander: "^15.0.0",
-    mermaid: "^11.17.2",
-    tsup: "^9.0.0",
-    zod: "^4.6.7"
-  }
-};
-
-// src/cli-version.ts
-import { readFile as readFile8, realpath as realpath2, stat as stat10 } from "fs/promises";
-import { delimiter, dirname as dirname9, join as join11 } from "path";
-var PACKAGE = "@cogit/cli";
-async function installedCliVersion(env) {
-  for (const dir of (env.PATH ?? "").split(delimiter)) {
-    if (dir === "") continue;
-    const bin = join11(dir, "cogit");
-    try {
-      if (!(await stat10(bin)).isFile()) continue;
-      const pkg = JSON.parse(
-        await readFile8(join11(dirname9(dirname9(await realpath2(bin))), "package.json"), "utf8")
-      );
-      if (pkg.name === PACKAGE && typeof pkg.version === "string") return pkg.version;
-      return void 0;
-    } catch {
-    }
-  }
-  return void 0;
-}
-function compareVersions(a, b) {
-  const parts = (v) => (v.split("-")[0] ?? "").split(".").map((n) => Number.parseInt(n, 10) || 0);
-  const [x, y] = [parts(a), parts(b)];
-  for (let i = 0; i < Math.max(x.length, y.length); i++) {
-    const d = (x[i] ?? 0) - (y[i] ?? 0);
-    if (d !== 0) return Math.sign(d);
-  }
-  return 0;
-}
-function versionNotice(running, installed) {
-  if (installed === void 0) return void 0;
-  const order = compareVersions(running, installed);
-  if (order > 0)
-    return `cogit: the cogit command is ${installed}, the plugin ${running}. Update the command with \`npm install -g ${PACKAGE}\`.`;
-  if (order < 0)
-    return `cogit: the plugin is ${running}, the cogit command ${installed}. Update the plugin with \`claude plugin update cogit@cogit\`, or turn on auto-update in /plugin \u2192 Marketplaces \u2192 cogit.`;
-  return void 0;
-}
-
 // src/record-sync.ts
-import { spawn } from "child_process";
-import { createHash as createHash2 } from "crypto";
-import { existsSync as existsSync4 } from "fs";
-import { rm as rm3, stat as stat11 } from "fs/promises";
-import { relative as relative7, sep as sep6 } from "path";
+import { spawn as spawn2 } from "child_process";
+import { createHash as createHash3 } from "crypto";
+import { existsSync as existsSync3 } from "fs";
+import { rm as rm4, stat as stat10 } from "fs/promises";
+import { relative as relative5, sep as sep4 } from "path";
 import { setTimeout as sleep2 } from "timers/promises";
 var LOCAL = "refs/cogit";
 var TRACKING = "refs/cogit-remote";
@@ -25742,7 +31064,7 @@ var SyncState = external_exports.object({
 });
 function runGit(root, args, env, input2) {
   return new Promise((done) => {
-    const child = spawn("git", ["-C", root, ...args], {
+    const child = spawn2("git", ["-C", root, ...args], {
       env,
       stdio: [input2 === void 0 ? "ignore" : "pipe", "pipe", "pipe"]
     });
@@ -25783,7 +31105,7 @@ async function gitVersionAtLeast(root, env, major, minor) {
   return version2[0] > major || version2[0] === major && version2[1] >= minor;
 }
 async function isSharing(root) {
-  if (!existsSync4(projectPaths(root).project)) return false;
+  if (!existsSync3(projectPaths(root).project)) return false;
   if (await findGitRoot(root) === void 0) return false;
   return !await cogitIgnored(root);
 }
@@ -25796,9 +31118,9 @@ async function syncRemote(root, env) {
 }
 async function sessionScope(root) {
   const gitRoot = await findGitRoot(root);
-  const prefix = gitRoot === void 0 ? "" : relative7(gitRoot, root).split(sep6).join("/");
+  const prefix = gitRoot === void 0 ? "" : relative5(gitRoot, root).split(sep4).join("/");
   if (prefix === "") return "sessions";
-  return `projects/${createHash2("sha256").update(prefix).digest("hex").slice(0, 16)}/sessions`;
+  return `projects/${createHash3("sha256").update(prefix).digest("hex").slice(0, 16)}/sessions`;
 }
 async function listRefs(root, base, scope, env) {
   const result = await runGit(
@@ -25843,12 +31165,12 @@ async function sessionFiles(root, id, conversations) {
     [EVENTS_FILE, paths.events(id)],
     ...conversations ? [[CONVERSATION_FILE, paths.conversation(id)]] : []
   ];
-  return all.filter(([, path2]) => existsSync4(path2));
+  return all.filter(([, path3]) => existsSync3(path3));
 }
 async function stampOf(files, conversations) {
   const parts = [conversations ? "c" : "-"];
-  for (const [name, path2] of files) {
-    const info = await stat11(path2);
+  for (const [name, path3] of files) {
+    const info = await stat10(path3);
     parts.push(`${name}:${info.mtimeMs}:${info.size}`);
   }
   return parts.join("|");
@@ -25880,7 +31202,7 @@ async function snapshotRecords(root, env) {
     }
     if (!touched) return state;
     if (changed.length === 0) return { ...state, stamps };
-    const paths = changed.flatMap(({ files }) => files.map(([, path2]) => path2));
+    const paths = changed.flatMap(({ files }) => files.map(([, path3]) => path3));
     const hashed = await runGit(
       root,
       ["hash-object", "-w", "--stdin-paths"],
@@ -25953,14 +31275,14 @@ async function importRecords(root, env) {
     const wanted = /* @__PURE__ */ new Map();
     for (const [id, tree] of tracking) {
       const mine = local.get(id);
-      const missing = !existsSync4(paths.session(id));
+      const missing = !existsSync3(paths.session(id));
       if (missing) wanted.set(id, mine ?? tree);
       else if (mine !== void 0) {
         if (mine === tree) imported[id] = tree;
       } else if (imported[id] !== tree) wanted.set(id, tree);
     }
     for (const [id, tree] of local) {
-      if (!tracking.has(id) && !existsSync4(paths.session(id))) wanted.set(id, tree);
+      if (!tracking.has(id) && !existsSync3(paths.session(id))) wanted.set(id, tree);
     }
     const ids = [...wanted.keys()];
     const agreed = Object.keys(imported).length !== Object.keys(state.imported).length;
@@ -26023,7 +31345,7 @@ async function restoreCommittedRecords(root, env) {
       if (name === null || !SESSION_ID.test(name[1])) return [];
       const id = name[1];
       const target = name[2] === ".json" ? paths.session(id) : paths.events(id);
-      return existsSync4(target) ? [] : [{ id, target, spec: `${from}^:./${file2}` }];
+      return existsSync3(target) ? [] : [{ id, target, spec: `${from}^:./${file2}` }];
     });
     const blobs = wanted.length === 0 ? /* @__PURE__ */ new Map() : await readBlobs(
       root,
@@ -26081,7 +31403,7 @@ async function downloadRecords(root, env, showProgress = false) {
 var REF_LINE = /^(From | .* -> )/;
 function fetchWithProgress(root, args, env) {
   return new Promise((done) => {
-    const child = spawn("git", ["-C", root, ...args], {
+    const child = spawn2("git", ["-C", root, ...args], {
       env,
       stdio: ["inherit", "inherit", "pipe"]
     });
@@ -26248,10 +31570,10 @@ async function deleteRecords(root, ids, env) {
     });
   }
   for (const id of ids) {
-    await rm3(paths.session(id), { force: true });
-    await rm3(paths.events(id), { force: true });
-    await rm3(paths.conversation(id), { force: true });
-    await rm3(paths.state(id), { force: true });
+    await rm4(paths.session(id), { force: true });
+    await rm4(paths.events(id), { force: true });
+    await rm4(paths.conversation(id), { force: true });
+    await rm4(paths.state(id), { force: true });
   }
 }
 
@@ -26300,9 +31622,9 @@ async function retryUnclosed(ctx) {
     let allowed = false;
     await updateState(ctx.root, id, (cur) => {
       const tries = cur?.closeRetries ?? 0;
-      if (tries >= CLOSE_RETRY_LIMIT) return cur ?? emptyState2();
+      if (tries >= CLOSE_RETRY_LIMIT) return cur ?? emptyState();
       allowed = true;
-      return { ...cur ?? emptyState2(), closeRetries: tries + 1 };
+      return { ...cur ?? emptyState(), closeRetries: tries + 1 };
     });
     if (!allowed) continue;
     ctx.spawnDetached(["backfill", id, "--tail", "--close", "-C", ctx.root]);
@@ -26315,15 +31637,14 @@ function unclosed(session, now) {
   const age = now - Date.parse(session.updatedAt);
   return age >= CLOSE_RETRY_IDLE_MS && age <= CLOSE_RETRY_WINDOW_MS;
 }
-function emptyState2() {
+function emptyState() {
   return {
     schema: STATE_SCHEMA,
     turns: 0,
     turnsSinceUpdate: 0,
     recordUpdatedAt: null,
     turnsSinceSide: 0,
-    agentWroteAt: null,
-    notedFiles: []
+    agentWroteAt: null
   };
 }
 
@@ -26383,19 +31704,19 @@ function additionalContext2(ctx, text) {
 }
 async function compactRequest(ctx) {
   if (!ctx.initialized) return void 0;
-  const messages = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
-  if (!messages) return void 0;
+  const messages2 = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
+  if (!messages2) return void 0;
   const record2 = await loadSession(ctx.root, ctx.sessionId);
   let recorded = /* @__PURE__ */ new Set();
   if (record2.found && record2.ok) {
-    const upgraded = upgradeSessionIds(record2.data, messages);
+    const upgraded = upgradeSessionIds(record2.data, messages2);
     const events = await readEvents(ctx.root, ctx.sessionId);
     recorded = new Set(applyEvents(upgraded.nodes, events).map((node2) => node2.id));
   }
-  if (messages.every((message) => isRecorded(recorded, message))) return void 0;
+  if (messages2.every((message) => isRecorded(recorded, message))) return void 0;
   return additionalContext2(ctx, COMPACT_REQUEST);
 }
-function oneLine5(text) {
+function oneLine3(text) {
   return text.replace(/\s+/g, " ").trim();
 }
 function clip(text, max) {
@@ -26409,8 +31730,8 @@ async function startupContext(ctx) {
   const previous = mostRecentOtherSession(sessions, ctx.sessionId);
   if (previous === void 0) return header;
   const events = await readEvents(ctx.root, previous.sessionId);
-  const messages = buildMessages(applyEvents(previous.nodes, events));
-  return composeStartupContext(header, previous, branchesOf(previous.sessionId, messages));
+  const messages2 = buildMessages(applyEvents(previous.nodes, events));
+  return composeStartupContext(header, previous, branchesOf(previous.sessionId, messages2));
 }
 function mostRecentOtherSession(sessions, sessionId) {
   return sessions.filter((session) => session.sessionId !== sessionId).sort(
@@ -26435,27 +31756,27 @@ function composeStartupContext(header, session, branches) {
   return `${text.slice(0, STARTUP_CONTEXT_TOKEN_CAP * 4 - 2).trimEnd()}\u2026`;
 }
 function statusLines(session) {
-  const title = session.title.trim() === "" ? session.sessionId : clip(oneLine5(session.title), 120);
+  const title = session.title.trim() === "" ? session.sessionId : clip(oneLine3(session.title), 120);
   const lines = [`Earlier session: ${title} (${session.sessionId})`];
   const { goal, pending, next } = session.status;
-  if (goal.trim() !== "") lines.push(`  goal: ${clip(oneLine5(goal), 400)}`);
+  if (goal.trim() !== "") lines.push(`  goal: ${clip(oneLine3(goal), 400)}`);
   const shown = pending.slice(0, 5);
   for (const item of shown) {
     const needsUser = item.needsUser ? " (needs the user)" : "";
-    lines.push(`  pending: ${clip(oneLine5(item.text), 200)}${needsUser}`);
+    lines.push(`  pending: ${clip(oneLine3(item.text), 200)}${needsUser}`);
   }
   if (pending.length > shown.length)
     lines.push(`  pending: \u2026 ${pending.length - shown.length} more`);
-  if (next.trim() !== "") lines.push(`  next: ${clip(oneLine5(next), 400)}`);
+  if (next.trim() !== "") lines.push(`  next: ${clip(oneLine3(next), 400)}`);
   return lines;
 }
 function branchLines2(branch) {
   const count = `${branch.count} message${branch.count === 1 ? "" : "s"}`;
   return [
-    `  \u256D ${clip(oneLine5(branch.title), 80)}  ${branch.start.label}\u2013${branch.end.label}, ${count}`,
-    `    asked: ${clip(oneLine5(branch.asked), 300)}`,
-    `    outcome: ${clip(oneLine5(branch.outcome), 600)}`,
-    `    open: ${branch.open.trim() === "" ? "\u2014" : clip(oneLine5(branch.open), 300)}`
+    `  \u256D ${clip(oneLine3(branch.title), 80)}  ${branch.start.label}\u2013${branch.end.label}, ${count}`,
+    `    asked: ${clip(oneLine3(branch.asked), 300)}`,
+    `    outcome: ${clip(oneLine3(branch.outcome), 600)}`,
+    `    open: ${branch.open.trim() === "" ? "\u2014" : clip(oneLine3(branch.open), 300)}`
   ];
 }
 
@@ -26471,8 +31792,7 @@ function countTurn(state, recordUpdatedAt, everyTurns, opts = {}) {
     turnsSinceUpdate: 0,
     recordUpdatedAt,
     turnsSinceSide: 0,
-    agentWroteAt: null,
-    notedFiles: []
+    agentWroteAt: null
   };
   const changed = cur.recordUpdatedAt !== recordUpdatedAt;
   const agentChanged = changed && opts.lastRecordedBy !== "side";
@@ -26536,14 +31856,13 @@ var HANDLERS = {
   stop: onStop,
   sessionstart: onSessionStart,
   sessionend: onSessionEnd,
-  promptsubmit: onPromptSubmit,
-  pretooluse: onPreToolUse
+  promptsubmit: onPromptSubmit
 };
 var HOOK_EVENTS = Object.keys(HANDLERS);
 var LOG_LIMIT = 256 * 1024;
 function openLog(log2, args) {
   try {
-    mkdirSync(dirname10(log2), { recursive: true });
+    mkdirSync(dirname9(log2), { recursive: true });
     let flag = "a";
     try {
       if (statSync2(log2).size > LOG_LIMIT) flag = "w";
@@ -26562,7 +31881,7 @@ function spawnDetachedProcess(cli2, args, env, log2) {
   const fd = log2 === void 0 ? void 0 : openLog(log2, args);
   const out = fd ?? "ignore";
   try {
-    spawn2(process.execPath, [cli2, ...args], {
+    spawn3(process.execPath, [cli2, ...args], {
       detached: true,
       stdio: ["ignore", out, out],
       env: { ...env, COGIT_DISABLE: "1" }
@@ -26571,7 +31890,7 @@ function spawnDetachedProcess(cli2, args, env, log2) {
     if (fd !== void 0) closeSync(fd);
   }
 }
-async function runHook(event, stdin, env, now, debug, deps = {}) {
+async function runHook(event, stdin, env, now, debug2, deps = {}) {
   try {
     if (captureDisabled(env)) return void 0;
     const handler = HANDLERS[event];
@@ -26579,15 +31898,15 @@ async function runHook(event, stdin, env, now, debug, deps = {}) {
     const agent = defaultAgent();
     const input2 = agent.parseHookInput(stdin);
     if (input2 === void 0) {
-      debug(`cogit ${event} hook: unreadable hook input`);
+      debug2(`cogit ${event} hook: unreadable hook input`);
       return void 0;
     }
     if (!Slug.safeParse(input2.session_id).success) return void 0;
     if (handler === onSessionStart)
-      await agent.markLive(input2.session_id).catch((err) => debug(`cogit mark: ${err.message}`));
+      await agent.markLive(input2.session_id).catch((err) => debug2(`cogit mark: ${err.message}`));
     if (agent.isHeadless(env) && !(await loadConfig(env)).recordHeadless) return void 0;
     const { root } = await resolveProjectRoot(env[agent.projectDirEnv] ?? input2.cwd ?? ".");
-    const initialized = existsSync5(projectPaths(root).project);
+    const initialized = existsSync4(projectPaths(root).project);
     if (!initialized && handler !== onSessionStart) return void 0;
     const cli2 = deps.cli ?? process.argv[1] ?? fileURLToPath(import.meta.url);
     const startCatchUp = (args) => (deps.spawnDetached ?? spawnDetachedProcess)(cli2, args, env, projectPaths(root).detachedLog);
@@ -26603,7 +31922,7 @@ async function runHook(event, stdin, env, now, debug, deps = {}) {
     });
     return out === void 0 ? void 0 : JSON.stringify(out);
   } catch (err) {
-    debug(`cogit ${event} hook: ${err.message}`);
+    debug2(`cogit ${event} hook: ${err.message}`);
     return void 0;
   }
 }
@@ -26658,8 +31977,8 @@ function readProcess(pid, platform = process.platform) {
 }
 function readProc(pid) {
   try {
-    const stat13 = readFileSync(`/proc/${pid}/stat`, "utf8");
-    const ppid = Number(stat13.slice(stat13.lastIndexOf(")") + 2).split(" ")[1]);
+    const stat12 = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const ppid = Number(stat12.slice(stat12.lastIndexOf(")") + 2).split(" ")[1]);
     const args = readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0").filter(Boolean);
     return Number.isInteger(ppid) ? { ppid, args } : void 0;
   } catch {
@@ -26771,13 +32090,13 @@ async function installGitHook(root, event) {
   if (gitRoot === void 0) return false;
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return false;
-  await mkdir6(dir, { recursive: true });
+  await mkdir7(dir, { recursive: true });
   const file2 = join12(dir, event);
-  const exists = await stat12(file2).then(
+  const exists = await stat11(file2).then(
     () => true,
     () => false
   );
-  const current = exists ? await readFile9(file2, "utf8") : "";
+  const current = exists ? await readFile10(file2, "utf8") : "";
   if (!isShellHook(current)) return false;
   const next = withHookBlock(current, hookBlock(event, root));
   if (exists && next === current) return false;
@@ -26791,7 +32110,7 @@ function isGitHookEvent(event) {
   return GIT_HOOK_EVENTS.includes(event);
 }
 async function installGitHooks(root) {
-  await rm4(projectPaths(root).hooksOff, { force: true });
+  await rm5(projectPaths(root).hooksOff, { force: true });
   const installed = [];
   for (const event of GIT_HOOK_EVENTS) {
     if (await installGitHook(root, event)) installed.push(event);
@@ -26804,8 +32123,8 @@ async function refreshGitHooks(root) {
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return [];
   const refreshed = [];
-  const hasBlock = async (event) => (await readFile9(join12(dir, event), "utf8").catch(() => void 0) ?? "").includes(BLOCK_START);
-  const installed = !existsSync6(projectPaths(root).hooksOff) || await hasBlock("prepare-commit-msg");
+  const hasBlock = async (event) => (await readFile10(join12(dir, event), "utf8").catch(() => void 0) ?? "").includes(BLOCK_START);
+  const installed = !existsSync5(projectPaths(root).hooksOff) || await hasBlock("prepare-commit-msg");
   for (const event of GIT_HOOK_EVENTS) {
     if (!installed && !await hasBlock(event)) continue;
     if (await installGitHook(root, event)) refreshed.push(event);
@@ -26821,8 +32140,8 @@ async function uninstallGitHooks(root) {
   await removeHookBlocks(dir, RETIRED_GIT_HOOK_EVENTS);
   const removed = await removeHookBlocks(dir, GIT_HOOK_EVENTS);
   const paths = projectPaths(root);
-  if (existsSync6(paths.project)) {
-    await mkdir6(dirname11(paths.hooksOff), { recursive: true });
+  if (existsSync5(paths.project)) {
+    await mkdir7(dirname10(paths.hooksOff), { recursive: true });
     await atomicWrite(paths.hooksOff, `${(/* @__PURE__ */ new Date()).toISOString()}
 `);
   }
@@ -26832,17 +32151,17 @@ async function removeHookBlocks(dir, events) {
   const removed = [];
   for (const event of events) {
     const file2 = join12(dir, event);
-    const current = await readFile9(file2, "utf8").catch(() => void 0);
+    const current = await readFile10(file2, "utf8").catch(() => void 0);
     if (current === void 0 || !current.includes(BLOCK_START)) continue;
     const next = withoutHookBlock(current);
-    if (onlyGeneratedShebang(next)) await rm4(file2, { force: true });
+    if (onlyGeneratedShebang(next)) await rm5(file2, { force: true });
     else await atomicWrite(file2, next);
     removed.push(event);
   }
   return removed;
 }
 var NO_OBJECT = /^0+$/;
-async function sendWithPush(dir, env, pushedRemote, pushedRefs, spawn3, dryRun) {
+async function sendWithPush(dir, env, pushedRemote, pushedRefs, spawn4, dryRun) {
   if (captureDisabled(env)) return;
   if (dryRun()) return;
   const lines = pushedRefs.split("\n").filter(Boolean);
@@ -26857,14 +32176,14 @@ async function sendWithPush(dir, env, pushedRemote, pushedRefs, spawn3, dryRun) 
 `
   );
   const after = going === void 0 ? [] : ["--after", `${going[2]}=${going[1]}`];
-  spawn3(
+  spawn4(
     cli2,
     ["record-sync", "send-pushed", ...after, "-C", dir],
     env,
     projectPaths(dir).detachedLog
   );
 }
-async function queueShape(dir, env, spawn3) {
+async function queueShape(dir, env, spawn4) {
   if (captureDisabled(env)) return;
   const config2 = await loadConfig(env).catch(() => void 0);
   if (config2 === void 0 || !config2.shapes || config2.recorder === "agent") return;
@@ -26874,13 +32193,13 @@ async function queueShape(dir, env, spawn3) {
   if (commit === void 0) return;
   const cli2 = currentCliPath();
   if (cli2 === void 0) return;
-  spawn3(cli2, ["shape", "--commit", commit, "-C", dir], env, projectPaths(dir).detachedLog);
+  spawn4(cli2, ["shape", "--commit", commit, "-C", dir], env, projectPaths(dir).detachedLog);
 }
 var GIT_REPO_ENV = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"];
 async function commonDir(cwd, env) {
   try {
     const { stdout } = await execGit(["rev-parse", "--git-common-dir"], { cwd, env });
-    const dir = resolve7(cwd, String(stdout).trim());
+    const dir = resolve4(cwd, String(stdout).trim());
     return await realpath3(dir).catch(() => dir);
   } catch {
     return void 0;
@@ -26896,14 +32215,14 @@ async function sameRepository(hookCwd, dir) {
   ]);
   return here === void 0 || project === void 0 || here === project;
 }
-async function runGitHook(event, dir, env = process.env, args = [], now = /* @__PURE__ */ new Date(), spawn3 = spawnDetachedProcess, pushedRefs = async () => "", dryRun = pushIsDryRun, hookCwd) {
+async function runGitHook(event, dir, env = process.env, args = [], now = /* @__PURE__ */ new Date(), spawn4 = spawnDetachedProcess, pushedRefs = async () => "", dryRun = pushIsDryRun, hookCwd) {
   if (hookCwd !== void 0 && !await sameRepository(hookCwd, dir)) return;
   if (event === "pre-push") {
-    await sendWithPush(dir, env, args[0], await pushedRefs(), spawn3, dryRun);
+    await sendWithPush(dir, env, args[0], await pushedRefs(), spawn4, dryRun);
     return;
   }
   if (event === "post-commit") {
-    await queueShape(dir, env, spawn3);
+    await queueShape(dir, env, spawn4);
     return;
   }
   const [messageFile, source] = args;
@@ -26972,6 +32291,7 @@ export {
   readCommitChanges,
   readCommitPatches,
   projectFiles,
+  blameCommitHashes,
   gitUserName,
   gitUserEmail,
   commitBetween,
@@ -26990,11 +32310,15 @@ export {
   loadRegistry,
   updateRegistry,
   updateState,
+  compareVersions,
+  versionNotice,
   readSessionHead,
   readThoughtTrailers,
   readCommitThought,
   earliestSessionStart,
   attachThoughtTrailers,
+  buildFileHistory,
+  modelSessions,
   sameAuthor,
   sessionIdentity,
   stampedIdentity,
@@ -27011,9 +32335,6 @@ export {
   markBuiltBy,
   builtBy,
   embedViewModel,
-  blame,
-  buildFileHistory,
-  modelSessions,
   loadEffectiveSessions,
   openProject,
   stamp,
@@ -27023,9 +32344,6 @@ export {
   formatShow,
   log,
   logFile,
-  why,
-  compareVersions,
-  versionNotice,
   isSharing,
   reconcileRecords,
   addRecordRefspec,

@@ -84,7 +84,7 @@ including the option that was rejected.*
   or plain steps), and the diff, in one place.
 - **Tasks**: when a session ends, a small model catches the work that came up and didn't get
   finished as a few user-level items; you accept, dismiss or close them (`cogit captures`, and
-  on the map).
+  on the map). Off by default: `cogit config set captures true`.
 - **Pull request descriptions with the decisions**: `cogit pr` writes the goal, the
   decisions and the rejected options, never the raw chat. `cogit pr --install-action` adds a
   GitHub Action that posts them on every pull request.
@@ -101,8 +101,8 @@ including the option that was rejected.*
   a pull request or `git status`. Your chats stay local, `cogit prune` deletes old sessions, and
   key and token patterns are redacted.
 - **The agent gets the context too**: a new session starts where the last one left off, and
-  before editing a file the agent hears what was already tried and rejected there. It works
-  alongside memory tools; it doesn't replace them.
+  the agent can look up what was decided and rejected with `cogit why`. It works alongside
+  memory tools; it doesn't replace them.
 
 ## Install
 
