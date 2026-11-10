@@ -633,9 +633,6 @@ const CANDIDATE_SESSIONS = 8;
 const CANDIDATE_MESSAGES = 3;
 const CANDIDATE_BRANCHES = 8;
 
-/** A first message that says, in the user's words, that it continues earlier work. */
-const CONTINUES = /\b(devam|kaldığımız yerden|continue)\b/i;
-
 /** One earlier session as the parent pick sees it: L0, its branches (L1) and its last messages. */
 export interface CandidateSession {
   sessionId: string;
@@ -747,9 +744,10 @@ export async function candidateSessions(
 
 /**
  * The candidates for hanging a session's first message from an earlier session
- * (8.6), with a hint when the transcript shows a handoff file being read or the
- * message itself says it continues. Cheap hints from records and the transcript,
- * no model call.
+ * (8.6), with a hint when the transcript shows a handoff file being read. Whether
+ * the message itself says it continues is left to the model reading it, which
+ * understands any language; a word list would only know a few. Cheap hints from
+ * records and the transcript, no model call.
  */
 async function parentCandidates(
   root: string,
@@ -762,7 +760,7 @@ async function parentCandidates(
   const handoff = file ? await agent.readsHandoff(file).catch(() => false) : false;
   return {
     forMessage: { id: first.hash, label: first.label },
-    ...(handoff || CONTINUES.test(first.text) ? { continuesHint: true } : {}),
+    ...(handoff ? { continuesHint: true } : {}),
     sessions,
   };
 }

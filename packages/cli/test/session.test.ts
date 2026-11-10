@@ -906,7 +906,6 @@ ${line("second", 2)}
     await sessionShow(root, "second", io);
     expect(shown().candidates).toEqual({
       forMessage: { id: messageHash("second", { at, text }), label: "m1" },
-      continuesHint: true,
       sessions: [
         {
           sessionId: "first",
