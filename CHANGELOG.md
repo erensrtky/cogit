@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-10
 ### Added
 - A **Pull request** view in the map, beside the Git and Graph views: the branch you are on as `cogit pr` describes it, with the goal, a card per thought (its reason, rejected options, the messages that led to it and its Shape diagram) and the commits no thought is behind. A thought opens its card with the diff, and **Copy as PR description** copies the Markdown. On `main` itself the view says there is nothing to merge. The view asks the local server for the branch checked out each time it opens, so switching branches does not need a rebuild.
 - `cogit pr` and the pull request Action now include each message's **Shape**: a Flow, a Mermaid diagram or a sequence as a `mermaid` block GitHub draws, a Before / After table as a table, and steps or examples as text. When a description would pass GitHub's size cap, the Shapes go after the file lists and summaries.
