@@ -313,6 +313,16 @@ describe("runHook", () => {
     expect(spawned).not.toEqual([]);
   });
 
+  it("records a `claude -p` session its tool marked with COGIT_RECORD=1", async () => {
+    await initialized(1);
+    const marked = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli", COGIT_RECORD: "1" };
+    expect(await sessionStart("startup", marked)).toContain("records this project's lineage");
+    await stop({}, marked);
+    expect(spawned).not.toEqual([]);
+    // cogit's own background runs stay out, marked or not.
+    expect(await sessionStart("startup", { ...marked, COGIT_DISABLE: "1" })).toBeUndefined();
+  });
+
   it("silences the setup hint per project with hint-off and undoes it with hint-on", async () => {
     const off = fakeIo(env);
     await configHintOff(root, off);

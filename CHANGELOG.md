@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- A tool that does real work through `claude -p` (a loop script like Ralph) can have its sessions recorded by starting them with `COGIT_RECORD=1`, while **Headless sessions** stays off and other plugins' background runs stay out of the map. `cogit doctor` now also counts the unrecorded tail of such a session.
+
 ### Fixed
 - The map's **Pull request** view asks for the branch again when you come back to the window, so a `git switch` in a terminal shows without reloading the page.
 - A Shape Flow whose node id is a word Mermaid reserves (`box`, `end`, `loop`…) drew as plain text in the map and broke its `mermaid` block in `cogit pr`; the diagram now uses its own ids.

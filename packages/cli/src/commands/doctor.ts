@@ -100,7 +100,7 @@ export async function projectTranscripts(
  */
 async function newestTranscript(
   transcripts: ReadonlyMap<string, string>,
-  skip: (file: string) => Promise<boolean>,
+  skip: (id: string, file: string) => Promise<boolean>,
 ): Promise<{ id: string; file: string } | undefined> {
   const dated: { id: string; file: string; mtime: number }[] = [];
   for (const [id, file] of transcripts) {
@@ -109,7 +109,7 @@ async function newestTranscript(
   }
   dated.sort((a, b) => b.mtime - a.mtime);
   for (const { id, file } of dated) {
-    if (!(await skip(file))) return { id, file };
+    if (!(await skip(id, file))) return { id, file };
   }
   return undefined;
 }
@@ -414,8 +414,12 @@ const CHECK_SPECS: CheckSpec[] = [
       const sessions = await ctx.sessions();
       const transcripts = await ctx.transcripts();
       const { recordHeadless } = await ctx.config();
-      const newest = await newestTranscript(transcripts, (file) =>
-        recordHeadless ? Promise.resolve(false) : ctx.agent.isHeadlessTranscript(file),
+      // A headless session with a record was marked (COGIT_RECORD=1); its tail counts.
+      const recorded = new Set(sessions.map((session) => session.sessionId));
+      const newest = await newestTranscript(transcripts, (id, file) =>
+        recordHeadless || recorded.has(id)
+          ? Promise.resolve(false)
+          : ctx.agent.isHeadlessTranscript(file),
       );
       const tail =
         newest === undefined

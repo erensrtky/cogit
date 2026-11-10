@@ -4,7 +4,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type AgentAdapter, defaultAgent, type HookInput } from "../agents/index.js";
 import { Slug } from "../schema/common.js";
-import { captureDisabled, projectPaths } from "../store/paths.js";
+import { captureDisabled, projectPaths, recordMarked } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadConfig } from "../store/stores.js";
 import { onPromptSubmit } from "./promptsubmit.js";
@@ -125,8 +125,11 @@ export async function runHook(
       await agent
         .markLive(input.session_id)
         .catch((err: Error) => debug(`cogit mark: ${err.message}`));
-    // A session nobody types into is left alone unless the user asked for it.
-    if (agent.isHeadless(env) && !(await loadConfig(env)).recordHeadless) return undefined;
+    // A session nobody types into is left alone unless the user asked for all of
+    // them, or the tool that started it marked it with COGIT_RECORD=1 (a loop
+    // like Ralph does real work headless; another plugin's summarizer does not).
+    if (agent.isHeadless(env) && !recordMarked(env) && !(await loadConfig(env)).recordHeadless)
+      return undefined;
     // In a linked worktree both point at the worktree; the record lives in the main checkout.
     const { root } = await resolveProjectRoot(env[agent.projectDirEnv] ?? input.cwd ?? ".");
     const initialized = existsSync(projectPaths(root).project);

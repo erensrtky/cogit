@@ -68,7 +68,9 @@ export const Config = z.object({
   /**
    * Whether sessions started without a person (`claude -p`, an SDK) are recorded.
    * Off by default: other plugins start them in the background, one per prompt,
-   * and they would fill the map and the inbox.
+   * and they would fill the map and the inbox. A tool that does real work
+   * headless (a loop like Ralph) marks its own sessions with `COGIT_RECORD=1`
+   * instead, and only those are recorded.
    */
   recordHeadless: z.boolean().default(false),
   /** Port the local map server binds on `127.0.0.1`. */

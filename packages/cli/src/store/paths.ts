@@ -17,6 +17,15 @@ export function captureDisabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.COGIT_DISABLE === "1" || env.CODELINEAGE_DISABLE === "1";
 }
 
+/**
+ * Whether the tool that started this headless session asked cogit to record it
+ * (`COGIT_RECORD=1`), whatever `recordHeadless` says. cogit's own background
+ * runs never get here: they carry `COGIT_DISABLE`, which is checked first.
+ */
+export function recordMarked(env: NodeJS.ProcessEnv): boolean {
+  return env.COGIT_RECORD === "1";
+}
+
 export function projectPaths(root: string) {
   const base = join(root, DIR_NAME);
   return {

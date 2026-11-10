@@ -100,7 +100,9 @@ const EDITABLE: FieldSpec[] = [
     details:
       "Some plugins and scripts run `claude -p` in the background, often once per prompt. " +
       "Off, cogit leaves those sessions out of the map and the inbox. Turn it on if you do " +
-      "real work through `claude -p` or the SDK and want it recorded.",
+      "real work through `claude -p` or the SDK and want all of it recorded. To record only " +
+      "one tool's sessions, such as a loop script, start them with `COGIT_RECORD=1` and " +
+      "leave this off.",
     kind: "boolean",
   },
   {
