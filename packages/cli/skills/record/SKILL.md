@@ -59,7 +59,8 @@ transcript is unreadable: send only `status`.
   (`{ "option", "why" }`). `alternatives` lists only options someone actually named in the
   conversation before the decision: never one inferred from the decision, never the current
   state, and no durations, sizes or reasons the conversation does not contain. An option only
-  postponed was not rejected. `"agreed"` needs the user approving the proposal in this message;
+  postponed was not rejected. Only options about the product or the code: not how the work is
+  run (which tool or agent does it, this chat or a new one, when to post or release). `"agreed"` needs the user approving the proposal in this message;
   a proposal the user has not answered is not a decision.
 - Your work belongs to the message that caused it: `work`, `agentDecisions`
   (`{ "title", "why", "alternatives" }`), `commits` (short hashes), `files` (a few paths).
