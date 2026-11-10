@@ -25,8 +25,8 @@ jobs:
     steps:
       # Windows would check the files out with CRLF, which the tests and the linter read as changes.
       - run: git config --global core.autocrlf false
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
