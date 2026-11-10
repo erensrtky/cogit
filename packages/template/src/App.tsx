@@ -10,7 +10,7 @@ import {
 } from "../../cli/src/view/search.js";
 import { BackToPanel, Brand } from "./Brand.js";
 import { isLivePage, MeaningError, pageToken, saveSetting, searchMeaning } from "./data.js";
-import { Graph } from "./Graph.js";
+import { Graph } from "./GraphView.js";
 import { Inbox } from "./Inbox.js";
 import { type MapSearchState, SearchBox } from "./MapSearch.js";
 import { declineOffer, meaningHits, mergeHits, offerDeclined } from "./meaningSearch.js";
