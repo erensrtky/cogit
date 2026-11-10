@@ -119,13 +119,17 @@ async function loadIndex(root: string): Promise<GraphIndex | undefined> {
 
 /** True when `name` is an executable file in one of PATH's directories. */
 async function onPath(name: string, env: NodeJS.ProcessEnv): Promise<boolean> {
+  // Windows tools carry an .exe the command leaves out.
+  const names = process.platform === "win32" ? [`${name}.exe`, name] : [name];
   for (const dir of (env.PATH ?? "").split(delimiter)) {
     if (dir === "") continue;
-    try {
-      await access(join(dir, name), constants.X_OK);
-      return true;
-    } catch {
-      // not here
+    for (const file of names) {
+      try {
+        await access(join(dir, file), constants.X_OK);
+        return true;
+      } catch {
+        // not here
+      }
     }
   }
   return false;

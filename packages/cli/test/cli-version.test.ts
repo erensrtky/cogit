@@ -1,10 +1,10 @@
 import { chmod, mkdir, symlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import pkg from "../package.json" with { type: "json" };
 import { compareVersions, installedCliVersion, versionNotice } from "../src/cli-version.js";
 import { runHook } from "../src/hooks/run.js";
-import { envFor, T0, tempDir } from "./helpers.js";
+import { envFor, pathWith, T0, tempDir } from "./helpers.js";
 
 let dir: string;
 beforeEach(async () => {
@@ -29,7 +29,22 @@ describe("the installed cogit command", () => {
     const newer = await npmPrefix("@cogit/cli", "0.19.1");
     const empty = join(dir, "empty");
     await mkdir(join(empty, "cogit"), { recursive: true });
-    expect(await installedCliVersion({ PATH: ["", empty, older, newer].join(":") })).toBe("0.18.0");
+    expect(await installedCliVersion({ PATH: ["", empty, older, newer].join(delimiter) })).toBe(
+      "0.18.0",
+    );
+  });
+
+  it("reads the version npm installs on Windows, beside the shims", async () => {
+    const prefix = join(dir, "npm-windows");
+    const pkgDir = join(prefix, "node_modules", "@cogit", "cli");
+    await mkdir(pkgDir, { recursive: true });
+    await writeFile(
+      join(pkgDir, "package.json"),
+      JSON.stringify({ name: "@cogit/cli", version: "1.4.0" }),
+    );
+    await writeFile(join(prefix, "cogit"), "#!/bin/sh\n");
+    await writeFile(join(prefix, "cogit.cmd"), "@node %*\r\n");
+    expect(await installedCliVersion({ PATH: prefix })).toBe("1.4.0");
   });
 
   it("says nothing for no PATH, no cogit, or a cogit that is not ours", async () => {
@@ -67,7 +82,7 @@ describe("the installed cogit command", () => {
   it("shows the notice to the user when a new chat starts, beside the agent's context", async () => {
     const root = join(dir, "proj");
     await mkdir(root);
-    const env = { ...envFor(dir), PATH: await npmPrefix("@cogit/cli", "0.0.1") };
+    const env = { ...envFor(dir), PATH: pathWith(await npmPrefix("@cogit/cli", "0.0.1")) };
     const start = async (source: string) =>
       runHook(
         "sessionstart",

@@ -1,7 +1,7 @@
 import { createReadStream } from "node:fs";
 import { access, type FileHandle, open, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import { createInterface } from "node:readline";
 import type { ChatTurn, ForkOrigin, LastTurn, ToolUse, UserMessage } from "../types.js";
 import { forkOrigin } from "./fork.js";
@@ -153,8 +153,13 @@ export function displayTurn(turn: ChatTurn, roots: string[]): ChatTurn {
       "\n[Pasted]\n$1\n[/Pasted]\n",
     )
     .trim();
-  const relative = (file: string): string => {
-    for (const root of roots) if (file.startsWith(`${root}/`)) return file.slice(root.length + 1);
+  // Shown the way git names files, with / even on Windows.
+  const fromRoot = (file: string): string => {
+    if (!isAbsolute(file)) return file;
+    for (const root of roots) {
+      const rel = relative(root, file);
+      if (rel !== "" && !rel.startsWith("..") && !isAbsolute(rel)) return rel.split(sep).join("/");
+    }
     return file;
   };
   return {
@@ -164,7 +169,7 @@ export function displayTurn(turn: ChatTurn, roots: string[]): ChatTurn {
     // Steps and questions feed the recorder only; the map keeps the counts.
     tools: {
       commands: turn.tools.commands,
-      files: turn.tools.files.map(relative),
+      files: turn.tools.files.map(fromRoot),
       other: turn.tools.other,
     },
   };

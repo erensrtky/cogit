@@ -17,13 +17,26 @@ export async function installedCliVersion(env: NodeJS.ProcessEnv): Promise<strin
     const bin = join(dir, "cogit");
     try {
       if (!(await stat(bin)).isFile()) continue;
-      // npm links bin/cogit to <package>/dist/cli.js.
-      const pkg = JSON.parse(
-        await readFile(join(dirname(dirname(await realpath(bin))), "package.json"), "utf8"),
-      ) as { name?: unknown; version?: unknown };
-      if (pkg.name === PACKAGE && typeof pkg.version === "string") return pkg.version;
-      return undefined;
-    } catch {}
+    } catch {
+      continue;
+    }
+    const manifests = [
+      // npm links bin/cogit to <package>/dist/cli.js...
+      async () => join(dirname(dirname(await realpath(bin))), "package.json"),
+      // ...and on Windows writes shims beside <prefix>/node_modules instead.
+      async () => join(dir, "node_modules", ...PACKAGE.split("/"), "package.json"),
+    ];
+    for (const manifest of manifests) {
+      try {
+        const pkg = JSON.parse(await readFile(await manifest(), "utf8")) as {
+          name?: unknown;
+          version?: unknown;
+        };
+        if (pkg.name === PACKAGE && typeof pkg.version === "string") return pkg.version;
+      } catch {}
+    }
+    // The first cogit on the PATH is the one that runs; it is not ours.
+    return undefined;
   }
   return undefined;
 }

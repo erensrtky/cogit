@@ -1,7 +1,8 @@
+import { EventEmitter } from "node:events";
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { claudeCommand, runClaude } from "../src/commands/backfill.js";
+import { claudeCommand, runClaude, stopTree } from "../src/commands/backfill.js";
 import { tempDir } from "./helpers.js";
 
 let root: string;
@@ -83,5 +84,29 @@ describe("runClaude on Windows", () => {
     Object.defineProperty(process, "platform", { value: "win32" });
     const env = { PATH: root, ComSpec: join(root, "no-such-cmd") };
     await expect(runClaude("hi", "haiku", env)).rejects.toThrow(/could not run claude/);
+  });
+});
+
+describe("stopTree", () => {
+  it("kills the run itself outside Windows, and the whole tree there", () => {
+    const killed: string[] = [];
+    const calls: string[][] = [];
+    const run = ((command: string, args: string[]) => {
+      calls.push([command, ...args]);
+      return new EventEmitter();
+    }) as never;
+    stopTree(42, () => killed.push("linux"), "linux", run);
+    stopTree(undefined, () => killed.push("no pid"), "win32", run);
+    stopTree(42, () => killed.push("win32"), "win32", run);
+    expect(killed).toEqual(["linux", "no pid"]);
+    expect(calls).toEqual([["taskkill", "/pid", "42", "/T", "/F"]]);
+  });
+
+  it("falls back to a plain kill when taskkill cannot start", () => {
+    const killed: string[] = [];
+    const child = new EventEmitter();
+    stopTree(42, () => killed.push("kill"), "win32", (() => child) as never);
+    child.emit("error", new Error("spawn taskkill ENOENT"));
+    expect(killed).toEqual(["kill"]);
   });
 });

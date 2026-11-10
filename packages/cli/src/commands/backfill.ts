@@ -244,6 +244,21 @@ export function runClaude(
   );
 }
 
+/**
+ * Stops a run that outlived its limit. On Windows killing the shim's cmd.exe
+ * would leave claude running and holding the output open, so the whole
+ * process tree goes, through taskkill.
+ */
+export function stopTree(
+  pid: number | undefined,
+  kill: () => void,
+  platform: NodeJS.Platform = process.platform,
+  run: typeof spawn = spawn,
+): void {
+  if (platform !== "win32" || pid === undefined) return kill();
+  run("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" }).on("error", kill);
+}
+
 /** Plain `claude` was not found; on Windows the `claude.cmd` shim is tried next. */
 class MissingClaudeError extends CliError {}
 
@@ -268,7 +283,7 @@ function runClaudeOnce(
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGKILL");
+      stopTree(child.pid, () => child.kill("SIGKILL"));
     }, limit);
     // The child may exit before reading the prompt; that write error is not ours.
     child.stdin.on("error", () => {});

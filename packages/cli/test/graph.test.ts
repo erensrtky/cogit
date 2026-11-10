@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, readFile, utimes, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
 import { init } from "../src/commands/init.js";
@@ -116,10 +116,12 @@ describe("the code graph engine", () => {
     const bin = join(dir, "bin");
     await mkdir(bin);
     expect(await graphify.status(root, { PATH: bin })).toEqual({ installed: false, graph: false });
-    await writeFile(join(bin, "graphify"), "#!/bin/sh\n");
-    await chmod(join(bin, "graphify"), 0o755);
+    // Installed as graphify.exe on Windows.
+    const engine = join(bin, process.platform === "win32" ? "graphify.exe" : "graphify");
+    await writeFile(engine, "#!/bin/sh\n");
+    await chmod(engine, 0o755);
     await writeGraph(graphOf(root));
-    expect(await graphify.status(root, { PATH: `:${bin}` })).toEqual({
+    expect(await graphify.status(root, { PATH: `${delimiter}${bin}` })).toEqual({
       installed: true,
       graph: true,
       builtAt: "abc1234",
@@ -171,44 +173,52 @@ describe("init and the code graph", () => {
     expect(existsSync(join(root, "graphify-out"))).toBe(false);
   });
 
-  it("builds the graph only when asked, and says how it stays fresh", async () => {
-    await installEngine();
-    const env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
-    // The default answer is no.
-    const quiet = fakeIo(env);
-    await init(root, options, quiet);
-    expect(existsSync(join(root, "graphify-out"))).toBe(false);
-    expect(quiet.asked.join("\n")).toContain("Build this project's code graph with graphify now");
+  // The stand-in graphify is a shell script, which Windows cannot start.
+  it.skipIf(process.platform === "win32")(
+    "builds the graph only when asked, and says how it stays fresh",
+    async () => {
+      await installEngine();
+      const env = { ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` };
+      // The default answer is no.
+      const quiet = fakeIo(env);
+      await init(root, options, quiet);
+      expect(existsSync(join(root, "graphify-out"))).toBe(false);
+      expect(quiet.asked.join("\n")).toContain("Build this project's code graph with graphify now");
 
-    const other = join(dir, "other");
-    await mkdir(other);
-    root = other;
-    await setUp();
-    const io = fakeIo(env);
-    await init(root, { ...options, graph: true }, io);
-    expect(JSON.parse(await readFile(join(root, "graphify-out", "graph.json"), "utf8"))).toEqual({
-      nodes: [],
-      links: [],
-    });
-    expect(io.lines.join("\n")).toContain(
-      "keep it fresh your way (by hand, or `graphify hook install`)",
-    );
-  });
+      const other = join(dir, "other");
+      await mkdir(other);
+      root = other;
+      await setUp();
+      const io = fakeIo(env);
+      await init(root, { ...options, graph: true }, io);
+      expect(JSON.parse(await readFile(join(root, "graphify-out", "graph.json"), "utf8"))).toEqual({
+        nodes: [],
+        links: [],
+      });
+      expect(io.lines.join("\n")).toContain(
+        "keep it fresh your way (by hand, or `graphify hook install`)",
+      );
+    },
+  );
 
-  it("finds a graph already there, and warns when the build fails", async () => {
-    await mkdir(join(root, "graphify-out"));
-    await writeFile(join(root, "graphify-out", "graph.json"), '{"nodes":[],"links":[]}');
-    const found = fakeIo({ ...envFor(dir), PATH: bin });
-    await init(root, options, found);
-    expect(found.lines.join("\n")).toContain("Found a graphify graph");
+  // The stand-in graphify is a shell script, which Windows cannot start.
+  it.skipIf(process.platform === "win32")(
+    "finds a graph already there, and warns when the build fails",
+    async () => {
+      await mkdir(join(root, "graphify-out"));
+      await writeFile(join(root, "graphify-out", "graph.json"), '{"nodes":[],"links":[]}');
+      const found = fakeIo({ ...envFor(dir), PATH: bin });
+      await init(root, options, found);
+      expect(found.lines.join("\n")).toContain("Found a graphify graph");
 
-    await installEngine(true);
-    const other = join(dir, "other");
-    await mkdir(other);
-    root = other;
-    await setUp();
-    const io = fakeIo({ ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` });
-    await init(root, { ...options, graph: true }, io);
-    expect(io.warnings.join("\n")).toContain("could not build the graphify graph");
-  });
+      await installEngine(true);
+      const other = join(dir, "other");
+      await mkdir(other);
+      root = other;
+      await setUp();
+      const io = fakeIo({ ...envFor(dir), PATH: `${bin}:${process.env.PATH ?? ""}` });
+      await init(root, { ...options, graph: true }, io);
+      expect(io.warnings.join("\n")).toContain("could not build the graphify graph");
+    },
+  );
 });

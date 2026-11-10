@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -191,6 +192,18 @@ describe("displayTurn", () => {
     );
     expect(shown.text).toBe("see \n[Pasted]\nlog\n[/Pasted]");
     expect(shown.tools.files).toEqual(["x.ts", "y.ts", "/elsewhere/z.ts"]);
+  });
+
+  it("names nested files with / on every system, and keeps a path already relative", () => {
+    const root = join(tmpdir(), "proj");
+    const shown = displayTurn(
+      {
+        ...turn("x"),
+        tools: { commands: 0, files: [join(root, "src", "a.ts"), "lib/b.ts"], other: 0 },
+      },
+      [root],
+    );
+    expect(shown.tools.files).toEqual(["src/a.ts", "lib/b.ts"]);
   });
 
   it("cuts very long text with a note", () => {
