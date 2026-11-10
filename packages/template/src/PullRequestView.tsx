@@ -243,7 +243,7 @@ function ThoughtCard({
         </>
       ) : null}
       {diagram === undefined ? null : (
-        <MermaidDiagram source={diagram} className="shape-preview-diagram" fit />
+        <MermaidDiagram source={diagram} className="pr-shape" interactive wheelZoom={false} />
       )}
       <ul className="pr-commits">
         {thought.commits.map((commit) => (

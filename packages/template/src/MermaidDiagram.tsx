@@ -120,6 +120,7 @@ export function MermaidDiagram({
   className,
   fit = false,
   interactive = false,
+  wheelZoom = true,
   available = mermaidAvailable(),
 }: {
   source: string;
@@ -131,6 +132,12 @@ export function MermaidDiagram({
    * Open window's diagram. The panel's preview leaves it off.
    */
   interactive?: boolean;
+  /**
+   * Whether a plain wheel zooms an interactive diagram. Off where the diagram
+   * sits in a page the wheel scrolls (the Pull request view's cards); the
+   * buttons and dragging still work there.
+   */
+  wheelZoom?: boolean;
   /** Whether Mermaid can be loaded; the page's protocol decides by default. */
   available?: boolean;
 }) {
@@ -221,7 +228,7 @@ export function MermaidDiagram({
   // the window behind it; React's wheel listener is passive, so this one is not.
   useEffect(() => {
     const box = viewport.current;
-    if (!interactive || box === null) return;
+    if (!interactive || !wheelZoom || box === null) return;
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       const rect = box.getBoundingClientRect();
@@ -232,7 +239,7 @@ export function MermaidDiagram({
     };
     box.addEventListener("wheel", onWheel, { passive: false });
     return () => box.removeEventListener("wheel", onWheel);
-  }, [interactive, move]);
+  }, [interactive, wheelZoom, move]);
 
   // A resize keeps the user's scale and only pulls the diagram back in reach.
   useEffect(() => {

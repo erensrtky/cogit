@@ -3908,6 +3908,16 @@ a.home-day:hover {
   background: var(--panel);
 }
 
+/* A thought's Shape opens fitted in a short box that drags and zooms with its
+   buttons, instead of a preview that scrolls both ways. */
+.pr-shape {
+  margin: 6px 0;
+}
+
+.pr-shape .shape-viewport {
+  height: 260px;
+}
+
 .pr-thought p,
 .pr-thought ul {
   margin: 6px 0;
