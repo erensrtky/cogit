@@ -423,6 +423,40 @@ main.map-page {
   opacity: 0.4;
 }
 
+/* All · This session · This branch, under the box while something is open. */
+.map-search-scope {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  margin: 4px 0 0;
+}
+
+.map-search-scope button {
+  padding: 1px 7px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.map-search-scope button:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.map-search-scope button[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--chip-bg);
+  border-color: var(--chip-line);
+}
+
+.map-search-scope button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .map-search-hint {
   margin: 4px 0 0;
   overflow: hidden;

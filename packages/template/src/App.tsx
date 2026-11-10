@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import type { LineageViewModel } from "../../cli/src/view/model.js";
 import {
   type HashRefResult,
@@ -13,6 +13,7 @@ import { Inbox } from "./Inbox.js";
 import { type MapSearchState, SearchBox } from "./MapSearch.js";
 import { ProjectSwitcher } from "./ProjectSwitcher.js";
 import { SettingsButton } from "./SettingsModal.js";
+import { branchOf, type ScopeAnchor, type SearchScope, scopeHits } from "./searchScope.js";
 import { ThemeButton } from "./ThemeButton.js";
 
 export function App({ model }: { model: LineageViewModel }) {
@@ -27,10 +28,29 @@ export function App({ model }: { model: LineageViewModel }) {
     () => (isHashQuery(deferred) ? resolveHashPrefix(model, deferred) : null),
     [model, deferred],
   );
-  const hits = useMemo(
+  const allHits = useMemo(
     () => (hash === null ? searchLineage(model, deferred) : []),
     [model, deferred, hash],
   );
+  // What the map has open, and how far the search is narrowed to it. With
+  // nothing open the scope falls back to the whole project.
+  const [anchor, setAnchor] = useState<ScopeAnchor | null>(null);
+  const [chosen, setChosen] = useState<SearchScope>("all");
+  const branch = useMemo(() => (anchor === null ? null : branchOf(model, anchor)), [model, anchor]);
+  const scope: SearchScope =
+    anchor === null ? "all" : chosen === "branch" && branch === null ? "session" : chosen;
+  const hits = useMemo(
+    () => scopeHits(allHits, scope, anchor, branch),
+    [allHits, scope, anchor, branch],
+  );
+  const onAnchor = useCallback((next: ScopeAnchor | null) => {
+    setAnchor(next);
+    if (next === null) setChosen("all");
+  }, []);
+  const sessionTitle =
+    anchor === null
+      ? null
+      : (model.sessions.find((session) => session.sessionId === anchor.sessionId)?.title ?? null);
   const search: MapSearchState = { hits, active, step, hash };
 
   function change(next: string): void {
@@ -40,6 +60,11 @@ export function App({ model }: { model: LineageViewModel }) {
   }
   function move(delta: number): void {
     setActive((index) => stepHitIndex(index, hits.length, delta));
+    setStep((value) => value + 1);
+  }
+  function narrow(next: SearchScope): void {
+    setChosen(next);
+    setActive(0);
     setStep((value) => value + 1);
   }
   function clear(): void {
@@ -64,6 +89,16 @@ export function App({ model }: { model: LineageViewModel }) {
               onQuery={change}
               onStep={move}
               onClear={clear}
+              scope={
+                anchor === null
+                  ? null
+                  : {
+                      current: scope,
+                      session: sessionTitle || anchor.sessionId,
+                      branch: branch?.title ?? null,
+                      onScope: narrow,
+                    }
+              }
             />
             <ThemeButton />
             <SettingsButton settings={model.settings} />
@@ -81,7 +116,7 @@ export function App({ model }: { model: LineageViewModel }) {
         <Inbox rows={model.inbox ?? []} collapsible />
       </div>
 
-      <Graph model={model} search={search} />
+      <Graph model={model} search={search} onAnchor={onAnchor} />
     </main>
   );
 }

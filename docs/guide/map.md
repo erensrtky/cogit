@@ -210,6 +210,10 @@ and Shift+Enter step through the hits, Esc clears. A pasted message hash jumps s
 message. Sessions the search opened close again when the search is cleared or stops matching
 them, unless you clicked into one. In the terminal: `cogit search "<text>"`.
 
+While a session or a message is open, **All · This session · This branch** under the box narrows
+the search to it: find the session first, then the one place in it. Closing the card goes back
+to the whole project.
+
 ## Switching projects
 
 Under the project's name, a strip of the most recently active projects and

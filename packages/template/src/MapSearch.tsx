@@ -1,5 +1,6 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef } from "react";
 import type { HashRefResult, SearchHit } from "../../cli/src/view/search.js";
+import type { SearchScope } from "./searchScope.js";
 
 /**
  * The map's search box (Story 8.14): Ctrl/Cmd+F focuses it while the map has the
@@ -25,6 +26,7 @@ export function SearchBox({
   onQuery,
   onStep,
   onClear,
+  scope = null,
 }: {
   /** The text in the box; the hits in `state` may lag behind it while scanning. */
   value: string;
@@ -32,6 +34,16 @@ export function SearchBox({
   onQuery: (query: string) => void;
   onStep: (delta: number) => void;
   onClear: () => void;
+  /**
+   * Narrowing to what the map has open; null when nothing is open. `branch` is
+   * the open message's branch title, null when only a session is open.
+   */
+  scope?: {
+    current: SearchScope;
+    session: string;
+    branch: string | null;
+    onScope: (scope: SearchScope) => void;
+  } | null;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -95,7 +107,13 @@ export function SearchBox({
           ref={inputRef}
           type="search"
           className="map-search-input"
-          placeholder="Search the lineage"
+          placeholder={
+            scope?.current === "session"
+              ? "Search this session: words or a message hash"
+              : scope?.current === "branch"
+                ? "Search this branch: words or a message hash"
+                : "Search words, or paste a message hash"
+          }
           aria-label="Search the lineage"
           value={value}
           onChange={(event) => onQuery(event.target.value)}
@@ -127,6 +145,28 @@ export function SearchBox({
           </>
         ) : null}
       </div>
+      {scope === null || scope === undefined ? null : (
+        <div className="map-search-scope" role="group" aria-label="Search in">
+          {(
+            [
+              ["all", "All", "Every session of the project"],
+              ["session", "This session", scope.session],
+              ["branch", "This branch", scope.branch],
+            ] as const
+          ).map(([key, label, title]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={scope.current === key}
+              disabled={key === "branch" && scope.branch === null}
+              title={title ?? "Open a message to search its branch"}
+              onClick={() => scope.onScope(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       {hint === null ? null : <p className="map-search-hint">{hint}</p>}
     </div>
   );

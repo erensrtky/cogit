@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The map's search narrows to what is open: while a session or a message is open, **All · This session · This branch** under the search box keeps the hits to that session or to the branch the message sits in. The box's hint now says it takes words or a message hash.
+
 ### Fixed
 - A "Your turn" row closed with × came back when the page was reloaded: the server stored the dismissal but kept serving the page built before it until the next recording. It now rebuilds the project's map and the start page before it answers.
 

@@ -38,6 +38,7 @@ import { OPEN_LINK_DROP, SessionMap } from "./SessionMap.js";
 import { DrillDown, type Selection } from "./SidePanel.js";
 import { usePageWheel } from "./scroll.js";
 import { applySearchHits, storedOpen } from "./searchOpen.js";
+import type { ScopeAnchor } from "./searchScope.js";
 import { layoutSessionGraph, openAtLoad, type SessionGraph } from "./sessionLayout.js";
 import { useTheme } from "./ThemeButton.js";
 import { readViewMemory, rememberView, withLinkedFile } from "./viewMemory.js";
@@ -291,7 +292,15 @@ function findSession(model: LineageViewModel, id: string): ViewSession | undefin
   return model.sessions.find((session) => session.sessionId === id);
 }
 
-function Flow({ model, search }: { model: LineageViewModel; search: MapSearchState }) {
+function Flow({
+  model,
+  search,
+  onAnchor,
+}: {
+  model: LineageViewModel;
+  search: MapSearchState;
+  onAnchor?: ((anchor: ScopeAnchor | null) => void) | undefined;
+}) {
   // One scroller (Story 9.2): a wheel outside the map moves the map.
   usePageWheel();
   // Read once: a live data swap must not move the page back to the hash target.
@@ -320,6 +329,12 @@ function Flow({ model, search }: { model: LineageViewModel; search: MapSearchSta
     if (initial.messageId === undefined) return { type: "session", sessionId: initial.sessionId };
     return { type: "node", sessionId: initial.sessionId, nodeId: initial.messageId };
   });
+  // The search box narrows to what is open here (searchScope.ts).
+  const anchorSession = selection?.sessionId ?? null;
+  const anchorNode = selection?.type === "node" ? selection.nodeId : null;
+  useEffect(() => {
+    onAnchor?.(anchorSession === null ? null : { sessionId: anchorSession, nodeId: anchorNode });
+  }, [onAnchor, anchorSession, anchorNode]);
   const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set());
   /** Each session's message row width, dragged at the rows' right edge. */
   const [rowWidths, setRowWidths] = useState<RowWidths>(() => rowWidthsOf(model.rowWidths));
@@ -1249,11 +1264,20 @@ function MapCanvas({
 }
 
 /** The project map: sessions at the top, a session's messages in place. */
-export function Graph({ model, search }: { model: LineageViewModel; search: MapSearchState }) {
+export function Graph({
+  model,
+  search,
+  onAnchor,
+}: {
+  model: LineageViewModel;
+  search: MapSearchState;
+  /** Told what is open, so the search can narrow to it. */
+  onAnchor?: (anchor: ScopeAnchor | null) => void;
+}) {
   return (
     <section className="lineage-map" aria-label="Project lineage graph">
       <ReactFlowProvider>
-        <Flow model={model} search={search} />
+        <Flow model={model} search={search} onAnchor={onAnchor} />
       </ReactFlowProvider>
     </section>
   );

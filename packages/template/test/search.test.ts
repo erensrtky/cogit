@@ -1,8 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import type { LineageViewModel } from "../../cli/src/view/model.js";
 import type { SearchHit } from "../../cli/src/view/search.js";
 import { type MapSearchState, SearchBox } from "../src/MapSearch.js";
+import { branchOf, scopeHits } from "../src/searchScope.js";
 
 const hit = (index: number): SearchHit => ({
   sessionId: "s1",
@@ -79,5 +81,83 @@ describe("SearchBox", () => {
     const html = render(state(), "");
     expect(html).not.toContain("map-search-count");
     expect(html).not.toContain("map-search-hint");
+  });
+});
+
+describe("search scope", () => {
+  const anchor = { sessionId: "s1", nodeId: "h1" };
+  const make = (sessionId: string, messageId: string | null): SearchHit => ({
+    ...hit(0),
+    sessionId,
+    messageId,
+  });
+  const hits = [make("s1", "h1"), make("s1", "h2"), make("s1", null), make("s2", "h3")];
+
+  it("keeps every hit for All or with nothing open", () => {
+    expect(scopeHits(hits, "all", anchor, null)).toHaveLength(4);
+    expect(scopeHits(hits, "session", null, null)).toHaveLength(4);
+  });
+
+  it("keeps the open session's hits, then only its branch's messages", () => {
+    expect(scopeHits(hits, "session", anchor, null).map((h) => h.messageId)).toEqual([
+      "h1",
+      "h2",
+      null,
+    ]);
+    expect(
+      scopeHits(hits, "branch", anchor, { ids: new Set(["h1"]) }).map((h) => h.messageId),
+    ).toEqual(["h1"]);
+    // No branch to narrow to: the session's hits.
+    expect(scopeHits(hits, "branch", anchor, null)).toHaveLength(3);
+  });
+
+  it("finds the branch an open message sits in", () => {
+    const model = {
+      sessions: [
+        {
+          sessionId: "s1",
+          title: "One",
+          messages: [
+            { id: "h1", kind: "message", title: "First", parent: null, at: "2026-10-21T10:00:00Z" },
+            {
+              id: "h2",
+              kind: "message",
+              title: "Second",
+              parent: "h1",
+              at: "2026-10-21T10:01:00Z",
+            },
+          ],
+        },
+      ],
+    } as unknown as LineageViewModel;
+    expect([...(branchOf(model, anchor)?.ids ?? [])]).toEqual(["h1", "h2"]);
+    expect(branchOf(model, { sessionId: "s1", nodeId: null })).toBeNull();
+    expect(branchOf(model, { sessionId: "nope", nodeId: "h1" })).toBeNull();
+    expect(branchOf(model, { sessionId: "s1", nodeId: "h9" })).toBeNull();
+  });
+
+  it("shows the scope buttons only while something is open, with the hint to match", () => {
+    const render = (scope: Parameters<typeof SearchBox>[0]["scope"]) =>
+      renderToStaticMarkup(
+        createElement(SearchBox, {
+          value: "",
+          state: state(),
+          onQuery: () => {},
+          onStep: () => {},
+          onClear: () => {},
+          scope,
+        }),
+      );
+    const closed = render(null);
+    expect(closed).not.toContain("map-search-scope");
+    expect(closed).toContain('placeholder="Search words, or paste a message hash"');
+    const open = render({ current: "session", session: "One", branch: null, onScope: () => {} });
+    expect(open).toContain("This session");
+    expect(open).toContain('placeholder="Search this session: words or a message hash"');
+    // A session with no message open has no branch to narrow to.
+    expect(open).toMatch(/disabled=""[^>]*>This branch/);
+    expect(
+      render({ current: "branch", session: "One", branch: "First", onScope: () => {} }),
+    ).toContain('placeholder="Search this branch: words or a message hash"');
   });
 });
