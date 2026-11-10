@@ -33,7 +33,16 @@ function guard(sessionId: string, attended: string): Promise<string> {
     const child = execFile(
       "sh",
       ["-c", GUARD_COMMAND],
-      { env: { PATH: process.env.PATH, TMPDIR: tmp, CLAUDE_CODE_SESSION_ATTENDED: attended } },
+      {
+        // TEMP / TMP are where Windows looks for the temp dir.
+        env: {
+          PATH: process.env.PATH,
+          TMPDIR: tmp,
+          TEMP: tmp,
+          TMP: tmp,
+          CLAUDE_CODE_SESSION_ATTENDED: attended,
+        },
+      },
       (err, stdout) => (err ? reject(err) : resolve(stdout)),
     );
     child.stdin?.end(JSON.stringify({ session_id: sessionId, prompt: "hi" }));

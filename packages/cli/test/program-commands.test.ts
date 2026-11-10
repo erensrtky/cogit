@@ -273,12 +273,12 @@ describe("commands through the CLI", () => {
     await cli("init", gone, "--yes", "--retention", "keep");
     await rm(gone, { recursive: true });
 
+    // A Windows path's backslashes are regex syntax.
+    const path = gone.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
     await cli("config", "prune", "--dry-run");
-    expect(io.lines.at(-1)).toMatch(
-      new RegExp(`^Would remove .+ \\(${gone.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}\\)$`),
-    );
+    expect(io.lines.at(-1)).toMatch(new RegExp(`^Would remove .+ \\(${path}\\)$`));
     await cli("config", "prune");
-    expect(io.lines.at(-1)).toMatch(new RegExp(`^Removed .+ \\(${gone}\\)$`));
+    expect(io.lines.at(-1)).toMatch(new RegExp(`^Removed .+ \\(${path}\\)$`));
   });
 
   it("runs the git hooks through the CLI", async () => {
