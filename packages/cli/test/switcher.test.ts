@@ -12,8 +12,8 @@ import {
   filterSwitcherProjects,
   recentSwitcherProjects,
   SWITCHER_RECENT_LIMIT,
-  switcherEntries,
 } from "../src/view/switcher.js";
+import { switcherEntries } from "../src/view/switcher-entries.js";
 import { envFor, fakeIo, tempDir } from "./helpers.js";
 
 const TEMPLATE = `<!doctype html><html><head><title>cogit — lineage</title></head><body>

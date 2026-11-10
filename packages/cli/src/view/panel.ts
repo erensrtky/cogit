@@ -25,7 +25,7 @@ import {
   type ViewInboxRow,
 } from "./model.js";
 import { mergeOverviews, type OverviewPart, readProjectOverview } from "./overview.js";
-import type { SwitcherSource } from "./switcher.js";
+import type { SwitcherSource } from "./switcher-entries.js";
 import { TEMPLATE_HTML } from "./template.js";
 
 export interface PanelOptions {
@@ -45,7 +45,7 @@ export interface PanelOptions {
 /**
  * A panel card with the one line the map's switcher shows (Story 8.12). The
  * panel page itself does not embed `leftOff`; the map's switcher does. The
- * shape lives in `switcher.ts` so the template can import it without this file.
+ * shape lives in `switcher-entries.ts`.
  */
 export type CollectedProject = SwitcherSource;
 

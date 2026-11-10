@@ -53,7 +53,7 @@ import {
   type PanelData,
   panelSettings,
 } from "../view/panel.js";
-import { switcherEntries } from "../view/switcher.js";
+import { switcherEntries } from "../view/switcher-entries.js";
 import { TEMPLATE_HTML } from "../view/template.js";
 
 export interface BuildOptions {
