@@ -31,6 +31,31 @@ describe("redactText", () => {
     ["Authorization: Bearer abcdefghijklmnop1234", "Authorization: Bearer [REDACTED]"],
     ["postgres://admin:s3cr3t@db.local/x", "postgres://admin:[REDACTED]@db.local/x"],
     ["-----BEGIN RSA PRIVATE KEY-----\nMIIE\n-----END RSA PRIVATE KEY-----", "[REDACTED]"],
+    // Passwords typed on a command line.
+    ["mysql -u root -pS3cretPass db", "mysql -u root -p[REDACTED] db"],
+    ["mysqldump -h h -u u -p'S3cret pass' db", "mysqldump -h h -u u -p'[REDACTED]' db"],
+    ["PGPASSWORD=S3cretPass psql -h db", "PGPASSWORD=[REDACTED] psql -h db"],
+    ["export DB_PASSWORD=hunter22!", "export DB_PASSWORD=[REDACTED]"],
+    ["MYSQL_PWD=hunter22! mysql", "MYSQL_PWD=[REDACTED] mysql"],
+    ["sshpass -p 'hunter22!' ssh me@host", "sshpass -p '[REDACTED]' ssh me@host"],
+    ["sshpass -phunter22 ssh me@host", "sshpass -p[REDACTED] ssh me@host"],
+    [
+      "//registry.npmjs.org/:_authToken=npm_abcdefghijklmnopqrstuvwxyz0123456789",
+      "//registry.npmjs.org/:_authToken=[REDACTED]",
+    ],
+    ["NPM npm_abcdefghijklmnopqrstuvwxyz0123456789 here", "NPM [REDACTED] here"],
+    [
+      "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      "aws_secret_access_key = [REDACTED]",
+    ],
+    [
+      "aws configure set aws_secret_access_key wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      "aws configure set aws_secret_access_key [REDACTED]",
+    ],
+    ["curl -u admin:hunter22 https://x.io", "curl -u admin:[REDACTED] https://x.io"],
+    ["curl --user 'admin:hunter 22' https://x.io", "curl --user 'admin:[REDACTED]' https://x.io"],
+    ["docker login --password hunter22! ghcr.io", "docker login --password [REDACTED] ghcr.io"],
+    ["Authorization: Basic YWRtaW46aHVudGVyMjI=", "Authorization: Basic [REDACTED]"],
   ])("masks %s", (input, expected) => {
     expect(redactText(input).text).toBe(expected);
   });
@@ -41,6 +66,18 @@ describe("redactText", () => {
     "decided to keep the secret in the OS keychain",
     "https://example.com/path@v2",
     "sk-short",
+    "ssh -p 2222 me@host",
+    "mkdir -p src/lib && cp -p a b",
+    "mysql -p asks for the password",
+    "max_tokens=4096",
+    "curl -u is how you pass a user",
+    "the npm_config_cache folder",
+    "set DB_PASSWORD in your .env file",
+    // Another command after the one that takes a password.
+    "mysql -u root db < dump.sql && mkdir -p backups/2026-11",
+    "curl -s https://x.io | sort -u keys:all",
+    'const CONFIG_TOKEN_HEADER = "x-cogit-token-v1";',
+    "STARTUP_CONTEXT_TOKEN_CAP = 12_000_000",
   ])("leaves prose alone: %s", (input) => {
     expect(redactText(input)).toEqual({ text: input, count: 0 });
   });
