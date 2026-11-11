@@ -131,9 +131,30 @@ export const updateSession = (
   return update(p.session(id), p.lock(`session-${id}`), Session, SESSION_SCHEMA, fn, opts);
 };
 
+/**
+ * A config this version cannot read whole, typically one a newer version wrote
+ * a value into that this one does not know (`recordHeadless: "auto"` read by
+ * 1.4.0): each setting that still reads is kept, and only the others fall back
+ * to their defaults, instead of every setting at once.
+ */
+export function salvageConfig(raw: unknown): Config {
+  const kept: Record<string, unknown> = {};
+  if (typeof raw === "object" && raw !== null) {
+    for (const [key, value] of Object.entries(raw)) {
+      if (key === "schema" || !(key in Config.shape)) continue;
+      if (Config.safeParse({ schema: CONFIG_SCHEMA, [key]: value }).success) kept[key] = value;
+    }
+  }
+  return Config.parse({ schema: CONFIG_SCHEMA, ...kept });
+}
+
 export const loadConfig = async (env?: NodeJS.ProcessEnv): Promise<Config> => {
-  const cur = await load(globalPaths(env).config, Config, CONFIG_SCHEMA);
-  return migrateConfig(cur.found && cur.ok ? cur.data : Config.parse({ schema: CONFIG_SCHEMA }));
+  const file = globalPaths(env).config;
+  const cur = await load(file, Config, CONFIG_SCHEMA);
+  if (cur.found && cur.ok) return migrateConfig(cur.data);
+  if (!cur.found) return migrateConfig(Config.parse({ schema: CONFIG_SCHEMA }));
+  const read = await readJson(file);
+  return migrateConfig(salvageConfig("value" in read ? read.value : undefined));
 };
 
 export const updateConfig = (

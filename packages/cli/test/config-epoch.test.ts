@@ -46,6 +46,28 @@ describe("config", () => {
     await expect(configSet("recordHeadless", "sometimes", fakeIo(env))).rejects.toThrow();
   });
 
+  it("keeps every setting it can read when one value is beyond this version", async () => {
+    const file = globalPaths(env).config;
+    await mkdir(dirname(file), { recursive: true });
+    // A newer version wrote a value this one does not know; the rest still reads.
+    await writeFile(
+      file,
+      JSON.stringify({ schema: 1, language: "tr", recorder: "side", recordHeadless: "sometimes" }),
+    );
+    const config = await loadConfig(env);
+    expect(config.language).toBe("tr");
+    expect(config.recorder).toBe("side");
+    expect(config.recordHeadless).toBe("auto");
+    // Writing is still refused, so the newer value is never overwritten.
+    await expect(configSet("language", "en", fakeIo(env))).rejects.toThrow();
+    expect(JSON.parse(await readFile(file, "utf8")).recordHeadless).toBe("sometimes");
+    // Not JSON at all, or not an object: every default.
+    await writeFile(file, "{ not json");
+    expect((await loadConfig(env)).language).toBe("auto");
+    await writeFile(file, "[1]");
+    expect((await loadConfig(env)).recorder).toBe("mixed");
+  });
+
   it("sets numbers, booleans, strings and agent lists", async () => {
     const io = fakeIo(env);
     await configSet("updateEveryTurns", "3", io);
