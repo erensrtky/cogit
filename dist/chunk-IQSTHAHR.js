@@ -992,7 +992,7 @@ var require_lib2 = __commonJS({
 import { execFile as execFile3 } from "child_process";
 import { existsSync as existsSync5, realpathSync } from "fs";
 import { chmod, mkdir as mkdir7, readFile as readFile10, realpath as realpath3, rm as rm5, stat as stat11 } from "fs/promises";
-import { dirname as dirname10, join as join13, resolve as resolve4 } from "path";
+import { dirname as dirname11, join as join13, resolve as resolve4 } from "path";
 import { promisify as promisify3 } from "util";
 
 // src/git.ts
@@ -1450,7 +1450,7 @@ import {
   writeSync
 } from "fs";
 import { tmpdir as tmpdir2 } from "os";
-import { dirname as dirname9, join as join12 } from "path";
+import { dirname as dirname10, join as join12 } from "path";
 import { fileURLToPath } from "url";
 
 // src/agents/types.ts
@@ -21275,23 +21275,24 @@ function isClaudeProcess(args) {
     return true;
   return /^node(\.exe)?$/.test(name) && /claude-code\/cli\.m?js$/.test((args[1] ?? "").replace(/\\/g, "/"));
 }
-function startedInsideSession(read = (pid) => readProcess(pid), start = process.ppid) {
+function sessionLineage(read = (pid) => readProcess(pid), start = process.ppid) {
   let pid = start;
-  let found = 0;
+  let own2;
   for (let depth = 0; depth < 64 && pid > 1; depth += 1) {
     const info = read(pid);
-    if (info === void 0) return depth === 0 ? void 0 : found > 0 ? false : void 0;
+    if (info === void 0) break;
     if (isClaudeProcess(info.args)) {
-      found += 1;
-      if (found === 2) return true;
+      if (own2 !== void 0) return { own: own2, parent: pid };
+      own2 = pid;
     }
     pid = info.ppid;
   }
-  return found > 0 ? false : void 0;
+  return own2 === void 0 ? void 0 : { own: own2, parent: null };
 }
-async function markChildren(env) {
+async function markChildren(env, own2) {
   const file2 = env.CLAUDE_ENV_FILE;
-  if (file2) await appendFile(file2, "export COGIT_RECORD=1\n");
+  if (file2) await appendFile(file2, `export COGIT_RECORD=${own2 ?? 1}
+`);
 }
 function userNotice(text) {
   return { systemMessage: text };
@@ -22048,7 +22049,7 @@ var claude = {
   parseHookInput,
   isHeadless,
   isHeadlessTranscript,
-  startedInsideSession: () => startedInsideSession(),
+  sessionLineage: () => sessionLineage(),
   markChildren,
   additionalContext,
   userNotice,
@@ -22094,9 +22095,6 @@ function configuredHome(env = process.env) {
 }
 function captureDisabled(env = process.env) {
   return env.COGIT_DISABLE === "1" || env.CODELINEAGE_DISABLE === "1";
-}
-function recordMarked(env) {
-  return env.COGIT_RECORD === "1";
 }
 function projectPaths(root) {
   const base = join7(root, DIR_NAME);
@@ -22224,7 +22222,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-HZIRSVY2.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-O36X5PKF.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -22374,19 +22372,16 @@ var Config = external_exports.object({
    */
   startupContext: external_exports.boolean().default(true),
   /**
-   * Which sessions started without a person (`claude -p`, an SDK) are recorded.
-   * `off`: none. `all`: every one, other plugins' background runs included.
-   * `auto` (new installs): those a person or a script started (a loop like
-   * Ralph, a cron job: no Claude Code process above them) and those a recorded
-   * session's own commands started (marked `COGIT_RECORD=1`), but not the ones
-   * another plugin's hook starts, one per prompt. A config written while this
-   * was a boolean reads `true` as `all` and `false` as `off`, so an existing
-   * install keeps what it had.
+   * Background work: whether sessions started without a person (`claude -p`,
+   * an SDK) are recorded. On records the ones a person or a script starts (a
+   * loop like Ralph, cron) and the ones a recorded chat starts through a
+   * command, never another plugin's internal runs (hooks/run.ts). On for new
+   * installs. 1.4.1 wrote "off", "auto" or "all"; they read as off, on, on.
    */
   recordHeadless: external_exports.preprocess(
-    (value) => value === true ? "all" : value === false ? "off" : value,
-    external_exports.enum(["off", "auto", "all"])
-  ).default("auto"),
+    (value) => value === "off" ? false : value === "auto" || value === "all" ? true : value,
+    external_exports.boolean()
+  ).default(true),
   /** Port the local map server binds on `127.0.0.1`. */
   serverPort: external_exports.int().min(1).max(65535).default(4747),
   /**
@@ -22647,7 +22642,15 @@ var HookState = external_exports.object({
    * Closing passes a later session started for this one because its own, at
    * the session end, never finished (machine shut down, run hung or failed).
    */
-  closeRetries: external_exports.number().int().min(0).optional()
+  closeRetries: external_exports.number().int().min(0).optional(),
+  /**
+   * Set when a closing pass starts for this session, cleared when one finishes.
+   * Still set means the pass was cut off (its environment ended, the machine
+   * shut down): a later session in the project finishes it, however much later.
+   */
+  closePending: IsoDate.nullable().optional(),
+  /** When a closing pass last finished for this session. */
+  closedAt: IsoDate.nullable().optional()
 });
 
 // src/schema/versioned.ts
@@ -22804,9 +22807,23 @@ var updateSession = (root, id, fn, opts) => {
   const p = projectPaths(root);
   return update(p.session(id), p.lock(`session-${id}`), Session, SESSION_SCHEMA, fn, opts);
 };
+function salvageConfig(raw) {
+  const kept = {};
+  if (typeof raw === "object" && raw !== null) {
+    for (const [key, value] of Object.entries(raw)) {
+      if (key === "schema" || !(key in Config.shape)) continue;
+      if (Config.safeParse({ schema: CONFIG_SCHEMA, [key]: value }).success) kept[key] = value;
+    }
+  }
+  return Config.parse({ schema: CONFIG_SCHEMA, ...kept });
+}
 var loadConfig = async (env) => {
-  const cur = await load(globalPaths(env).config, Config, CONFIG_SCHEMA);
-  return migrateConfig(cur.found && cur.ok ? cur.data : Config.parse({ schema: CONFIG_SCHEMA }));
+  const file2 = globalPaths(env).config;
+  const cur = await load(file2, Config, CONFIG_SCHEMA);
+  if (cur.found && cur.ok) return migrateConfig(cur.data);
+  if (!cur.found) return migrateConfig(Config.parse({ schema: CONFIG_SCHEMA }));
+  const read = await readJson(file2);
+  return migrateConfig(salvageConfig("value" in read ? read.value : void 0));
 };
 var updateConfig = (fn, env, opts) => {
   const g = globalPaths(env);
@@ -22830,6 +22847,7 @@ var updateRegistry = (fn, env) => {
     (cur) => fn(cur ?? Registry.parse({ schema: CONFIG_SCHEMA }))
   );
 };
+var loadState = (root, id) => load(projectPaths(root).state(id), HookState, STATE_SCHEMA);
 var updateState = (root, id, fn, opts) => {
   const p = projectPaths(root);
   return update(p.state(id), p.lock(`state-${id}`), HookState, STATE_SCHEMA, fn, opts, true);
@@ -27930,6 +27948,79 @@ function upgradeSessionIds(session, messages2) {
   return { ...session, nodes: [...byId.values()] };
 }
 
+// src/hooks/close-retry.ts
+import { statSync } from "fs";
+import { dirname as dirname7 } from "path";
+var CLOSE_RETRY_IDLE_MS = 10 * 6e4;
+var CLOSE_RETRY_WINDOW_MS = 3 * 24 * 60 * 6e4;
+var CLOSE_RETRY_LIMIT = 2;
+var CLOSE_RETRY_BATCH = 3;
+async function retryUnclosed(ctx) {
+  const config2 = await loadConfig(ctx.env);
+  if (!config2.sessionEndCatchUp) return;
+  const now = Date.parse(ctx.now);
+  const sessions = await loadAllSessions(ctx.root, () => {
+  });
+  const unclosedIds = sessions.filter((session) => session.sessionId !== ctx.sessionId && unclosed(session, now)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((session) => session.sessionId);
+  const pending = await markedPending(ctx);
+  const candidates = [.../* @__PURE__ */ new Set([...pending, ...unclosedIds])];
+  let started = 0;
+  for (const id of candidates) {
+    if (started >= CLOSE_RETRY_BATCH) break;
+    const transcript = await ctx.agent.findTranscript(id, ctx.env);
+    const written = transcript ? statSync(transcript, { throwIfNoEntry: false })?.mtimeMs : void 0;
+    if (written !== void 0 && now - written < CLOSE_RETRY_IDLE_MS) continue;
+    let allowed = false;
+    await updateState(ctx.root, id, (cur) => {
+      const tries = cur?.closeRetries ?? 0;
+      if (tries >= CLOSE_RETRY_LIMIT) return cur ?? emptyState();
+      allowed = true;
+      return { ...cur ?? emptyState(), closeRetries: tries + 1 };
+    });
+    if (!allowed) continue;
+    await markClosePending(ctx.root, id, ctx.now);
+    ctx.spawnDetached(["backfill", id, "--tail", "--close", "-C", ctx.root]);
+    started += 1;
+  }
+}
+async function markedPending(ctx) {
+  const ids = await listSessionIds(dirname7(projectPaths(ctx.root).state("x")));
+  const marked = [];
+  for (const id of ids) {
+    if (id === ctx.sessionId || !Slug.safeParse(id).success) continue;
+    const state = await loadState(ctx.root, id);
+    const at = state.found && state.ok ? state.data.closePending : void 0;
+    if (at) marked.push({ id, at });
+  }
+  return marked.sort((a, b) => a.at.localeCompare(b.at)).map((entry) => entry.id);
+}
+async function markClosePending(root, id, at) {
+  await updateState(root, id, (cur) => ({ ...cur ?? emptyState(), closePending: at }));
+}
+async function markClosed(root, id, at) {
+  await updateState(root, id, (cur) => ({
+    ...cur ?? emptyState(),
+    closePending: null,
+    closedAt: at
+  }));
+}
+function unclosed(session, now) {
+  if (session.leftOff !== void 0) return false;
+  if (!session.nodes.some((node2) => node2.kind === "message")) return false;
+  const age = now - Date.parse(session.updatedAt);
+  return age >= CLOSE_RETRY_IDLE_MS && age <= CLOSE_RETRY_WINDOW_MS;
+}
+function emptyState() {
+  return {
+    schema: STATE_SCHEMA,
+    turns: 0,
+    turnsSinceUpdate: 0,
+    recordUpdatedAt: null,
+    turnsSinceSide: 0,
+    agentWroteAt: null
+  };
+}
+
 // src/hooks/sessionend.ts
 async function onSessionEnd(ctx) {
   if (!ctx.initialized) return void 0;
@@ -27937,7 +28028,10 @@ async function onSessionEnd(ctx) {
   if (!config2.sessionEndCatchUp) return void 0;
   const messages2 = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
   if (!messages2 || messages2.length === 0) return void 0;
+  const state = await loadState(ctx.root, ctx.sessionId);
+  if (state.found && state.ok && state.data.closedAt && !state.data.closePending) return void 0;
   const review = config2.recorder === "mixed" ? ["--review"] : [];
+  await markClosePending(ctx.root, ctx.sessionId, ctx.now);
   ctx.spawnDetached(["backfill", ctx.sessionId, "--tail", "--close", ...review, "-C", ctx.root]);
   return void 0;
 }
@@ -27945,7 +28039,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "1.4.1",
+  version: "1.4.2",
   description: "Git for the intent behind agent-written code.",
   license: "MIT",
   keywords: [
@@ -28000,7 +28094,7 @@ var package_default = {
 
 // src/cli-version.ts
 import { readFile as readFile8, realpath, stat as stat9 } from "fs/promises";
-import { delimiter, dirname as dirname7, join as join11 } from "path";
+import { delimiter, dirname as dirname8, join as join11 } from "path";
 var PACKAGE = "@cogit/cli";
 async function installedCliVersion(env) {
   for (const dir of (env.PATH ?? "").split(delimiter)) {
@@ -28013,7 +28107,7 @@ async function installedCliVersion(env) {
     }
     const manifests = [
       // npm links bin/cogit to <package>/dist/cli.js...
-      async () => join11(dirname7(dirname7(await realpath(bin))), "package.json"),
+      async () => join11(dirname8(dirname8(await realpath(bin))), "package.json"),
       // ...and on Windows writes shims beside <prefix>/node_modules instead.
       async () => join11(dir, "node_modules", ...PACKAGE.split("/"), "package.json")
     ];
@@ -29958,7 +30052,7 @@ function exitOnClosedPipe(stream = process.stdout, exit = process.exit) {
 
 // src/store/events.ts
 import { appendFile as appendFile3, mkdir as mkdir6, readFile as readFile9 } from "fs/promises";
-import { dirname as dirname8 } from "path";
+import { dirname as dirname9 } from "path";
 
 // src/schema/events.ts
 var SessionEvent = external_exports.object({
@@ -30000,7 +30094,7 @@ async function readEvents(root, sessionId) {
 async function appendEvents(root, sessionId, events) {
   if (events.length === 0) return 0;
   const file2 = projectPaths(root).events(sessionId);
-  await mkdir6(dirname8(file2), { recursive: true });
+  await mkdir6(dirname9(file2), { recursive: true });
   await appendFile3(file2, `${events.map((event) => JSON.stringify(event)).join("\n")}
 `);
   return events.length;
@@ -31719,55 +31813,6 @@ async function prepareRecords(root, env, warn2) {
   }
 }
 
-// src/hooks/close-retry.ts
-import { statSync } from "fs";
-var CLOSE_RETRY_IDLE_MS = 10 * 6e4;
-var CLOSE_RETRY_WINDOW_MS = 3 * 24 * 60 * 6e4;
-var CLOSE_RETRY_LIMIT = 2;
-var CLOSE_RETRY_BATCH = 3;
-async function retryUnclosed(ctx) {
-  const config2 = await loadConfig(ctx.env);
-  if (!config2.sessionEndCatchUp) return;
-  const now = Date.parse(ctx.now);
-  const sessions = await loadAllSessions(ctx.root, () => {
-  });
-  const candidates = sessions.filter((session) => session.sessionId !== ctx.sessionId && unclosed(session, now)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  let started = 0;
-  for (const session of candidates) {
-    if (started >= CLOSE_RETRY_BATCH) break;
-    const id = session.sessionId;
-    const transcript = await ctx.agent.findTranscript(id, ctx.env);
-    const written = transcript ? statSync(transcript, { throwIfNoEntry: false })?.mtimeMs : void 0;
-    if (written !== void 0 && now - written < CLOSE_RETRY_IDLE_MS) continue;
-    let allowed = false;
-    await updateState(ctx.root, id, (cur) => {
-      const tries = cur?.closeRetries ?? 0;
-      if (tries >= CLOSE_RETRY_LIMIT) return cur ?? emptyState();
-      allowed = true;
-      return { ...cur ?? emptyState(), closeRetries: tries + 1 };
-    });
-    if (!allowed) continue;
-    ctx.spawnDetached(["backfill", id, "--tail", "--close", "-C", ctx.root]);
-    started += 1;
-  }
-}
-function unclosed(session, now) {
-  if (session.leftOff !== void 0) return false;
-  if (!session.nodes.some((node2) => node2.kind === "message")) return false;
-  const age = now - Date.parse(session.updatedAt);
-  return age >= CLOSE_RETRY_IDLE_MS && age <= CLOSE_RETRY_WINDOW_MS;
-}
-function emptyState() {
-  return {
-    schema: STATE_SCHEMA,
-    turns: 0,
-    turnsSinceUpdate: 0,
-    recordUpdatedAt: null,
-    turnsSinceSide: 0,
-    agentWroteAt: null
-  };
-}
-
 // src/hooks/sessionstart.ts
 function compactRequestText(skill) {
   return `cogit: this session was compacted and some of its user messages are not in the lineage record yet. Run the ${skill} skill now; \`session show\` lists the messages that have no node. It records only what is missing and replies "up to date" when nothing is; do not mention this request otherwise.`;
@@ -31966,35 +32011,46 @@ async function onStop(ctx) {
     },
     { timeoutMs: 2e3 }
   );
+  if (ctx.agent.isHeadless(ctx.env) && config2.sessionEndCatchUp) {
+    const review = config2.recorder === "mixed" ? ["--review"] : [];
+    await markClosePending(root, sessionId, ctx.now);
+    await ctx.runAndWait(["backfill", sessionId, "--tail", "--close", ...review, "-C", root]);
+    return void 0;
+  }
   if (side) ctx.spawnDetached(["backfill", sessionId, "--tail", "-C", root]);
   if (!request) return void 0;
   return ctx.agent.additionalContext("Stop", UPDATE_REQUEST);
 }
 
 // src/hooks/run.ts
-function insideCacheDir() {
+function lineageCacheDir() {
   return join12(tmpdir2(), "cogit-headless");
 }
-function rememberedInside(dir, sessionId, read) {
+function rememberedLineage(dir, sessionId, read) {
   const file2 = join12(dir, sessionId);
   try {
-    const kept = readFileSync2(file2, "utf8");
-    if (kept === "inside" || kept === "outside" || kept === "unknown")
-      return kept === "unknown" ? void 0 : kept === "inside";
+    const kept = JSON.parse(readFileSync2(file2, "utf8"));
+    if (kept === "unknown") return void 0;
+    if (typeof kept === "object" && kept !== null && typeof kept.own === "number")
+      return kept;
   } catch {
   }
   const answer = read();
   try {
     mkdirSync(dir, { recursive: true });
-    writeFileSync(file2, answer === void 0 ? "unknown" : answer ? "inside" : "outside");
+    writeFileSync(file2, JSON.stringify(answer ?? "unknown"));
   } catch {
   }
   return answer;
 }
-function recordsHeadless(mode, env, startedInsideSession2) {
-  if (mode === "all") return true;
-  if (mode === "off") return false;
-  return recordMarked(env) || startedInsideSession2() === false;
+function recordsHeadless(on, env, lineage) {
+  if (!on) return false;
+  const mark = env.COGIT_RECORD;
+  if (mark === "1") return true;
+  const known = lineage();
+  if (mark !== void 0 && /^\d+$/.test(mark))
+    return known === void 0 || known.parent === Number(mark);
+  return known !== void 0 && known.parent === null;
 }
 var HANDLERS = {
   stop: onStop,
@@ -32006,7 +32062,7 @@ var HOOK_EVENTS = Object.keys(HANDLERS);
 var LOG_LIMIT = 256 * 1024;
 function openLog(log2, args) {
   try {
-    mkdirSync(dirname9(log2), { recursive: true });
+    mkdirSync(dirname10(log2), { recursive: true });
     let flag = "a";
     try {
       if (statSync2(log2).size > LOG_LIMIT) flag = "w";
@@ -32020,6 +32076,25 @@ function openLog(log2, args) {
   } catch {
     return void 0;
   }
+}
+var RUN_AND_WAIT_LIMIT_MS = 9 * 6e4;
+function runAndWaitProcess(cli2, args, env, log2, limit = RUN_AND_WAIT_LIMIT_MS) {
+  const fd = log2 === void 0 ? void 0 : openLog(log2, args);
+  const out = fd ?? "ignore";
+  return new Promise((resolve5) => {
+    const done = () => {
+      clearTimeout(timer);
+      if (fd !== void 0) closeSync(fd);
+      resolve5();
+    };
+    const child = spawn3(process.execPath, [cli2, ...args], {
+      stdio: ["ignore", out, out],
+      env: { ...env, COGIT_DISABLE: "1" }
+    });
+    const timer = setTimeout(() => child.kill(), limit);
+    child.on("exit", done);
+    child.on("error", done);
+  });
 }
 function spawnDetachedProcess(cli2, args, env, log2) {
   const fd = log2 === void 0 ? void 0 : openLog(log2, args);
@@ -32049,10 +32124,10 @@ async function runHook(event, stdin, env, now, debug2, deps = {}) {
     if (handler === onSessionStart)
       await agent.markLive(input2.session_id).catch((err) => debug2(`cogit mark: ${err.message}`));
     const { recordHeadless } = await loadConfig(env);
-    const inside = deps.startedInsideSession ?? (() => rememberedInside(insideCacheDir(), input2.session_id, () => agent.startedInsideSession()));
-    if (agent.isHeadless(env) && !recordsHeadless(recordHeadless, env, inside)) return void 0;
-    if (handler === onSessionStart && recordHeadless === "auto")
-      await agent.markChildren(env).catch((err) => debug2(`cogit mark: ${err.message}`));
+    const lineage = deps.sessionLineage ?? (() => rememberedLineage(lineageCacheDir(), input2.session_id, () => agent.sessionLineage()));
+    if (agent.isHeadless(env) && !recordsHeadless(recordHeadless, env, lineage)) return void 0;
+    if (handler === onSessionStart && recordHeadless)
+      await agent.markChildren(env, lineage()?.own).catch((err) => debug2(`cogit mark: ${err.message}`));
     const { root } = await resolveProjectRoot(env[agent.projectDirEnv] ?? input2.cwd ?? ".");
     const initialized = existsSync4(projectPaths(root).project);
     if (!initialized && handler !== onSessionStart) return void 0;
@@ -32066,7 +32141,8 @@ async function runHook(event, stdin, env, now, debug2, deps = {}) {
       initialized,
       env,
       now,
-      spawnDetached: startCatchUp
+      spawnDetached: startCatchUp,
+      runAndWait: (args) => (deps.runAndWait ?? runAndWaitProcess)(cli2, args, env, projectPaths(root).detachedLog)
     });
     return out === void 0 ? void 0 : JSON.stringify(out);
   } catch (err) {
@@ -32221,7 +32297,7 @@ async function uninstallGitHooks(root) {
   const removed = await removeHookBlocks(dir, GIT_HOOK_EVENTS);
   const paths = projectPaths(root);
   if (existsSync5(paths.project)) {
-    await mkdir7(dirname10(paths.hooksOff), { recursive: true });
+    await mkdir7(dirname11(paths.hooksOff), { recursive: true });
     await atomicWrite(paths.hooksOff, `${(/* @__PURE__ */ new Date()).toISOString()}
 `);
   }
@@ -32328,9 +32404,35 @@ export {
   atomicWriteJson,
   readJson,
   defaultAgent,
-  redactDeep,
+  Slug,
+  IsoDate,
+  parseMessageRef,
+  STATE_SCHEMA,
+  HookState,
   projectPaths,
   globalPaths,
+  Config,
+  SESSION_SCHEMA,
+  MESSAGE_ID,
+  BranchSummary,
+  Status,
+  LineageNodeInput,
+  SessionInput,
+  LockBusyError,
+  withLock,
+  loadProject,
+  updateProject,
+  loadSession,
+  listSessionIds,
+  loadAllSessions,
+  updateSession,
+  loadConfig,
+  updateConfig,
+  loadRegistry,
+  updateRegistry,
+  updateState,
+  markClosed,
+  redactDeep,
   readConversationStore,
   appendConversationTurns,
   appendConversationHashes,
@@ -32344,22 +32446,11 @@ export {
   labelsToHashes,
   hashesToLabels,
   upgradeSessionIds,
-  Slug,
-  IsoDate,
-  parseMessageRef,
-  SESSION_SCHEMA,
-  MESSAGE_ID,
-  BranchSummary,
-  Status,
-  LineageNodeInput,
-  SessionInput,
   readEvents,
   appendEvents,
   sideOwnedParents,
   applyEvents,
   seedEvents,
-  LockBusyError,
-  withLock,
   findGitRoot,
   resolveCommit,
   ensureGitignore,
@@ -32376,20 +32467,6 @@ export {
   gitUserEmail,
   commitBetween,
   gitHooksDir,
-  Config,
-  STATE_SCHEMA,
-  HookState,
-  loadProject,
-  updateProject,
-  loadSession,
-  listSessionIds,
-  loadAllSessions,
-  updateSession,
-  loadConfig,
-  updateConfig,
-  loadRegistry,
-  updateRegistry,
-  updateState,
   compareVersions,
   versionNotice,
   readSessionHead,
