@@ -992,7 +992,7 @@ var require_lib2 = __commonJS({
 import { execFile as execFile3 } from "child_process";
 import { existsSync as existsSync5, realpathSync } from "fs";
 import { chmod, mkdir as mkdir7, readFile as readFile10, realpath as realpath3, rm as rm5, stat as stat11 } from "fs/promises";
-import { dirname as dirname10, join as join12, resolve as resolve4 } from "path";
+import { dirname as dirname10, join as join13, resolve as resolve4 } from "path";
 import { promisify as promisify3 } from "util";
 
 // src/git.ts
@@ -1439,12 +1439,26 @@ async function gitHooksDir(root) {
 
 // src/hooks/run.ts
 import { spawn as spawn3 } from "child_process";
-import { closeSync, existsSync as existsSync4, mkdirSync, openSync, statSync as statSync2, writeSync } from "fs";
-import { dirname as dirname9 } from "path";
+import {
+  closeSync,
+  existsSync as existsSync4,
+  mkdirSync,
+  openSync,
+  readFileSync as readFileSync2,
+  statSync as statSync2,
+  writeFileSync,
+  writeSync
+} from "fs";
+import { tmpdir as tmpdir2 } from "os";
+import { dirname as dirname9, join as join12 } from "path";
 import { fileURLToPath } from "url";
 
 // src/agents/types.ts
 var DEFAULT_AGENT = "claude-code";
+
+// src/agents/claude/hooks.ts
+import { appendFile } from "fs/promises";
+import { basename as basename3 } from "path";
 
 // ../../node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -21163,6 +21177,74 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
+// src/push-command.ts
+import { spawnSync } from "child_process";
+import { readFileSync } from "fs";
+import { basename as basename2 } from "path";
+var MAX_DEPTH = 6;
+function findPushArgs(startPid, read) {
+  let pid = startPid;
+  for (let depth = 0; depth < MAX_DEPTH && pid > 1; depth++) {
+    const info = read(pid);
+    if (info === void 0) return void 0;
+    const name = basename2(info.args[0] ?? "").replace(/\.exe$/i, "");
+    if (name === "git" && info.args.includes("push")) return info.args;
+    pid = info.ppid;
+  }
+  return void 0;
+}
+var VALUE_OPTIONS = /* @__PURE__ */ new Set(["--push-option", "--repo", "--receive-pack", "--exec"]);
+function isDryRun(args) {
+  const start = args.indexOf("push");
+  if (start === -1) return false;
+  for (let i = start + 1; i < args.length; i++) {
+    const arg = args[i] ?? "";
+    if (arg === "--") return false;
+    if (arg === "--dry-run") return true;
+    if (VALUE_OPTIONS.has(arg)) {
+      i++;
+      continue;
+    }
+    if (!/^-[^-]/.test(arg)) continue;
+    for (let c = 1; c < arg.length; c++) {
+      if (arg[c] === "n") return true;
+      if (arg[c] === "o") {
+        if (c === arg.length - 1) i++;
+        break;
+      }
+    }
+  }
+  return false;
+}
+function pushIsDryRun(read = (pid) => readProcess(pid)) {
+  const args = findPushArgs(process.ppid, read);
+  return args !== void 0 && isDryRun(args);
+}
+function readProcess(pid, platform = process.platform) {
+  if (platform === "linux") return readProc(pid);
+  if (platform === "darwin") return readPs(pid);
+  return void 0;
+}
+function readProc(pid) {
+  try {
+    const stat12 = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const ppid = Number(stat12.slice(stat12.lastIndexOf(")") + 2).split(" ")[1]);
+    const args = readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0").filter(Boolean);
+    return Number.isInteger(ppid) ? { ppid, args } : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function readPs(pid) {
+  const out = spawnSync("ps", ["-o", "ppid=,args=", "-p", String(pid)], {
+    encoding: "utf8",
+    timeout: 1e3
+  });
+  const match = /^(\d+)\s+([\s\S]*)$/.exec((out.stdout ?? "").trim());
+  if (out.status !== 0 || match === null) return void 0;
+  return { ppid: Number(match[1]), args: (match[2] ?? "").trim().split(/\s+/) };
+}
+
 // src/agents/claude/hooks.ts
 var ClaudeHookInput = external_exports.looseObject({
   session_id: external_exports.string(),
@@ -21185,6 +21267,31 @@ function parseHookInput(stdin) {
 }
 function isHeadless(env) {
   return env.CLAUDE_CODE_ENTRYPOINT?.startsWith("sdk") ?? false;
+}
+function isClaudeProcess(args) {
+  const first = (args[0] ?? "").replace(/\\/g, "/");
+  const name = basename3(first).toLowerCase();
+  if (name === "claude" || name === "claude.exe" || first.includes("/claude/versions/"))
+    return true;
+  return /^node(\.exe)?$/.test(name) && /claude-code\/cli\.m?js$/.test((args[1] ?? "").replace(/\\/g, "/"));
+}
+function startedInsideSession(read = (pid) => readProcess(pid), start = process.ppid) {
+  let pid = start;
+  let found = 0;
+  for (let depth = 0; depth < 64 && pid > 1; depth += 1) {
+    const info = read(pid);
+    if (info === void 0) return depth === 0 ? void 0 : found > 0 ? false : void 0;
+    if (isClaudeProcess(info.args)) {
+      found += 1;
+      if (found === 2) return true;
+    }
+    pid = info.ppid;
+  }
+  return found > 0 ? false : void 0;
+}
+async function markChildren(env) {
+  const file2 = env.CLAUDE_ENV_FILE;
+  if (file2) await appendFile(file2, "export COGIT_RECORD=1\n");
 }
 function userNotice(text) {
   return { systemMessage: text };
@@ -21396,9 +21503,9 @@ import { createInterface as createInterface2 } from "readline";
 // src/agents/claude/fork.ts
 import { createReadStream } from "fs";
 import { readdir, stat as stat3 } from "fs/promises";
-import { basename as basename2, dirname as dirname3, join as join4 } from "path";
+import { basename as basename4, dirname as dirname3, join as join4 } from "path";
 import { createInterface } from "readline";
-var MAX_DEPTH = 8;
+var MAX_DEPTH2 = 8;
 var USER_LINE = /"type":"user"/;
 var LINE_UUID = /"uuid":"([^"]+)"/;
 var firstUuids = /* @__PURE__ */ new Map();
@@ -21445,7 +21552,7 @@ function sharedPrefix(a, b) {
 }
 async function forkOrigin(file2, turns, readTurns, isMessage, depth = 0) {
   const first = turns[0];
-  if (first?.uuid === void 0 || depth > MAX_DEPTH) return null;
+  if (first?.uuid === void 0 || depth > MAX_DEPTH2) return null;
   const born = await bornAt(file2);
   const dir = dirname3(file2);
   const names = (await readdir(dir).catch(() => [])).filter(
@@ -21470,7 +21577,7 @@ async function forkOrigin(file2, turns, readTurns, isMessage, depth = 0) {
   const deeper = parentTurns ? await forkOrigin(best.file, parentTurns, readTurns, isMessage, depth + 1) : null;
   if (deeper && best.shared <= deeper.copied)
     return { sessionId: deeper.sessionId, copied: best.shared, last: copy };
-  return { sessionId: basename2(best.file, ".jsonl"), copied: best.shared, last: copy };
+  return { sessionId: basename4(best.file, ".jsonl"), copied: best.shared, last: copy };
 }
 
 // src/agents/claude/turn-cache.ts
@@ -21941,6 +22048,8 @@ var claude = {
   parseHookInput,
   isHeadless,
   isHeadlessTranscript,
+  startedInsideSession: () => startedInsideSession(),
+  markChildren,
   additionalContext,
   userNotice,
   readRetention,
@@ -21985,6 +22094,9 @@ function configuredHome(env = process.env) {
 }
 function captureDisabled(env = process.env) {
   return env.COGIT_DISABLE === "1" || env.CODELINEAGE_DISABLE === "1";
+}
+function recordMarked(env) {
+  return env.COGIT_RECORD === "1";
 }
 function projectPaths(root) {
   const base = join7(root, DIR_NAME);
@@ -22112,7 +22224,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-AGBO333W.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-HZIRSVY2.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -22262,11 +22374,19 @@ var Config = external_exports.object({
    */
   startupContext: external_exports.boolean().default(true),
   /**
-   * Whether sessions started without a person (`claude -p`, an SDK) are recorded.
-   * Off by default: other plugins start them in the background, one per prompt,
-   * and they would fill the map and the inbox.
+   * Which sessions started without a person (`claude -p`, an SDK) are recorded.
+   * `off`: none. `all`: every one, other plugins' background runs included.
+   * `auto` (new installs): those a person or a script started (a loop like
+   * Ralph, a cron job: no Claude Code process above them) and those a recorded
+   * session's own commands started (marked `COGIT_RECORD=1`), but not the ones
+   * another plugin's hook starts, one per prompt. A config written while this
+   * was a boolean reads `true` as `all` and `false` as `off`, so an existing
+   * install keeps what it had.
    */
-  recordHeadless: external_exports.boolean().default(false),
+  recordHeadless: external_exports.preprocess(
+    (value) => value === true ? "all" : value === false ? "off" : value,
+    external_exports.enum(["off", "auto", "all"])
+  ).default("auto"),
   /** Port the local map server binds on `127.0.0.1`. */
   serverPort: external_exports.int().min(1).max(65535).default(4747),
   /**
@@ -22739,7 +22859,7 @@ async function onPromptSubmit(ctx) {
 import { createHash as createHash2 } from "crypto";
 
 // src/store/conversations.ts
-import { appendFile, mkdir as mkdir5, readFile as readFile7 } from "fs/promises";
+import { appendFile as appendFile2, mkdir as mkdir5, readFile as readFile7 } from "fs/promises";
 import { dirname as dirname6 } from "path";
 import { constants as constants2, gunzipSync, gzipSync } from "zlib";
 
@@ -27701,7 +27821,7 @@ async function appendConversationTurns(root, sessionId, turns) {
 `;
   const file2 = projectPaths(root).conversation(sessionId);
   await mkdir5(dirname6(file2), { recursive: true });
-  await appendFile(file2, gzipSync(Buffer.from(chunk, "utf8")));
+  await appendFile2(file2, gzipSync(Buffer.from(chunk, "utf8")));
   return value.length;
 }
 async function appendConversationHashes(root, sessionId, hashes) {
@@ -27713,7 +27833,7 @@ async function appendConversationHashes(root, sessionId, hashes) {
 `;
   const file2 = projectPaths(root).conversation(sessionId);
   await mkdir5(dirname6(file2), { recursive: true });
-  await appendFile(file2, gzipSync(Buffer.from(chunk, "utf8")));
+  await appendFile2(file2, gzipSync(Buffer.from(chunk, "utf8")));
   return fresh.length;
 }
 
@@ -27825,7 +27945,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "1.4.0",
+  version: "1.4.1",
   description: "Git for the intent behind agent-written code.",
   license: "MIT",
   keywords: [
@@ -29837,7 +29957,7 @@ function exitOnClosedPipe(stream = process.stdout, exit = process.exit) {
 }
 
 // src/store/events.ts
-import { appendFile as appendFile2, mkdir as mkdir6, readFile as readFile9 } from "fs/promises";
+import { appendFile as appendFile3, mkdir as mkdir6, readFile as readFile9 } from "fs/promises";
 import { dirname as dirname8 } from "path";
 
 // src/schema/events.ts
@@ -29881,7 +30001,7 @@ async function appendEvents(root, sessionId, events) {
   if (events.length === 0) return 0;
   const file2 = projectPaths(root).events(sessionId);
   await mkdir6(dirname8(file2), { recursive: true });
-  await appendFile2(file2, `${events.map((event) => JSON.stringify(event)).join("\n")}
+  await appendFile3(file2, `${events.map((event) => JSON.stringify(event)).join("\n")}
 `);
   return events.length;
 }
@@ -31852,6 +31972,30 @@ async function onStop(ctx) {
 }
 
 // src/hooks/run.ts
+function insideCacheDir() {
+  return join12(tmpdir2(), "cogit-headless");
+}
+function rememberedInside(dir, sessionId, read) {
+  const file2 = join12(dir, sessionId);
+  try {
+    const kept = readFileSync2(file2, "utf8");
+    if (kept === "inside" || kept === "outside" || kept === "unknown")
+      return kept === "unknown" ? void 0 : kept === "inside";
+  } catch {
+  }
+  const answer = read();
+  try {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(file2, answer === void 0 ? "unknown" : answer ? "inside" : "outside");
+  } catch {
+  }
+  return answer;
+}
+function recordsHeadless(mode, env, startedInsideSession2) {
+  if (mode === "all") return true;
+  if (mode === "off") return false;
+  return recordMarked(env) || startedInsideSession2() === false;
+}
 var HANDLERS = {
   stop: onStop,
   sessionstart: onSessionStart,
@@ -31904,7 +32048,11 @@ async function runHook(event, stdin, env, now, debug2, deps = {}) {
     if (!Slug.safeParse(input2.session_id).success) return void 0;
     if (handler === onSessionStart)
       await agent.markLive(input2.session_id).catch((err) => debug2(`cogit mark: ${err.message}`));
-    if (agent.isHeadless(env) && !(await loadConfig(env)).recordHeadless) return void 0;
+    const { recordHeadless } = await loadConfig(env);
+    const inside = deps.startedInsideSession ?? (() => rememberedInside(insideCacheDir(), input2.session_id, () => agent.startedInsideSession()));
+    if (agent.isHeadless(env) && !recordsHeadless(recordHeadless, env, inside)) return void 0;
+    if (handler === onSessionStart && recordHeadless === "auto")
+      await agent.markChildren(env).catch((err) => debug2(`cogit mark: ${err.message}`));
     const { root } = await resolveProjectRoot(env[agent.projectDirEnv] ?? input2.cwd ?? ".");
     const initialized = existsSync4(projectPaths(root).project);
     if (!initialized && handler !== onSessionStart) return void 0;
@@ -31925,74 +32073,6 @@ async function runHook(event, stdin, env, now, debug2, deps = {}) {
     debug2(`cogit ${event} hook: ${err.message}`);
     return void 0;
   }
-}
-
-// src/push-command.ts
-import { spawnSync } from "child_process";
-import { readFileSync } from "fs";
-import { basename as basename3 } from "path";
-var MAX_DEPTH2 = 6;
-function findPushArgs(startPid, read) {
-  let pid = startPid;
-  for (let depth = 0; depth < MAX_DEPTH2 && pid > 1; depth++) {
-    const info = read(pid);
-    if (info === void 0) return void 0;
-    const name = basename3(info.args[0] ?? "").replace(/\.exe$/i, "");
-    if (name === "git" && info.args.includes("push")) return info.args;
-    pid = info.ppid;
-  }
-  return void 0;
-}
-var VALUE_OPTIONS = /* @__PURE__ */ new Set(["--push-option", "--repo", "--receive-pack", "--exec"]);
-function isDryRun(args) {
-  const start = args.indexOf("push");
-  if (start === -1) return false;
-  for (let i = start + 1; i < args.length; i++) {
-    const arg = args[i] ?? "";
-    if (arg === "--") return false;
-    if (arg === "--dry-run") return true;
-    if (VALUE_OPTIONS.has(arg)) {
-      i++;
-      continue;
-    }
-    if (!/^-[^-]/.test(arg)) continue;
-    for (let c = 1; c < arg.length; c++) {
-      if (arg[c] === "n") return true;
-      if (arg[c] === "o") {
-        if (c === arg.length - 1) i++;
-        break;
-      }
-    }
-  }
-  return false;
-}
-function pushIsDryRun(read = (pid) => readProcess(pid)) {
-  const args = findPushArgs(process.ppid, read);
-  return args !== void 0 && isDryRun(args);
-}
-function readProcess(pid, platform = process.platform) {
-  if (platform === "linux") return readProc(pid);
-  if (platform === "darwin") return readPs(pid);
-  return void 0;
-}
-function readProc(pid) {
-  try {
-    const stat12 = readFileSync(`/proc/${pid}/stat`, "utf8");
-    const ppid = Number(stat12.slice(stat12.lastIndexOf(")") + 2).split(" ")[1]);
-    const args = readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0").filter(Boolean);
-    return Number.isInteger(ppid) ? { ppid, args } : void 0;
-  } catch {
-    return void 0;
-  }
-}
-function readPs(pid) {
-  const out = spawnSync("ps", ["-o", "ppid=,args=", "-p", String(pid)], {
-    encoding: "utf8",
-    timeout: 1e3
-  });
-  const match = /^(\d+)\s+([\s\S]*)$/.exec((out.stdout ?? "").trim());
-  if (out.status !== 0 || match === null) return void 0;
-  return { ppid: Number(match[1]), args: (match[2] ?? "").trim().split(/\s+/) };
 }
 
 // src/git-hooks.ts
@@ -32091,7 +32171,7 @@ async function installGitHook(root, event) {
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return false;
   await mkdir7(dir, { recursive: true });
-  const file2 = join12(dir, event);
+  const file2 = join13(dir, event);
   const exists = await stat11(file2).then(
     () => true,
     () => false
@@ -32123,7 +32203,7 @@ async function refreshGitHooks(root) {
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return [];
   const refreshed = [];
-  const hasBlock = async (event) => (await readFile10(join12(dir, event), "utf8").catch(() => void 0) ?? "").includes(BLOCK_START);
+  const hasBlock = async (event) => (await readFile10(join13(dir, event), "utf8").catch(() => void 0) ?? "").includes(BLOCK_START);
   const installed = !existsSync5(projectPaths(root).hooksOff) || await hasBlock("prepare-commit-msg");
   for (const event of GIT_HOOK_EVENTS) {
     if (!installed && !await hasBlock(event)) continue;
@@ -32150,7 +32230,7 @@ async function uninstallGitHooks(root) {
 async function removeHookBlocks(dir, events) {
   const removed = [];
   for (const event of events) {
-    const file2 = join12(dir, event);
+    const file2 = join13(dir, event);
     const current = await readFile10(file2, "utf8").catch(() => void 0);
     if (current === void 0 || !current.includes(BLOCK_START)) continue;
     const next = withoutHookBlock(current);
