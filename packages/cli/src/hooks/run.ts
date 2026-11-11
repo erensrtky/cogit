@@ -57,8 +57,8 @@ export function insideCacheDir(): string {
 
 /**
  * The process-tree answer for one session, read once and kept for its later
- * hooks: on Windows the read costs a PowerShell call, and a loop's session runs
- * several hooks. "No answer" is kept too, so a slow read is not tried again.
+ * hooks: on macOS each process costs a `ps` call, and a loop's session runs
+ * several hooks. "No answer" is kept too, so it is not asked again.
  */
 export function rememberedInside(
   dir: string,

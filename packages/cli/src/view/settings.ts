@@ -103,7 +103,8 @@ const EDITABLE: FieldSpec[] = [
       "as a task handed to another `claude -p`. It leaves out the ones other plugins start in " +
       "the background, often once per prompt, which would fill the map and the inbox. Off " +
       "records only the chats you type into. All records every one. A script can also start " +
-      "its sessions with `COGIT_RECORD=1`, which Auto always records.",
+      "its sessions with `COGIT_RECORD=1`, which Auto always records; on Windows, Auto " +
+      "records a script's sessions only that way.",
     kind: "select",
     options: [
       { value: "auto", label: "Auto (recommended)" },

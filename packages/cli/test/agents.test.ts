@@ -1,17 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  isClaudeProcess,
-  platformReader,
-  startedInsideSession,
-} from "../src/agents/claude/hooks.js";
+import { isClaudeProcess, startedInsideSession } from "../src/agents/claude/hooks.js";
 import { AGENTS, defaultAgent } from "../src/agents/index.js";
-import {
-  type ProcessInfo,
-  parseWindowsProcesses,
-  readWindowsProcesses,
-  WINDOWS_READ_TIMEOUT_MS,
-  windowsCommandLine,
-} from "../src/push-command.js";
+import type { ProcessInfo } from "../src/push-command.js";
 
 /**
  * The adapter is the only place that knows which agent cogit records. These
@@ -80,70 +70,10 @@ describe("agent adapter", () => {
     expect(startedInsideSession(() => undefined, 10)).toBeUndefined();
     expect(startedInsideSession(tree({ 10: [1, ["sh"]] }), 10)).toBeUndefined();
     expect(startedInsideSession(tree({ 10: [11, ["sh"]] }), 10)).toBeUndefined();
-    // Windows reuses a dead parent's pid: a "parent" younger than its child is the top.
-    const reused = (pid: number) =>
-      ({
-        10: { ppid: 11, args: ["bash.exe"], started: 500 },
-        11: { ppid: 20, args: ["claude.exe", "-p"], started: 400 },
-        20: { ppid: 30, args: ["claude.exe"], started: 900 },
-      })[pid];
-    expect(startedInsideSession(reused, 10)).toBe(false);
-  });
-
-  it("reads Windows' process table from PowerShell's JSON", () => {
-    expect(
-      windowsCommandLine('"C:\\Program Files\\nodejs\\node.exe" C:\\npm\\cli.js -p "a b"'),
-    ).toEqual(["C:\\Program Files\\nodejs\\node.exe", "C:\\npm\\cli.js", "-p", "a b"]);
-    const table = parseWindowsProcesses(
-      JSON.stringify([
-        { p: 10, pp: 11, n: "bash.exe", c: "bash.exe -c hook", t: 500 },
-        { p: 11, pp: 4, n: "claude.exe", c: null, t: 400 },
-        { p: 12, pp: 4, n: "System", c: "", t: 0 },
-        { p: "x", pp: 1 },
-        null,
-      ]),
-    );
-    expect(table?.get(10)).toEqual({ ppid: 11, args: ["bash.exe", "-c", "hook"], started: 500 });
-    // A hidden command line falls back to the image name.
-    expect(table?.get(11)).toEqual({ ppid: 4, args: ["claude.exe"], started: 400 });
-    expect(table?.get(12)).toEqual({ ppid: 4, args: ["System"] });
-    expect(table?.size).toBe(3);
-    // One process prints as an object, not an array; bad output is no table.
-    expect(
-      parseWindowsProcesses(JSON.stringify({ p: 1, pp: 0, n: "x", c: null, t: 1 }))?.size,
-    ).toBe(1);
-    expect(parseWindowsProcesses("not json")).toBeUndefined();
-  });
-
-  it("asks PowerShell once per walk on Windows, for the chain above the hook", () => {
-    const calls: { args: string[]; timeout: unknown }[] = [];
-    const answer = (status: number, stdout: string) =>
-      ((_command: string, args: string[], options: { timeout?: number }) => {
-        calls.push({ args, timeout: options.timeout });
-        return { status, stdout };
-      }) as unknown as Parameters<typeof readWindowsProcesses>[1];
-    const json = JSON.stringify([{ p: 10, pp: 1, n: "claude.exe", c: null, t: 5 }]);
-    expect(readWindowsProcesses(10, answer(0, json))?.get(10)?.args).toEqual(["claude.exe"]);
-    // One process at a time, from the hook up, with a short limit.
-    expect(calls[0]?.args.at(-1)).toMatch(/^\$p = 10; .*-Filter "ProcessId=\$p"/);
-    expect(calls[0]?.timeout).toBe(WINDOWS_READ_TIMEOUT_MS);
-    expect(readWindowsProcesses(10, answer(1, ""))).toBeUndefined();
-
-    const starts: number[] = [];
-    const read = platformReader("win32", (start) => {
-      starts.push(start);
-      return parseWindowsProcesses(json);
-    });
-    expect(read(10)?.ppid).toBe(1);
-    expect(read(99)).toBeUndefined();
-    expect(starts).toEqual([10]);
-    expect(platformReader("win32", () => undefined)(10)).toBeUndefined();
-    // Elsewhere one process is read at a time; an unknown platform reads nothing.
-    expect(platformReader("aix")(process.pid)).toBeUndefined();
   });
 
   it("reads the real process tree without throwing", { timeout: 30_000 }, () => {
-    // What it says depends on who runs the tests; Windows goes through PowerShell.
+    // What it says depends on who runs the tests; on Windows there is no tree to read.
     const began = Date.now();
     const answer = defaultAgent().startedInsideSession();
     // The CI log shows what the read costs on each system.

@@ -9,11 +9,10 @@ import { basename } from "node:path";
  * counts as real, as before.
  */
 
-/** One process: its parent's pid, its argument list and, where known, when it started (ms). */
+/** One process: its parent's pid and its argument list. */
 export interface ProcessInfo {
   ppid: number;
   args: string[];
-  started?: number;
 }
 
 export type ReadProcess = (pid: number) => ProcessInfo | undefined;
@@ -87,73 +86,6 @@ export function readProc(pid: number): ProcessInfo | undefined {
   } catch {
     return undefined;
   }
-}
-
-/** How long the Windows read may take before the caller goes on without it. */
-export const WINDOWS_READ_TIMEOUT_MS = 3000;
-
-/**
- * Windows has neither `/proc` nor `ps`: one PowerShell call walks up from
- * `start`, asking for one process at a time and only the fields needed (parent,
- * name, command line, start time), and prints that chain. Listing every process
- * instead read each one's command line and took over ten seconds on a CI
- * runner. Undefined when PowerShell does not answer in time.
- */
-export function readWindowsProcesses(
-  start: number,
-  run: typeof spawnSync = spawnSync,
-): Map<number, ProcessInfo> | undefined {
-  const pid = Math.trunc(start);
-  const script =
-    `$p = ${pid}; $rows = @(); ` +
-    "for ($i = 0; $i -lt 64 -and $p -gt 0; $i++) { " +
-    '$x = Get-CimInstance Win32_Process -Filter "ProcessId=$p" ' +
-    "-Property ProcessId,ParentProcessId,Name,CommandLine,CreationDate; " +
-    "if (-not $x) { break }; " +
-    "$rows += [pscustomobject]@{ p = $x.ProcessId; pp = $x.ParentProcessId; n = $x.Name; c = $x.CommandLine; " +
-    "t = if ($x.CreationDate) { ([DateTimeOffset]$x.CreationDate).ToUnixTimeMilliseconds() } else { 0 } }; " +
-    "$p = $x.ParentProcessId }; " +
-    "ConvertTo-Json -Compress -InputObject $rows";
-  const out = run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
-    encoding: "utf8",
-    timeout: WINDOWS_READ_TIMEOUT_MS,
-    windowsHide: true,
-  });
-  return out.status === 0 ? parseWindowsProcesses(out.stdout ?? "") : undefined;
-}
-
-/**
- * The table `readWindowsProcesses` prints: one object, or an array of them, with
- * the pid, parent pid, image name, command line (null when Windows hides it)
- * and start time.
- */
-export function parseWindowsProcesses(json: string): Map<number, ProcessInfo> | undefined {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(json);
-  } catch {
-    return undefined;
-  }
-  const rows = Array.isArray(parsed) ? parsed : [parsed];
-  const table = new Map<number, ProcessInfo>();
-  for (const row of rows) {
-    if (typeof row !== "object" || row === null) continue;
-    const { p, pp, n, c, t } = row as Record<string, unknown>;
-    if (typeof p !== "number" || typeof pp !== "number") continue;
-    const args =
-      typeof c === "string" && c.trim() !== ""
-        ? windowsCommandLine(c)
-        : typeof n === "string"
-          ? [n]
-          : [];
-    table.set(p, { ppid: pp, args, ...(typeof t === "number" && t > 0 ? { started: t } : {}) });
-  }
-  return table;
-}
-
-/** A Windows command line as arguments: quoted runs kept whole, enough to read the program and its script. */
-export function windowsCommandLine(line: string): string[] {
-  return [...line.matchAll(/"([^"]*)"|[^\s"]+/g)].map((match) => match[1] ?? match[0]);
 }
 
 /** `ps` joins the arguments with spaces; enough to spot `push` and its flags. */

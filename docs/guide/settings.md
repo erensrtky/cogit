@@ -38,7 +38,7 @@ When a chat starts, the agent gets a short summary of where the previous session
 
 **Which sessions that start without a person, such as `claude -p`, are recorded.**
 
-Auto (recommended) records the ones you or your scripts start, such as a loop like Ralph or a cron job, and the ones your recorded chats start through a command, such as a task handed to another `claude -p`. It leaves out the ones other plugins start in the background, often once per prompt, which would fill the map and the inbox. Off records only the chats you type into. All records every one. A script can also start its sessions with `COGIT_RECORD=1`, which Auto always records.
+Auto (recommended) records the ones you or your scripts start, such as a loop like Ralph or a cron job, and the ones your recorded chats start through a command, such as a task handed to another `claude -p`. It leaves out the ones other plugins start in the background, often once per prompt, which would fill the map and the inbox. Off records only the chats you type into. All records every one. A script can also start its sessions with `COGIT_RECORD=1`, which Auto always records; on Windows, Auto records a script's sessions only that way.
 
 ### Intent, Shape and Code
 
