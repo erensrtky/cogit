@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.4.1] - 2026-11-11
 ### Added
 - **Headless sessions** has three choices instead of on and off. **Auto**, the default for new installs, records the `claude -p` sessions you or your scripts start (a loop like Ralph, a cron job) and the ones your recorded chats start through a command (a task handed to another `claude -p`), and leaves out the ones other plugins start in the background, often once per prompt. **Off** records only the chats you type into; **All** records every one. An existing install keeps what it had: off reads as Off, on as All. Auto tells them apart by what started the session, read from the process list on Linux and macOS; a tool can also mark its sessions with `COGIT_RECORD=1`, which Auto always records, and on Windows that mark is how a script's sessions are recorded. `cogit doctor` counts the unrecorded tail of a headless session that was recorded.
 
