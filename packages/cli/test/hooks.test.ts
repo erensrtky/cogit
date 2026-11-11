@@ -174,6 +174,7 @@ describe("runHook", () => {
       {
         cli: "/plugin/dist/cli.js",
         spawnDetached: (cli, args) => spawned.push([cli, ...args]),
+        sessionLineage: () => lineage,
       },
     );
 
