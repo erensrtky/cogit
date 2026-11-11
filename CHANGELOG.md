@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.4.2] - 2026-11-11
 ### Changed
 - **Headless sessions** is now **Background work**, on or off. On is what Auto was in 1.4.1: the `claude -p` sessions your loops, scripts and chats start are recorded, other plugins' internal calls are not. All is gone: it only added those calls, which nobody needs on the map. 1.4.1's Off reads as off, Auto and All as on. `cogit config set recordHeadless true|false`.
 
