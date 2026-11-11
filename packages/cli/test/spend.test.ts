@@ -1,7 +1,7 @@
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { runClaude } from "../src/commands/backfill.js";
+import { runClaude } from "../src/agents/claude/run.js";
 import { projectPaths } from "../src/store/paths.js";
 import { readSpend, recordSpend, spendOf } from "../src/store/spend.js";
 import { pathWith, tempDir, writeFakeClaude } from "./helpers.js";

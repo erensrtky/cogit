@@ -1,13 +1,13 @@
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
+import { resultText } from "../src/agents/claude/run.js";
+import { headlessEnv } from "../src/agents/headless.js";
 import type { ChatTurn } from "../src/agents/types.js";
 import {
   agentRecord,
   backfillTail,
   catchUpPrompt,
-  headlessEnv,
-  resultText,
   withoutNulls,
   writableAnswer,
 } from "../src/commands/backfill.js";

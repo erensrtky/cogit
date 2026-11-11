@@ -1,4 +1,4 @@
-import { type ChatTurn, defaultAgent } from "../agents/index.js";
+import { type ChatTurn, findSession } from "../agents/index.js";
 import { distillAtClose } from "../captures.js";
 import type { Io } from "../io.js";
 import { hashTurns, upgradeSessionIds } from "../messages.js";
@@ -6,14 +6,7 @@ import { parseMessageRef } from "../schema/common.js";
 import { BranchSummary, type Session, Status } from "../schema/session.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { loadConfig, loadSession } from "../store/stores.js";
-import {
-  actionLines,
-  agentRecord,
-  resultText,
-  runClaude,
-  withoutNulls,
-  writableAnswer,
-} from "./backfill.js";
+import { actionLines, agentRecord, withoutNulls, writableAnswer } from "./backfill.js";
 import { type CandidateSession, candidateSessions, sessionWrite } from "./session.js";
 
 /**
@@ -368,10 +361,10 @@ function withOptionObjects(node: Record<string, unknown>): Record<string, unknow
  * later session: by then the cache is cold, and the side model's pass is enough.
  */
 async function reviewAtClose(root: string, sessionId: string, io: Io): Promise<void> {
-  const agent = defaultAgent();
-  const file = await agent.findTranscript(sessionId, io.env);
+  const found = await findSession(sessionId, io.env);
   const loaded = await loadSession(root, sessionId);
-  if (!file || !loaded.found || !loaded.ok) return;
+  if (!found || !loaded.found || !loaded.ok) return;
+  const { agent, file } = found;
   const model = await agent.readSessionModel(file);
   if (model === undefined) {
     io.warn(`no model found in the transcript of ${sessionId}; skipping the Quality review`);
@@ -391,9 +384,7 @@ async function reviewAtClose(root: string, sessionId: string, io: Io): Promise<v
   const cwd = (await agent.readSessionCwd(file)) ?? root;
   const answer = withoutNulls(
     agentRecord(
-      resultText(
-        await runClaude(prompt, model, io.env, { sessionId, cwd }, { root, kind: "review" }),
-      ),
+      await agent.run(prompt, model, io.env, { sessionId, cwd }, { root, kind: "review" }),
     ),
   );
   // The review corrects notes; the structure stays the side model's and the close pass's.
@@ -433,13 +424,13 @@ export async function closeSession(
         )
       : false;
   if (reviewed) io.out(`reviewed ${sessionId} with the session's own model`);
-  const agent = defaultAgent();
-  const file = await agent.findTranscript(sessionId, io.env);
+  const found = await findSession(sessionId, io.env);
   const loaded = await loadSession(root, sessionId);
-  if (!file || !loaded.found || !loaded.ok) {
+  if (!found || !loaded.found || !loaded.ok) {
     io.out(`session ${sessionId} has no record to close`);
     return;
   }
+  const { agent, file } = found;
   const turns = hashTurns(sessionId, await agent.readConversation(file));
   const upgraded = upgradeSessionIds(loaded.data, turns);
   const record: Session = {
@@ -468,9 +459,7 @@ export async function closeSession(
     status,
   });
   const answer = agentRecord(
-    resultText(
-      await runClaude(prompt, config.sideModel, io.env, undefined, { root, kind: "side" }),
-    ),
+    await agent.run(prompt, config.sideModel, io.env, undefined, { root, kind: "side" }),
   );
   const payload = closePayload(answer, closing, record, { status });
   await sessionWrite({ dir: root, by: "side" }, io, async () => JSON.stringify(payload));

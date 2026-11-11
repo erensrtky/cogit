@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { defaultAgent } from "../agents/index.js";
+import { agentNamed, collectAllTranscripts } from "../agents/index.js";
 import type { Io } from "../io.js";
 import { redactDeep } from "../redact.js";
 import type { Config, RegistryEntry } from "../schema/config.js";
@@ -151,7 +151,6 @@ export async function collectInboxForProject(
 ): Promise<ViewInboxRow[]> {
   // Turned off: no rows anywhere, and no transcript read for them.
   if (config.inbox === false) return [];
-  const agent = defaultAgent();
   const cutoff = Date.parse(now) - config.inboxMaxAgeDays * 24 * 60 * 60 * 1000;
   const candidates: InboxCandidate[] = [];
   for (const session of sessions) {
@@ -163,7 +162,7 @@ export async function collectInboxForProject(
     let turn: InboxCandidate["turn"] = null;
     if (file !== undefined) {
       try {
-        const last = await agent.readLastTurn(file);
+        const last = await agentNamed(session.agent).readLastTurn(file);
         if (last?.speaker === "agent") turn = { at: last.at, text: last.text };
       } catch {
         // An unreadable transcript is a missing signal, never a failed build.
@@ -219,7 +218,7 @@ export async function collectPanelData(
   quietPath?: string,
 ): Promise<PanelData> {
   const config = await loadConfig(env);
-  const transcripts = await defaultAgent().collectTranscripts(env);
+  const transcripts = await collectAllTranscripts(env);
   const projects: CollectedProject[] = [];
   const inbox: ViewInboxRow[] = [];
   for (const entry of entries) {

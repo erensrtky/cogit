@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { access, realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { promisify } from "node:util";
-import { type AgentAdapter, defaultAgent } from "./agents/index.js";
+import { AGENTS, type AgentAdapter, agentOfTranscript, findSession } from "./agents/index.js";
 import { findGitRoot } from "./git.js";
 import { messageHash } from "./messages.js";
 import type { Session } from "./schema/session.js";
@@ -156,10 +156,13 @@ export async function addThoughtTrailer(opts: TrailerOptions): Promise<boolean> 
   if (captureDisabled(env)) return false;
   if (opts.source === "merge" || opts.source === "squash") return false;
   if (await replayingCommits(opts.dir, env)) return false;
-  const agent = defaultAgent();
-
-  const named = (env[agent.commitSessionEnv] ?? "").trim();
-  if (named !== "") {
+  // The agent running the commit names its session in its own variable.
+  const naming = Object.values(AGENTS).find(
+    (agent) => (env[agent.commitSessionEnv] ?? "").trim() !== "",
+  );
+  if (naming !== undefined) {
+    const agent = naming;
+    const named = (env[agent.commitSessionEnv] ?? "").trim();
     const transcript = await agent.findTranscript(named, env);
     if (transcript === null) return false;
     // A session working in another repository (a library next to its project)
@@ -187,10 +190,10 @@ export async function addThoughtTrailer(opts: TrailerOptions): Promise<boolean> 
   const transcript =
     head.transcriptPath !== undefined && (await readable(head.transcriptPath))
       ? head.transcriptPath
-      : await agent.findTranscript(head.sessionId, env);
+      : ((await findSession(head.sessionId, env))?.file ?? null);
   if (transcript === null) return false;
 
-  const value = await newestThought(agent, transcript, head.sessionId);
+  const value = await newestThought(agentOfTranscript(transcript, env), transcript, head.sessionId);
   if (value === undefined) return false;
   await writeTrailer(opts.messageFile, value);
   return true;

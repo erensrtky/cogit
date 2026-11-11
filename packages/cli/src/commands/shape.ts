@@ -1,3 +1,4 @@
+import { agentNamed } from "../agents/index.js";
 import {
   findGitRoot,
   readCommitChanges,
@@ -23,7 +24,6 @@ import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadConfig, loadProject, loadSession } from "../store/stores.js";
 import { attachThoughtTrailers, readCommitThought, readThoughtTrailers } from "../thought.js";
-import { resultText, runClaude } from "./backfill.js";
 import { sessionWrite } from "./session.js";
 
 /**
@@ -309,11 +309,14 @@ async function shapeNode(
     diffTruncated: patches.truncated,
     language: config.language,
   });
-  const stdout = await runClaude(prompt, config.sideModel, io.env, undefined, {
+  const agent = agentNamed(
+    sessionId === undefined ? undefined : await sessionAgent(root, sessionId),
+  );
+  const text = await agent.run(prompt, config.sideModel, io.env, undefined, {
     root,
     kind: "shape",
   });
-  const answer = parseShapeAnswer(resultText(stdout)) ?? { tools: [], commits: [] };
+  const answer = parseShapeAnswer(text) ?? { tools: [], commits: [] };
   if (sessionId === undefined) {
     io.out(JSON.stringify({ tools: validateShapeTools(answer.tools) }, null, 2));
     return true;
@@ -337,4 +340,10 @@ async function shapeNode(
     async () => JSON.stringify(payload),
   );
   return true;
+}
+
+/** The agent a recorded session ran on; undefined when its record cannot be read. */
+async function sessionAgent(root: string, sessionId: string): Promise<string | undefined> {
+  const loaded = await loadSession(root, sessionId);
+  return loaded.found && loaded.ok ? loaded.data.agent : undefined;
 }

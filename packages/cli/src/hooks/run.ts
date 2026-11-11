@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type AgentAdapter, defaultAgent, type HookInput } from "../agents/index.js";
+import { AGENTS, type AgentAdapter, defaultAgent, type HookInput } from "../agents/index.js";
 import type { SessionLineage } from "../agents/types.js";
 import { Slug } from "../schema/common.js";
 import { captureDisabled, projectPaths } from "../store/paths.js";
@@ -52,6 +52,8 @@ export interface HookDeps {
   runAndWait?: (cli: string, args: string[], env: NodeJS.ProcessEnv, log?: string) => Promise<void>;
   /** Stands in for the agent's process-tree read; tests fix the answer. */
   sessionLineage?: () => SessionLineage | undefined;
+  /** The agent the plugin's hook names (`cogit hook <event> --agent <name>`); Claude Code when absent. */
+  agent?: string | undefined;
 }
 
 /** Where each session's process-tree answer is kept for its later hooks. */
@@ -226,7 +228,11 @@ export async function runHook(
     if (captureDisabled(env)) return undefined;
     const handler = HANDLERS[event];
     if (!handler) return undefined;
-    const agent = defaultAgent();
+    const agent = deps.agent === undefined ? defaultAgent() : AGENTS[deps.agent];
+    if (agent === undefined) {
+      debug(`cogit ${event} hook: unknown agent ${deps.agent}`);
+      return undefined;
+    }
     const input = agent.parseHookInput(stdin);
     if (input === undefined) {
       debug(`cogit ${event} hook: unreadable hook input`);

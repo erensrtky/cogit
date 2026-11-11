@@ -1,6 +1,6 @@
 import { readFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
-import { defaultAgent } from "../agents/index.js";
+import { defaultAgent, findSession } from "../agents/index.js";
 import { type Author, sameAuthor, sessionIdentity, stampedIdentity } from "../author.js";
 
 export { sessionAuthor } from "../author.js";
@@ -314,10 +314,9 @@ export async function forkParent(
   sessionId: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<string | null> {
-  const agent = defaultAgent();
-  const file = await agent.findTranscript(sessionId, env);
-  if (!file) return null;
-  const origin = await agent.readForkOrigin(file).catch(() => null);
+  const found = await findSession(sessionId, env);
+  if (!found) return null;
+  const origin = await found.agent.readForkOrigin(found.file).catch(() => null);
   return origin ? `${origin.sessionId}:${messageHash(origin.sessionId, origin.last)}` : null;
 }
 
@@ -507,8 +506,8 @@ export async function sessionShow(
   view.sideRecorded = sideRecorded(effective, labels, await agentWroteAt(root, sessionId));
   // A format change would otherwise look like "nothing written yet" forever.
   if (messages && messages.length === 0) {
-    const file = await agent.findTranscript(sessionId, io.env);
-    const userLines = file ? await agent.countUserLines(file).catch(() => 0) : 0;
+    const found = await findSession(sessionId, io.env);
+    const userLines = found ? await found.agent.countUserLines(found.file).catch(() => 0) : 0;
     if (userLines > 0)
       view.transcriptWarning =
         `the transcript has ${userLines} user line(s) but none read as a message; ` +
@@ -756,8 +755,8 @@ async function parentCandidates(
   io: Io,
 ): Promise<Record<string, unknown>> {
   const sessions = await candidateSessions(root, sessionId, io.env);
-  const file = await agent.findTranscript(sessionId, io.env);
-  const handoff = file ? await agent.readsHandoff(file).catch(() => false) : false;
+  const found = await findSession(sessionId, io.env);
+  const handoff = found ? await found.agent.readsHandoff(found.file).catch(() => false) : false;
   return {
     forMessage: { id: first.hash, label: first.label },
     ...(handoff ? { continuesHint: true } : {}),

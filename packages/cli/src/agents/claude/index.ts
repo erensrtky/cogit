@@ -7,6 +7,7 @@ import {
   sessionLineage,
   userNotice,
 } from "./hooks.js";
+import { run } from "./run.js";
 import {
   allowSkill,
   CLAUDE_DEFAULT_RETENTION,
@@ -42,8 +43,7 @@ import {
 
 /**
  * Claude Code: transcripts under `~/.claude/projects`, hooks whose payload
- * arrives on stdin, and the `cogit:record` plugin skill. The only adapter today;
- * adding another agent means adding a sibling folder, not touching callers.
+ * arrives on stdin, and the `cogit:record` plugin skill.
  */
 export const claude: AgentAdapter = {
   name: DEFAULT_AGENT,
@@ -89,4 +89,5 @@ export const claude: AgentAdapter = {
   writeProjectSetup,
   refreshProjectSetup,
   markLive,
+  run,
 };

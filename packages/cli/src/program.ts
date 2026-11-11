@@ -699,9 +699,10 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
     .argument("<event>", "hook event, e.g. stop, sessionstart, pre-commit")
     .argument("[args...]", "arguments git passed to its hook: $1, $2, …")
     .option("-C, --dir <dir>", "project directory (git hooks pass theirs)")
+    .option("--agent <name>", "the agent whose plugin runs the hook (default: claude-code)")
     .allowExcessArguments(true)
     .addHelpText("after", examples("cogit hook stop", "cogit hook pre-push --dir ../my-app"))
-    .action(async (event: string, args: string[], opts: { dir?: string }) => {
+    .action(async (event: string, args: string[], opts: { dir?: string; agent?: string }) => {
       const io = makeIo(false);
       // A block a past version left in a hook it has since retired: quiet until refreshed.
       if (event === "pre-commit") return;
@@ -725,7 +726,7 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
         return;
       }
       const input = await (deps.stdin ?? readStdin)();
-      const out = await runHook(event, input, io.env, io.now(), io.warn);
+      const out = await runHook(event, input, io.env, io.now(), io.warn, { agent: opts.agent });
       if (out !== undefined) io.out(out);
     });
 

@@ -1,7 +1,12 @@
 import { readdir, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import pkg from "../../package.json" with { type: "json" };
-import { type ChatTurn, defaultAgent } from "../agents/index.js";
+import {
+  agentNamed,
+  agentOfTranscript,
+  type ChatTurn,
+  collectAllTranscripts,
+} from "../agents/index.js";
 import { sessionIdentity } from "../author.js";
 import {
   type CommitChange,
@@ -150,13 +155,13 @@ async function readTranscriptViews(
   root: string,
   io: Io,
 ): Promise<TranscriptViews> {
-  const agent = defaultAgent();
   const chats = new Map<string, ViewChatTurn[]>();
   const pending = new Map<string, ViewPendingMessage[]>();
   const prepared: Session[] = [];
   const unrecorded = new Map<string, number>();
   for (const session of sessions) {
     const file = transcripts.get(session.sessionId);
+    const agent = file ? agentOfTranscript(file, io.env) : agentNamed(session.agent);
     const recordsMessages = session.nodes.some((node) => node.kind === "message");
     const roots = [session.worktree?.path, root].filter((r): r is string => Boolean(r));
     let stored = await readConversationStore(root, session.sessionId);
@@ -329,7 +334,7 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
     paths.lock("build"),
     async () => {
       const recorded = await loadAllSessions(root, io.warn);
-      const transcripts = await defaultAgent().collectTranscripts(io.env);
+      const transcripts = await collectAllTranscripts(io.env);
       const sessions = [...recorded, ...(await unrecordedSessions(root, recorded, transcripts))];
       const views = await readTranscriptViews(sessions, transcripts, root, io);
       // The `Thought:` trailers git holds (Story 9.4) attach commits to the

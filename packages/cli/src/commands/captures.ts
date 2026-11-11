@@ -166,6 +166,7 @@ async function distillOne(
   }
   const result = await distillSessionInput(root, input, {
     io: opts.io,
+    agent: entry.session.agent,
     ...(opts.dryRun === undefined ? {} : { dryRun: opts.dryRun }),
     ...(opts.now === undefined ? {} : { now: opts.now }),
   });

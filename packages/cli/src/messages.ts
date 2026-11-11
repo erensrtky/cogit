@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { type ChatTurn, defaultAgent } from "./agents/index.js";
+import { type ChatTurn, findSession } from "./agents/index.js";
 import type { LineageNode, Session } from "./schema/session.js";
 import { readConversationStore } from "./store/conversations.js";
 
@@ -63,11 +63,10 @@ export async function readSessionMessages(
   sessionId: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<SessionMessage[] | null> {
-  const agent = defaultAgent();
-  const file = await agent.findTranscript(sessionId, env);
-  if (file) {
+  const found = await findSession(sessionId, env);
+  if (found) {
     try {
-      const turns = await agent.readConversation(file);
+      const turns = await found.agent.readConversation(found.file);
       if (turns.length > 0) return hashTurns(sessionId, turns);
       const stored = await readConversationStore(root, sessionId);
       if (stored.length > 0) return storedMessages(sessionId, stored);

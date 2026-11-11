@@ -202,4 +202,29 @@ export interface AgentAdapter {
   refreshProjectSetup(root: string): Promise<string | undefined>;
   /** Records that this session started with the plugin loaded; the guard looks for it. */
   markLive(sessionId: string): Promise<void>;
+  /**
+   * Runs the agent once, headless and leaving no session behind, with the
+   * prompt on stdin, and resolves with its answer text. With `resume` the run
+   * reads that session's whole conversation first; with `spend` its cost is
+   * noted for the project. A missing agent, a failed run or a timeout rejects.
+   */
+  run(
+    prompt: string,
+    model: string,
+    env: NodeJS.ProcessEnv,
+    resume?: RunResume,
+    spend?: RunSpend,
+  ): Promise<string>;
+}
+
+/** The session a headless run reads before answering, and where it ran. */
+export interface RunResume {
+  sessionId: string;
+  cwd: string;
+}
+
+/** Where a headless run's cost is noted, and as what kind of pass. */
+export interface RunSpend {
+  root: string;
+  kind: string;
 }

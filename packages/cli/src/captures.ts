@@ -1,4 +1,5 @@
-import { agentRecord, resultText, runClaude } from "./commands/backfill.js";
+import { agentNamed } from "./agents/index.js";
+import { agentRecord } from "./commands/backfill.js";
 import { buildProject } from "./commands/build.js";
 import type { Io } from "./io.js";
 import type { Session } from "./schema/session.js";
@@ -148,6 +149,8 @@ export interface DistillOptions {
   dryRun?: boolean | undefined;
   /** Stamp for the store; tests pin it. */
   now?: string | undefined;
+  /** The agent the session ran on, which runs the pass; the default when unknown. */
+  agent?: string | undefined;
 }
 
 /** The input a recorded session gives the pass. */
@@ -179,12 +182,10 @@ export async function distillSessionInput(
     .map((item): ExistingCapture => ({ id: item.id, text: item.text }));
   const prompt = distillPrompt(input, existing, config.language);
   const answer = parseDistillAnswer(
-    resultText(
-      await runClaude(prompt, config.sideModel, opts.io.env, undefined, {
-        root,
-        kind: "captures",
-      }),
-    ),
+    await agentNamed(opts.agent).run(prompt, config.sideModel, opts.io.env, undefined, {
+      root,
+      kind: "captures",
+    }),
   );
   const items = answer.items;
   const known = new Set(existing.map((item) => item.id));
@@ -226,7 +227,7 @@ export async function distillAtClose(
   try {
     result = await withLock(
       projectPaths(root).lock(`captures-${record.sessionId}`),
-      () => distillSessionInput(root, input, { io }),
+      () => distillSessionInput(root, input, { io, agent: record.agent }),
       { timeoutMs: 0 },
     );
   } catch (err) {

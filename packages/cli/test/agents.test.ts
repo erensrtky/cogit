@@ -1,7 +1,18 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { isClaudeProcess, sessionLineage } from "../src/agents/claude/hooks.js";
-import { AGENTS, defaultAgent } from "../src/agents/index.js";
+import {
+  AGENTS,
+  agentNamed,
+  agentOfTranscript,
+  collectAllTranscripts,
+  defaultAgent,
+  findSession,
+} from "../src/agents/index.js";
+import { runHook } from "../src/hooks/run.js";
 import type { ProcessInfo } from "../src/push-command.js";
+import { T0, tempDir } from "./helpers.js";
 
 /**
  * The adapter is the only place that knows which agent cogit records. These
@@ -81,5 +92,55 @@ describe("agent adapter", () => {
       `process tree on ${process.platform}: ${JSON.stringify(answer)} in ${Date.now() - began} ms`,
     );
     expect(answer === undefined || typeof answer.own === "number").toBe(true);
+  });
+});
+
+/**
+ * Each session is read by the agent it ran on (Story 16.1): its record names
+ * it, and its transcript sits in that agent's own directory.
+ */
+describe("agent per session", () => {
+  async function claudeHome(): Promise<NodeJS.ProcessEnv> {
+    const dir = await tempDir();
+    const env = { CLAUDE_CONFIG_DIR: join(dir, "claude") };
+    await mkdir(join(dir, "claude", "projects", "proj"), { recursive: true });
+    await writeFile(join(dir, "claude", "projects", "proj", "s1.jsonl"), "{}\n");
+    return env;
+  }
+
+  it("takes the agent a record names, and the default for none or an unknown name", () => {
+    expect(agentNamed("claude-code")).toBe(AGENTS["claude-code"]);
+    expect(agentNamed(undefined)).toBe(defaultAgent());
+    expect(agentNamed("no-such-agent")).toBe(defaultAgent());
+  });
+
+  it("finds a session's transcript with the agent that wrote it", async () => {
+    const env = await claudeHome();
+    const found = await findSession("s1", env);
+    expect(found?.agent).toBe(AGENTS["claude-code"]);
+    expect(found?.file).toBe(join(env.CLAUDE_CONFIG_DIR ?? "", "projects", "proj", "s1.jsonl"));
+    expect(await findSession("s2", env)).toBeNull();
+    expect([...(await collectAllTranscripts(env)).keys()]).toEqual(["s1"]);
+  });
+
+  it("names the agent whose directory holds a transcript", async () => {
+    const env = await claudeHome();
+    const file = join(env.CLAUDE_CONFIG_DIR ?? "", "projects", "proj", "s1.jsonl");
+    expect(agentOfTranscript(file, env)).toBe(AGENTS["claude-code"]);
+    expect(agentOfTranscript("/elsewhere/s1.jsonl", env)).toBe(defaultAgent());
+  });
+
+  it("leaves a hook alone when the plugin names an agent cogit does not know", async () => {
+    const debug: string[] = [];
+    const out = await runHook(
+      "stop",
+      JSON.stringify({ session_id: "s1", cwd: "/p" }),
+      {},
+      T0,
+      (line) => debug.push(line),
+      { agent: "no-such-agent" },
+    );
+    expect(out).toBeUndefined();
+    expect(debug).toEqual(["cogit stop hook: unknown agent no-such-agent"]);
   });
 });
