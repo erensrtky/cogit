@@ -36,6 +36,8 @@ export interface HookContext {
   now: string;
   /** Starts the detached catch-up (`node <cli> <args>`); never waited for. */
   spawnDetached: (args: string[]) => void;
+  /** Runs `node <cli> <args>` and waits for it, up to `RUN_AND_WAIT_LIMIT_MS`. */
+  runAndWait: (args: string[]) => Promise<void>;
 }
 
 export type HookOutput = Record<string, unknown>;
@@ -46,6 +48,8 @@ export interface HookDeps {
   cli?: string;
   /** Starts the detached process; tests observe instead of spawning. */
   spawnDetached?: (cli: string, args: string[], env: NodeJS.ProcessEnv, log?: string) => void;
+  /** Runs a child and waits for it; tests observe instead of running. */
+  runAndWait?: (cli: string, args: string[], env: NodeJS.ProcessEnv, log?: string) => Promise<void>;
   /** Stands in for the agent's process-tree check; tests fix the answer. */
   startedInsideSession?: () => boolean | undefined;
 }
@@ -134,6 +138,41 @@ function openLog(log: string, args: string[]): number | undefined {
 }
 
 /**
+ * How long a hook waits for a child it runs in the foreground. The plugin gives
+ * the Stop hook ten minutes; this leaves room to return before that.
+ */
+export const RUN_AND_WAIT_LIMIT_MS = 9 * 60_000;
+
+/**
+ * Runs `node <cli> <args>` with capture disabled, like the detached child, but
+ * waits for it to end (or for `limit`, then stops it). Its output goes to `log`.
+ */
+export function runAndWaitProcess(
+  cli: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  log?: string,
+  limit = RUN_AND_WAIT_LIMIT_MS,
+): Promise<void> {
+  const fd = log === undefined ? undefined : openLog(log, args);
+  const out = fd ?? "ignore";
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      if (fd !== undefined) closeSync(fd);
+      resolve();
+    };
+    const child = spawn(process.execPath, [cli, ...args], {
+      stdio: ["ignore", out, out],
+      env: { ...env, COGIT_DISABLE: "1" },
+    });
+    const timer = setTimeout(() => child.kill(), limit);
+    child.on("exit", done);
+    child.on("error", done);
+  });
+}
+
+/**
  * Starts `node <cli> <args>` detached, with capture disabled in the child so it
  * cannot fire these hooks again. The hook returns at once. With `log`, the
  * child's stdout and stderr are appended there; a failed side run is otherwise
@@ -216,6 +255,8 @@ export async function runHook(
       env,
       now,
       spawnDetached: startCatchUp,
+      runAndWait: (args: string[]) =>
+        (deps.runAndWait ?? runAndWaitProcess)(cli, args, env, projectPaths(root).detachedLog),
     });
     return out === undefined ? undefined : JSON.stringify(out);
   } catch (err) {

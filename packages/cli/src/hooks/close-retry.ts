@@ -31,10 +31,10 @@ export const CLOSE_RETRY_BATCH = 3;
  * Closing one that is in fact still open is harmless: its own session end runs
  * the pass again and rewrites what this one wrote.
  *
- * A session can also be cut off before its record exists at all: a sandbox, a
- * container or a loop script that ends right after `claude -p` takes the
- * detached pass with it. Its hook state and transcript stay on disk, so the
- * next session in the project (in a loop, the next turn) closes it the same way.
+ * Every closing pass marks the session `closePending` first and clears it when
+ * it finishes, so a pass that was cut off (a sandbox, a container or a loop
+ * script that ends right after `claude -p`, a machine shut down) leaves the
+ * mark. A later session closes every marked one, however long ago it ran.
  */
 export async function retryUnclosed(ctx: HookContext): Promise<void> {
   const config = await loadConfig(ctx.env);
@@ -45,8 +45,8 @@ export async function retryUnclosed(ctx: HookContext): Promise<void> {
     .filter((session) => session.sessionId !== ctx.sessionId && unclosed(session, now))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .map((session) => session.sessionId);
-  const recorded = new Set(sessions.map((session) => session.sessionId));
-  const candidates = [...unclosedIds, ...(await cutOff(ctx, recorded))];
+  const pending = await markedPending(ctx);
+  const candidates = [...new Set([...pending, ...unclosedIds])];
   let started = 0;
   for (const id of candidates) {
     if (started >= CLOSE_RETRY_BATCH) break;
@@ -56,9 +56,6 @@ export async function retryUnclosed(ctx: HookContext): Promise<void> {
       ? statSync(transcript, { throwIfNoEntry: false })?.mtimeMs
       : undefined;
     if (written !== undefined && now - written < CLOSE_RETRY_IDLE_MS) continue;
-    // A cut-off session has no record to date it; its transcript does.
-    if (!recorded.has(id) && (written === undefined || now - written > CLOSE_RETRY_WINDOW_MS))
-      continue;
     let allowed = false;
     await updateState(ctx.root, id, (cur) => {
       const tries = cur?.closeRetries ?? 0;
@@ -67,26 +64,37 @@ export async function retryUnclosed(ctx: HookContext): Promise<void> {
       return { ...(cur ?? emptyState()), closeRetries: tries + 1 };
     });
     if (!allowed) continue;
+    await markClosePending(ctx.root, id, ctx.now);
     ctx.spawnDetached(["backfill", id, "--tail", "--close", "-C", ctx.root]);
     started += 1;
   }
 }
 
-/**
- * Sessions the hooks took in that never got a record: a hook state with a turn
- * and no record seen yet. A session that had a record once (removed since, as
- * by `cogit prune`) has seen one, so it is not brought back.
- */
-async function cutOff(ctx: HookContext, recorded: ReadonlySet<string>): Promise<string[]> {
+/** Sessions whose closing pass started and never finished, oldest mark first. */
+async function markedPending(ctx: HookContext): Promise<string[]> {
   const ids = await listSessionIds(dirname(projectPaths(ctx.root).state("x")));
-  const found: string[] = [];
+  const marked: { id: string; at: string }[] = [];
   for (const id of ids) {
-    if (id === ctx.sessionId || recorded.has(id) || !Slug.safeParse(id).success) continue;
+    if (id === ctx.sessionId || !Slug.safeParse(id).success) continue;
     const state = await loadState(ctx.root, id);
-    if (state.found && state.ok && state.data.turns > 0 && state.data.recordUpdatedAt === null)
-      found.push(id);
+    const at = state.found && state.ok ? state.data.closePending : undefined;
+    if (at) marked.push({ id, at });
   }
-  return found;
+  return marked.sort((a, b) => a.at.localeCompare(b.at)).map((entry) => entry.id);
+}
+
+/** Marks a closing pass as started; `markClosed` clears it when it finishes. */
+export async function markClosePending(root: string, id: string, at: string): Promise<void> {
+  await updateState(root, id, (cur) => ({ ...(cur ?? emptyState()), closePending: at }));
+}
+
+/** Clears the mark: the session's closing pass finished. */
+export async function markClosed(root: string, id: string, at: string): Promise<void> {
+  await updateState(root, id, (cur) => ({
+    ...(cur ?? emptyState()),
+    closePending: null,
+    closedAt: at,
+  }));
 }
 
 /** Recorded messages, no `leftOff`, idle long enough and recent enough. */

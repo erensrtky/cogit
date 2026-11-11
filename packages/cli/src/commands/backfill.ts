@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { type ChatTurn, defaultAgent } from "../agents/index.js";
+import { markClosed } from "../hooks/close-retry.js";
 import { CliError, type Io } from "../io.js";
 import { hashTurns, isRecorded, type SessionMessage, upgradeSessionIds } from "../messages.js";
 import { LineageNodeInput, type Session, Status } from "../schema/session.js";
@@ -437,6 +438,17 @@ function ownedFields(node: unknown, soleOwner: boolean): { node: unknown; remove
   return branch === undefined ? { node, removed: 0 } : { node: rest, removed: 1 };
 }
 
+/** Closes the session, then clears the mark its hook set before the pass (close-retry.ts). */
+async function closeAndMark(
+  root: string,
+  sessionId: string,
+  io: Io,
+  opts: { review?: boolean },
+): Promise<void> {
+  await closeSession(root, sessionId, io, opts);
+  await markClosed(root, sessionId, new Date().toISOString());
+}
+
 export async function backfillTail(
   dir: string,
   sessionId: string,
@@ -463,7 +475,7 @@ export async function backfillTail(
   }
   if (turns.length === 0) {
     io.out(`session ${sessionId} has nothing left to record`);
-    if (opts.close === true) await closeSession(root, sessionId, io, close);
+    if (opts.close === true) await closeAndMark(root, sessionId, io, close);
     return;
   }
 
@@ -493,7 +505,7 @@ export async function backfillTail(
     JSON.stringify({ ...payload, sessionId }),
   );
   // At the session end the closing pass reads the whole session once it is all recorded.
-  if (opts.close === true) await closeSession(root, sessionId, io, close);
+  if (opts.close === true) await closeAndMark(root, sessionId, io, close);
   // The session end wrote the last messages after the last code commit; auto
   // mode commits exactly those record files now (Story 9.3).
 }

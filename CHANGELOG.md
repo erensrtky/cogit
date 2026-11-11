@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- A headless session cut off before cogit wrote its record (a sandbox, container or loop script that ends right after `claude -p` takes the background recorder with it) is now finished by a later session in the project, once it has been idle ten minutes; in a loop, a later turn. Before, such a session was never recorded. A new guide page, [Loops, sandboxes and agent factories](docs/guide/loops-and-sandboxes.md), covers what these setups need and the one case cogit cannot cover.
+- A headless session's record is now finished before `claude -p` returns: cogit records and closes it when the agent ends its answer, while Claude Code waits, so a loop, sandbox or container that ends right after `claude -p` no longer takes the recording with it. Before, such a session was never recorded. A run stopped mid-recording (killed, machine shut down) leaves the session marked, and the next session in the project finishes it, however much later. Chats you type into are unchanged. A new guide page, [Loops, sandboxes and agent factories](docs/guide/loops-and-sandboxes.md), covers what these setups need and the one case cogit cannot cover.
 - When the settings file holds one value this version cannot read, such as a choice a newer version added, cogit keeps every other setting and puts only that one back to its default. Before, it ignored all your settings at once.
 
 ## [1.4.1] - 2026-11-11

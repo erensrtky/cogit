@@ -9,9 +9,11 @@ import { configHintOff, configHintOn, configSet } from "../src/commands/config.j
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
 import { hookBlock } from "../src/git-hooks.js";
+import { markClosed } from "../src/hooks/close-retry.js";
 import {
   insideCacheDir,
   rememberedInside,
+  runAndWaitProcess,
   runHook,
   spawnDetachedProcess,
 } from "../src/hooks/run.js";
@@ -127,6 +129,8 @@ describe("runHook", () => {
 
   // What the process tree would say: started from inside another session or not.
   let inside: boolean | undefined;
+  // What a hook ran in the foreground and waited for.
+  let waited: string[][];
 
   const stop = (extra: Record<string, unknown> = {}, e = env) =>
     runHook(
@@ -138,6 +142,9 @@ describe("runHook", () => {
       {
         cli: "/plugin/dist/cli.js",
         spawnDetached: (cli, args) => spawned.push([cli, ...args]),
+        runAndWait: async (cli, args) => {
+          waited.push([cli, ...args]);
+        },
         startedInsideSession: () => inside,
       },
     );
@@ -173,6 +180,7 @@ describe("runHook", () => {
     env = envFor(dir);
     debug = [];
     spawned = [];
+    waited = [];
     inside = false;
   });
 
@@ -632,6 +640,50 @@ describe("runHook", () => {
     expect(spawned).toEqual([
       ["/plugin/dist/cli.js", "backfill", "s1", "--tail", "--close", "-C", root],
     ]);
+  });
+
+  it("closes a headless session at its Stop, waiting, and not again at its end", async () => {
+    await initialized(2);
+    await configSet("recorder", "mixed", fakeIo(env));
+    await transcript([typed("first", 1)]);
+    const headless = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli" };
+    expect(await stop({}, headless)).toBeUndefined();
+    expect(waited).toEqual([
+      ["/plugin/dist/cli.js", "backfill", "s1", "--tail", "--close", "--review", "-C", root],
+    ]);
+    // Marked before the pass; the pass itself clears the mark.
+    const state = () => readFile(projectPaths(root).state("s1"), "utf8").then(JSON.parse);
+    expect((await state()).closePending).toBe(T0);
+    expect(spawned.filter((args) => args[1] === "backfill")).toEqual([]);
+    // Cut off: the session end still starts the pass.
+    expect(await sessionEnd(headless)).toBeUndefined();
+    expect(spawned.filter((args) => args[1] === "backfill")).toHaveLength(1);
+    // Finished: nothing more at the session end.
+    spawned = [];
+    await markClosed(root, "s1", T0);
+    expect(await sessionEnd(headless)).toBeUndefined();
+    expect(spawned).toEqual([]);
+    // A chat someone types into is never held up.
+    waited = [];
+    await stop();
+    expect(waited).toEqual([]);
+  });
+
+  it("runs a foreground child to its end, and stops one that overruns", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "cogit-wait-"));
+    const script = join(dir, "child.mjs");
+    await writeFile(script, 'console.log("done");\n');
+    const log = join(dir, "state", "detached.log");
+    await runAndWaitProcess(script, ["close"], env, log);
+    expect(await readFile(log, "utf8")).toMatch(/close\ndone\n$/);
+    const slow = join(dir, "slow.mjs");
+    await writeFile(slow, "setTimeout(() => {}, 60000);\n");
+    const began = Date.now();
+    await runAndWaitProcess(slow, [], env, undefined, 200);
+    expect(Date.now() - began).toBeLessThan(10_000);
+    // A program that cannot start still returns.
+    await runAndWaitProcess(join(dir, "missing.mjs"), [], { ...env, PATH: "" }, undefined, 2000);
+    await rm(dir, { recursive: true, force: true });
   });
 
   it("does not spawn at session end when the catch-up is off", async () => {

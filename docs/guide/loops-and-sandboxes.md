@@ -31,37 +31,36 @@ On Windows, Auto does not read the process list (asking for it took more than th
 too long for a hook). There, a script's sessions are recorded when the script starts them with
 `COGIT_RECORD=1`, or with **All**.
 
-## What the record needs from your setup
+## When the record is written
 
-cogit writes most of a headless session's record after the session ends, in the background: a
-small model reads the conversation and records it, which usually takes a minute or two. Two
-directories must still be there when it runs:
+A headless session's record is finished before `claude -p` returns. When the agent ends its
+answer, cogit records the session and closes it (its threads, branch summaries and where it left
+off) while Claude Code waits, so a loop, a sandbox or a container can end the moment `claude -p`
+returns and the record is already there. This adds the recording time to each run, usually under
+a minute. Chats you type into are not held up: their record is written in the background after
+they end.
+
+Two directories must be on disk that the run can write to:
 
 - the project's `.cogit/` directory, where the record goes;
 - Claude Code's own directory (`~/.claude`, or `CLAUDE_CONFIG_DIR`), where the transcript is.
 
 Most sandboxes keep both, since Claude Code needs its directory to log in at all.
 
-That background run uses the session's own environment. A loop that runs Claude Code on another
+The recording uses the session's own environment. A loop that runs Claude Code on another
 provider records with that provider's model for the name cogit asks for (`sideModel`, `haiku` by
 default), so check that the provider maps it. Each session's record costs one small-model call;
 a loop runs many sessions.
 
-## When the environment ends first
+## When a run is cut off
 
-If the sandbox, the container or the script ends right after `claude -p` returns, it can take the
-background run with it. Some examples:
-
-- bubblewrap with `--unshare-pid` ends every process inside the sandbox when the sandbox closes;
-- stopping a container stops every process in it;
-- a job runner that kills the whole process group when a step ends.
-
-Nothing is lost. The session's hook state and its transcript stay on disk, and a later session in
-the project finishes the record: the first one that starts after the cut-off session has been
-idle for ten minutes (so a session still open in another terminal is never closed early). In a
-loop that is a later turn; the last turn's record is finished by the next session you open in
-the project, within three days. You do not need to configure anything. Each session start
-finishes up to three such sessions, and tries each one at most twice.
+If the run is stopped while cogit is still recording (the process is killed, the machine shuts
+down), nothing is lost. Before it starts, cogit marks the session as waiting for its record, and
+it clears the mark when the record is finished. The transcript stays on disk, so the next session
+in the project finishes every marked session, however long ago it ran: in a loop, a later turn;
+otherwise the next session you open in the project. It waits until a marked session has been
+idle for ten minutes, so a session still open in another terminal is never closed early, and
+tries each one at most twice.
 
 To finish one by hand instead, run:
 
@@ -71,11 +70,12 @@ cogit backfill <session-id> --tail --close
 
 ## What cogit cannot cover
 
-An environment that throws away the project directory or Claude Code's directory when it ends,
-such as a CI job on a fresh machine or a container without volumes: the transcript goes with it,
-so nothing is left to finish the record from. To record there, keep both directories on storage
-that outlives the run (a volume, a cache, a mounted path); the next run then finishes what the
-previous one could not.
+An environment that throws away the project directory when it ends, such as a CI job on a fresh
+machine or a container without volumes: cogit still writes the record, but it is thrown away with
+the directory, and a run cut off there leaves no mark or transcript to finish it from. To keep
+records there, put `.cogit/` and Claude Code's directory on storage that outlives the run (a
+volume, a cache, a mounted path), or share the record with `git push` before the run ends
+(see [Teams and git](teams-and-git.md)).
 
 ## Checklist
 

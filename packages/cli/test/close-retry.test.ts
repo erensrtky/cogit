@@ -5,7 +5,7 @@ import { defaultAgent } from "../src/agents/index.js";
 import { configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
-import { CLOSE_RETRY_LIMIT, retryUnclosed } from "../src/hooks/close-retry.js";
+import { CLOSE_RETRY_LIMIT, markClosed, retryUnclosed } from "../src/hooks/close-retry.js";
 import type { HookContext } from "../src/hooks/run.js";
 import { projectPaths } from "../src/store/paths.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
@@ -39,6 +39,7 @@ function ctx(now: string, sessionId = "current"): HookContext {
     env,
     now,
     spawnDetached: (args) => spawned.push(args),
+    runAndWait: async () => {},
   };
 }
 
@@ -103,35 +104,31 @@ describe("retryUnclosed", () => {
     expect(spawned).toHaveLength(3);
   });
 
-  it("closes a session cut off before its record was written, and no other", async () => {
-    // What the hooks leave behind when a sandbox or loop script ends right after
-    // `claude -p`: a hook state with a turn, a transcript, no record.
-    const cut = async (id: string, state: Record<string, unknown> = {}, transcript = true) => {
+  it("closes every session whose closing pass was cut off, however long ago", async () => {
+    // A pass marks the session before it starts and clears the mark when it ends;
+    // a sandbox, container or loop script that ends first leaves the mark.
+    const marked = async (id: string, state: Record<string, unknown>) => {
       await mkdir(join(root, ".cogit", "state"), { recursive: true });
-      await writeFile(
-        projectPaths(root).state(id),
-        JSON.stringify({ schema: 1, turns: 1, recordUpdatedAt: null, ...state }),
-      );
-      if (!transcript) return;
-      await mkdir(join(env.CLAUDE_CONFIG_DIR ?? "", "projects", "proj"), { recursive: true });
-      const line = { type: "user", timestamp: T0, message: { content: "Go" } };
-      await writeFile(transcriptPath(id), `${JSON.stringify(line)}\n`);
-      await utimes(transcriptPath(id), at(0), at(0));
+      await writeFile(projectPaths(root).state(id), JSON.stringify({ schema: 1, ...state }));
     };
-    await cut("cut");
-    // Recorded once and removed since (cogit prune): not brought back.
-    await cut("pruned", { recordUpdatedAt: T0 });
-    await cut("empty", { turns: 0 });
-    await cut("gone", {}, false);
-    await cut("current");
+    await marked("cut", { closePending: T0 });
+    await marked("older", { closePending: later(-HOUR) });
+    await marked("done", { closePending: null, closedAt: T0 });
+    await marked("never", { turns: 3 });
+    await marked("current", { closePending: T0 });
     await writeFile(join(root, ".cogit", "state", "inbox.json"), "{}");
+    // Ten days on: still finished, the oldest mark first.
+    await retryUnclosed(ctx(later(10 * 24 * HOUR)));
+    expect(spawned).toEqual([closing("older"), closing("cut")]);
+  });
+
+  it("marks a retried session pending and clears the mark when the pass ends", async () => {
+    await recorded("s1");
     await retryUnclosed(ctx(later(HOUR)));
-    expect(spawned).toEqual([closing("cut")]);
-    // Too old to be worth a model call.
-    spawned = [];
-    await cut("stale");
-    await retryUnclosed(ctx(later(4 * 24 * HOUR), "none"));
-    expect(spawned).toEqual([]);
+    const read = async () => JSON.parse(await readFile(projectPaths(root).state("s1"), "utf8"));
+    expect((await read()).closePending).toBe(later(HOUR));
+    await markClosed(root, "s1", later(2 * HOUR));
+    expect(await read()).toMatchObject({ closePending: null, closedAt: later(2 * HOUR) });
   });
 
   it("does nothing when the session-end catch-up is off", async () => {

@@ -4,6 +4,7 @@ import { STATE_SCHEMA } from "../schema/state.js";
 import { isLockHeld } from "../store/lock.js";
 import { projectPaths } from "../store/paths.js";
 import { loadConfig, loadSession, updateState } from "../store/stores.js";
+import { markClosePending } from "./close-retry.js";
 import type { HookContext, HookOutput } from "./run.js";
 
 /** The turn-count request, naming the skill the way the agent spells it. */
@@ -114,6 +115,16 @@ export async function onStop(ctx: HookContext): Promise<HookOutput | undefined> 
     },
     { timeoutMs: 2000 },
   );
+  // A headless session (`claude -p`, a loop's turn) is closed here, waiting:
+  // whatever runs it may end the environment the moment `claude -p` returns,
+  // which would take a detached pass with it. Claude Code waits for a Stop
+  // hook, not for a SessionEnd one.
+  if (ctx.agent.isHeadless(ctx.env) && config.sessionEndCatchUp) {
+    const review = config.recorder === "mixed" ? ["--review"] : [];
+    await markClosePending(root, sessionId, ctx.now);
+    await ctx.runAndWait(["backfill", sessionId, "--tail", "--close", ...review, "-C", root]);
+    return undefined;
+  }
   // The side run records outside the chat: detached, behind the session lock,
   // and it never prints into the conversation.
   if (side) ctx.spawnDetached(["backfill", sessionId, "--tail", "-C", root]);

@@ -28,6 +28,14 @@ export const HookState = z.object({
    * the session end, never finished (machine shut down, run hung or failed).
    */
   closeRetries: z.number().int().min(0).optional(),
+  /**
+   * Set when a closing pass starts for this session, cleared when one finishes.
+   * Still set means the pass was cut off (its environment ended, the machine
+   * shut down): a later session in the project finishes it, however much later.
+   */
+  closePending: IsoDate.nullable().optional(),
+  /** When a closing pass last finished for this session. */
+  closedAt: IsoDate.nullable().optional(),
 });
 
 export type HookState = z.infer<typeof HookState>;
