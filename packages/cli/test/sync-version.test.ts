@@ -7,6 +7,8 @@ import { tempDir } from "./helpers.js";
 
 describe("sync-version", () => {
   it("copies VERSION into the npm and plugin manifests, keeping other keys", async () => {
+    // Claude Code and Codex each read their own manifest from the one plugin branch.
+    expect(TARGETS).toContain("packages/cli/.codex-plugin/plugin.json");
     const root = await tempDir();
     await writeFile(join(root, "VERSION"), "1.2.3\n");
     for (const rel of TARGETS as string[]) {
@@ -55,10 +57,11 @@ describe("sync-version", () => {
   it("never takes a manifest back below VERSION, so a bump before the release stays", async () => {
     const root = await tempDir();
     await writeFile(join(root, "VERSION"), "1.3.1\n");
-    const [ahead, behind] = TARGETS as [string, string];
+    const [ahead, behind, current] = TARGETS as [string, string, string];
     for (const [rel, version] of [
       [ahead, "1.4.0"],
       [behind, "1.2.0"],
+      [current, "1.3.1"],
     ] as const) {
       await mkdir(join(root, rel, ".."), { recursive: true });
       await writeFile(join(root, rel), JSON.stringify({ name: "x", version }));

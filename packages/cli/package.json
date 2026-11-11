@@ -28,6 +28,7 @@
   "files": [
     "dist",
     ".claude-plugin",
+    ".codex-plugin",
     "skills",
     "hooks"
   ],

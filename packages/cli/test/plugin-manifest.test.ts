@@ -1,5 +1,6 @@
 import { access, readdir, readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { codex } from "../src/agents/codex/index.js";
 
 const read = async (path: string) =>
   JSON.parse(await readFile(new URL(path, import.meta.url), "utf8")) as Record<string, unknown>;
@@ -28,7 +29,63 @@ describe("plugin packaging", () => {
     // A scoped package publishes as private unless told otherwise.
     expect(pkg.publishConfig).toEqual({ access: "public" });
     expect(pkg.files).toEqual(
-      expect.arrayContaining(["dist", ".claude-plugin", "skills", "hooks"]),
+      expect.arrayContaining(["dist", ".claude-plugin", ".codex-plugin", "skills", "hooks"]),
+    );
+  });
+
+  it("gives Codex its own manifest, pointing at its own hooks file", async () => {
+    const claude = await read("../.claude-plugin/plugin.json");
+    const codex = await read("../.codex-plugin/plugin.json");
+    expect(codex).toMatchObject({ name: claude.name, version: claude.version });
+    // Codex reads only the hooks the manifest names: Claude Code's hooks.json passes `args`,
+    // a field Codex lacks, so Codex would run a bare `node`. Paths must start with "./".
+    expect(codex.hooks).toBe("./hooks/codex.json");
+    expect(codex.skills).toBe("./skills/");
+  });
+
+  it("calls the CLI from Codex hooks in one stable line per event, naming the agent", async () => {
+    const { hooks } = (await read("../hooks/codex.json")) as {
+      hooks: Record<string, { hooks: Record<string, unknown>[] }[]>;
+    };
+    const events = {
+      SessionStart: "sessionstart",
+      UserPromptSubmit: "promptsubmit",
+      Stop: "stop",
+      SessionEnd: "sessionend",
+    };
+    expect(Object.keys(hooks).sort()).toEqual(Object.keys(events).sort());
+    for (const [event, arg] of Object.entries(events)) {
+      const [handler] = hooks[event]?.[0]?.hooks ?? [];
+      // Codex trusts a hook by a hash of its definition: the command names no version, so an
+      // update keeps the same text.
+      expect(handler).toMatchObject({
+        type: "command",
+        command: `node "$PLUGIN_ROOT/dist/cli.js" hook ${arg} --agent codex`,
+        commandWindows: `node "%PLUGIN_ROOT%\\dist\\cli.js" hook ${arg} --agent codex`,
+      });
+      expect(handler?.args).toBeUndefined();
+    }
+    // Codex caps SessionEnd at 3 s; Stop waits for headless closes like Claude's does.
+    expect(hooks.SessionEnd?.[0]?.hooks[0]?.timeout).toBeLessThanOrEqual(3);
+    expect(hooks.Stop?.[0]?.hooks[0]?.timeout).toBe(600);
+  });
+
+  it("lists the plugin for Codex from the same branch, in a source Codex reads", async () => {
+    const marketplace = await read("../../../.agents/plugins/marketplace.json");
+    // Codex skips Claude's `github` source; it looks in .agents/plugins before .claude-plugin.
+    expect(marketplace.name).toBe("cogit");
+    expect(marketplace.plugins).toEqual([
+      expect.objectContaining({
+        name: "cogit",
+        source: { source: "url", url: "https://github.com/erensrtky/cogit.git", ref: "plugin" },
+      }),
+    ]);
+  });
+
+  it("tells a Codex user the two commands that install from that marketplace", () => {
+    // Measured on Codex 0.167.1: the marketplace is added by repo, the plugin as name@marketplace.
+    expect(codex.installCommand).toBe(
+      "codex plugin marketplace add erensrtky/cogit && codex plugin add cogit@cogit",
     );
   });
 

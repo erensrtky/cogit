@@ -22,8 +22,10 @@ async function builtRepo(): Promise<string> {
     "README.md": "readme\n",
     LICENSE: "licence\n",
     "packages/cli/.claude-plugin/plugin.json": '{ "name": "cogit", "version": "1.2.3" }\n',
+    "packages/cli/.codex-plugin/plugin.json": '{ "name": "cogit", "version": "1.2.3" }\n',
     "packages/cli/dist/cli.js": "built\n",
     "packages/cli/hooks/hooks.json": "{}\n",
+    "packages/cli/hooks/codex.json": "{}\n",
     "packages/cli/skills/record/SKILL.md": "skill\n",
     "packages/cli/src/cli.ts": "source\n",
   };
@@ -50,9 +52,11 @@ describe("build-plugin-branch", () => {
     expect(first).toMatchObject({ changed: true, version: "1.2.3" });
     expect(git(root, "ls-tree", "-r", "--name-only", "plugin").split("\n")).toEqual([
       ".claude-plugin/plugin.json",
+      ".codex-plugin/plugin.json",
       "LICENSE",
       "README.md",
       "dist/cli.js",
+      "hooks/codex.json",
       "hooks/hooks.json",
       "skills/record/SKILL.md",
     ]);

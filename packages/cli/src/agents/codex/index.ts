@@ -1,3 +1,4 @@
+import { MARKETPLACE_REPO } from "../claude/settings.js";
 import type { AgentAdapter } from "../types.js";
 import {
   additionalContext,
@@ -42,8 +43,11 @@ export const codex: AgentAdapter = {
   name: "codex",
   skill: "$cogit:record",
   skillRule: "$cogit:record",
-  /** Story 16.5 checks the real command; until then, where it will be written down. */
-  installCommand: "see the cogit README, section Codex",
+  /**
+   * Codex skips Claude's `github` marketplace source and reads `.agents/plugins/marketplace.json`
+   * first, which points at the same plugin branch. The hooks then wait for trust in `/hooks`.
+   */
+  installCommand: `codex plugin marketplace add ${MARKETPLACE_REPO} && codex plugin add cogit@cogit`,
   /** Codex names no project directory for hooks; the payload's cwd is used. */
   projectDirEnv: "CODEX_PROJECT_DIR",
   pluginRootEnv: "PLUGIN_ROOT",

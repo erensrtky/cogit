@@ -1,0 +1,52 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/dist/cli.js\" hook sessionstart --agent codex",
+            "commandWindows": "node \"%PLUGIN_ROOT%\\dist\\cli.js\" hook sessionstart --agent codex",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/dist/cli.js\" hook promptsubmit --agent codex",
+            "commandWindows": "node \"%PLUGIN_ROOT%\\dist\\cli.js\" hook promptsubmit --agent codex",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/dist/cli.js\" hook stop --agent codex",
+            "commandWindows": "node \"%PLUGIN_ROOT%\\dist\\cli.js\" hook stop --agent codex",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/dist/cli.js\" hook sessionend --agent codex",
+            "commandWindows": "node \"%PLUGIN_ROOT%\\dist\\cli.js\" hook sessionend --agent codex",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

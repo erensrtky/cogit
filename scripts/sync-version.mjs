@@ -1,10 +1,14 @@
 #!/usr/bin/env node
-// VERSION is the single source (./release bumps it); npm and the plugin manifest copy it.
+// VERSION is the single source (./release bumps it); npm and both plugin manifests copy it.
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const TARGETS = ["packages/cli/package.json", "packages/cli/.claude-plugin/plugin.json"];
+export const TARGETS = [
+  "packages/cli/package.json",
+  "packages/cli/.claude-plugin/plugin.json",
+  "packages/cli/.codex-plugin/plugin.json",
+];
 
 /** Compares two x.y.z versions numerically. */
 function compare(a, b) {

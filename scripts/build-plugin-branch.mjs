@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The marketplace installs the plugin from the `plugin` branch: only what Claude Code loads,
+// Both marketplaces install the plugin from the `plugin` branch: only what Claude Code and Codex load,
 // built, with no source. main keeps dist/ out of git, so this writes the branch with git
 // plumbing (a private index, no checkout) after `npm run build`. The release Action runs it on
 // every v* tag; run it by hand to create the branch the first time.
@@ -10,7 +10,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** What the branch holds, relative to packages/cli; README and LICENSE come from the root. */
-export const PLUGIN_FILES = [".claude-plugin/plugin.json", "dist", "hooks/hooks.json", "skills"];
+export const PLUGIN_FILES = [
+  ".claude-plugin/plugin.json",
+  ".codex-plugin/plugin.json",
+  "dist",
+  "hooks/hooks.json",
+  "hooks/codex.json",
+  "skills",
+];
 export const ROOT_FILES = ["README.md", "LICENSE"];
 
 /** Copies the built plugin into `target`; throws when the build is missing. */
