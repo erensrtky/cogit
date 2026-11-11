@@ -103,6 +103,37 @@ describe("retryUnclosed", () => {
     expect(spawned).toHaveLength(3);
   });
 
+  it("closes a session cut off before its record was written, and no other", async () => {
+    // What the hooks leave behind when a sandbox or loop script ends right after
+    // `claude -p`: a hook state with a turn, a transcript, no record.
+    const cut = async (id: string, state: Record<string, unknown> = {}, transcript = true) => {
+      await mkdir(join(root, ".cogit", "state"), { recursive: true });
+      await writeFile(
+        projectPaths(root).state(id),
+        JSON.stringify({ schema: 1, turns: 1, recordUpdatedAt: null, ...state }),
+      );
+      if (!transcript) return;
+      await mkdir(join(env.CLAUDE_CONFIG_DIR ?? "", "projects", "proj"), { recursive: true });
+      const line = { type: "user", timestamp: T0, message: { content: "Go" } };
+      await writeFile(transcriptPath(id), `${JSON.stringify(line)}\n`);
+      await utimes(transcriptPath(id), at(0), at(0));
+    };
+    await cut("cut");
+    // Recorded once and removed since (cogit prune): not brought back.
+    await cut("pruned", { recordUpdatedAt: T0 });
+    await cut("empty", { turns: 0 });
+    await cut("gone", {}, false);
+    await cut("current");
+    await writeFile(join(root, ".cogit", "state", "inbox.json"), "{}");
+    await retryUnclosed(ctx(later(HOUR)));
+    expect(spawned).toEqual([closing("cut")]);
+    // Too old to be worth a model call.
+    spawned = [];
+    await cut("stale");
+    await retryUnclosed(ctx(later(4 * 24 * HOUR), "none"));
+    expect(spawned).toEqual([]);
+  });
+
   it("does nothing when the session-end catch-up is off", async () => {
     await recorded("s1");
     await configSet("sessionEndCatchUp", "false", fakeIo(env));

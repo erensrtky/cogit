@@ -148,6 +148,8 @@ cogit open .
 - [Teams and git](docs/guide/teams-and-git.md): what is shared, the trailer, the hooks
 - [Recording and cost](docs/guide/recording-and-cost.md): who writes the record, what it
   costs
+- [Loops, sandboxes and agent factories](docs/guide/loops-and-sandboxes.md): recording
+  `claude -p` loops and sandboxed runs
 - [Privacy](docs/guide/privacy.md): what is recorded and what never leaves your machine
 - [Settings](docs/guide/settings.md): every setting, explained
 - [Troubleshooting](docs/guide/troubleshooting.md)

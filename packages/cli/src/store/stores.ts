@@ -184,6 +184,9 @@ export const updateRegistry = (fn: (cur: Registry) => Registry, env?: NodeJS.Pro
 };
 
 /** Hook state is derived, so an unreadable file is replaced instead of blocking hooks. */
+export const loadState = (root: string, id: string) =>
+  load(projectPaths(root).state(id), HookState, STATE_SCHEMA);
+
 export const updateState = (
   root: string,
   id: string,
