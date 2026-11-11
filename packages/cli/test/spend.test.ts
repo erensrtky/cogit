@@ -57,9 +57,9 @@ describe("spendOf", () => {
 describe("recordSpend and readSpend", () => {
   it("adds up the runs and keeps the first one's time", async () => {
     expect(await readSpend(root)).toBeUndefined();
-    await recordSpend(root, "side", "haiku", ENVELOPE, new Date("2026-11-02T10:00:00Z"));
-    await recordSpend(root, "review", "opus", ENVELOPE, new Date("2026-11-01T10:00:00Z"));
-    await recordSpend(root, "side", "haiku", "no envelope");
+    await recordSpend(root, "side", "haiku", spendOf(ENVELOPE), new Date("2026-11-02T10:00:00Z"));
+    await recordSpend(root, "review", "opus", spendOf(ENVELOPE), new Date("2026-11-01T10:00:00Z"));
+    await recordSpend(root, "side", "haiku", spendOf("no envelope"));
     // A torn line is skipped, not fatal.
     await writeFile(projectPaths(root).spend, "{broken\n", { flag: "a" });
     const totals = await readSpend(root);
@@ -80,7 +80,7 @@ describe("recordSpend and readSpend", () => {
 
   it("never throws when the state folder cannot be written", async () => {
     await writeFile(join(root, ".cogit"), "a file, not a folder");
-    await expect(recordSpend(root, "side", "haiku", ENVELOPE)).resolves.toBeUndefined();
+    await expect(recordSpend(root, "side", "haiku", spendOf(ENVELOPE))).resolves.toBeUndefined();
   });
 });
 

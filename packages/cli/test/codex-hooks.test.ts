@@ -144,7 +144,6 @@ describe("Codex adapter", () => {
     );
     await expect(codex.allowSkill({}, "s")).rejects.toThrow("for Codex yet");
     await expect(codex.writeProjectSetup("/p")).rejects.toThrow("for Codex yet");
-    await expect(codex.run("p", "m", {})).rejects.toThrow("cannot run the recorder for Codex yet");
     await expect(codex.markLive("s")).resolves.toBeUndefined();
   });
 

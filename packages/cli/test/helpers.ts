@@ -12,14 +12,19 @@ export const T0 = "2026-10-21T10:00:00.000Z";
  * which also takes cogit's own fallback to the shim (issue #2).
  */
 export async function writeFakeClaude(bin: string, script: string): Promise<void> {
+  await writeFakeAgent("claude", bin, script);
+}
+
+/** A Node script on PATH under the agent's binary name (a `.cmd` shim on Windows). */
+export async function writeFakeAgent(name: string, bin: string, script: string): Promise<void> {
   await mkdir(bin, { recursive: true });
   if (process.platform === "win32") {
-    await writeFile(join(bin, "claude.cjs"), script);
-    await writeFile(join(bin, "claude.cmd"), `@"${process.execPath}" "%~dp0claude.cjs" %*\r\n`);
+    await writeFile(join(bin, `${name}.cjs`), script);
+    await writeFile(join(bin, `${name}.cmd`), `@"${process.execPath}" "%~dp0${name}.cjs" %*\r\n`);
     return;
   }
-  await writeFile(join(bin, "claude"), `#!/usr/bin/env node\n${script}`);
-  await chmod(join(bin, "claude"), 0o755);
+  await writeFile(join(bin, name), `#!/usr/bin/env node\n${script}`);
+  await chmod(join(bin, name), 0o755);
 }
 
 /** PATH with `bin` in front, joined the way this system joins it. */

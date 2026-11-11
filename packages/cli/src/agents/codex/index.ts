@@ -7,6 +7,7 @@ import {
   sessionLineage,
   userNotice,
 } from "./hooks.js";
+import { run } from "./run.js";
 import {
   codexHome,
   collectTranscriptIds,
@@ -33,9 +34,9 @@ const unknown = async (): Promise<undefined> => undefined;
 
 /**
  * Codex CLI: rollouts under `~/.codex/sessions`, hooks with Claude Code's
- * payload fields, and the plugin skill `$cogit:record`. Settings, setup and the
- * headless recorder run are not here yet: reads answer "unknown" and changes
- * refuse.
+ * payload fields, the plugin skill `$cogit:record`, and `codex exec` for
+ * cogit's own runs. Settings and setup are not here yet: reads answer
+ * "unknown" and changes refuse.
  */
 export const codex: AgentAdapter = {
   name: "codex",
@@ -84,5 +85,5 @@ export const codex: AgentAdapter = {
   writeProjectSetup: notYet("write project settings"),
   refreshProjectSetup: unknown,
   markLive: async () => {},
-  run: notYet("run the recorder"),
+  run,
 };

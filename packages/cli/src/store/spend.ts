@@ -5,8 +5,9 @@ import { projectPaths } from "./paths.js";
 /**
  * What cogit's own headless runs cost (the side model, the closing review,
  * Shapes, captured work), one JSON line per run in `.cogit/state/spend.jsonl`.
- * Claude Code reports it in its `--output-format json` envelope; cogit only
- * keeps it. Local to the machine and never committed.
+ * Claude Code reports cost and tokens in its `--output-format json` envelope,
+ * Codex only tokens (`usd` stays 0); cogit only keeps them. Local to the
+ * machine and never committed.
  */
 export interface SpendEntry {
   at: string;
@@ -36,7 +37,7 @@ const number = (value: unknown): number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
 
 /** The cost and tokens in a `--output-format json` envelope; undefined when it carries none. */
-export function spendOf(stdout: string): Omit<SpendEntry, "at" | "kind" | "model"> | undefined {
+export function spendOf(stdout: string): Spent | undefined {
   let envelope: unknown;
   try {
     envelope = JSON.parse(stdout);
@@ -56,15 +57,17 @@ export function spendOf(stdout: string): Omit<SpendEntry, "at" | "kind" | "model
   };
 }
 
+/** What one run spent, as the agent reported it. */
+export type Spent = Omit<SpendEntry, "at" | "kind" | "model">;
+
 /** Appends one run's spend; a run that reported none, or a failed write, is skipped. */
 export async function recordSpend(
   root: string,
   kind: string,
   model: string,
-  stdout: string,
+  spent: Spent | undefined,
   now: Date = new Date(),
 ): Promise<void> {
-  const spent = spendOf(stdout);
   if (spent === undefined) return;
   const entry: SpendEntry = { at: now.toISOString(), kind, model, ...spent };
   const file = projectPaths(root).spend;
