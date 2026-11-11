@@ -16,6 +16,7 @@ export function updateRequestText(skill: string): string {
   );
 }
 
+/** The request as Claude Code reads it. */
 export const UPDATE_REQUEST = updateRequestText(defaultAgent().skill);
 
 export interface TurnOptions {
@@ -119,7 +120,7 @@ export async function onStop(ctx: HookContext): Promise<HookOutput | undefined> 
   // whatever runs it may end the environment the moment `claude -p` returns,
   // which would take a detached pass with it. Claude Code waits for a Stop
   // hook, not for a SessionEnd one.
-  if (ctx.agent.isHeadless(ctx.env) && config.sessionEndCatchUp) {
+  if (ctx.headless && config.sessionEndCatchUp) {
     const review = config.recorder === "mixed" ? ["--review"] : [];
     await markClosePending(root, sessionId, ctx.now);
     await ctx.runAndWait(["backfill", sessionId, "--tail", "--close", ...review, "-C", root]);
@@ -129,5 +130,5 @@ export async function onStop(ctx: HookContext): Promise<HookOutput | undefined> 
   // and it never prints into the conversation.
   if (side) ctx.spawnDetached(["backfill", sessionId, "--tail", "-C", root]);
   if (!request) return undefined;
-  return ctx.agent.additionalContext("Stop", UPDATE_REQUEST);
+  return ctx.agent.additionalContext("Stop", updateRequestText(ctx.agent.skill));
 }

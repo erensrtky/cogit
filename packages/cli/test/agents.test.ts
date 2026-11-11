@@ -100,16 +100,21 @@ describe("agent adapter", () => {
  * it, and its transcript sits in that agent's own directory.
  */
 describe("agent per session", () => {
+  const CODEX_ID = "01a1ccda-328f-79b2-8b47-8e0b8167fae8";
   async function claudeHome(): Promise<NodeJS.ProcessEnv> {
     const dir = await tempDir();
-    const env = { CLAUDE_CONFIG_DIR: join(dir, "claude") };
+    const env = { CLAUDE_CONFIG_DIR: join(dir, "claude"), CODEX_HOME: join(dir, "codex") };
     await mkdir(join(dir, "claude", "projects", "proj"), { recursive: true });
     await writeFile(join(dir, "claude", "projects", "proj", "s1.jsonl"), "{}\n");
+    const day = join(dir, "codex", "sessions", "2026", "11", "12");
+    await mkdir(day, { recursive: true });
+    await writeFile(join(day, `rollout-2026-11-12T10-00-00-${CODEX_ID}.jsonl`), "{}\n");
     return env;
   }
 
   it("takes the agent a record names, and the default for none or an unknown name", () => {
     expect(agentNamed("claude-code")).toBe(AGENTS["claude-code"]);
+    expect(agentNamed("codex")).toBe(AGENTS.codex);
     expect(agentNamed(undefined)).toBe(defaultAgent());
     expect(agentNamed("no-such-agent")).toBe(defaultAgent());
   });
@@ -120,13 +125,17 @@ describe("agent per session", () => {
     expect(found?.agent).toBe(AGENTS["claude-code"]);
     expect(found?.file).toBe(join(env.CLAUDE_CONFIG_DIR ?? "", "projects", "proj", "s1.jsonl"));
     expect(await findSession("s2", env)).toBeNull();
-    expect([...(await collectAllTranscripts(env)).keys()]).toEqual(["s1"]);
+    expect((await findSession(CODEX_ID, env))?.agent).toBe(AGENTS.codex);
+    expect([...(await collectAllTranscripts(env)).keys()]).toEqual(["s1", CODEX_ID]);
   });
 
   it("names the agent whose directory holds a transcript", async () => {
     const env = await claudeHome();
     const file = join(env.CLAUDE_CONFIG_DIR ?? "", "projects", "proj", "s1.jsonl");
     expect(agentOfTranscript(file, env)).toBe(AGENTS["claude-code"]);
+    expect(agentOfTranscript(join(env.CODEX_HOME ?? "", "sessions", "x.jsonl"), env)).toBe(
+      AGENTS.codex,
+    );
     expect(agentOfTranscript("/elsewhere/s1.jsonl", env)).toBe(defaultAgent());
   });
 

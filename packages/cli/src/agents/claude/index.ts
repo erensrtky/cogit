@@ -71,7 +71,7 @@ export const claude: AgentAdapter = {
   excerpt,
 
   parseHookInput,
-  isHeadless,
+  isHeadless: async (env) => isHeadless(env),
   isHeadlessTranscript,
   sessionLineage: () => sessionLineage(),
   markChildren,

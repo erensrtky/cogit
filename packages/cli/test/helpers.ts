@@ -90,5 +90,9 @@ export function fakeIo(env: NodeJS.ProcessEnv, answers: string[] = [], strict = 
 }
 
 export function envFor(dir: string): NodeJS.ProcessEnv {
-  return { COGIT_HOME: join(dir, "home"), CLAUDE_CONFIG_DIR: join(dir, "claude") };
+  return {
+    COGIT_HOME: join(dir, "home"),
+    CLAUDE_CONFIG_DIR: join(dir, "claude"),
+    CODEX_HOME: join(dir, "codex"),
+  };
 }

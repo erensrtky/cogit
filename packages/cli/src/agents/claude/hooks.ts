@@ -1,7 +1,7 @@
 import { appendFile } from "node:fs/promises";
-import { basename } from "node:path";
 import { z } from "zod";
-import { type ReadProcess, readProcess } from "../../push-command.js";
+import type { ReadProcess } from "../../push-command.js";
+import { isClaudeProcess, walkLineage } from "../lineage.js";
 import type { HookInput, SessionLineage } from "../types.js";
 
 /**
@@ -41,21 +41,7 @@ export function isHeadless(env: NodeJS.ProcessEnv): boolean {
   return env.CLAUDE_CODE_ENTRYPOINT?.startsWith("sdk") ?? false;
 }
 
-/**
- * A Claude Code process by its arguments: the native `claude` binary (on the
- * PATH, or the versioned file it links to) or the npm package's `cli.js` under
- * Node.
- */
-export function isClaudeProcess(args: readonly string[]): boolean {
-  const first = (args[0] ?? "").replace(/\\/g, "/");
-  const name = basename(first).toLowerCase();
-  if (name === "claude" || name === "claude.exe" || first.includes("/claude/versions/"))
-    return true;
-  return (
-    /^node(\.exe)?$/.test(name) &&
-    /claude-code\/cli\.m?js$/.test((args[1] ?? "").replace(/\\/g, "/"))
-  );
-}
+export { isClaudeProcess } from "../lineage.js";
 
 /**
  * The Claude Code processes above a hook: walking up, the first is the
@@ -65,23 +51,8 @@ export function isClaudeProcess(args: readonly string[]): boolean {
  * Windows, where asking PowerShell took over three seconds on a CI runner, too
  * long for a hook.
  */
-export function sessionLineage(
-  read: ReadProcess = (pid) => readProcess(pid),
-  start: number = process.ppid,
-): SessionLineage | undefined {
-  let pid = start;
-  let own: number | undefined;
-  for (let depth = 0; depth < 64 && pid > 1; depth += 1) {
-    const info = read(pid);
-    // Unreadable later (a sandbox's own PID 1) is the top; from the start, no answer.
-    if (info === undefined) break;
-    if (isClaudeProcess(info.args)) {
-      if (own !== undefined) return { own, parent: pid };
-      own = pid;
-    }
-    pid = info.ppid;
-  }
-  return own === undefined ? undefined : { own, parent: null };
+export function sessionLineage(read?: ReadProcess, start?: number): SessionLineage | undefined {
+  return walkLineage(isClaudeProcess, isClaudeProcess, read, start);
 }
 
 /**

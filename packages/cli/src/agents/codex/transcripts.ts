@@ -322,9 +322,15 @@ export async function readSessionModel(file: string): Promise<string | undefined
   return model;
 }
 
+/** The client that started the session (`codex_exec`, `codex-tui`, …); undefined when unknown. */
+export async function readOriginator(file: string): Promise<string | undefined> {
+  const originator = (await sessionMeta(file))?.originator;
+  return typeof originator === "string" ? originator : undefined;
+}
+
 /** Whether nobody typed into this session: `codex exec` names itself as the originator. */
 export async function isHeadlessTranscript(file: string): Promise<boolean> {
-  return (await sessionMeta(file))?.originator === "codex_exec";
+  return (await readOriginator(file)) === "codex_exec";
 }
 
 /**

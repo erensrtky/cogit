@@ -30,6 +30,8 @@ export interface HookContext {
   sessionId: string;
   /** Where `.cogit/` lives: `CLAUDE_PROJECT_DIR`, else the hook's `cwd`, mapped out of a worktree. */
   root: string;
+  /** Whether nobody types into this session (`claude -p`, `codex exec`). */
+  headless: boolean;
   /** Whether `.cogit/project.json` exists; only SessionStart runs without it. */
   initialized: boolean;
   env: NodeJS.ProcessEnv;
@@ -248,7 +250,8 @@ export async function runHook(
     const lineage =
       deps.sessionLineage ??
       (() => rememberedLineage(lineageCacheDir(), input.session_id, () => agent.sessionLineage()));
-    if (agent.isHeadless(env) && !recordsHeadless(recordHeadless, env, lineage)) return undefined;
+    const headless = await agent.isHeadless(env, input);
+    if (headless && !recordsHeadless(recordHeadless, env, lineage)) return undefined;
     // What this session starts through its own commands (a `claude -p` handed a
     // task) is recorded with it.
     if (handler === onSessionStart && recordHeadless)
@@ -269,6 +272,7 @@ export async function runHook(
       input,
       sessionId: input.session_id,
       root,
+      headless,
       initialized,
       env,
       now,

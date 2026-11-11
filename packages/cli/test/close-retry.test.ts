@@ -35,6 +35,7 @@ function ctx(now: string, sessionId = "current"): HookContext {
     input: { session_id: sessionId, cwd: root, source: "startup" },
     sessionId,
     root,
+    headless: false,
     initialized: true,
     env,
     now,

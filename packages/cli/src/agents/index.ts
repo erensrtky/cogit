@@ -1,5 +1,6 @@
 import { relative, resolve, sep } from "node:path";
 import { claude } from "./claude/index.js";
+import { codex } from "./codex/index.js";
 import type { AgentAdapter } from "./types.js";
 
 /**
@@ -9,6 +10,7 @@ import type { AgentAdapter } from "./types.js";
  */
 export const AGENTS: Readonly<Record<string, AgentAdapter>> = {
   "claude-code": claude,
+  codex,
 };
 
 /** The agent for setup and wording when no session is in question. */

@@ -28,6 +28,7 @@ export function compactRequestText(skill: string): string {
   );
 }
 
+/** The request as Claude Code reads it. */
 export const COMPACT_REQUEST = compactRequestText(defaultAgent().skill);
 
 /**
@@ -141,7 +142,7 @@ async function compactRequest(ctx: HookContext): Promise<HookOutput | undefined>
     recorded = new Set(applyEvents(upgraded.nodes, events).map((node) => node.id));
   }
   if (messages.every((message) => isRecorded(recorded, message))) return undefined;
-  return additionalContext(ctx, COMPACT_REQUEST);
+  return additionalContext(ctx, compactRequestText(ctx.agent.skill));
 }
 
 /** One line of prose, however the record stored it. */

@@ -162,8 +162,11 @@ export interface AgentAdapter {
   excerpt(text: string, max?: number): string;
   /** Parses a hook's stdin; undefined when it is not a payload cogit understands. */
   parseHookInput(stdin: string): HookInput | undefined;
-  /** Whether the hook runs in a session started without a person (`claude -p`, an SDK). */
-  isHeadless(env: NodeJS.ProcessEnv): boolean;
+  /**
+   * Whether the hook runs in a session started without a person (`claude -p`,
+   * an SDK, `codex exec`), from its environment or its payload.
+   */
+  isHeadless(env: NodeJS.ProcessEnv, input: HookInput): Promise<boolean>;
   /** The same for a transcript on disk: whether a headless run wrote it. */
   isHeadlessTranscript(file: string): Promise<boolean>;
   /**
