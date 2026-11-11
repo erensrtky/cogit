@@ -2,7 +2,7 @@ import { appendFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { z } from "zod";
 import { type ReadProcess, readProcess } from "../../push-command.js";
-import type { HookInput } from "../types.js";
+import type { HookInput, SessionLineage } from "../types.js";
 
 /**
  * Claude Code's hook protocol: the payload arrives on stdin as JSON, and a hook
@@ -58,43 +58,43 @@ export function isClaudeProcess(args: readonly string[]): boolean {
 }
 
 /**
- * Whether this session was started from inside another Claude Code session:
- * walking up from the hook, the first Claude Code process is the session's own,
- * and a second one above it is the session that started it, through its hooks
- * or its commands. A loop script or a cron job has none. Undefined where the
- * process tree cannot be read: on Windows, where asking PowerShell took over
- * three seconds on a CI runner, too long for a hook, so there only the
- * `COGIT_RECORD=1` mark counts.
+ * The Claude Code processes above a hook: walking up, the first is the
+ * session's own, and a second one above it is the session that started it,
+ * through its hooks or its commands (`parent`). A loop script or a cron job has
+ * none (`parent: null`). Undefined where the process tree cannot be read: on
+ * Windows, where asking PowerShell took over three seconds on a CI runner, too
+ * long for a hook.
  */
-export function startedInsideSession(
+export function sessionLineage(
   read: ReadProcess = (pid) => readProcess(pid),
   start: number = process.ppid,
-): boolean | undefined {
+): SessionLineage | undefined {
   let pid = start;
-  let found = 0;
+  let own: number | undefined;
   for (let depth = 0; depth < 64 && pid > 1; depth += 1) {
     const info = read(pid);
-    // Unreadable from the start: no answer; later (a sandbox's own PID 1): the top.
-    if (info === undefined) return depth === 0 ? undefined : found > 0 ? false : undefined;
+    // Unreadable later (a sandbox's own PID 1) is the top; from the start, no answer.
+    if (info === undefined) break;
     if (isClaudeProcess(info.args)) {
-      found += 1;
-      if (found === 2) return true;
+      if (own !== undefined) return { own, parent: pid };
+      own = pid;
     }
     pid = info.ppid;
   }
-  return found > 0 ? false : undefined;
+  return own === undefined ? undefined : { own, parent: null };
 }
 
 /**
- * Hands the record mark (`COGIT_RECORD=1`) to the commands this session runs,
- * through the file Claude Code gives SessionStart for that: a `claude -p` the
- * agent starts is then recorded too. Claude Code applies the file to the
- * agent's commands only, not to hooks, so another plugin's background runs
- * never see it.
+ * Hands the record mark to the commands this session runs, through the file
+ * Claude Code gives SessionStart for that: a `claude -p` the agent starts is
+ * then recorded too. The mark names this session's own process, so only a
+ * session it starts directly counts, not one a plugin starts inside that
+ * session in turn. Where the process is unknown (Windows) it is `1`. Claude
+ * Code applies the file to the agent's commands only, not to hooks.
  */
-export async function markChildren(env: NodeJS.ProcessEnv): Promise<void> {
+export async function markChildren(env: NodeJS.ProcessEnv, own?: number): Promise<void> {
   const file = env.CLAUDE_ENV_FILE;
-  if (file) await appendFile(file, "export COGIT_RECORD=1\n");
+  if (file) await appendFile(file, `export COGIT_RECORD=${own ?? 1}\n`);
 }
 
 /** A hook answer Claude Code shows the user as a warning line; the agent does not see it. */

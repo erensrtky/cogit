@@ -7,29 +7,31 @@ needs from your setup, and the one case it cannot cover.
 
 ## Which headless sessions are recorded
 
-**Headless sessions** in Settings (`cogit config set recordHeadless off|auto|all`) decides:
+**Background work** in Settings (`cogit config set recordHeadless true|false`) decides. It is on
+for new installs.
 
-| Choice | Recorded |
-|---|---|
-| **Auto** (default for new installs) | The sessions you or your scripts start, and the ones your recorded chats start through a command. Not the ones other plugins start in the background. |
-| **Off** | Only the chats you type into. |
-| **All** | Every headless session, other plugins' background runs included. |
+- **On:** the sessions you or your scripts start without typing (a loop, cron) and the ones your
+  recorded chats start through a command (a task handed to another `claude -p`). Never the small
+  background calls other plugins make for themselves, often once per prompt.
+- **Off:** only the chats you type into.
 
-How Auto tells them apart:
+How On tells them apart:
 
 - **Started by a script, a loop or cron:** no Claude Code process is above the session, so it is
   recorded. A sandbox that hides the processes outside it gives the same answer.
 - **Started by a command in a recorded chat** (the agent runs `claude -p` to hand off a task): a
-  recorded session passes `COGIT_RECORD=1` to the commands it runs, so the new session is recorded.
-- **Started by another plugin's hook** (a summarizer that runs once per prompt): there is a Claude
-  Code session above it and no mark, so it is left out.
+  recorded session passes `COGIT_RECORD=<its process id>` to the commands it runs, and the new
+  session is recorded because that chat started it.
+- **Started by another plugin's hook** (a summarizer): there is a Claude Code session above it,
+  and it is left out. That holds inside a handed-off session too: the mark names the chat, so a
+  plugin's call inside the handed-off session does not match it.
 
-A tool can always mark its own sessions with `COGIT_RECORD=1`; Auto records a marked session
-whatever started it. cogit's own background runs are never recorded, in any mode.
+A tool can always mark its own sessions with `COGIT_RECORD=1`; On records them whatever started
+them. cogit's own background runs are never recorded.
 
-On Windows, Auto does not read the process list (asking for it took more than three seconds,
+On Windows, cogit does not read the process list (asking for it took more than three seconds,
 too long for a hook). There, a script's sessions are recorded when the script starts them with
-`COGIT_RECORD=1`, or with **All**.
+`COGIT_RECORD=1`, and a chat's mark counts for every session below it, a plugin's included.
 
 ## When the record is written
 
@@ -79,7 +81,7 @@ volume, a cache, a mounted path), or share the record with `git push` before the
 
 ## Checklist
 
-- **Headless sessions** on **Auto** (or **All**).
+- **Background work** on.
 - `.cogit/` and Claude Code's directory on storage that outlives the run.
 - On Windows, start the loop's sessions with `COGIT_RECORD=1`.
 - If the provider is not Anthropic, check that it maps the `sideModel` name.

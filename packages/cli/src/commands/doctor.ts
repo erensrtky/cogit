@@ -413,13 +413,11 @@ const CHECK_SPECS: CheckSpec[] = [
     run: async (ctx) => {
       const sessions = await ctx.sessions();
       const transcripts = await ctx.transcripts();
-      const { recordHeadless } = await ctx.config();
-      // A headless session with a record was marked (COGIT_RECORD=1); its tail counts.
+      // A headless session with a record was let in; its tail counts. Others
+      // (another plugin's runs, or all of them with Background work off) never do.
       const recorded = new Set(sessions.map((session) => session.sessionId));
       const newest = await newestTranscript(transcripts, (id, file) =>
-        recordHeadless === "all" || recorded.has(id)
-          ? Promise.resolve(false)
-          : ctx.agent.isHeadlessTranscript(file),
+        recorded.has(id) ? Promise.resolve(false) : ctx.agent.isHeadlessTranscript(file),
       );
       const tail =
         newest === undefined

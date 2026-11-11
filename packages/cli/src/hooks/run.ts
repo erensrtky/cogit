@@ -13,9 +13,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type AgentAdapter, defaultAgent, type HookInput } from "../agents/index.js";
+import type { SessionLineage } from "../agents/types.js";
 import { Slug } from "../schema/common.js";
-import type { Config } from "../schema/config.js";
-import { captureDisabled, projectPaths, recordMarked } from "../store/paths.js";
+import { captureDisabled, projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadConfig } from "../store/stores.js";
 import { onPromptSubmit } from "./promptsubmit.js";
@@ -50,12 +50,12 @@ export interface HookDeps {
   spawnDetached?: (cli: string, args: string[], env: NodeJS.ProcessEnv, log?: string) => void;
   /** Runs a child and waits for it; tests observe instead of running. */
   runAndWait?: (cli: string, args: string[], env: NodeJS.ProcessEnv, log?: string) => Promise<void>;
-  /** Stands in for the agent's process-tree check; tests fix the answer. */
-  startedInsideSession?: () => boolean | undefined;
+  /** Stands in for the agent's process-tree read; tests fix the answer. */
+  sessionLineage?: () => SessionLineage | undefined;
 }
 
-/** Where each headless session's answer to "started from inside a session?" is kept. */
-export function insideCacheDir(): string {
+/** Where each session's process-tree answer is kept for its later hooks. */
+export function lineageCacheDir(): string {
   return join(tmpdir(), "cogit-headless");
 }
 
@@ -64,23 +64,28 @@ export function insideCacheDir(): string {
  * hooks: on macOS each process costs a `ps` call, and a loop's session runs
  * several hooks. "No answer" is kept too, so it is not asked again.
  */
-export function rememberedInside(
+export function rememberedLineage(
   dir: string,
   sessionId: string,
-  read: () => boolean | undefined,
-): boolean | undefined {
+  read: () => SessionLineage | undefined,
+): SessionLineage | undefined {
   const file = join(dir, sessionId);
   try {
-    const kept = readFileSync(file, "utf8");
-    if (kept === "inside" || kept === "outside" || kept === "unknown")
-      return kept === "unknown" ? undefined : kept === "inside";
+    const kept = JSON.parse(readFileSync(file, "utf8")) as unknown;
+    if (kept === "unknown") return undefined;
+    if (
+      typeof kept === "object" &&
+      kept !== null &&
+      typeof (kept as SessionLineage).own === "number"
+    )
+      return kept as SessionLineage;
   } catch {
     // Not read yet for this session.
   }
   const answer = read();
   try {
     mkdirSync(dir, { recursive: true });
-    writeFileSync(file, answer === undefined ? "unknown" : answer ? "inside" : "outside");
+    writeFileSync(file, JSON.stringify(answer ?? "unknown"));
   } catch {
     // Read again next time.
   }
@@ -88,20 +93,26 @@ export function rememberedInside(
 }
 
 /**
- * Whether a headless session is recorded under `recordHeadless`. In `auto` a
- * session is recorded when it carries the mark a recorded session hands to its
- * commands, or when nothing in Claude Code started it (a loop script, cron);
- * one another plugin's hook started is not, and neither is one where the
- * process tree cannot be read.
+ * Whether a headless session is recorded under `recordHeadless` (Background
+ * work). On records the sessions a person or a script started (no session
+ * process above: a loop, cron) and the ones a recorded session started through
+ * its commands: that session hands them `COGIT_RECORD=<its process>`, and only
+ * a session it started directly counts, not one a plugin starts inside it in
+ * turn. A tool's own `COGIT_RECORD=1` always counts. Where the process tree
+ * cannot be read (Windows), a session mark counts too and nothing else does.
  */
 export function recordsHeadless(
-  mode: Config["recordHeadless"],
+  on: boolean,
   env: NodeJS.ProcessEnv,
-  startedInsideSession: () => boolean | undefined,
+  lineage: () => SessionLineage | undefined,
 ): boolean {
-  if (mode === "all") return true;
-  if (mode === "off") return false;
-  return recordMarked(env) || startedInsideSession() === false;
+  if (!on) return false;
+  const mark = env.COGIT_RECORD;
+  if (mark === "1") return true;
+  const known = lineage();
+  if (mark !== undefined && /^\d+$/.test(mark))
+    return known === undefined || known.parent === Number(mark);
+  return known !== undefined && known.parent === null;
 }
 
 const HANDLERS: Record<string, (ctx: HookContext) => Promise<HookOutput | undefined>> = {
@@ -228,15 +239,16 @@ export async function runHook(
         .markLive(input.session_id)
         .catch((err: Error) => debug(`cogit mark: ${err.message}`));
     const { recordHeadless } = await loadConfig(env);
-    const inside =
-      deps.startedInsideSession ??
-      (() =>
-        rememberedInside(insideCacheDir(), input.session_id, () => agent.startedInsideSession()));
-    if (agent.isHeadless(env) && !recordsHeadless(recordHeadless, env, inside)) return undefined;
+    const lineage =
+      deps.sessionLineage ??
+      (() => rememberedLineage(lineageCacheDir(), input.session_id, () => agent.sessionLineage()));
+    if (agent.isHeadless(env) && !recordsHeadless(recordHeadless, env, lineage)) return undefined;
     // What this session starts through its own commands (a `claude -p` handed a
     // task) is recorded with it.
-    if (handler === onSessionStart && recordHeadless === "auto")
-      await agent.markChildren(env).catch((err: Error) => debug(`cogit mark: ${err.message}`));
+    if (handler === onSessionStart && recordHeadless)
+      await agent
+        .markChildren(env, lineage()?.own)
+        .catch((err: Error) => debug(`cogit mark: ${err.message}`));
     // In a linked worktree both point at the worktree; the record lives in the main checkout.
     const { root } = await resolveProjectRoot(env[agent.projectDirEnv] ?? input.cwd ?? ".");
     const initialized = existsSync(projectPaths(root).project);

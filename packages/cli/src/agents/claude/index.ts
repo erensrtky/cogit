@@ -4,7 +4,7 @@ import {
   isHeadless,
   markChildren,
   parseHookInput,
-  startedInsideSession,
+  sessionLineage,
   userNotice,
 } from "./hooks.js";
 import {
@@ -73,7 +73,7 @@ export const claude: AgentAdapter = {
   parseHookInput,
   isHeadless,
   isHeadlessTranscript,
-  startedInsideSession: () => startedInsideSession(),
+  sessionLineage: () => sessionLineage(),
   markChildren,
   additionalContext,
   userNotice,

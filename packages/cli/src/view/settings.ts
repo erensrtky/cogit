@@ -95,22 +95,16 @@ const EDITABLE: FieldSpec[] = [
   },
   {
     key: "recordHeadless",
-    label: "Headless sessions",
-    help: "Which sessions that start without a person, such as `claude -p`, are recorded.",
+    label: "Background work",
+    help: "Record the `claude -p` sessions your loops, scripts and chats start.",
     details:
-      "Auto (recommended) records the ones you or your scripts start, such as a loop like " +
-      "Ralph or a cron job, and the ones your recorded chats start through a command, such " +
-      "as a task handed to another `claude -p`. It leaves out the ones other plugins start in " +
-      "the background, often once per prompt, which would fill the map and the inbox. Off " +
-      "records only the chats you type into. All records every one. A script can also start " +
-      "its sessions with `COGIT_RECORD=1`, which Auto always records; on Windows, Auto " +
-      "records a script's sessions only that way.",
-    kind: "select",
-    options: [
-      { value: "auto", label: "Auto (recommended)" },
-      { value: "off", label: "Off" },
-      { value: "all", label: "All" },
-    ],
+      "On records the sessions you or your scripts start without typing, such as a loop like " +
+      "Ralph or a cron job, and the ones your recorded chats start through a command, such as " +
+      "a task handed to another `claude -p`. It never records the small background calls other " +
+      "plugins make for themselves, often once per prompt. Off records only the chats you type " +
+      "into. A script can also start its sessions with `COGIT_RECORD=1`, which On always " +
+      "records; on Windows, that is how a script's sessions are recorded.",
+    kind: "boolean",
   },
   {
     key: "shapes",
@@ -313,7 +307,7 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   sideModel: "haiku",
   messageSummaries: true,
   startupContext: true,
-  recordHeadless: "auto",
+  recordHeadless: true,
   shapes: true,
   captures: false,
   inbox: true,

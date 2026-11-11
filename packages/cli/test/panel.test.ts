@@ -89,7 +89,7 @@ describe("buildPanel", () => {
         sideModel: "haiku",
         messageSummaries: true,
         startupContext: true,
-        recordHeadless: "auto",
+        recordHeadless: true,
         shapes: true,
         captures: false,
         inbox: true,

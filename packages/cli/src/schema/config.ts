@@ -66,21 +66,18 @@ export const Config = z.object({
    */
   startupContext: z.boolean().default(true),
   /**
-   * Which sessions started without a person (`claude -p`, an SDK) are recorded.
-   * `off`: none. `all`: every one, other plugins' background runs included.
-   * `auto` (new installs): those a person or a script started (a loop like
-   * Ralph, a cron job: no Claude Code process above them) and those a recorded
-   * session's own commands started (marked `COGIT_RECORD=1`), but not the ones
-   * another plugin's hook starts, one per prompt. A config written while this
-   * was a boolean reads `true` as `all` and `false` as `off`, so an existing
-   * install keeps what it had.
+   * Background work: whether sessions started without a person (`claude -p`,
+   * an SDK) are recorded. On records the ones a person or a script starts (a
+   * loop like Ralph, cron) and the ones a recorded chat starts through a
+   * command, never another plugin's internal runs (hooks/run.ts). On for new
+   * installs. 1.4.1 wrote "off", "auto" or "all"; they read as off, on, on.
    */
   recordHeadless: z
     .preprocess(
-      (value) => (value === true ? "all" : value === false ? "off" : value),
-      z.enum(["off", "auto", "all"]),
+      (value) => (value === "off" ? false : value === "auto" || value === "all" ? true : value),
+      z.boolean(),
     )
-    .default("auto"),
+    .default(true),
   /** Port the local map server binds on `127.0.0.1`. */
   serverPort: z.int().min(1).max(65535).default(4747),
   /**

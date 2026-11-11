@@ -101,6 +101,12 @@ export interface FileChange {
  * them, how its hooks deliver a payload and receive context, and how to let the
  * agent run the record skill without asking every time.
  */
+/** The agent processes above a hook: its session's own, and the session that started it. */
+export interface SessionLineage {
+  own: number;
+  parent: number | null;
+}
+
 export interface AgentAdapter {
   /** The value stored in a session record's `agent` field. */
   readonly name: string;
@@ -161,12 +167,12 @@ export interface AgentAdapter {
   /** The same for a transcript on disk: whether a headless run wrote it. */
   isHeadlessTranscript(file: string): Promise<boolean>;
   /**
-   * Whether this session was started from inside another session of the agent
-   * (its hooks or its commands); undefined where that cannot be read.
+   * This session's own process and the session process that started it (null
+   * for a script or a person); undefined where that cannot be read.
    */
-  startedInsideSession(): boolean | undefined;
-  /** Passes `COGIT_RECORD=1` to the commands this session runs, where the agent allows it. */
-  markChildren(env: NodeJS.ProcessEnv): Promise<void>;
+  sessionLineage(): SessionLineage | undefined;
+  /** Passes the record mark naming `own` to the commands this session runs. */
+  markChildren(env: NodeJS.ProcessEnv, own?: number): Promise<void>;
   /** Hook output that adds context for the agent, in the agent's own protocol. */
   additionalContext(event: string, text: string): Record<string, unknown>;
   /** A hook answer that shows one line to the user, not to the agent. */

@@ -5,14 +5,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { SessionLineage } from "../src/agents/types.js";
 import { configHintOff, configHintOn, configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
 import { hookBlock } from "../src/git-hooks.js";
 import { markClosed } from "../src/hooks/close-retry.js";
 import {
-  insideCacheDir,
-  rememberedInside,
+  lineageCacheDir,
+  rememberedLineage,
   runAndWaitProcess,
   runHook,
   spawnDetachedProcess,
@@ -127,8 +128,11 @@ describe("runHook", () => {
   let debug: string[];
   let spawned: string[][];
 
-  // What the process tree would say: started from inside another session or not.
-  let inside: boolean | undefined;
+  // What the process tree would say: this session's process, and the session
+  // process that started it (null for a script).
+  let lineage: SessionLineage | undefined;
+  const SCRIPT: SessionLineage = { own: 20, parent: null };
+  const FROM = (parent: number): SessionLineage => ({ own: 20, parent });
   // What a hook ran in the foreground and waited for.
   let waited: string[][];
 
@@ -145,7 +149,7 @@ describe("runHook", () => {
         runAndWait: async (cli, args) => {
           waited.push([cli, ...args]);
         },
-        startedInsideSession: () => inside,
+        sessionLineage: () => lineage,
       },
     );
 
@@ -156,7 +160,7 @@ describe("runHook", () => {
       e,
       T0,
       (l) => debug.push(l),
-      { startedInsideSession: () => inside },
+      { sessionLineage: () => lineage },
     );
 
   // The catch-up itself is covered by backfill.test.ts; here we only see the spawn.
@@ -181,7 +185,7 @@ describe("runHook", () => {
     debug = [];
     spawned = [];
     waited = [];
-    inside = false;
+    lineage = SCRIPT;
   });
 
   const initialized = async (everyTurns: number) => {
@@ -323,53 +327,70 @@ describe("runHook", () => {
     expect(await sessionStart("clear")).toBeUndefined();
   });
 
-  it("in Auto, leaves out a `claude -p` another session's hook started", async () => {
+  it("leaves out a `claude -p` another session's hook started", async () => {
     const headless = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli" };
-    inside = true;
+    lineage = FROM(30);
     expect(await sessionStart("startup", headless)).toBeUndefined();
     await initialized(1);
     expect(await sessionStart("startup", headless)).toBeUndefined();
     expect(await stop({}, headless)).toBeUndefined();
     expect(spawned).toEqual([]);
-    // Unreadable process tree (Windows): left out too.
-    inside = undefined;
+    // Unreadable process tree (Windows) and no mark: left out too.
+    lineage = undefined;
     expect(await sessionStart("startup", headless)).toBeUndefined();
   });
 
-  it("in Auto, records one a script started and one a recorded session's command started", async () => {
+  it("records one a script started, one a recorded chat started, and one a tool marked", async () => {
     await initialized(1);
     const headless = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli" };
-    inside = false;
-    expect(await sessionStart("startup", headless)).toContain("records this project's lineage");
+    const recorded = "records this project's lineage";
+    lineage = SCRIPT;
+    expect(await sessionStart("startup", headless)).toContain(recorded);
     await stop({}, headless);
-    expect(spawned).not.toEqual([]);
-    inside = true;
-    const marked = { ...headless, COGIT_RECORD: "1" };
-    expect(await sessionStart("startup", marked)).toContain("records this project's lineage");
+    expect(waited).not.toEqual([]);
+    // Started by the recorded chat whose process is 30.
+    lineage = FROM(30);
+    expect(await sessionStart("startup", { ...headless, COGIT_RECORD: "30" })).toContain(recorded);
+    // A tool's own mark, whatever started it.
+    expect(await sessionStart("startup", { ...headless, COGIT_RECORD: "1" })).toContain(recorded);
     // cogit's own background runs stay out, marked or not.
-    expect(await sessionStart("startup", { ...marked, COGIT_DISABLE: "1" })).toBeUndefined();
+    expect(
+      await sessionStart("startup", { ...headless, COGIT_RECORD: "1", COGIT_DISABLE: "1" }),
+    ).toBeUndefined();
+  });
+
+  it("leaves out a plugin's run inside a session the recorded chat started", async () => {
+    await initialized(1);
+    // The mark names chat 30; this session's starter is 40, the handed-off session.
+    lineage = FROM(40);
+    const nested = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli", COGIT_RECORD: "30" };
+    expect(await sessionStart("startup", nested)).toBeUndefined();
+    // Where the tree cannot be read, the chat's mark is all there is: it counts.
+    lineage = undefined;
+    expect(await sessionStart("startup", nested)).toContain("records this project's lineage");
   });
 
   it("reads the process tree once per session and keeps the answer, even no answer", async () => {
     const cache = join(dir, "headless");
     let reads = 0;
-    const read = (answer: boolean | undefined) => () => {
+    const read = (answer: SessionLineage | undefined) => () => {
       reads += 1;
       return answer;
     };
-    expect(rememberedInside(cache, "a", read(true))).toBe(true);
-    expect(rememberedInside(cache, "a", read(false))).toBe(true);
-    expect(rememberedInside(cache, "b", read(false))).toBe(false);
-    expect(rememberedInside(cache, "b", read(true))).toBe(false);
-    expect(rememberedInside(cache, "c", read(undefined))).toBeUndefined();
-    expect(rememberedInside(cache, "c", read(true))).toBeUndefined();
+    expect(rememberedLineage(cache, "a", read(FROM(30)))).toEqual(FROM(30));
+    expect(rememberedLineage(cache, "a", read(SCRIPT))).toEqual(FROM(30));
+    expect(rememberedLineage(cache, "b", read(SCRIPT))).toEqual(SCRIPT);
+    expect(rememberedLineage(cache, "c", read(undefined))).toBeUndefined();
+    expect(rememberedLineage(cache, "c", read(SCRIPT))).toBeUndefined();
     expect(reads).toBe(3);
     // A file it did not write is read again; an unwritable place still answers.
     await writeFile(join(cache, "d"), "?");
-    expect(rememberedInside(cache, "d", read(true))).toBe(true);
+    expect(rememberedLineage(cache, "d", read(SCRIPT))).toEqual(SCRIPT);
+    await writeFile(join(cache, "e"), "[1]");
+    expect(rememberedLineage(cache, "e", read(SCRIPT))).toEqual(SCRIPT);
     await writeFile(join(dir, "file"), "");
-    expect(rememberedInside(join(dir, "file"), "e", read(false))).toBe(false);
-    expect(insideCacheDir()).toContain("cogit-headless");
+    expect(rememberedLineage(join(dir, "file"), "f", read(SCRIPT))).toEqual(SCRIPT);
+    expect(lineageCacheDir()).toContain("cogit-headless");
   });
 
   it("asks the real process tree once and keeps the answer for the session", async () => {
@@ -383,34 +404,37 @@ describe("runHook", () => {
       T0,
       (l) => debug.push(l),
     );
-    const kept = join(insideCacheDir(), id);
-    expect(["inside", "outside", "unknown"]).toContain(await readFile(kept, "utf8"));
+    const kept = join(lineageCacheDir(), id);
+    expect(await readFile(kept, "utf8")).toMatch(/^("unknown"|\{"own":\d+,"parent":(\d+|null)\})$/);
     await rm(kept);
   });
 
-  it("hands the mark to the session's commands in Auto only", async () => {
+  it("hands the commands a mark naming this session, and none when Background work is off", async () => {
     await initialized(1);
     const file = join(dir, "claude-env");
     await sessionStart("startup", { ...env, CLAUDE_ENV_FILE: file });
+    expect(await readFile(file, "utf8")).toBe("export COGIT_RECORD=20\n");
+    await rm(file);
+    // Unknown process (Windows): the plain mark.
+    lineage = undefined;
+    await sessionStart("startup", { ...env, CLAUDE_ENV_FILE: file });
     expect(await readFile(file, "utf8")).toBe("export COGIT_RECORD=1\n");
     await rm(file);
-    await configSet("recordHeadless", "off", fakeIo(env));
+    // A file that cannot be written is only a debug line; the session goes on.
+    lineage = SCRIPT;
+    await sessionStart("startup", { ...env, CLAUDE_ENV_FILE: join(file, "no", "such") });
+    expect(debug.some((line) => line.startsWith("cogit mark: "))).toBe(true);
+    await configSet("recordHeadless", "false", fakeIo(env));
     await sessionStart("startup", { ...env, CLAUDE_ENV_FILE: file });
     expect(existsSync(file)).toBe(false);
   });
 
-  it("follows Off and All whatever started the session", async () => {
+  it("records no headless session with Background work off, marked or not", async () => {
     await initialized(1);
+    lineage = SCRIPT;
+    await configSet("recordHeadless", "false", fakeIo(env));
     const marked = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli", COGIT_RECORD: "1" };
-    inside = false;
-    await configSet("recordHeadless", "off", fakeIo(env));
     expect(await sessionStart("startup", marked)).toBeUndefined();
-    inside = true;
-    // The old boolean still reads: true is All.
-    await configSet("recordHeadless", "true", fakeIo(env));
-    expect(await sessionStart("startup", { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli" })).toContain(
-      "records this project's lineage",
-    );
   });
 
   it("silences the setup hint per project with hint-off and undoes it with hint-on", async () => {

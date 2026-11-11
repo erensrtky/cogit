@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isClaudeProcess, startedInsideSession } from "../src/agents/claude/hooks.js";
+import { isClaudeProcess, sessionLineage } from "../src/agents/claude/hooks.js";
 import { AGENTS, defaultAgent } from "../src/agents/index.js";
 import type { ProcessInfo } from "../src/push-command.js";
 
@@ -59,25 +59,27 @@ describe("agent adapter", () => {
     const own: [number, string[]] = [20, ["claude", "-p"]];
     // Ralph: hook shell, the session, the loop script, systemd.
     const script = tree({ 10: [11, ["sh"]], 11: own, 20: [1, ["bash", "ralph_loop.sh"]] });
-    expect(startedInsideSession(script, 10)).toBe(false);
+    expect(sessionLineage(script, 10)).toEqual({ own: 11, parent: null });
     // Another plugin's hook: the session, the hook's node, the person's Claude Code.
     const hook = tree({ 10: own, 20: [30, ["node", "recall.mjs"]], 30: [1, ["claude"]] });
-    expect(startedInsideSession(hook, 10)).toBe(true);
+    expect(sessionLineage(hook, 10)).toEqual({ own: 10, parent: 30 });
     // A sandbox hides what is above its own PID 1: the top, no second Claude.
     const sandboxed = tree({ 10: own, 20: [99, ["bwrap"]] });
-    expect(startedInsideSession(sandboxed, 10)).toBe(false);
+    expect(sessionLineage(sandboxed, 10)).toEqual({ own: 10, parent: null });
     // No process tree (Windows), or no Claude Code in it: no answer.
-    expect(startedInsideSession(() => undefined, 10)).toBeUndefined();
-    expect(startedInsideSession(tree({ 10: [1, ["sh"]] }), 10)).toBeUndefined();
-    expect(startedInsideSession(tree({ 10: [11, ["sh"]] }), 10)).toBeUndefined();
+    expect(sessionLineage(() => undefined, 10)).toBeUndefined();
+    expect(sessionLineage(tree({ 10: [1, ["sh"]] }), 10)).toBeUndefined();
+    expect(sessionLineage(tree({ 10: [11, ["sh"]] }), 10)).toBeUndefined();
   });
 
   it("reads the real process tree without throwing", { timeout: 30_000 }, () => {
     // What it says depends on who runs the tests; on Windows there is no tree to read.
     const began = Date.now();
-    const answer = defaultAgent().startedInsideSession();
+    const answer = defaultAgent().sessionLineage();
     // The CI log shows what the read costs on each system.
-    console.info(`process tree on ${process.platform}: ${answer} in ${Date.now() - began} ms`);
-    expect([true, false, undefined]).toContain(answer);
+    console.info(
+      `process tree on ${process.platform}: ${JSON.stringify(answer)} in ${Date.now() - began} ms`,
+    );
+    expect(answer === undefined || typeof answer.own === "number").toBe(true);
   });
 });

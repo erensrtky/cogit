@@ -5,7 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **Headless sessions** is now **Background work**, on or off. On is what Auto was in 1.4.1: the `claude -p` sessions your loops, scripts and chats start are recorded, other plugins' internal calls are not. All is gone: it only added those calls, which nobody needs on the map. 1.4.1's Off reads as off, Auto and All as on. `cogit config set recordHeadless true|false`.
+
 ### Fixed
+- A plugin's internal `claude -p` call inside a session your chat handed a task to was recorded, since that session carried your chat's mark. The mark now names the chat, and only a session it started directly matches it (Linux and macOS).
 - A headless session's record is now finished before `claude -p` returns: cogit records and closes it when the agent ends its answer, while Claude Code waits, so a loop, sandbox or container that ends right after `claude -p` no longer takes the recording with it. Before, such a session was never recorded. A run stopped mid-recording (killed, machine shut down) leaves the session marked, and the next session in the project finishes it, however much later. Chats you type into are unchanged. A new guide page, [Loops, sandboxes and agent factories](docs/guide/loops-and-sandboxes.md), covers what these setups need and the one case cogit cannot cover.
 - When the settings file holds one value this version cannot read, such as a choice a newer version added, cogit keeps every other setting and puts only that one back to its default. Before, it ignored all your settings at once.
 

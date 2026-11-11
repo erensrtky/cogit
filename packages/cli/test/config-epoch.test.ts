@@ -35,14 +35,20 @@ describe("config", () => {
     expect(io.lines.at(-1)).toBe('"haiku"');
   });
 
-  it("reads the old on/off Headless sessions as All and Off, and starts new installs on Auto", async () => {
-    expect((await loadConfig(env)).recordHeadless).toBe("auto");
+  it("starts new installs with Background work on, and reads 1.4.1's three choices", async () => {
+    expect((await loadConfig(env)).recordHeadless).toBe(true);
     const file = globalPaths(env).config;
     await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, JSON.stringify({ schema: 1, recordHeadless: false }));
-    expect((await loadConfig(env)).recordHeadless).toBe("off");
-    await writeFile(file, JSON.stringify({ schema: 1, recordHeadless: true }));
-    expect((await loadConfig(env)).recordHeadless).toBe("all");
+    for (const [stored, read] of [
+      [false, false],
+      [true, true],
+      ["off", false],
+      ["auto", true],
+      ["all", true],
+    ] as const) {
+      await writeFile(file, JSON.stringify({ schema: 1, recordHeadless: stored }));
+      expect((await loadConfig(env)).recordHeadless).toBe(read);
+    }
     await expect(configSet("recordHeadless", "sometimes", fakeIo(env))).rejects.toThrow();
   });
 
@@ -57,7 +63,7 @@ describe("config", () => {
     const config = await loadConfig(env);
     expect(config.language).toBe("tr");
     expect(config.recorder).toBe("side");
-    expect(config.recordHeadless).toBe("auto");
+    expect(config.recordHeadless).toBe(true);
     // Writing is still refused, so the newer value is never overwritten.
     await expect(configSet("language", "en", fakeIo(env))).rejects.toThrow();
     expect(JSON.parse(await readFile(file, "utf8")).recordHeadless).toBe("sometimes");
