@@ -89,25 +89,35 @@ export function readProc(pid: number): ProcessInfo | undefined {
   }
 }
 
+/** How long the Windows read may take before the caller goes on without it. */
+export const WINDOWS_READ_TIMEOUT_MS = 3000;
+
 /**
- * Windows has neither `/proc` nor `ps`: one PowerShell call lists every process
- * with its parent, command line and start time, and the caller walks that
- * table. Undefined when PowerShell does not answer in time. It takes about half
- * a second, so it is read once per walk, never per process.
+ * Windows has neither `/proc` nor `ps`: one PowerShell call walks up from
+ * `start`, asking for one process at a time and only the fields needed (parent,
+ * name, command line, start time), and prints that chain. Listing every process
+ * instead read each one's command line and took over ten seconds on a CI
+ * runner. Undefined when PowerShell does not answer in time.
  */
 export function readWindowsProcesses(
+  start: number,
   run: typeof spawnSync = spawnSync,
 ): Map<number, ProcessInfo> | undefined {
+  const pid = Math.trunc(start);
   const script =
-    "Get-CimInstance Win32_Process | ForEach-Object { [pscustomobject]@{ " +
-    "p = $_.ProcessId; pp = $_.ParentProcessId; n = $_.Name; c = $_.CommandLine; " +
-    "t = if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() } else { 0 } " +
-    "} } | ConvertTo-Json -Compress";
+    `$p = ${pid}; $rows = @(); ` +
+    "for ($i = 0; $i -lt 64 -and $p -gt 0; $i++) { " +
+    '$x = Get-CimInstance Win32_Process -Filter "ProcessId=$p" ' +
+    "-Property ProcessId,ParentProcessId,Name,CommandLine,CreationDate; " +
+    "if (-not $x) { break }; " +
+    "$rows += [pscustomobject]@{ p = $x.ProcessId; pp = $x.ParentProcessId; n = $x.Name; c = $x.CommandLine; " +
+    "t = if ($x.CreationDate) { ([DateTimeOffset]$x.CreationDate).ToUnixTimeMilliseconds() } else { 0 } }; " +
+    "$p = $x.ParentProcessId }; " +
+    "ConvertTo-Json -Compress -InputObject $rows";
   const out = run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
     encoding: "utf8",
-    timeout: 10_000,
+    timeout: WINDOWS_READ_TIMEOUT_MS,
     windowsHide: true,
-    maxBuffer: 16 * 1024 * 1024,
   });
   return out.status === 0 ? parseWindowsProcesses(out.stdout ?? "") : undefined;
 }

@@ -9,7 +9,12 @@ import { configHintOff, configHintOn, configSet } from "../src/commands/config.j
 import { init } from "../src/commands/init.js";
 import { sessionWrite } from "../src/commands/session.js";
 import { hookBlock } from "../src/git-hooks.js";
-import { runHook, spawnDetachedProcess } from "../src/hooks/run.js";
+import {
+  insideCacheDir,
+  rememberedInside,
+  runHook,
+  spawnDetachedProcess,
+} from "../src/hooks/run.js";
 import {
   COMPACT_REQUEST,
   composeStartupContext,
@@ -335,6 +340,44 @@ describe("runHook", () => {
     expect(await sessionStart("startup", marked)).toContain("records this project's lineage");
     // cogit's own background runs stay out, marked or not.
     expect(await sessionStart("startup", { ...marked, COGIT_DISABLE: "1" })).toBeUndefined();
+  });
+
+  it("reads the process tree once per session and keeps the answer, even no answer", async () => {
+    const cache = join(dir, "headless");
+    let reads = 0;
+    const read = (answer: boolean | undefined) => () => {
+      reads += 1;
+      return answer;
+    };
+    expect(rememberedInside(cache, "a", read(true))).toBe(true);
+    expect(rememberedInside(cache, "a", read(false))).toBe(true);
+    expect(rememberedInside(cache, "b", read(false))).toBe(false);
+    expect(rememberedInside(cache, "b", read(true))).toBe(false);
+    expect(rememberedInside(cache, "c", read(undefined))).toBeUndefined();
+    expect(rememberedInside(cache, "c", read(true))).toBeUndefined();
+    expect(reads).toBe(3);
+    // A file it did not write is read again; an unwritable place still answers.
+    await writeFile(join(cache, "d"), "?");
+    expect(rememberedInside(cache, "d", read(true))).toBe(true);
+    await writeFile(join(dir, "file"), "");
+    expect(rememberedInside(join(dir, "file"), "e", read(false))).toBe(false);
+    expect(insideCacheDir()).toContain("cogit-headless");
+  });
+
+  it("asks the real process tree once and keeps the answer for the session", async () => {
+    await initialized(1);
+    const id = `t-${process.pid}-${Date.now()}`;
+    const headless = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli" };
+    await runHook(
+      "sessionstart",
+      JSON.stringify({ session_id: id, cwd: root, source: "startup" }),
+      headless,
+      T0,
+      (l) => debug.push(l),
+    );
+    const kept = join(insideCacheDir(), id);
+    expect(["inside", "outside", "unknown"]).toContain(await readFile(kept, "utf8"));
+    await rm(kept);
   });
 
   it("hands the mark to the session's commands in Auto only", async () => {

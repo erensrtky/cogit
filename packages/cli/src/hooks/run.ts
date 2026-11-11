@@ -1,6 +1,16 @@
 import { spawn } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, statSync, writeSync } from "node:fs";
-import { dirname } from "node:path";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+  writeSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type AgentAdapter, defaultAgent, type HookInput } from "../agents/index.js";
 import { Slug } from "../schema/common.js";
@@ -38,6 +48,39 @@ export interface HookDeps {
   spawnDetached?: (cli: string, args: string[], env: NodeJS.ProcessEnv, log?: string) => void;
   /** Stands in for the agent's process-tree check; tests fix the answer. */
   startedInsideSession?: () => boolean | undefined;
+}
+
+/** Where each headless session's answer to "started from inside a session?" is kept. */
+export function insideCacheDir(): string {
+  return join(tmpdir(), "cogit-headless");
+}
+
+/**
+ * The process-tree answer for one session, read once and kept for its later
+ * hooks: on Windows the read costs a PowerShell call, and a loop's session runs
+ * several hooks. "No answer" is kept too, so a slow read is not tried again.
+ */
+export function rememberedInside(
+  dir: string,
+  sessionId: string,
+  read: () => boolean | undefined,
+): boolean | undefined {
+  const file = join(dir, sessionId);
+  try {
+    const kept = readFileSync(file, "utf8");
+    if (kept === "inside" || kept === "outside" || kept === "unknown")
+      return kept === "unknown" ? undefined : kept === "inside";
+  } catch {
+    // Not read yet for this session.
+  }
+  const answer = read();
+  try {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(file, answer === undefined ? "unknown" : answer ? "inside" : "outside");
+  } catch {
+    // Read again next time.
+  }
+  return answer;
 }
 
 /**
@@ -146,7 +189,10 @@ export async function runHook(
         .markLive(input.session_id)
         .catch((err: Error) => debug(`cogit mark: ${err.message}`));
     const { recordHeadless } = await loadConfig(env);
-    const inside = deps.startedInsideSession ?? (() => agent.startedInsideSession());
+    const inside =
+      deps.startedInsideSession ??
+      (() =>
+        rememberedInside(insideCacheDir(), input.session_id, () => agent.startedInsideSession()));
     if (agent.isHeadless(env) && !recordsHeadless(recordHeadless, env, inside)) return undefined;
     // What this session starts through its own commands (a `claude -p` handed a
     // task) is recorded with it.

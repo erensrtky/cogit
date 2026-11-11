@@ -9,6 +9,7 @@ import {
   type ProcessInfo,
   parseWindowsProcesses,
   readWindowsProcesses,
+  WINDOWS_READ_TIMEOUT_MS,
   windowsCommandLine,
 } from "../src/push-command.js";
 
@@ -114,26 +115,28 @@ describe("agent adapter", () => {
     expect(parseWindowsProcesses("not json")).toBeUndefined();
   });
 
-  it("asks PowerShell once per walk on Windows", () => {
-    const calls: string[][] = [];
+  it("asks PowerShell once per walk on Windows, for the chain above the hook", () => {
+    const calls: { args: string[]; timeout: unknown }[] = [];
     const answer = (status: number, stdout: string) =>
-      ((command: string, args: string[]) => {
-        calls.push([command, ...args]);
+      ((_command: string, args: string[], options: { timeout?: number }) => {
+        calls.push({ args, timeout: options.timeout });
         return { status, stdout };
-      }) as unknown as Parameters<typeof readWindowsProcesses>[0];
+      }) as unknown as Parameters<typeof readWindowsProcesses>[1];
     const json = JSON.stringify([{ p: 10, pp: 1, n: "claude.exe", c: null, t: 5 }]);
-    expect(readWindowsProcesses(answer(0, json))?.get(10)?.args).toEqual(["claude.exe"]);
-    expect(calls[0]?.[0]).toBe("powershell.exe");
-    expect(readWindowsProcesses(answer(1, ""))).toBeUndefined();
+    expect(readWindowsProcesses(10, answer(0, json))?.get(10)?.args).toEqual(["claude.exe"]);
+    // One process at a time, from the hook up, with a short limit.
+    expect(calls[0]?.args.at(-1)).toMatch(/^\$p = 10; .*-Filter "ProcessId=\$p"/);
+    expect(calls[0]?.timeout).toBe(WINDOWS_READ_TIMEOUT_MS);
+    expect(readWindowsProcesses(10, answer(1, ""))).toBeUndefined();
 
-    let reads = 0;
-    const read = platformReader("win32", () => {
-      reads += 1;
+    const starts: number[] = [];
+    const read = platformReader("win32", (start) => {
+      starts.push(start);
       return parseWindowsProcesses(json);
     });
     expect(read(10)?.ppid).toBe(1);
     expect(read(99)).toBeUndefined();
-    expect(reads).toBe(1);
+    expect(starts).toEqual([10]);
     expect(platformReader("win32", () => undefined)(10)).toBeUndefined();
     // Elsewhere one process is read at a time; an unknown platform reads nothing.
     expect(platformReader("aix")(process.pid)).toBeUndefined();
@@ -141,6 +144,10 @@ describe("agent adapter", () => {
 
   it("reads the real process tree without throwing", { timeout: 30_000 }, () => {
     // What it says depends on who runs the tests; Windows goes through PowerShell.
-    expect([true, false, undefined]).toContain(defaultAgent().startedInsideSession());
+    const began = Date.now();
+    const answer = defaultAgent().startedInsideSession();
+    // The CI log shows what the read costs on each system.
+    console.info(`process tree on ${process.platform}: ${answer} in ${Date.now() - began} ms`);
+    expect([true, false, undefined]).toContain(answer);
   });
 });

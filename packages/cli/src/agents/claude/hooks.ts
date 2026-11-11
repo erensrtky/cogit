@@ -64,17 +64,17 @@ export function isClaudeProcess(args: readonly string[]): boolean {
 
 /**
  * How this platform reads one process: `/proc` or `ps` per process, and on
- * Windows one PowerShell table, read on first use.
+ * Windows one PowerShell call for the whole chain above the first pid asked.
  */
 export function platformReader(
   platform: NodeJS.Platform = process.platform,
-  readTable: () => Map<number, ProcessInfo> | undefined = readWindowsProcesses,
+  readChain: (start: number) => Map<number, ProcessInfo> | undefined = readWindowsProcesses,
 ): ReadProcess {
   if (platform !== "win32") return (pid) => readProcess(pid, platform);
-  let table: Map<number, ProcessInfo> | undefined | null = null;
+  let chain: Map<number, ProcessInfo> | undefined | null = null;
   return (pid) => {
-    if (table === null) table = readTable();
-    return table?.get(pid);
+    if (chain === null) chain = readChain(pid);
+    return chain?.get(pid);
   };
 }
 
