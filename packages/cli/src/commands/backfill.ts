@@ -135,7 +135,11 @@ export function agentRecord(text: string): Record<string, unknown> {
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    throw new CliError("the agent did not return a JSON record");
+    // The start of the answer goes in the log, so a reply that is not JSON shows what it was.
+    const start = cleaned.replace(/\s+/g, " ").slice(0, 120);
+    throw new CliError(
+      `the agent did not return a JSON record (it began: ${JSON.stringify(start)})`,
+    );
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
     throw new CliError("the agent did not return a JSON object");

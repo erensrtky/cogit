@@ -163,6 +163,9 @@ describe("headless output", () => {
     expect(agentRecord('{"a":1}')).toEqual({ a: 1 });
     expect(agentRecord('```json\n{"a":1}\n```')).toEqual({ a: 1 });
     expect(() => agentRecord("not json")).toThrow(/JSON record/);
+    expect(() => agentRecord("Here is the record:\n{")).toThrow(
+      'it began: "Here is the record: {"',
+    );
     expect(() => agentRecord("[1]")).toThrow(/JSON object/);
   });
 

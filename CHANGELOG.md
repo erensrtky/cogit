@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - The record skill names the type of the fields that take a list (`done`, `work`, `commits`, `files`) and says `branch.open` is one string; Codex's model had sent them the other way round on its first write.
 - `cogit session show` prints the session's id in its output.
+- When the model behind a background pass answers with something other than the JSON record, the error in `.cogit/state/detached.log` now shows how the answer began.
 
 ## [1.4.2] - 2026-11-11
 ### Changed
