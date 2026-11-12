@@ -1,3 +1,4 @@
+import { agentPresent } from "../presence.js";
 import { type AgentAdapter, DEFAULT_AGENT } from "../types.js";
 import {
   additionalContext,
@@ -11,6 +12,7 @@ import { run } from "./run.js";
 import {
   allowSkill,
   CLAUDE_DEFAULT_RETENTION,
+  claudeSettingsPath,
   INSTALL_COMMAND,
   markLive,
   readPluginEnabled,
@@ -47,9 +49,11 @@ import {
  */
 export const claude: AgentAdapter = {
   name: DEFAULT_AGENT,
+  displayName: "Claude Code",
   skill: "/cogit:record",
   skillRule: SKILL_RULE,
   installCommand: INSTALL_COMMAND,
+  updateCommand: "claude plugin update cogit@cogit",
   projectDirEnv: "CLAUDE_PROJECT_DIR",
   pluginRootEnv: "CLAUDE_PLUGIN_ROOT",
   sessionIdEnv: "CLAUDE_SESSION_ID",
@@ -83,6 +87,11 @@ export const claude: AgentAdapter = {
   readPluginVersion,
   readPluginEnabled,
   readSkillAllowed,
+  isPresent: (env) => agentPresent(claudeConfigDir(env), "claude", env),
+  /** Claude Code runs an enabled plugin's hooks without asking. */
+  readHookTrust: async () => "trusted",
+  settingsFile: claudeSettingsPath,
+  unreadableTranscripts: async () => [],
   setRetention,
   allowSkill,
   readProjectSetup,

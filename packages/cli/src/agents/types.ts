@@ -107,15 +107,26 @@ export interface SessionLineage {
   parent: number | null;
 }
 
+/**
+ * Whether the agent runs cogit's hooks: `trusted`; never approved (`untrusted`);
+ * approved for an earlier version of the plugin (`review`); turned off for
+ * cogit (`disabled`) or for every hook (`off`).
+ */
+export type HookTrust = "trusted" | "untrusted" | "review" | "disabled" | "off";
+
 export interface AgentAdapter {
   /** The value stored in a session record's `agent` field. */
   readonly name: string;
+  /** The agent's name in text for people, e.g. `Claude Code`. */
+  readonly displayName: string;
   /** How a message asks the agent to run the record skill, e.g. `/cogit:record`. */
   readonly skill: string;
   /** The permission rule that allows the skill without a prompt. */
   readonly skillRule: string;
   /** The shell command that installs the plugin. */
   readonly installCommand: string;
+  /** The shell command that brings the installed plugin to the newest version. */
+  readonly updateCommand: string;
   /** Env var the agent sets to the project directory for hooks. */
   readonly projectDirEnv: string;
   /** Env var that points at the installed plugin (skill text uses it). */
@@ -193,6 +204,14 @@ export interface AgentAdapter {
   readPluginEnabled(env: NodeJS.ProcessEnv, root?: string): Promise<boolean | undefined>;
   /** Whether the record skill is already allowed; undefined when unreadable. */
   readSkillAllowed(env: NodeJS.ProcessEnv): Promise<boolean | undefined>;
+  /** Whether the agent is on this machine: it has run here, or its command is installed. */
+  isPresent(env: NodeJS.ProcessEnv): Promise<boolean>;
+  /** Whether the agent runs the plugin's hooks; undefined when its settings are unreadable. */
+  readHookTrust(env: NodeJS.ProcessEnv): Promise<HookTrust | undefined>;
+  /** The user settings file cogit reads, for messages. */
+  settingsFile(env: NodeJS.ProcessEnv): string;
+  /** Transcripts on this machine cogit cannot read (Codex's compressed ones on an older Node). */
+  unreadableTranscripts(env: NodeJS.ProcessEnv): Promise<string[]>;
   /** Sets the transcript retention in the agent's settings. */
   setRetention(days: number, env: NodeJS.ProcessEnv, stamp: string): Promise<FileChange>;
   /** Allows the record skill in the agent's settings. */

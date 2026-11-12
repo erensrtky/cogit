@@ -2,10 +2,10 @@ import { execFile } from "node:child_process";
 import { mkdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import pkg from "../package.json" with { type: "json" };
 import { SKILL_RULE } from "../src/agents/claude/settings.js";
-import { defaultAgent } from "../src/agents/index.js";
+import { AGENTS, type AgentAdapter, defaultAgent } from "../src/agents/index.js";
 import {
   closePassError,
   type DoctorCheck,
@@ -20,6 +20,12 @@ import { hashTurns } from "../src/messages.js";
 import { createProgram } from "../src/program.js";
 import { startMapServer } from "../src/server.js";
 import { updateConfig } from "../src/store/stores.js";
+import {
+  codexSession,
+  installCodexPlugin,
+  trustedCodexPlugin,
+  writeCodexConfig,
+} from "./codex-setup.js";
 import { envFor, type FakeIo, fakeIo, noGitDir, T0, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
@@ -413,5 +419,147 @@ describe("doctor", () => {
       "server",
       "detached",
     ]);
+  });
+});
+
+describe("doctor with Codex on the machine", () => {
+  const codexOf = () => AGENTS.codex as AgentAdapter;
+  const ids = async (root: string) =>
+    (await doctor({ dir: root, io: fakeIo(env) })).checks.map((entry) => entry.id);
+
+  it("adds no line where Codex is not, and two where it is", async () => {
+    const root = await project();
+    await mkdir(claudeDir(), { recursive: true });
+    expect(await ids(root)).not.toContain("codex");
+    await mkdir(env.CODEX_HOME as string, { recursive: true });
+    const all = await ids(root);
+    expect(all.slice(0, 4)).toEqual(["node", "plugin", "codex", "codex-transcripts"]);
+    expect(await check(root, "codex")).toMatchObject({
+      status: "ok",
+      message: expect.stringContaining(codexOf().installCommand),
+    });
+    expect(await check(root, "codex-transcripts")).toEqual({
+      id: "codex-transcripts",
+      status: "ok",
+      message: "no Codex sessions in this project yet",
+    });
+  });
+
+  it("warns when Codex runs here without the plugin, and fails when it is the only agent", async () => {
+    const root = await project();
+    await mkdir(claudeDir(), { recursive: true });
+    await codexSession(env, root);
+    expect(await check(root, "codex")).toMatchObject({
+      status: "warn",
+      fix: codexOf().installCommand,
+    });
+    expect((await check(root, "codex-transcripts")).message).toBe(
+      "1 Codex session(s) here, 0 recorded; Codex keeps them until you delete them",
+    );
+    // A Codex-only machine: Claude Code's checks would only fail for no one.
+    await rm(claudeDir(), { recursive: true, force: true });
+    expect(await check(root, "codex")).toMatchObject({ status: "fail" });
+    const all = await ids(root);
+    for (const id of ["plugin", "skill", "transcripts"]) expect(all).not.toContain(id);
+  });
+
+  it("says the one missing step: turning it on, trusting the hooks, or reviewing them", async () => {
+    const root = await project();
+    const plugin = await installCodexPlugin(env, pkg.version);
+    expect(await check(root, "codex")).toMatchObject({ status: "warn" });
+    await writeCodexConfig(env, { enabled: false });
+    expect(await check(root, "codex")).toMatchObject({
+      status: "warn",
+      message: expect.stringContaining("turned off"),
+      fix: "turn cogit on in Codex's /plugins",
+    });
+    await writeCodexConfig(env, { enabled: true });
+    expect(await check(root, "codex")).toMatchObject({
+      message: "Codex has not trusted cogit's hooks yet, so it skips them and records nothing",
+      fix: expect.stringContaining("accept the hooks review"),
+    });
+    await trustedCodexPlugin(env, pkg.version);
+    expect(await check(root, "codex")).toEqual({
+      id: "codex",
+      status: "ok",
+      message: `the Codex plugin is installed, on and trusted (${pkg.version})`,
+    });
+    await writeFile(join(plugin, "dist", "cli.js"), "// updated\n");
+    expect((await check(root, "codex")).message).toMatch(/review them again/);
+    await writeCodexConfig(env, { enabled: true, trust: { enabled: false } });
+    expect((await check(root, "codex")).fix).toBe("turn them back on in Codex's /hooks");
+    await writeCodexConfig(env, { enabled: true, trust: {}, extra: "[features]\nhooks = false\n" });
+    expect((await check(root, "codex")).message).toMatch(/every hook turned off/);
+  });
+
+  it("warns when Codex's config cannot be read", async () => {
+    const root = await project();
+    await installCodexPlugin(env, pkg.version);
+    await writeFile(join(env.CODEX_HOME as string, "config.toml"), "[[");
+    expect(await check(root, "codex")).toMatchObject({
+      status: "warn",
+      message: expect.stringContaining("whether the Codex plugin is on"),
+    });
+    const trust = vi.spyOn(codexOf(), "readPluginEnabled").mockResolvedValue(true);
+    try {
+      expect((await check(root, "codex")).message).toMatch(/whether Codex trusts cogit's hooks/);
+    } finally {
+      trust.mockRestore();
+    }
+  });
+
+  it("names the update for whichever side is behind", async () => {
+    const root = await project();
+    await trustedCodexPlugin(env, "99.0.0");
+    expect(await check(root, "codex")).toMatchObject({
+      message: `the Codex plugin is 99.0.0, the cogit command ${pkg.version}`,
+      fix: "npm install -g @cogit/cli",
+    });
+    await rm(join(env.CODEX_HOME as string, "plugins"), { recursive: true });
+    await trustedCodexPlugin(env, "0.0.1");
+    expect((await check(root, "codex")).fix).toBe(
+      `${codexOf().updateCommand}, then accept the hooks review Codex shows at its next start`,
+    );
+    const version = vi.spyOn(codexOf(), "readPluginVersion").mockResolvedValue(undefined);
+    try {
+      expect((await check(root, "codex")).message).toBe(
+        "the Codex plugin is installed, on and trusted",
+      );
+    } finally {
+      version.mockRestore();
+    }
+  });
+
+  it("counts recorded Codex sessions and says what cannot be read or how long they stay", async () => {
+    const root = await project();
+    await mkdir(claudeDir(), { recursive: true });
+    const id = "01a1cd04-0e72-7a70-9406-6562bc6c3361";
+    await codexSession(env, root, id);
+    await codexSession(env, join(dir, "elsewhere"));
+    await record(root, id, []);
+    expect((await check(root, "codex-transcripts")).message).toMatch(
+      /^1 Codex session\(s\) here, 1 recorded/,
+    );
+    const retention = vi
+      .spyOn(codexOf(), "readRetention")
+      .mockResolvedValueOnce(30)
+      .mockResolvedValueOnce(undefined);
+    const unreadable = vi.spyOn(codexOf(), "unreadableTranscripts");
+    try {
+      expect((await check(root, "codex-transcripts")).message).toMatch(
+        /deletes them after 30 days$/,
+      );
+      expect((await check(root, "codex-transcripts")).message).toMatch(/1 recorded$/);
+      unreadable.mockResolvedValue(["a.jsonl.zst", "b.jsonl.zst"]);
+      expect(await check(root, "codex-transcripts")).toMatchObject({
+        status: "warn",
+        message: expect.stringMatching(
+          /^2 compressed Codex session\(s\) on this machine need Node 22\.15/,
+        ),
+      });
+    } finally {
+      retention.mockRestore();
+      unreadable.mockRestore();
+    }
   });
 });

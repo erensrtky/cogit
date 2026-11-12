@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { promisify, styleText } from "node:util";
-import { defaultAgent } from "../agents/index.js";
+import { AGENTS, type AgentAdapter, defaultAgent } from "../agents/index.js";
 import { sessionIdentity } from "../author.js";
 import {
   cogitIgnored,
@@ -96,6 +96,43 @@ async function bestEffort(io: Io, what: string, fn: () => Promise<unknown>): Pro
     io.warn(`${what}: ${(err as Error).message}`);
     return false;
   }
+}
+
+/** The other agents on this machine, and whether the default one is missing from it. */
+async function presentAgents(
+  env: NodeJS.ProcessEnv,
+): Promise<{ others: AgentAdapter[]; skipDefault: boolean }> {
+  const others: AgentAdapter[] = [];
+  for (const other of Object.values(AGENTS))
+    if (other !== agent && (await other.isPresent(env))) others.push(other);
+  return { others, skipDefault: others.length > 0 && !(await agent.isPresent(env)) };
+}
+
+/**
+ * The one step another agent still needs before it records here, in plain
+ * words; undefined when it already does. Read only: cogit writes none of its
+ * settings.
+ */
+export async function agentNextStep(
+  other: AgentAdapter,
+  env: NodeJS.ProcessEnv,
+  root: string,
+  only = false,
+): Promise<string | undefined> {
+  const name = other.displayName;
+  const review = `start ${name} here and accept the hooks review it shows`;
+  if (!(await other.readPluginInstalled(env)))
+    return `To record ${name} sessions${only ? "" : " too"}: \`${other.installCommand}\`, then ${review}.`;
+  if ((await other.readPluginEnabled(env, root)) === false)
+    return `cogit is installed in ${name} but turned off: turn it on in ${name}'s /plugins.`;
+  const trust = await other.readHookTrust(env);
+  if (trust === "untrusted" || trust === "review")
+    return `${name} has not trusted cogit's hooks${trust === "review" ? " since cogit changed" : " yet"}: ${review}.`;
+  if (trust === "disabled")
+    return `cogit's hooks are turned off in ${name}: turn them on in /hooks.`;
+  if (trust === "off")
+    return `${name} has every hook turned off: remove \`hooks = false\` from ${other.settingsFile(env)}.`;
+  return undefined;
 }
 
 /**
@@ -195,6 +232,26 @@ async function askLanguage(io: Io, opts: InitOptions): Promise<void> {
   );
 }
 
+/**
+ * One line per other agent that still needs a step; nothing for one that
+ * records already. Returns how many lines it printed.
+ */
+async function nextSteps(
+  io: Io,
+  root: string,
+  others: AgentAdapter[],
+  only = false,
+): Promise<number> {
+  let printed = 0;
+  for (const other of others) {
+    const step = await agentNextStep(other, io.env, root, only).catch(() => undefined);
+    if (step === undefined) continue;
+    io.out(step);
+    printed += 1;
+  }
+  return printed;
+}
+
 export async function register(io: Io, root: string, name: string): Promise<void> {
   await bestEffort(io, "could not register the project in the global panel", () =>
     updateRegistry(
@@ -254,6 +311,13 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
   if (existing.found) {
     if (!existing.ok) throw new CliError(`${projectPaths(root).project}: ${existing.error}`);
     await register(io, root, existing.data.name);
+    const { others, skipDefault } = await presentAgents(io.env);
+    if (skipDefault) {
+      await refreshGitIntegration(io, root);
+      await nextSteps(io, root, others, true);
+      io.out(`Already initialized: ${existing.data.name} (${root})`);
+      return;
+    }
     if (opts.allowSkill !== undefined) await askSkillPermission(io, opts);
     // `cogit doctor` suggests `init --retention 90` for a set-up project too.
     if (opts.retention !== undefined) await askRetention(io, opts);
@@ -263,6 +327,7 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
       if (file) io.out(`Updated the cogit guard and marketplace in ${file}.`);
     });
     await refreshGitIntegration(io, root);
+    await nextSteps(io, root, others);
     io.out(`Already initialized: ${existing.data.name} (${root})`);
     return;
   }
@@ -288,9 +353,13 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
 
   const policy: GitPolicy = opts.git ?? (await askGitPolicy(io));
 
-  await askRetention(io, opts);
-  await askSkillPermission(io, opts);
-  await askProjectSettings(io, root, opts);
+  // A machine with only another agent gets none of Claude Code's settings.
+  const { others, skipDefault } = await presentAgents(io.env);
+  if (!skipDefault) {
+    await askRetention(io, opts);
+    await askSkillPermission(io, opts);
+    await askProjectSettings(io, root, opts);
+  }
   await askLanguage(io, opts);
 
   await updateProject(root, (cur) => cur ?? { schema: 1, name });
@@ -311,6 +380,16 @@ export async function init(dir: string, opts: InitOptions, io: Io): Promise<void
       : "Conversations are stored in .cogit/conversations/ and stay on this machine.",
   );
   io.out(`Initialized ${name} in ${projectPaths(root).base}`);
+  const steps = await nextSteps(io, root, others, skipDefault);
+  if (skipDefault) {
+    const names = others.map((other) => other.displayName).join(" or ");
+    io.out(
+      steps > 0
+        ? "Then run `cogit open` after a session to see the map."
+        : `Next: work with ${names} here, then run \`cogit open\` to see the map.`,
+    );
+    return;
+  }
   const installed = await agent.readPluginInstalled(io.env).catch(() => undefined);
   io.out(
     installed

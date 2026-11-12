@@ -2,7 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import pkg from "../../package.json" with { type: "json" };
 import type { AgentAdapter } from "../agents/index.js";
-import { defaultAgent } from "../agents/index.js";
+import { AGENTS, defaultAgent } from "../agents/index.js";
 import { compareVersions, versionNotice } from "../cli-version.js";
 import { cogitIgnored, findGitRoot, gitHooksDir, gitUserEmail, gitUserName } from "../git.js";
 import { BLOCK_START, GIT_HOOK_EVENTS, hookCommandLine, isShellHook } from "../git-hooks.js";
@@ -62,6 +62,15 @@ interface DoctorContext {
   root: string;
   env: NodeJS.ProcessEnv;
   agent: AgentAdapter;
+  /** The linked worktree's path, when the command runs in one. */
+  worktree?: string;
+  /** The other agents on this machine; each gets its own setup and transcript lines. */
+  others: () => Promise<AgentAdapter[]>;
+  /**
+   * Whether the default agent's checks are left out: it is not on this machine
+   * and another agent is, so its missing plugin is no one's problem.
+   */
+  skipDefault: () => Promise<boolean>;
   gitRoot: () => Promise<string | undefined>;
   project: () => Promise<Awaited<ReturnType<typeof loadProject>>>;
   sessions: () => Promise<Session[]>;
@@ -71,7 +80,8 @@ interface DoctorContext {
 
 interface CheckSpec {
   id: string;
-  run: (ctx: DoctorContext) => Promise<DoctorCheck>;
+  /** One line, several (one per other agent), or none (a check that does not apply). */
+  run: (ctx: DoctorContext) => Promise<DoctorCheck | DoctorCheck[] | undefined>;
 }
 
 /** Claude Code's folder for a working directory: every non-alphanumeric becomes `-`. */
@@ -188,6 +198,7 @@ const CHECK_SPECS: CheckSpec[] = [
   {
     id: "plugin",
     run: async (ctx) => {
+      if (await ctx.skipDefault()) return undefined;
       const installed = await ctx.agent.readPluginInstalled(ctx.env);
       if (installed !== true)
         return {
@@ -226,6 +237,22 @@ const CHECK_SPECS: CheckSpec[] = [
         status: "ok",
         message: `the plugin is installed, enabled and at the CLI's version (${version})`,
       };
+    },
+  },
+
+  {
+    id: "agents",
+    run: async (ctx) => {
+      const checks: DoctorCheck[] = [];
+      const others = await ctx.others();
+      for (const agent of others) {
+        const transcripts = await agentTranscripts(ctx, agent);
+        checks.push(
+          await agentSetupCheck(ctx, agent, transcripts.size, await ctx.skipDefault()),
+          await agentTranscriptsCheck(ctx, agent, transcripts),
+        );
+      }
+      return checks;
     },
   },
 
@@ -351,6 +378,7 @@ const CHECK_SPECS: CheckSpec[] = [
   {
     id: "skill",
     run: async (ctx) => {
+      if (await ctx.skipDefault()) return undefined;
       const allowed = await ctx.agent.readSkillAllowed(ctx.env);
       if (allowed === undefined)
         return {
@@ -377,6 +405,7 @@ const CHECK_SPECS: CheckSpec[] = [
   {
     id: "transcripts",
     run: async (ctx) => {
+      if (await ctx.skipDefault()) return undefined;
       const transcripts = await ctx.transcripts();
       const retention = await ctx.agent.readRetention(ctx.env);
       if (transcripts.size === 0)
@@ -493,6 +522,157 @@ const CHECK_SPECS: CheckSpec[] = [
   },
 ];
 
+/** This project's sessions of an agent other than the default one, by id: those that ran here. */
+async function agentTranscripts(
+  ctx: DoctorContext,
+  agent: AgentAdapter,
+): Promise<Map<string, string>> {
+  const dirs = new Set([ctx.root, ...(ctx.worktree === undefined ? [] : [ctx.worktree])]);
+  const here = new Map<string, string>();
+  for (const [id, file] of await agent.collectTranscripts(ctx.env)) {
+    const cwd = await agent.readSessionCwd(file);
+    if (cwd !== undefined && dirs.has(cwd)) here.set(id, file);
+  }
+  return here;
+}
+
+/**
+ * Whether another agent records here, as the one step that is missing: the
+ * plugin, turning it on, or the agent's trust in its hooks. Not installing it is
+ * fine where the agent is not used; it fails only where it is the only agent.
+ */
+async function agentSetupCheck(
+  ctx: DoctorContext,
+  agent: AgentAdapter,
+  sessionsHere: number,
+  only: boolean,
+): Promise<DoctorCheck> {
+  const id = agent.name;
+  const name = agent.displayName;
+  const settings = agent.settingsFile(ctx.env);
+  if (!(await agent.readPluginInstalled(ctx.env))) {
+    if (only || sessionsHere > 0)
+      return {
+        id,
+        status: only ? "fail" : "warn",
+        message: `the cogit plugin is not installed in ${name}, so ${name} sessions are not recorded`,
+        fix: agent.installCommand,
+      };
+    return {
+      id,
+      status: "ok",
+      message: `${name} is on this machine without the cogit plugin; to record its sessions too: ${agent.installCommand}`,
+    };
+  }
+  const enabled = await agent.readPluginEnabled(ctx.env, ctx.root);
+  if (enabled === undefined)
+    return {
+      id,
+      status: "warn",
+      message: `could not read ${settings} to see whether the ${name} plugin is on`,
+      fix: `check ${settings} is valid`,
+    };
+  if (!enabled)
+    return {
+      id,
+      status: "warn",
+      message: `the cogit plugin is installed in ${name} but turned off, so its sessions record nothing`,
+      fix: `turn cogit on in ${name}'s /plugins`,
+    };
+  const trust = await agent.readHookTrust(ctx.env);
+  const review = `start ${name} here and accept the hooks review it shows (or trust cogit's hooks in /hooks)`;
+  const hookProblem: Record<string, DoctorCheck | undefined> = {
+    untrusted: {
+      id,
+      status: "warn",
+      message: `${name} has not trusted cogit's hooks yet, so it skips them and records nothing`,
+      fix: review,
+    },
+    review: {
+      id,
+      status: "warn",
+      message: `cogit changed since you trusted its hooks, so ${name} holds them back until you review them again`,
+      fix: review,
+    },
+    disabled: {
+      id,
+      status: "warn",
+      message: `cogit's hooks are turned off in ${name}, so its sessions record nothing`,
+      fix: `turn them back on in ${name}'s /hooks`,
+    },
+    off: {
+      id,
+      status: "warn",
+      message: `${name} has every hook turned off ([features] hooks = false in ${settings})`,
+      fix: `remove that line from ${settings}`,
+    },
+  };
+  if (trust === undefined)
+    return {
+      id,
+      status: "warn",
+      message: `could not read ${settings} to see whether ${name} trusts cogit's hooks`,
+      fix: `check ${settings} is valid`,
+    };
+  const problem = hookProblem[trust];
+  if (problem !== undefined) return problem;
+  const version = await agent.readPluginVersion(ctx.env);
+  const order = version === undefined ? 0 : compareVersions(version, pkg.version);
+  if (order > 0)
+    return {
+      id,
+      status: "warn",
+      message: `the ${name} plugin is ${version}, the cogit command ${pkg.version}`,
+      fix: "npm install -g @cogit/cli",
+    };
+  if (order < 0)
+    return {
+      id,
+      status: "warn",
+      message: `the ${name} plugin is ${version}, the cogit command ${pkg.version}`,
+      fix: `${agent.updateCommand}, then accept the hooks review ${name} shows at its next start`,
+    };
+  return {
+    id,
+    status: "ok",
+    message: `the ${name} plugin is installed, on and trusted${version === undefined ? "" : ` (${version})`}`,
+  };
+}
+
+/** How many of the agent's sessions ran here, how many are recorded, and how long they stay. */
+async function agentTranscriptsCheck(
+  ctx: DoctorContext,
+  agent: AgentAdapter,
+  transcripts: ReadonlyMap<string, string>,
+): Promise<DoctorCheck> {
+  const id = `${agent.name}-transcripts`;
+  const name = agent.displayName;
+  const unreadable = (await agent.unreadableTranscripts(ctx.env)).length;
+  if (unreadable > 0)
+    return {
+      id,
+      status: "warn",
+      message: `${unreadable} compressed ${name} session(s) on this machine need Node 22.15 or newer to read (this is ${process.versions.node})`,
+      fix: "install Node 22.15 or newer (https://nodejs.org)",
+    };
+  if (transcripts.size === 0)
+    return { id, status: "ok", message: `no ${name} sessions in this project yet` };
+  const recorded = new Set((await ctx.sessions()).map((session) => session.sessionId));
+  const done = [...transcripts.keys()].filter((key) => recorded.has(key)).length;
+  const retention = await agent.readRetention(ctx.env);
+  const kept =
+    retention === undefined
+      ? ""
+      : retention === Number.POSITIVE_INFINITY
+        ? `; ${name} keeps them until you delete them`
+        : `; ${name} deletes them after ${retention} days`;
+  return {
+    id,
+    status: "ok",
+    message: `${transcripts.size} ${name} session(s) here, ${done} recorded${kept}`,
+  };
+}
+
 /**
  * Hook files that are missing or carry a block for another project or an
  * earlier hook command. Only the `cogit hook …` line is compared: the fallback
@@ -536,10 +716,19 @@ export async function doctor(opts: DoctorOptions): Promise<DoctorReport> {
   const resolved = await resolveProjectRoot(opts.dir);
   const root = resolved.root;
 
+  const others = once(async () => {
+    const present: AgentAdapter[] = [];
+    for (const other of Object.values(AGENTS))
+      if (other !== agent && (await other.isPresent(io.env))) present.push(other);
+    return present;
+  });
   const ctx: DoctorContext = {
     root,
     env: io.env,
     agent,
+    ...(resolved.worktree === undefined ? {} : { worktree: resolved.worktree.path }),
+    others,
+    skipDefault: once(async () => (await others()).length > 0 && !(await agent.isPresent(io.env))),
     gitRoot: once(() => findGitRoot(root)),
     project: once(() => loadProject(root)),
     sessions: once(() => loadAllSessions(root, io.warn)),
@@ -550,7 +739,8 @@ export async function doctor(opts: DoctorOptions): Promise<DoctorReport> {
   const checks: DoctorCheck[] = [];
   for (const spec of CHECK_SPECS) {
     try {
-      checks.push(await spec.run(ctx));
+      const result = await spec.run(ctx);
+      if (result !== undefined) checks.push(...(Array.isArray(result) ? result : [result]));
     } catch (err) {
       checks.push({
         id: spec.id,

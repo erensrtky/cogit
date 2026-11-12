@@ -128,16 +128,9 @@ describe("Codex adapter", () => {
     expect(codex.excerpt("a\n b")).toBe("a b");
   });
 
-  it("answers unknown for settings it cannot read yet and refuses changes", async () => {
-    for (const read of [
-      codex.readRetention,
-      codex.readPluginInstalled,
-      codex.readPluginVersion,
-      codex.readPluginEnabled,
-      codex.readSkillAllowed,
-      codex.readProjectSetup,
-      codex.refreshProjectSetup,
-    ])
+  it("answers unknown for project setup and refuses changes to Codex's settings", async () => {
+    // Codex's own settings are read in codex-settings.test.ts; cogit writes none of them.
+    for (const read of [codex.readProjectSetup, codex.refreshProjectSetup])
       expect(await (read as () => Promise<unknown>)()).toBeUndefined();
     await expect(codex.setRetention(30, {}, "s")).rejects.toThrow(
       "cannot set transcript retention for Codex yet",

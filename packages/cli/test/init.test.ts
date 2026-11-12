@@ -14,9 +14,11 @@ import {
   SKILL_RULE,
   setRetention,
 } from "../src/agents/claude/settings.js";
-import { init } from "../src/commands/init.js";
+import { AGENTS, type AgentAdapter } from "../src/agents/index.js";
+import { agentNextStep, init } from "../src/commands/init.js";
 import { cogitGitignore, ensureCogitGitignore, ensureGitignore, findGitRoot } from "../src/git.js";
 import { loadConfig, loadProject, loadRegistry } from "../src/store/stores.js";
+import { installCodexPlugin, trustedCodexPlugin, writeCodexConfig } from "./codex-setup.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
 let dir: string;
@@ -441,5 +443,83 @@ describe("allowSkill", () => {
     expect(JSON.parse(await readText(settingsFile()))).toEqual({
       permissions: { allow: [SKILL_RULE] },
     });
+  });
+});
+
+describe("init with Codex on the machine", () => {
+  const codex = AGENTS.codex as AgentAdapter;
+  const opts = { git: "ignore", language: "auto", graph: false } as const;
+  const gitRepo = () => promisify(execFile)("git", ["init", "-q", root]);
+
+  it("asks nothing of Claude Code where only Codex is, and says how to install the plugin", async () => {
+    await gitRepo();
+    await mkdir(env.CODEX_HOME as string, { recursive: true });
+    const io = fakeIo(env, [], true);
+    await init(root, opts, io);
+    expect(existsSync(settingsFile())).toBe(false);
+    expect(io.lines.slice(-2)).toEqual([
+      `To record Codex sessions: \`${codex.installCommand}\`, then start Codex here and accept the hooks review it shows.`,
+      "Then run `cogit open` after a session to see the map.",
+    ]);
+    // Again on the set-up project: the same step, still nothing for Claude Code.
+    const again = fakeIo(env, [], true);
+    await init(root, { allowSkill: true, retention: 90 }, again);
+    expect(existsSync(settingsFile())).toBe(false);
+    expect(again.lines.slice(-2)).toEqual([
+      `To record Codex sessions: \`${codex.installCommand}\`, then start Codex here and accept the hooks review it shows.`,
+      `Already initialized: proj (${root})`,
+    ]);
+  });
+
+  it("only points at the map where Codex records already", async () => {
+    await gitRepo();
+    await trustedCodexPlugin(env, "1.5.0");
+    const io = fakeIo(env, [], true);
+    await init(root, opts, io);
+    expect(io.lines.at(-1)).toBe(
+      "Next: work with Codex here, then run `cogit open` to see the map.",
+    );
+  });
+
+  it("keeps Claude Code's setup and adds the Codex step where both are", async () => {
+    await gitRepo();
+    await mkdir(join(dir, "claude"), { recursive: true });
+    await mkdir(env.CODEX_HOME as string, { recursive: true });
+    const io = fakeIo(env);
+    await init(root, { ...opts, retention: "keep", allowSkill: false, projectSettings: false }, io);
+    expect(io.lines.slice(-2)).toEqual([
+      `To record Codex sessions too: \`${codex.installCommand}\`, then start Codex here and accept the hooks review it shows.`,
+      expect.stringMatching(/^Next: install the Claude Code plugin/),
+    ]);
+    const again = fakeIo(env);
+    await init(root, {}, again);
+    expect(again.lines).toContain(
+      `To record Codex sessions too: \`${codex.installCommand}\`, then start Codex here and accept the hooks review it shows.`,
+    );
+  });
+
+  it("names the one step Codex still needs, and none once it records", async () => {
+    const step = () => agentNextStep(codex, env, root);
+    const plugin = await installCodexPlugin(env, "1.5.0");
+    await writeCodexConfig(env, { enabled: false });
+    expect(await step()).toBe(
+      "cogit is installed in Codex but turned off: turn it on in Codex's /plugins.",
+    );
+    await writeCodexConfig(env, { enabled: true });
+    expect(await step()).toBe(
+      "Codex has not trusted cogit's hooks yet: start Codex here and accept the hooks review it shows.",
+    );
+    await trustedCodexPlugin(env, "1.5.0");
+    expect(await step()).toBeUndefined();
+    await writeFile(join(plugin, "dist", "cli.js"), "// updated\n");
+    expect(await step()).toBe(
+      "Codex has not trusted cogit's hooks since cogit changed: start Codex here and accept the hooks review it shows.",
+    );
+    await writeCodexConfig(env, { enabled: true, trust: { enabled: false } });
+    expect(await step()).toBe("cogit's hooks are turned off in Codex: turn them on in /hooks.");
+    await writeCodexConfig(env, { enabled: true, trust: {}, extra: "[features]\nhooks = false\n" });
+    expect(await step()).toBe(
+      `Codex has every hook turned off: remove \`hooks = false\` from ${join(env.CODEX_HOME as string, "config.toml")}.`,
+    );
   });
 });
