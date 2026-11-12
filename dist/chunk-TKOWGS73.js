@@ -991,8 +991,8 @@ var require_src = __commonJS({
 // src/git-hooks.ts
 import { execFile as execFile3 } from "child_process";
 import { existsSync as existsSync5, realpathSync } from "fs";
-import { chmod, mkdir as mkdir8, readFile as readFile12, realpath as realpath3, rm as rm5, stat as stat12 } from "fs/promises";
-import { dirname as dirname13, join as join17, resolve as resolve5 } from "path";
+import { chmod, mkdir as mkdir8, readFile as readFile13, realpath as realpath3, rm as rm5, stat as stat12 } from "fs/promises";
+import { dirname as dirname13, join as join18, resolve as resolve5 } from "path";
 import { promisify as promisify3 } from "util";
 
 // src/git.ts
@@ -1450,7 +1450,7 @@ import {
   writeSync
 } from "fs";
 import { tmpdir as tmpdir2 } from "os";
-import { dirname as dirname12, join as join16 } from "path";
+import { dirname as dirname12, join as join17 } from "path";
 import { fileURLToPath } from "url";
 
 // src/agents/index.ts
@@ -24267,6 +24267,7 @@ var claude = {
   skillRule: SKILL_RULE,
   installCommand: INSTALL_COMMAND,
   updateCommand: "claude plugin update cogit@cogit",
+  updateHint: "the plugin with `claude plugin update cogit@cogit` (or turn on auto-update in /plugin \u2192 Marketplaces \u2192 cogit)",
   projectDirEnv: "CLAUDE_PROJECT_DIR",
   pluginRootEnv: "CLAUDE_PLUGIN_ROOT",
   sessionIdEnv: "CLAUDE_SESSION_ID",
@@ -24300,6 +24301,7 @@ var claude = {
   isPresent: (env) => agentPresent(claudeConfigDir(env), "claude", env),
   /** Claude Code runs an enabled plugin's hooks without asking. */
   readHookTrust: async () => "trusted",
+  readSetupAdvice: async () => void 0,
   settingsFile: claudeSettingsPath,
   unreadableTranscripts: async () => [],
   setRetention,
@@ -25530,18 +25532,19 @@ function compareVersions(a, b) {
   }
   return 0;
 }
-function versionNotice(running, installed) {
+function versionNotice(running, installed, agent) {
   if (installed === void 0) return void 0;
   const order = compareVersions(running, installed);
   if (order > 0)
     return `cogit: the cogit command is ${installed}, the plugin ${running}. Update the command with \`npm install -g ${PACKAGE}\`.`;
   if (order < 0)
-    return `cogit: the plugin is ${running}, the cogit command ${installed}. Update the plugin with \`claude plugin update cogit@cogit\`, or turn on auto-update in /plugin \u2192 Marketplaces \u2192 cogit.`;
+    return `cogit: the plugin is ${running}, the cogit command ${installed}. Update ${agent.updateHint}.`;
   return void 0;
 }
 
 // src/agents/codex/settings.ts
 var PLUGIN_ID2 = "cogit@cogit";
+var MARKETPLACE_SPARSE = ".agents";
 var HOOKS_FILE = "hooks/codex.json";
 var HOOK_EVENTS = ["session_start", "user_prompt_submit", "stop", "session_end"];
 function isTable(value) {
@@ -25636,6 +25639,14 @@ function updateBytes(hash2, bytes) {
   hash2.update(u64(bytes.length));
   hash2.update(bytes);
 }
+async function readMarketplaceSparse(env) {
+  const config2 = await readConfig(env);
+  const marketplaces = isTable(config2?.marketplaces) ? config2.marketplaces : {};
+  const entry = marketplaces.cogit;
+  if (!isTable(entry) || entry.source_type !== "git") return void 0;
+  const sparse = Array.isArray(entry.sparse_paths) ? entry.sparse_paths : [];
+  return sparse.includes(MARKETPLACE_SPARSE);
+}
 async function readHookTrust(env) {
   const config2 = await readConfig(env);
   if (config2 === void 0) return void 0;
@@ -25656,6 +25667,7 @@ async function readHookTrust(env) {
 }
 
 // src/agents/codex/index.ts
+var ADD_MARKETPLACE = `codex plugin marketplace add ${MARKETPLACE_REPO} --sparse ${MARKETPLACE_SPARSE}`;
 function notYet(what) {
   return () => Promise.reject(new Error(`cogit cannot ${what} for Codex yet`));
 }
@@ -25667,11 +25679,14 @@ var codex = {
   skillRule: "$cogit:record",
   /**
    * Codex skips Claude's `github` marketplace source and reads `.agents/plugins/marketplace.json`
-   * first, which points at the same plugin branch. The hooks then wait for trust in `/hooks`.
+   * first, which points at the same plugin branch. `--sparse` keeps Codex from fetching the whole
+   * repository. The hooks then wait for trust in `/hooks`.
    */
-  installCommand: `codex plugin marketplace add ${MARKETPLACE_REPO} && codex plugin add cogit@cogit`,
+  installCommand: `${ADD_MARKETPLACE} && codex plugin add cogit@cogit`,
   /** Refreshes the marketplace's copy of the repository, then installs the plugin again from it. */
   updateCommand: "codex plugin marketplace upgrade cogit && codex plugin add cogit@cogit",
+  /** Every update changes the plugin's fingerprint, so Codex holds the hooks until a review. */
+  updateHint: "the plugin with `codex plugin marketplace upgrade cogit && codex plugin add cogit@cogit`, then accept the hooks review Codex shows at its next start",
   /** Codex names no project directory for hooks; the payload's cwd is used. */
   projectDirEnv: "CODEX_PROJECT_DIR",
   pluginRootEnv: "PLUGIN_ROOT",
@@ -25708,6 +25723,11 @@ var codex = {
   readSkillAllowed: async () => true,
   isPresent: (env) => agentPresent(codexHome(env), "codex", env),
   readHookTrust,
+  /** A marketplace added without `--sparse` fetches the whole repository on every update. */
+  readSetupAdvice: async (env) => await readMarketplaceSparse(env) === false ? {
+    message: "cogit's Codex marketplace downloads the whole repository on every update, which can time out on a slow connection",
+    fix: `codex plugin marketplace remove cogit && ${ADD_MARKETPLACE} (the installed plugin stays)`
+  } : void 0,
   settingsFile: (env) => join12(codexHome(env), "config.toml"),
   unreadableTranscripts: (env) => unreadableTranscripts(env),
   setRetention: notYet("set transcript retention"),
@@ -25824,7 +25844,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-GBMH2RE2.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-HZXKENBY.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -26016,6 +26036,11 @@ var Config = external_exports.object({
    * dismissals already made are kept.
    */
   inbox: external_exports.boolean().default(true),
+  /**
+   * Whether cogit asks npm once a day for its newest version and says at a new
+   * chat's start when one is out. Only that request leaves the machine.
+   */
+  updateCheck: external_exports.boolean().default(true),
   agents: external_exports.array(external_exports.string().min(1)).default(["claude-code"]),
   /** Project roots ("don't ask again" in this project) where the setup hint stays silent. */
   setupHintOff: external_exports.array(external_exports.string().min(1)).default([])
@@ -31640,7 +31665,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "1.5.0",
+  version: "1.5.1",
   description: "Git for the intent behind agent-written code.",
   license: "MIT",
   keywords: [
@@ -32137,6 +32162,7 @@ var PANEL_EDITABLE_KEYS = [
   "shapes",
   "captures",
   "inbox",
+  "updateCheck",
   "semanticSearch",
   "language",
   "shareConversations"
@@ -33462,6 +33488,67 @@ async function prepareRecords(root, env, warn2) {
   }
 }
 
+// src/update-check.ts
+import { readFile as readFile12 } from "fs/promises";
+import { join as join16 } from "path";
+var LATEST_URL = `https://registry.npmjs.org/${PACKAGE}/latest`;
+var DAY_MS = 24 * 60 * 6e4;
+var FETCH_TIMEOUT_MS = 1e4;
+var VERSION = /^\d+\.\d+\.\d+$/;
+function statePath(env) {
+  return join16(globalPaths(env).base, "state", "update-check.json");
+}
+async function readUpdateState(env) {
+  try {
+    const value = JSON.parse(await readFile12(statePath(env), "utf8"));
+    return typeof value === "object" && value !== null ? value : {};
+  } catch {
+    return {};
+  }
+}
+function writeUpdateState(env, state) {
+  return atomicWriteJson(statePath(env), state);
+}
+async function fetchLatestVersion(fetchImpl = fetch, timeoutMs = FETCH_TIMEOUT_MS) {
+  try {
+    const response = await fetchImpl(LATEST_URL, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!response.ok) return void 0;
+    const body = await response.json();
+    return typeof body.version === "string" && VERSION.test(body.version) ? body.version : void 0;
+  } catch {
+    return void 0;
+  }
+}
+async function refreshUpdateState(env, now, fetchImpl) {
+  const latest = await fetchLatestVersion(fetchImpl);
+  if (latest === void 0) return void 0;
+  await writeUpdateState(env, { ...await readUpdateState(env), checkedAt: now, latest });
+  return latest;
+}
+function updateCheckDue(state, now) {
+  if (state.checkedAt === void 0) return true;
+  const age = Date.parse(now) - Date.parse(state.checkedAt);
+  return !(age >= 0 && age < DAY_MS);
+}
+function newerVersion(state, running) {
+  const latest = state.latest;
+  if (latest === void 0 || !VERSION.test(latest)) return void 0;
+  return compareVersions(latest, running) > 0 ? latest : void 0;
+}
+function updateText(latest, running, agent) {
+  return `cogit ${latest} is out (you have ${running}). Update with \`npm install -g ${PACKAGE}\` and ${agent.updateHint}. Turn this off with \`cogit config set updateCheck false\`.`;
+}
+async function updateNotice(env, now, running, agent, refresh) {
+  const state = await readUpdateState(env);
+  if (updateCheckDue(state, now)) refresh();
+  const latest = newerVersion(state, running);
+  if (latest === void 0) return void 0;
+  const told = state.told;
+  if (told?.version === latest && !updateCheckDue({ checkedAt: told.at }, now)) return void 0;
+  await writeUpdateState(env, { ...state, told: { version: latest, at: now } });
+  return updateText(latest, running, agent);
+}
+
 // src/hooks/sessionstart.ts
 function compactRequestText(skill) {
   return `cogit: this session was compacted and some of its user messages are not in the lineage record yet. Run the ${skill} skill now; \`session show\` lists the messages that have no node. It records only what is missing and replies "up to date" when nothing is; do not mention this request otherwise.`;
@@ -33481,8 +33568,17 @@ function setupHint(ctx) {
 async function onSessionStart(ctx) {
   const output2 = await sessionStartOutput(ctx);
   if (ctx.input.source !== "startup") return output2;
-  const notice = versionNotice(package_default.version, await installedCliVersion(ctx.env));
-  return notice === void 0 ? output2 : { ...output2, ...ctx.agent.userNotice(notice) };
+  const notices = [
+    versionNotice(package_default.version, await installedCliVersion(ctx.env), ctx.agent),
+    ctx.initialized && (await loadConfig(ctx.env)).updateCheck ? await updateNotice(
+      ctx.env,
+      ctx.now,
+      package_default.version,
+      ctx.agent,
+      () => ctx.spawnDetached(["update-check"])
+    ).catch(() => void 0) : void 0
+  ].filter((notice) => notice !== void 0);
+  return notices.length === 0 ? output2 : { ...output2, ...ctx.agent.userNotice(notices.join("\n")) };
 }
 async function sessionStartOutput(ctx) {
   if (ctx.input.source === "compact") return compactRequest(ctx);
@@ -33673,10 +33769,10 @@ async function onStop(ctx) {
 
 // src/hooks/run.ts
 function lineageCacheDir() {
-  return join16(tmpdir2(), "cogit-headless");
+  return join17(tmpdir2(), "cogit-headless");
 }
 function rememberedLineage(dir, sessionId, read) {
-  const file2 = join16(dir, sessionId);
+  const file2 = join17(dir, sessionId);
   try {
     const kept = JSON.parse(readFileSync2(file2, "utf8"));
     if (kept === "unknown") return void 0;
@@ -33902,12 +33998,12 @@ async function installGitHook(root, event) {
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return false;
   await mkdir8(dir, { recursive: true });
-  const file2 = join17(dir, event);
+  const file2 = join18(dir, event);
   const exists = await stat12(file2).then(
     () => true,
     () => false
   );
-  const current = exists ? await readFile12(file2, "utf8") : "";
+  const current = exists ? await readFile13(file2, "utf8") : "";
   if (!isShellHook(current)) return false;
   const next = withHookBlock(current, hookBlock(event, root));
   if (exists && next === current) return false;
@@ -33934,7 +34030,7 @@ async function refreshGitHooks(root) {
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return [];
   const refreshed = [];
-  const hasBlock = async (event) => (await readFile12(join17(dir, event), "utf8").catch(() => void 0) ?? "").includes(BLOCK_START);
+  const hasBlock = async (event) => (await readFile13(join18(dir, event), "utf8").catch(() => void 0) ?? "").includes(BLOCK_START);
   const installed = !existsSync5(projectPaths(root).hooksOff) || await hasBlock("prepare-commit-msg");
   for (const event of GIT_HOOK_EVENTS) {
     if (!installed && !await hasBlock(event)) continue;
@@ -33961,8 +34057,8 @@ async function uninstallGitHooks(root) {
 async function removeHookBlocks(dir, events) {
   const removed = [];
   for (const event of events) {
-    const file2 = join17(dir, event);
-    const current = await readFile12(file2, "utf8").catch(() => void 0);
+    const file2 = join18(dir, event);
+    const current = await readFile13(file2, "utf8").catch(() => void 0);
     if (current === void 0 || !current.includes(BLOCK_START)) continue;
     const next = withoutHookBlock(current);
     if (onlyGeneratedShebang(next)) await rm5(file2, { force: true });
@@ -34173,6 +34269,9 @@ export {
   recordSyncStatus,
   deleteRecords,
   prepareRecords,
+  readUpdateState,
+  refreshUpdateState,
+  newerVersion,
   spawnDetachedProcess,
   runHook,
   BLOCK_START,

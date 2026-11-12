@@ -5,14 +5,14 @@ description: Record or update this session's cogit lineage: one node per user me
 
 # Record this session's lineage
 
-The cogit CLI is `${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.0/dist/cli.js`. On a shell without `${…:-…}`: this file is `<plugin>/dist/codex-skills/record/SKILL.md` and the CLI is `<plugin>/dist/cli.js`. Run the commands from the session's working directory.
+The cogit CLI is `${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.1/dist/cli.js`. On a shell without `${…:-…}`: this file is `<plugin>/dist/codex-skills/record/SKILL.md` and the CLI is `<plugin>/dist/cli.js`. Run the commands from the session's working directory.
 
 The current record (`cogit session show`):
 
 Run this first and read its output:
 
 ```sh
-node "${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.0/dist/cli.js" session show "$CODEX_THREAD_ID" -C .
+node "${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.1/dist/cli.js" session show "$CODEX_THREAD_ID" -C .
 ```
 
 ## Check first
@@ -25,16 +25,16 @@ node "${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.0/dist/cli.js" s
 
 ## Look something up
 
-A word rather than a hash: `node "${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.0/dist/cli.js" search "<text>" -C "<dir>"`
+A word rather than a hash: `node "${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.1/dist/cli.js" search "<text>" -C "<dir>"`
 scans titles, branch summaries, decisions and stored conversations, newest first (`--json`,
 `-n`, `--session`); hashes go to `show`.
 
 ## A pull request description
 
 When the user asks for a PR description, run
-`node "${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.0/dist/cli.js" pr -C .` and hand its output
+`node "${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.1/dist/cli.js" pr -C .` and hand its output
 over as it is; do not write one yourself. Only when the user uses `gh`, follow it with
-`gh pr create --body "$(node "${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.0/dist/cli.js" pr -C .)"`.
+`gh pr create --body "$(node "${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.1/dist/cli.js" pr -C .)"`.
 
 ## Send only what is new or changed
 
@@ -178,7 +178,7 @@ personal data, file contents or command output.
 ## Write it in two steps
 
 1. Write the JSON to the `inbox` path with your file editing tool (no heredoc or `echo`).
-2. `node "${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.0/dist/cli.js" session write -C "<dir from the record>" --file "<inbox path>" --consume`
+2. `node "${CODEX_HOME:-$HOME/.codex}/plugins/cache/cogit/cogit/1.5.1/dist/cli.js" session write -C "<dir from the record>" --file "<inbox path>" --consume`
 
 If it fails, fix the JSON according to the error and run it again. Then reply with one short
 line, e.g. "cogit updated (3 nodes)"; never repeat the JSON.
