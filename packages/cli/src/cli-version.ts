@@ -1,5 +1,6 @@
 import { readFile, realpath, stat } from "node:fs/promises";
 import { delimiter, dirname, join } from "node:path";
+import type { AgentAdapter } from "./agents/types.js";
 
 /**
  * The plugin and the `cogit` command on the PATH update through different channels
@@ -8,7 +9,7 @@ import { delimiter, dirname, join } from "node:path";
  * update. Nothing here touches the network: it reads the installed package's manifest.
  */
 
-const PACKAGE = "@cogit/cli";
+export const PACKAGE = "@cogit/cli";
 
 /** The version of the `cogit` command on `env.PATH`; undefined when there is none or it is not ours. */
 export async function installedCliVersion(env: NodeJS.ProcessEnv): Promise<string | undefined> {
@@ -54,15 +55,16 @@ export function compareVersions(a: string, b: string): number {
 }
 
 /** One line for the user when the plugin (`running`) and the installed command differ. */
-export function versionNotice(running: string, installed: string | undefined): string | undefined {
+export function versionNotice(
+  running: string,
+  installed: string | undefined,
+  agent: Pick<AgentAdapter, "updateHint">,
+): string | undefined {
   if (installed === undefined) return undefined;
   const order = compareVersions(running, installed);
   if (order > 0)
     return `cogit: the cogit command is ${installed}, the plugin ${running}. Update the command with \`npm install -g ${PACKAGE}\`.`;
   if (order < 0)
-    return (
-      `cogit: the plugin is ${running}, the cogit command ${installed}. Update the plugin with ` +
-      "`claude plugin update cogit@cogit`, or turn on auto-update in /plugin → Marketplaces → cogit."
-    );
+    return `cogit: the plugin is ${running}, the cogit command ${installed}. Update ${agent.updateHint}.`;
   return undefined;
 }

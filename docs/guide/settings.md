@@ -64,6 +64,14 @@ When a session ends, the side model reads what its record left open and drafts a
 
 On, the start page and each map list the sessions whose last word is the agent's, or whose record says it needs you, newest waits first. Off, the box is gone everywhere and cogit no longer reads the transcripts for it. Rows you closed with × stay closed when you turn it back on.
 
+### New version notice
+
+`updateCheck` · default `true`
+
+**Says at the start of a new chat when a newer cogit is out, with the commands to update.**
+
+Once a day cogit asks npm for the newest version of @cogit/cli; that request is all that leaves your machine, with no conversation or code. When a newer one is out, the next new chat starts with one line for you (not for the agent) naming the commands for Claude Code or Codex, at most once a day per version. `cogit doctor` says it too. Off, cogit never asks.
+
 ### Search by meaning
 
 `semanticSearch` · default `false`

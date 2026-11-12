@@ -110,6 +110,11 @@ export const Config = z.object({
    * dismissals already made are kept.
    */
   inbox: z.boolean().default(true),
+  /**
+   * Whether cogit asks npm once a day for its newest version and says at a new
+   * chat's start when one is out. Only that request leaves the machine.
+   */
+  updateCheck: z.boolean().default(true),
   agents: z.array(z.string().min(1)).default(["claude-code"]),
   /** Project roots ("don't ask again" in this project) where the setup hint stays silent. */
   setupHintOff: z.array(z.string().min(1)).default([]),

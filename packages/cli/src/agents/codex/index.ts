@@ -67,6 +67,9 @@ export const codex: AgentAdapter = {
   installCommand: `${ADD_MARKETPLACE} && codex plugin add cogit@cogit`,
   /** Refreshes the marketplace's copy of the repository, then installs the plugin again from it. */
   updateCommand: "codex plugin marketplace upgrade cogit && codex plugin add cogit@cogit",
+  /** Every update changes the plugin's fingerprint, so Codex holds the hooks until a review. */
+  updateHint:
+    "the plugin with `codex plugin marketplace upgrade cogit && codex plugin add cogit@cogit`, then accept the hooks review Codex shows at its next start",
   /** Codex names no project directory for hooks; the payload's cwd is used. */
   projectDirEnv: "CODEX_PROJECT_DIR",
   pluginRootEnv: "PLUGIN_ROOT",

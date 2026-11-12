@@ -15,6 +15,7 @@ import { applyEvents, readEvents } from "../store/events.js";
 import { projectPaths } from "../store/paths.js";
 import { resolveProjectRoot } from "../store/root.js";
 import { loadAllSessions, loadConfig, loadProject, loadSession } from "../store/stores.js";
+import { newerVersion, readUpdateState } from "../update-check.js";
 
 /**
  * `cogit doctor` (Story 13.1): the one command to hand a user whose map stays
@@ -230,7 +231,7 @@ const CHECK_SPECS: CheckSpec[] = [
           message: "the plugin is installed and enabled, but its version is unknown",
           fix: "claude plugin update cogit@cogit",
         };
-      const notice = versionNotice(version, pkg.version);
+      const notice = versionNotice(version, pkg.version, ctx.agent);
       if (notice !== undefined) return { id: "plugin", status: "warn", message: notice };
       return {
         id: "plugin",
@@ -517,6 +518,25 @@ const CHECK_SPECS: CheckSpec[] = [
           error.sessionId === undefined
             ? "cogit backfill <session-id> --tail --close"
             : `cogit backfill ${error.sessionId} --tail --close`,
+      };
+    },
+  },
+
+  {
+    // From npm's last answer (SessionStart refreshes it daily); no request here.
+    id: "update",
+    run: async (ctx) => {
+      if (!(await ctx.config()).updateCheck) return undefined;
+      const state = await readUpdateState(ctx.env);
+      if (state.latest === undefined) return undefined;
+      const latest = newerVersion(state, pkg.version);
+      if (latest === undefined)
+        return { id: "update", status: "ok", message: `cogit ${pkg.version} is the newest on npm` };
+      return {
+        id: "update",
+        status: "warn",
+        message: `cogit ${latest} is out (you have ${pkg.version})`,
+        fix: `npm install -g @cogit/cli, then update ${ctx.agent.updateHint}`,
       };
     },
   },

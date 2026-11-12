@@ -38,6 +38,7 @@ import { takeMigrationWarnings } from "./store/migrate.js";
 import { projectPaths } from "./store/paths.js";
 import { resolveProjectRoot } from "./store/root.js";
 import { loadConfig } from "./store/stores.js";
+import { refreshUpdateState } from "./update-check.js";
 import { configHelpLines } from "./view/settings.js";
 
 export type IoFactory = (interactive: boolean) => Io;
@@ -765,6 +766,18 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
         io.out(
           `Migrated ${result.migrated} session(s); ${result.skipped} skipped (already migrated or unmappable).`,
         );
+      }),
+    );
+
+  // Started detached by SessionStart when npm's last answer is a day old.
+  program
+    .command("update-check", { hidden: true })
+    .description("ask npm for cogit's newest version and keep the answer")
+    .action(
+      run(async () => {
+        const io = makeIo(false);
+        const latest = await refreshUpdateState(io.env, new Date().toISOString());
+        io.out(latest === undefined ? "could not reach npm" : `newest on npm: ${latest}`);
       }),
     );
 

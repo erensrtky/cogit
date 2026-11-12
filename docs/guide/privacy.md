@@ -1,7 +1,12 @@
 # Privacy
 
-cogit has no server and no account. Everything runs on your machine; the only network calls
-are the ones your own Claude Code login makes for the side model.
+cogit has no server and no account. Everything runs on your machine. The network calls are:
+
+- the ones your own Claude Code or Codex login makes for cogit's background runs (the side model
+  and the closing pass);
+- once a day, one question to npm: "what is the newest version of @cogit/cli?" Nothing about you,
+  your code or your chats goes with it. It lets cogit say when an update is out; turn it off with
+  `cogit config set updateCheck false`.
 
 ## What is recorded
 

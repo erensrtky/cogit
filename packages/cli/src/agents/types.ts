@@ -127,6 +127,8 @@ export interface AgentAdapter {
   readonly installCommand: string;
   /** The shell command that brings the installed plugin to the newest version. */
   readonly updateCommand: string;
+  /** How to update the plugin, completing "Update …": the command and what follows it. */
+  readonly updateHint: string;
   /** Env var the agent sets to the project directory for hooks. */
   readonly projectDirEnv: string;
   /** Env var that points at the installed plugin (skill text uses it). */

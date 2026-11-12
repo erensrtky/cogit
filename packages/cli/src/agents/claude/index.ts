@@ -55,6 +55,8 @@ export const claude: AgentAdapter = {
   skillRule: SKILL_RULE,
   installCommand: INSTALL_COMMAND,
   updateCommand: "claude plugin update cogit@cogit",
+  updateHint:
+    "the plugin with `claude plugin update cogit@cogit` (or turn on auto-update in /plugin → Marketplaces → cogit)",
   projectDirEnv: "CLAUDE_PROJECT_DIR",
   pluginRootEnv: "CLAUDE_PLUGIN_ROOT",
   sessionIdEnv: "CLAUDE_SESSION_ID",

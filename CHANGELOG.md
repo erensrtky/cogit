@@ -5,7 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- cogit tells you when a newer version is out: at the start of a new chat, one line for you (not for the agent) with the commands for Claude Code or Codex, at most once a day per version, and in `cogit doctor`. To know, it asks npm once a day for the newest version of @cogit/cli, in the background so no chat waits for it; nothing else goes with that request. Turn it off in Settings or with `cogit config set updateCheck false`.
+
 ### Fixed
+- In a Codex session, the notice that the plugin and the `cogit` command are on different versions gave Claude Code's update command; it now gives Codex's.
 - Updating cogit in Codex could fail with "git clone marketplace source timed out after 30s": Codex fetched the whole repository (about 33 MB) for the marketplace. The install command now adds it with `--sparse .agents`, about 1 MB. If you installed 1.5.0 in Codex, `cogit doctor` gives the two commands that add it again; the installed plugin stays.
 
 ## [1.5.0] - 2026-11-12

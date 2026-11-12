@@ -119,6 +119,10 @@
       "default": true,
       "type": "boolean"
     },
+    "updateCheck": {
+      "default": true,
+      "type": "boolean"
+    },
     "agents": {
       "default": [
         "claude-code"
@@ -159,6 +163,7 @@
     "bigChangeLines",
     "inboxMaxAgeDays",
     "inbox",
+    "updateCheck",
     "agents",
     "setupHintOff"
   ],

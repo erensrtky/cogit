@@ -181,6 +181,30 @@ describe("doctor", () => {
     expect(nodeCheck("22.12.0").fix).toContain("22.13");
   });
 
+  it("says a newer cogit is out from npm's last answer, without asking npm itself", async () => {
+    const root = await project();
+    const ids = async () => (await doctor({ dir: root, io: fakeIo(env) })).checks.map((c) => c.id);
+    // No answer kept yet: no line.
+    expect(await ids()).not.toContain("update");
+    const state = join(env.COGIT_HOME as string, "state");
+    await mkdir(state, { recursive: true });
+    await writeFile(join(state, "update-check.json"), JSON.stringify({ latest: pkg.version }));
+    expect(await check(root, "update")).toEqual({
+      id: "update",
+      status: "ok",
+      message: `cogit ${pkg.version} is the newest on npm`,
+    });
+    await writeFile(join(state, "update-check.json"), JSON.stringify({ latest: "99.0.0" }));
+    expect(await check(root, "update")).toEqual({
+      id: "update",
+      status: "warn",
+      message: `cogit 99.0.0 is out (you have ${pkg.version})`,
+      fix: "npm install -g @cogit/cli, then update the plugin with `claude plugin update cogit@cogit` (or turn on auto-update in /plugin → Marketplaces → cogit)",
+    });
+    await updateConfig((config) => ({ ...config, updateCheck: false }), env);
+    expect(await ids()).not.toContain("update");
+  });
+
   it("fails when the plugin is not installed and passes when it is enabled", async () => {
     const root = await project();
     expect((await check(root, "plugin")).status).toBe("fail");

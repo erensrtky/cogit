@@ -70,6 +70,7 @@ export function panelSettings(config: Config): PanelSettings {
     shapes: config.shapes,
     captures: config.captures,
     inbox: config.inbox,
+    updateCheck: config.updateCheck,
     semanticSearch: config.semanticSearch,
     embeddingModel: config.embeddingModel,
     shareConversations: config.shareConversations,

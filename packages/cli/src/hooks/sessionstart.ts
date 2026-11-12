@@ -14,6 +14,7 @@ import {
 import type { Session } from "../schema/session.js";
 import { applyEvents, readEvents } from "../store/events.js";
 import { loadAllSessions, loadConfig, loadSession } from "../store/stores.js";
+import { updateNotice } from "../update-check.js";
 import { buildMessages } from "../view/lineage.js";
 import { retryUnclosed } from "./close-retry.js";
 import type { HookContext, HookOutput } from "./run.js";
@@ -78,10 +79,19 @@ export function setupHint(ctx: HookContext): string {
  */
 export async function onSessionStart(ctx: HookContext): Promise<HookOutput | undefined> {
   const output = await sessionStartOutput(ctx);
-  // Once per new chat: the user hears when the plugin and the cogit command drifted apart.
+  // Once per new chat: the user hears when the plugin and the cogit command drifted apart,
+  // and (at most once a day) when a newer cogit is out. The latter only in a project cogit
+  // records, so a chat elsewhere starts no process and leaves no `.cogit/` behind.
   if (ctx.input.source !== "startup") return output;
-  const notice = versionNotice(pkg.version, await installedCliVersion(ctx.env));
-  return notice === undefined ? output : { ...output, ...ctx.agent.userNotice(notice) };
+  const notices = [
+    versionNotice(pkg.version, await installedCliVersion(ctx.env), ctx.agent),
+    ctx.initialized && (await loadConfig(ctx.env)).updateCheck
+      ? await updateNotice(ctx.env, ctx.now, pkg.version, ctx.agent, () =>
+          ctx.spawnDetached(["update-check"]),
+        ).catch(() => undefined)
+      : undefined,
+  ].filter((notice) => notice !== undefined);
+  return notices.length === 0 ? output : { ...output, ...ctx.agent.userNotice(notices.join("\n")) };
 }
 
 async function sessionStartOutput(ctx: HookContext): Promise<HookOutput | undefined> {

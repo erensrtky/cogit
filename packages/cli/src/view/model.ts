@@ -41,6 +41,7 @@ export const PANEL_EDITABLE_KEYS = [
   "shapes",
   "captures",
   "inbox",
+  "updateCheck",
   "semanticSearch",
   "language",
   "shareConversations",
@@ -561,6 +562,8 @@ export interface PanelSettings {
   captures: boolean;
   /** Whether the "Your turn" inbox shows, on the start page and on every map. */
   inbox: boolean;
+  /** Whether cogit asks npm once a day for its newest version and says when one is out. */
+  updateCheck: boolean;
   /** Whether the map's search also finds messages by meaning, through the local Ollama. */
   semanticSearch: boolean;
   /** The Ollama embedding model the meaning search uses. */

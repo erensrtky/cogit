@@ -1,10 +1,11 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { beforeEach, describe, expect, it } from "vitest";
+import pkg from "../package.json" with { type: "json" };
 import type { SessionLineage } from "../src/agents/types.js";
 import { configHintOff, configHintOn, configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
@@ -153,6 +154,8 @@ describe("runHook", () => {
       },
     );
 
+  // What SessionStart started in the background; never a real process here.
+  const started: string[][] = [];
   const sessionStart = (source: string, e = env, id = "s1") =>
     runHook(
       "sessionstart",
@@ -160,7 +163,7 @@ describe("runHook", () => {
       e,
       T0,
       (l) => debug.push(l),
-      { sessionLineage: () => lineage },
+      { sessionLineage: () => lineage, spawnDetached: (_cli, args) => started.push(args) },
     );
 
   // The catch-up itself is covered by backfill.test.ts; here we only see the spawn.
@@ -218,6 +221,49 @@ describe("runHook", () => {
       JSON.parse((await sessionStart("startup")) ?? "").hookSpecificOutput.additionalContext,
     ).not.toContain("records this project's lineage");
     expect(existsSync(join(root, ".cogit"))).toBe(false);
+  });
+
+  it("tells the user once a day that a newer cogit is out, and refreshes npm's answer daily", async () => {
+    await initialized(1);
+    const state = join(env.COGIT_HOME as string, "state", "update-check.json");
+    const notice = async () => JSON.parse((await sessionStart("startup")) ?? "{}").systemMessage;
+    started.length = 0;
+    // No answer yet: nothing to say, and the refresh starts in the background.
+    expect(await notice()).toBeUndefined();
+    expect(started).toEqual([["update-check"]]);
+    await mkdir(join(env.COGIT_HOME as string, "state"), { recursive: true });
+    await writeFile(state, JSON.stringify({ checkedAt: T0, latest: "99.0.0" }));
+    started.length = 0;
+    expect(await notice()).toBe(
+      `cogit 99.0.0 is out (you have ${pkg.version}). Update with \`npm install -g @cogit/cli\` and ` +
+        "the plugin with `claude plugin update cogit@cogit` (or turn on auto-update in /plugin → Marketplaces → cogit). " +
+        "Turn this off with `cogit config set updateCheck false`.",
+    );
+    // A fresh answer starts no refresh, and the same version is not told twice in a day.
+    expect(started).toEqual([]);
+    expect(await notice()).toBeUndefined();
+    await writeFile(state, JSON.stringify({ checkedAt: T0, latest: "99.0.0" }));
+    await configSet("updateCheck", "false", fakeIo(env));
+    expect(await notice()).toBeUndefined();
+    expect(started).toEqual([]);
+  });
+
+  it("starts the chat as usual when the update notice cannot be saved", async () => {
+    await initialized(1);
+    const dir = join(env.COGIT_HOME as string, "state");
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, "update-check.json"),
+      JSON.stringify({ checkedAt: T0, latest: "99.0.0" }),
+    );
+    await chmod(dir, 0o500);
+    try {
+      const out = JSON.parse((await sessionStart("startup")) ?? "{}");
+      expect(out.systemMessage).toBeUndefined();
+      expect(out.hookSpecificOutput.additionalContext).toContain("records this project's lineage");
+    } finally {
+      await chmod(dir, 0o700);
+    }
   });
 
   it("offers no setup outside a git repository, where init would refuse", async () => {

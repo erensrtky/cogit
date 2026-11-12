@@ -2,6 +2,7 @@ import { chmod, mkdir, symlink, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import pkg from "../package.json" with { type: "json" };
+import { AGENTS, type AgentAdapter } from "../src/agents/index.js";
 import { compareVersions, installedCliVersion, versionNotice } from "../src/cli-version.js";
 import { runHook } from "../src/hooks/run.js";
 import { envFor, pathWith, T0, tempDir } from "./helpers.js";
@@ -68,14 +69,19 @@ describe("the installed cogit command", () => {
     expect(compareVersions("x", "0.0.0")).toBe(0);
   });
 
-  it("names the one to update", () => {
-    expect(versionNotice("0.19.1", undefined)).toBeUndefined();
-    expect(versionNotice("0.19.1", "0.19.1")).toBeUndefined();
-    expect(versionNotice("0.19.1", "0.19.0")).toBe(
+  it("names the one to update, with the session's own agent's command", () => {
+    const claude = AGENTS["claude-code"] as AgentAdapter;
+    expect(versionNotice("0.19.1", undefined, claude)).toBeUndefined();
+    expect(versionNotice("0.19.1", "0.19.1", claude)).toBeUndefined();
+    expect(versionNotice("0.19.1", "0.19.0", claude)).toBe(
       "cogit: the cogit command is 0.19.0, the plugin 0.19.1. Update the command with `npm install -g @cogit/cli`.",
     );
-    expect(versionNotice("0.19.0", "0.19.1")).toContain(
+    expect(versionNotice("0.19.0", "0.19.1", claude)).toContain(
       "the plugin is 0.19.0, the cogit command 0.19.1. Update the plugin with `claude plugin update cogit@cogit`",
+    );
+    // Codex users were told Claude Code's command before.
+    expect(versionNotice("0.19.0", "0.19.1", AGENTS.codex as AgentAdapter)).toContain(
+      "Update the plugin with `codex plugin marketplace upgrade cogit && codex plugin add cogit@cogit`, then accept the hooks review",
     );
   });
 

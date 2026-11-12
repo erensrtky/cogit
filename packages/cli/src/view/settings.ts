@@ -142,6 +142,18 @@ const EDITABLE: FieldSpec[] = [
     kind: "boolean",
   },
   {
+    key: "updateCheck",
+    label: "New version notice",
+    help: "Says at the start of a new chat when a newer cogit is out, with the commands to update.",
+    details:
+      "Once a day cogit asks npm for the newest version of @cogit/cli; that request is all " +
+      "that leaves your machine, with no conversation or code. When a newer one is out, the " +
+      "next new chat starts with one line for you (not for the agent) naming the commands " +
+      "for Claude Code or Codex, at most once a day per version. `cogit doctor` says it too. " +
+      "Off, cogit never asks.",
+    kind: "boolean",
+  },
+  {
     key: "semanticSearch",
     label: "Search by meaning",
     help: "The map's search also finds messages that mean the same thing in other words, using Ollama on this machine.",
@@ -311,6 +323,7 @@ export const DEFAULT_SETTINGS: PanelSettings = {
   shapes: true,
   captures: false,
   inbox: true,
+  updateCheck: true,
   semanticSearch: false,
   embeddingModel: "bge-m3",
   shareConversations: false,
@@ -332,6 +345,7 @@ export function editableSettings(settings: PanelSettings): PanelEditableSettings
     shapes: settings.shapes,
     captures: settings.captures,
     inbox: settings.inbox,
+    updateCheck: settings.updateCheck,
     semanticSearch: settings.semanticSearch,
     language: settings.language,
     shareConversations: settings.shareConversations,
