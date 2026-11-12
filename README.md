@@ -9,12 +9,12 @@
 cogit records every message you send to an AI coding agent as a *thought commit*: what you
 asked, what came of it, and the message it answered. Your code commits point back to the
 thought behind them, so `cogit why` takes any line of code back to the reason it exists. It works
-with Claude Code today.
+with Claude Code and Codex CLI.
 
 Agent memory helps your agent remember. cogit helps you understand.
 
-It runs as a Claude Code plugin and works through Claude Code hooks, so the record is written
-while you work, not reconstructed from the diff afterwards.
+It runs as a plugin in Claude Code or Codex and works through the agent's hooks, so the record is
+written while you work, not reconstructed from the diff afterwards.
 
 **[Click through a saved map](https://erensrtky.github.io/cogit/demo/)**: no install, no server.
 It's the page `cogit open` writes, built from sample data and read-only.
