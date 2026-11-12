@@ -1,6 +1,8 @@
 import { copyFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { defineConfig } from "tsup";
+// @ts-expect-error plain ESM script without types
+import { run as writeCodexSkill } from "../../scripts/codex-skill.mjs";
 
 export default defineConfig({
   entry: { cli: "src/cli.ts" },
@@ -16,6 +18,8 @@ export default defineConfig({
   onSuccess: async () => {
     const source = createRequire(import.meta.url).resolve("mermaid/dist/mermaid.min.js");
     await copyFile(source, "dist/mermaid.min.js");
+    // Codex fills in no variable of Claude Code's skill text; it gets its own copy.
+    writeCodexSkill(".");
   },
   // CJS deps bundled into ESM still call require() for node builtins
   banner: {

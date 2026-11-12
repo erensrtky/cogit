@@ -136,6 +136,11 @@ export async function sessionWrite(
     io.env,
     identity,
   );
+  // A new record names the agent whose transcript it is: neither the skill nor the side model
+  // says, and a Codex session stored as Claude Code's would be closed by the wrong agent.
+  const found = input.agent === undefined && !current.found;
+  const agent = found ? (await findSession(input.sessionId, io.env))?.agent.name : input.agent;
+  const named = agent === undefined ? input : { ...input, agent };
   let warnings: string[] = [];
   const saved = await updateSession(root, input.sessionId, async (cur) => {
     // A record written before 8.5 still names messages `m1`, `m2`, …; the file is
@@ -144,7 +149,7 @@ export async function sessionWrite(
     const events = await readEvents(root, input.sessionId);
     const base = upgraded ? { ...upgraded, nodes: applyEvents(upgraded.nodes, events) } : undefined;
     const by = opts.by ?? "agent";
-    const merged = mergeSession(base, input, io.now(), {
+    const merged = mergeSession(base, named, io.now(), {
       ...(messages ? { order: messageOrder(messages) } : {}),
       labels: hashesToLabels(messages),
       crossTargets,
@@ -454,6 +459,8 @@ export async function sessionShow(
   const loaded = await loadSession(root, sessionId);
   const view: Record<string, unknown> = {
     initialized: true,
+    // The id the write must name: Codex's skill reads it here, as nothing fills it into the text.
+    sessionId,
     dir: given,
     ...store,
     project: project.data.name,
@@ -511,7 +518,7 @@ export async function sessionShow(
     if (userLines > 0)
       view.transcriptWarning =
         `the transcript has ${userLines} user line(s) but none read as a message; ` +
-        "Claude Code's transcript format may have changed";
+        `${found?.agent.displayName ?? "the agent"}'s transcript format may have changed`;
   }
   view.inbox = projectPaths(given).inbox(sessionId);
   io.out(JSON.stringify(view, null, 2));

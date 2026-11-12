@@ -136,9 +136,9 @@ The local Ollama model that turns messages into fingerprints for search by meani
 
 `agents` · default `claude-code`
 
-**Which agents record lineage; change it with `cogit config set`.**
+**Shown for reference; an agent records once the cogit plugin is installed in it.**
 
-Which AI agents in this project should record what they are asked and what they decide. Claude Code is the only one today.
+Claude Code and Codex record through the cogit plugin installed in each; `cogit doctor` says what one still needs. This list changes nothing.
 
 ### Inbox age
 

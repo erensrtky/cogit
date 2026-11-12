@@ -93,6 +93,24 @@ describe("Overview", () => {
     expect(html).toContain("in 2 background runs");
     // One message since the first run.
     expect(html).toContain("about $0.30 a message");
+    expect(html).not.toContain("Codex");
+  });
+
+  it("says when Codex runs are left out of the dollar figure", () => {
+    const html = render({
+      spend: {
+        runs: 3,
+        usd: 0.3,
+        inputTokens: 1000,
+        outputTokens: 500,
+        cacheReadTokens: 10_000,
+        cacheWriteTokens: 0,
+        unpriced: 1,
+      },
+    });
+    expect(html).toContain("1 of the runs went to Codex, which reports tokens but no");
+    // An average over priced and unpriced runs would read low.
+    expect(html).not.toContain("a message");
   });
 
   it("leaves out the chart and the calendar before any message", () => {

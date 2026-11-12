@@ -110,6 +110,7 @@ async function unrecordedSessions(
   root: string,
   sessions: Session[],
   transcripts: ReadonlyMap<string, string>,
+  env: NodeJS.ProcessEnv,
 ): Promise<Session[]> {
   const dir = dirname(projectPaths(root).state("x"));
   let names: string[];
@@ -131,7 +132,7 @@ async function unrecordedSessions(
     found.push({
       schema: SESSION_SCHEMA,
       sessionId: id,
-      agent: "claude-code",
+      agent: agentOfTranscript(transcripts.get(id) as string, env).name,
       title: "",
       startedAt,
       updatedAt: info.mtime.toISOString(),
@@ -335,7 +336,10 @@ export async function buildProject(opts: BuildOptions): Promise<LineageViewModel
     async () => {
       const recorded = await loadAllSessions(root, io.warn);
       const transcripts = await collectAllTranscripts(io.env);
-      const sessions = [...recorded, ...(await unrecordedSessions(root, recorded, transcripts))];
+      const sessions = [
+        ...recorded,
+        ...(await unrecordedSessions(root, recorded, transcripts, io.env)),
+      ];
       const views = await readTranscriptViews(sessions, transcripts, root, io);
       // The `Thought:` trailers git holds (Story 9.4) attach commits to the
       // message they carry out, so the map, the file history and `blame` agree

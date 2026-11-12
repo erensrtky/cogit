@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { agentLabel } from "../../cli/src/view/agent-names.js";
 import { formatChange, isBigChange } from "../../cli/src/view/change.js";
 import { timeSince } from "../../cli/src/view/inbox.js";
 import type {
@@ -95,6 +96,7 @@ function ResumeRow({ model, session }: { model: LineageViewModel; session: ViewS
       <ResumeButton
         projectPath={model.project.path}
         sessionId={session.sessionId}
+        agent={session.agent}
         available={session.transcriptAvailable}
       />
     </div>
@@ -174,7 +176,7 @@ function SessionSummary({ model, session }: { model: LineageViewModel; session: 
   return (
     <>
       <dl className="drilldown-meta">
-        <Field label="Agent">{session.agent}</Field>
+        <Field label="Agent">{agentLabel(session.agent)}</Field>
         {session.author ? (
           <Field label="Recorded by">
             {session.author}

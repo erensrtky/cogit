@@ -13,7 +13,7 @@ const SPOKEN: Record<Action, string> = {
 };
 
 /**
- * The copy sign in front of each label: the page cannot start Claude Code, it
+ * The copy sign in front of each label: the page cannot start the agent, it
  * only copies the command, and a bare "Resume" read as if it would.
  */
 const COPY_SIGN = "⧉";
@@ -32,10 +32,13 @@ const HINTS: Record<Action, string> = {
 export function ResumeButton({
   projectPath,
   sessionId,
+  agent,
   available = true,
 }: {
   projectPath: string;
   sessionId: string;
+  /** The agent the session ran on; its own resume command is copied. */
+  agent?: string;
   /** False when the transcript is gone, so resuming cannot work. */
   available?: boolean;
 }) {
@@ -64,7 +67,7 @@ export function ResumeButton({
   const copy = (next: Action): void => {
     setAction(next);
     setState("idle");
-    void copyText(resumeCommand(projectPath, sessionId, next === "fork")).then((ok) =>
+    void copyText(resumeCommand(projectPath, sessionId, next === "fork", agent)).then((ok) =>
       setState(ok ? "copied" : "failed"),
     );
   };
@@ -76,7 +79,7 @@ export function ResumeButton({
           key={each}
           type="button"
           className="resume-button"
-          title={`${HINTS[each]}: ${resumeCommand(projectPath, sessionId, each === "fork")}`}
+          title={`${HINTS[each]}: ${resumeCommand(projectPath, sessionId, each === "fork", agent)}`}
           aria-label={SPOKEN[each]}
           onClick={() => copy(each)}
         >
@@ -100,7 +103,7 @@ export function ResumeButton({
               selection?.addRange(range);
             }}
           >
-            {resumeCommand(projectPath, sessionId, action === "fork")}
+            {resumeCommand(projectPath, sessionId, action === "fork", agent)}
           </code>
         </>
       ) : null}

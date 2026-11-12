@@ -29,6 +29,8 @@ export interface SpendTotals {
   outputTokens: number;
   cacheReadTokens: number;
   cacheWriteTokens: number;
+  /** Runs whose agent reports tokens but no price (Codex); absent when there are none. */
+  unpriced?: number;
   /** The first run counted. */
   since?: string;
 }
@@ -105,6 +107,7 @@ export async function readSpend(root: string): Promise<SpendTotals | undefined> 
     }
     totals.runs += 1;
     totals.usd += number(entry.usd);
+    if (number(entry.usd) === 0) totals.unpriced = (totals.unpriced ?? 0) + 1;
     totals.inputTokens += number(entry.inputTokens);
     totals.outputTokens += number(entry.outputTokens);
     totals.cacheReadTokens += number(entry.cacheReadTokens);

@@ -1127,7 +1127,7 @@ function Flow({
               <p className="graph-status empty">
                 {model.recordDownloadFailed === true
                   ? "Your team's session records could not be downloaded. Check your connection and run cogit open again."
-                  : "No sessions recorded yet. They appear here as you work with Claude Code."}
+                  : "No sessions recorded yet. They appear here as you work with Claude Code or Codex."}
               </p>
             ) : (
               <MapCanvas

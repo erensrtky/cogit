@@ -450,6 +450,8 @@ export interface ViewSpend {
   outputTokens: number;
   cacheReadTokens: number;
   cacheWriteTokens: number;
+  /** Runs whose agent reports tokens but no price (Codex); absent when there are none. */
+  unpriced?: number;
   /** The first run counted. */
   since?: string;
 }

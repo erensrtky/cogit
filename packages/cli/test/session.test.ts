@@ -11,6 +11,7 @@ import { readStdin, sessionShow, sessionWrite } from "../src/commands/session.js
 import { messageHash } from "../src/messages.js";
 import { redactDeep, redactText } from "../src/redact.js";
 import { loadSession } from "../src/store/stores.js";
+import { codexSession } from "./codex-setup.js";
 import { envFor, type FakeIo, fakeIo, T0, tempDir } from "./helpers.js";
 
 const run = promisify(execFile);
@@ -146,6 +147,19 @@ describe("session write", () => {
     await mkdir(root);
     io = fakeIo(envFor(dir));
     await init(root, { name: "p", retention: "keep", language: "auto" }, fakeIo(envFor(dir)));
+  });
+
+  it("names the agent whose transcript the new record is, and keeps it after", async () => {
+    const id = "01a1cd61-6d31-7391-800e-4107b7f9e2fd";
+    await codexSession(io.env, root, id);
+    await write({ sessionId: id, title: "On Codex" });
+    expect(await loadSession(root, id)).toMatchObject({ data: { agent: "codex" } });
+    // No transcript anywhere: the default, as before.
+    await write({ sessionId: "s9", title: "Gone" });
+    expect(await loadSession(root, "s9")).toMatchObject({ data: { agent: "claude-code" } });
+    // A record's agent is never guessed again; one the writer names wins.
+    await write({ sessionId: "s9", agent: "codex" });
+    expect(await loadSession(root, "s9")).toMatchObject({ data: { agent: "codex" } });
   });
 
   it("drops a side message node the transcript does not have", async () => {
@@ -591,6 +605,7 @@ describe("session show", () => {
     await sessionShow(root, "s1", io);
     expect(shown()).toEqual({
       initialized: true,
+      sessionId: "s1",
       dir: root,
       project: "p",
       language: "tr",

@@ -61,6 +61,37 @@ describe("Story 9.3 on the map", () => {
     expect(html).toContain("Ada");
   });
 
+  it("labels a session that ran on another agent, and resumes it with that agent", () => {
+    const render = (model: LineageViewModel): string =>
+      renderToStaticMarkup(
+        createElement(SessionMap, {
+          model,
+          graph: layoutSessionGraph(model),
+          selectedSessionId: null,
+          openIds: new Set<string>(),
+          highlightSessionIds: new Set<string>(),
+          onOpen: () => {},
+          onOpenCard: () => {},
+          onContinue: () => {},
+        }),
+      );
+    expect(render(modelOf(session))).not.toContain("session-agent");
+    const codex = { ...session, agent: "codex", transcriptAvailable: true };
+    expect(render(modelOf(codex))).toContain(
+      '<span class="session-agent" title="Ran on Codex">Codex</span>',
+    );
+    const panel = renderToStaticMarkup(
+      createElement(DrillDown, {
+        model: modelOf(codex),
+        selection: { type: "session", sessionId: "s1" },
+        onClose: () => {},
+      }),
+    );
+    expect(panel).toContain("Codex");
+    expect(panel).toContain("codex resume s1");
+    expect(panel).not.toContain("claude --resume");
+  });
+
   it("says a missing conversation lives on another machine", () => {
     const html = renderToStaticMarkup(
       createElement(DrillDown, {

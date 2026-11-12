@@ -3977,3 +3977,15 @@ a.home-day:hover {
   margin: 0 0 8px;
   font-size: 0.85rem;
 }
+
+/* The agent a session ran on, shown only when it is not Claude Code (Story 16.7). */
+.session-agent {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border: 1px solid var(--chip-line);
+  border-radius: 999px;
+  background: var(--chip-bg);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}

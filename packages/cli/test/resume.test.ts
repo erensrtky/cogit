@@ -6,6 +6,7 @@ import { buildProject } from "../src/commands/build.js";
 import { init } from "../src/commands/init.js";
 import type { Session } from "../src/schema/session.js";
 import { projectPaths } from "../src/store/paths.js";
+import { agentLabel } from "../src/view/agent-names.js";
 import { resumeCommand, shellQuote } from "../src/view/resume.js";
 import { envFor, fakeIo, T0, tempDir } from "./helpers.js";
 
@@ -105,5 +106,19 @@ describe("buildProject transcript availability", () => {
       ["alive", true],
       ["gone", false],
     ]);
+  });
+});
+
+describe("resumeCommand for Codex", () => {
+  it("uses Codex's own resume and fork commands", () => {
+    expect(resumeCommand("/p", "01a1-cd", false, "codex")).toBe("cd '/p' && codex resume 01a1-cd");
+    expect(resumeCommand("/p", "01a1-cd", true, "codex")).toBe("cd '/p' && codex fork 01a1-cd");
+    expect(resumeCommand("/p", "a", false, "claude-code")).toBe("cd '/p' && claude --resume a");
+  });
+
+  it("names agents for people, keeping an unknown one's stored name", () => {
+    expect(agentLabel("codex")).toBe("Codex");
+    expect(agentLabel("claude-code")).toBe("Claude Code");
+    expect(agentLabel("gemini")).toBe("gemini");
   });
 });

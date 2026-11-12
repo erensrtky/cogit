@@ -72,6 +72,8 @@ describe("recordSpend and readSpend", () => {
       since: "2026-11-01T10:00:00.000Z",
     });
     expect(totals?.usd).toBeCloseTo(0.0246);
+    // Every run here has a price.
+    expect(totals?.unpriced).toBeUndefined();
     const first = JSON.parse(
       (await readFile(projectPaths(root).spend, "utf8")).split("\n")[0] ?? "",
     );
@@ -96,5 +98,19 @@ describe("runClaude", () => {
     expect(await readSpend(root)).toBeUndefined();
     await runClaude("hi", "haiku", env, undefined, { root, kind: "shape" });
     expect((await readSpend(root))?.runs).toBe(1);
+  });
+});
+
+describe("runs without a price", () => {
+  it("counts the runs an agent reports no price for", async () => {
+    await recordSpend(root, "side", "codex", {
+      usd: 0,
+      inputTokens: 10,
+      outputTokens: 5,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    });
+    await recordSpend(root, "review", "opus", spendOf(ENVELOPE));
+    expect(await readSpend(root)).toMatchObject({ runs: 2, unpriced: 1 });
   });
 });

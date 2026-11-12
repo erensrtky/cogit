@@ -7,7 +7,7 @@
   },
   "license": "MIT",
   "keywords": ["lineage", "sessions", "history", "decisions"],
-  "skills": "./skills/",
+  "skills": "./dist/codex-skills/",
   "hooks": "./hooks/codex.json",
   "interface": {
     "displayName": "cogit"

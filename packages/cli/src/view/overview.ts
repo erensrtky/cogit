@@ -163,6 +163,9 @@ export function mergeOverviews(parts: readonly OverviewPart[]): PanelOverview | 
         outputTokens: was.outputTokens + part.spend.outputTokens,
         cacheReadTokens: was.cacheReadTokens + part.spend.cacheReadTokens,
         cacheWriteTokens: was.cacheWriteTokens + part.spend.cacheWriteTokens,
+        ...(was.unpriced === undefined && part.spend.unpriced === undefined
+          ? {}
+          : { unpriced: (was.unpriced ?? 0) + (part.spend.unpriced ?? 0) }),
         ...(since === undefined ? {} : { since }),
       };
     }

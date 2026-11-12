@@ -40,7 +40,8 @@ describe("plugin packaging", () => {
     // Codex reads only the hooks the manifest names: Claude Code's hooks.json passes `args`,
     // a field Codex lacks, so Codex would run a bare `node`. Paths must start with "./".
     expect(codex.hooks).toBe("./hooks/codex.json");
-    expect(codex.skills).toBe("./skills/");
+    // Codex reads its own copy of the skill, written at build time (scripts/codex-skill.mjs).
+    expect(codex.skills).toBe("./dist/codex-skills/");
   });
 
   it("calls the CLI from Codex hooks in one stable line per event, naming the agent", async () => {

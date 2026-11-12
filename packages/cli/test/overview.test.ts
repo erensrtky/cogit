@@ -143,7 +143,7 @@ describe("mergeOverviews", () => {
         path: "/b",
         mapUrl: "file:///b",
         overview: b,
-        spend: spend(0.2, "2026-11-01T00:00:00Z"),
+        spend: { ...spend(0.2, "2026-11-01T00:00:00Z"), unpriced: 1 },
       },
       { name: "empty", path: "/e", mapUrl: "file:///e" },
     ]);
@@ -167,7 +167,12 @@ describe("mergeOverviews", () => {
       path: "lib/x.ts",
       count: 9,
     });
-    expect(merged?.spend).toMatchObject({ runs: 2, inputTokens: 2, since: "2026-11-01T00:00:00Z" });
+    expect(merged?.spend).toMatchObject({
+      runs: 2,
+      inputTokens: 2,
+      unpriced: 1,
+      since: "2026-11-01T00:00:00Z",
+    });
     expect(merged?.spend?.usd).toBeCloseTo(0.3);
   });
 

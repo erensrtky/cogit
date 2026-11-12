@@ -230,10 +230,10 @@ export const CLI_ONLY: CliSetting[] = [
   {
     key: "agents",
     label: "Agents",
-    help: "Which agents record lineage; change it with `cogit config set`.",
+    help: "Shown for reference; an agent records once the cogit plugin is installed in it.",
     details:
-      "Which AI agents in this project should record what they are asked and what they " +
-      "decide. Claude Code is the only one today.",
+      "Claude Code and Codex record through the cogit plugin installed in each; `cogit doctor` " +
+      "says what one still needs. This list changes nothing.",
   },
   {
     key: "inboxMaxAgeDays",

@@ -1,4 +1,5 @@
 import type { MouseEvent } from "react";
+import { agentLabel, USUAL_AGENT } from "../../cli/src/view/agent-names.js";
 import type { LineageViewModel, ViewSession } from "../../cli/src/view/model.js";
 import { formatStamp } from "./format.js";
 import { branchPath, type GitMessageRow, type GitRow, LANE_COLORS } from "./gitLayout.js";
@@ -104,6 +105,11 @@ function SessionRow({
       </button>
       <span className="git-time">{session.startedAt ? formatStamp(session.startedAt) : ""}</span>
       <span className="git-title">{session.title || session.sessionId}</span>
+      {session.agent === USUAL_AGENT ? null : (
+        <span className="session-agent" title={`Ran on ${agentLabel(session.agent)}`}>
+          {agentLabel(session.agent)}
+        </span>
+      )}
       {badge === undefined ? null : (
         <button
           type="button"

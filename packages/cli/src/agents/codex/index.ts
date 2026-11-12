@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { agentLabel } from "../../view/agent-names.js";
 import { MARKETPLACE_REPO } from "../claude/settings.js";
 import { agentPresent } from "../presence.js";
 import type { AgentAdapter } from "../types.js";
@@ -50,7 +51,7 @@ const unknown = async (): Promise<undefined> => undefined;
  */
 export const codex: AgentAdapter = {
   name: "codex",
-  displayName: "Codex",
+  displayName: agentLabel("codex"),
   skill: "$cogit:record",
   skillRule: "$cogit:record",
   /**

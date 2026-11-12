@@ -1,3 +1,4 @@
+import { agentLabel } from "../../view/agent-names.js";
 import { agentPresent } from "../presence.js";
 import { type AgentAdapter, DEFAULT_AGENT } from "../types.js";
 import {
@@ -49,7 +50,7 @@ import {
  */
 export const claude: AgentAdapter = {
   name: DEFAULT_AGENT,
-  displayName: "Claude Code",
+  displayName: agentLabel(DEFAULT_AGENT),
   skill: "/cogit:record",
   skillRule: SKILL_RULE,
   installCommand: INSTALL_COMMAND,

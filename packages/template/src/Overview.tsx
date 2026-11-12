@@ -105,9 +105,17 @@ function SpendTile({ spend, days }: { spend: ViewSpend | undefined; days: readon
       <p className="home-note">
         {compact.format(tokens)} tokens in {formatCount(spend.runs)} background run
         {spend.runs === 1 ? "" : "s"}
-        {messages > 0 ? <>, about {formatUsd(spend.usd / messages)} a message</> : null}
+        {messages > 0 && spend.unpriced === undefined ? (
+          <>, about {formatUsd(spend.usd / messages)} a message</>
+        ) : null}
         {since === undefined ? null : <>, since {since.toLocaleDateString("en")}</>}
       </p>
+      {spend.unpriced === undefined ? null : (
+        <p className="home-note">
+          {formatCount(spend.unpriced)} of the runs went to Codex, which reports tokens but no
+          price; the dollar figure leaves them out.
+        </p>
+      )}
     </section>
   );
 }
