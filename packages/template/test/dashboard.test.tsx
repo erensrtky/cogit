@@ -89,28 +89,31 @@ describe("Overview", () => {
         since: new Date(2026, 10, 3, 9).toISOString(),
       },
     });
-    expect(html).toContain("$0.30");
+    // Tokens only, cache reads apart: no dollar figure.
+    expect(html).toContain("1.5K tokens");
+    expect(html).not.toContain("$");
     expect(html).toContain("in 2 background runs");
     // One message since the first run.
-    expect(html).toContain("about $0.30 a message");
-    expect(html).not.toContain("Codex");
+    expect(html).toContain("about 1.5K a message");
+    expect(html).toContain("Plus 10K re-read from cache");
   });
 
-  it("says when Codex runs are left out of the dollar figure", () => {
+  it("counts Codex runs too, and skips the cache line when nothing was re-read", () => {
     const html = render({
       spend: {
-        runs: 3,
-        usd: 0.3,
-        inputTokens: 1000,
-        outputTokens: 500,
-        cacheReadTokens: 10_000,
+        runs: 1,
+        usd: 0,
+        inputTokens: 200,
+        outputTokens: 100,
+        cacheReadTokens: 0,
         cacheWriteTokens: 0,
         unpriced: 1,
       },
     });
-    expect(html).toContain("1 of the runs went to Codex, which reports tokens but no");
-    // An average over priced and unpriced runs would read low.
-    expect(html).not.toContain("a message");
+    expect(html).toContain("300 tokens");
+    expect(html).toContain("in 1 background run, about 100 a message");
+    expect(html).not.toContain("Codex");
+    expect(html).not.toContain("re-read from cache");
   });
 
   it("leaves out the chart and the calendar before any message", () => {

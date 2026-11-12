@@ -77,45 +77,42 @@ function formatCount(value: number): string {
   return value < 10_000 ? value.toLocaleString("en") : compact.format(value);
 }
 
-function formatUsd(value: number): string {
-  return value < 0.01 && value > 0 ? "< $0.01" : `$${value.toFixed(2)}`;
-}
-
-/** What cogit's own background runs cost, and per message since the first one. */
+/**
+ * The tokens cogit's own background runs used, and per message since the first
+ * one. Tokens only: the reported dollar figure is not trusted (a forked review
+ * run reported far more than its tokens cost), and Codex reports no price.
+ * Cache reads are told apart, as they are most of the total and the cheapest.
+ */
 function SpendTile({ spend, days }: { spend: ViewSpend | undefined; days: readonly DayCount[] }) {
   if (spend === undefined)
     return (
       <section className="home-tile">
-        <h3>cogit's own cost</h3>
+        <h3>cogit's own use</h3>
         <p className="home-number home-number-quiet">Not measured yet</p>
         <p className="home-note">
-          Each background run cogit makes (recording, review, Shapes) notes its cost from 1.3.0 on.
+          Each background run cogit makes (recording, review, Shapes) notes the tokens it used from
+          1.3.0 on.
         </p>
       </section>
     );
-  const tokens =
-    spend.inputTokens + spend.outputTokens + spend.cacheReadTokens + spend.cacheWriteTokens;
+  const fresh = spend.inputTokens + spend.outputTokens + spend.cacheWriteTokens;
   const since = spend.since === undefined ? undefined : new Date(spend.since);
   const from = since === undefined ? "" : dayOf(since);
   const messages = days.reduce((sum, day) => (day.day >= from ? sum + day.messages : sum), 0);
   return (
     <section className="home-tile">
-      <h3>cogit's own cost</h3>
-      <p className="home-number">{formatUsd(spend.usd)}</p>
+      <h3>cogit's own use</h3>
+      <p className="home-number">{compact.format(fresh)} tokens</p>
       <p className="home-note">
-        {compact.format(tokens)} tokens in {formatCount(spend.runs)} background run
-        {spend.runs === 1 ? "" : "s"}
-        {messages > 0 && spend.unpriced === undefined ? (
-          <>, about {formatUsd(spend.usd / messages)} a message</>
-        ) : null}
+        in {formatCount(spend.runs)} background run{spend.runs === 1 ? "" : "s"}
+        {messages > 0 ? <>, about {compact.format(fresh / messages)} a message</> : null}
         {since === undefined ? null : <>, since {since.toLocaleDateString("en")}</>}
       </p>
-      {spend.unpriced === undefined ? null : (
+      {spend.cacheReadTokens > 0 ? (
         <p className="home-note">
-          {formatCount(spend.unpriced)} of the runs went to Codex, which reports tokens but no
-          price; the dollar figure leaves them out.
+          Plus {compact.format(spend.cacheReadTokens)} re-read from cache, the cheapest kind.
         </p>
-      )}
+      ) : null}
     </section>
   );
 }

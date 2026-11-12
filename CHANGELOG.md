@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- The home page shows cogit's own use in tokens, not dollars: the tokens its background runs used, about how many a message, and apart from them the tokens re-read from cache, the cheapest kind. The dollar figure Claude Code reports for a review run could be far above what its tokens cost, and Codex reports no price at all.
 
 ## [1.5.1] - 2026-11-12
 ### Added
