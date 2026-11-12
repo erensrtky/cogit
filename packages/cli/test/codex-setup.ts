@@ -28,13 +28,16 @@ export interface CodexConfig {
   enabled?: boolean;
   /** How the hooks are trusted: per hook, with this content hash (or none). */
   trust?: { contentHash?: string; enabled?: boolean; events?: string[] };
+  /** A marketplace added before `--sparse`, which fetches the whole repository. */
+  wholeRepo?: boolean;
   /** Extra TOML appended as it is. */
   extra?: string;
 }
 
 /** Writes `$CODEX_HOME/config.toml` from the pieces cogit reads. */
 export async function writeCodexConfig(env: NodeJS.ProcessEnv, config: CodexConfig): Promise<void> {
-  const lines: string[] = ['[marketplaces.cogit]\nsource_type = "git"\n'];
+  const sparse = config.wholeRepo === true ? "" : 'sparse_paths = [".agents"]\n';
+  const lines: string[] = [`[marketplaces.cogit]\nsource_type = "git"\n${sparse}`];
   if (config.enabled !== undefined)
     lines.push(`[plugins."${PLUGIN_ID}"]\nenabled = ${config.enabled}\n`);
   if (config.trust !== undefined) {

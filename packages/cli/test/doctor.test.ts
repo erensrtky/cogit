@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import pkg from "../package.json" with { type: "json" };
 import { SKILL_RULE } from "../src/agents/claude/settings.js";
+import { pluginContentHash } from "../src/agents/codex/settings.js";
 import { AGENTS, type AgentAdapter, defaultAgent } from "../src/agents/index.js";
 import {
   closePassError,
@@ -484,6 +485,14 @@ describe("doctor with Codex on the machine", () => {
       status: "ok",
       message: `the Codex plugin is installed, on and trusted (${pkg.version})`,
     });
+    // Added before `--sparse`: records today, but `marketplace upgrade` fetches the whole repo.
+    const trusted = { contentHash: await pluginContentHash(plugin) };
+    await writeCodexConfig(env, { enabled: true, trust: trusted, wholeRepo: true });
+    expect(await check(root, "codex")).toMatchObject({
+      status: "warn",
+      fix: expect.stringContaining("codex plugin marketplace remove cogit && "),
+    });
+    await writeCodexConfig(env, { enabled: true, trust: trusted });
     await writeFile(join(plugin, "dist", "cli.js"), "// updated\n");
     expect((await check(root, "codex")).message).toMatch(/review them again/);
     await writeCodexConfig(env, { enabled: true, trust: { enabled: false } });

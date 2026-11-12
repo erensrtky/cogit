@@ -85,8 +85,10 @@ describe("plugin packaging", () => {
 
   it("tells a Codex user the two commands that install from that marketplace", () => {
     // Measured on Codex 0.167.1: the marketplace is added by repo, the plugin as name@marketplace.
+    // On 0.167.2 `--sparse .agents` cut the fetch from the whole repository (33 MB, past
+    // `marketplace upgrade`'s 30 s on a slow line) to about 1 MB.
     expect(codex.installCommand).toBe(
-      "codex plugin marketplace add erensrtky/cogit && codex plugin add cogit@cogit",
+      "codex plugin marketplace add erensrtky/cogit --sparse .agents && codex plugin add cogit@cogit",
     );
   });
 

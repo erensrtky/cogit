@@ -616,6 +616,8 @@ async function agentSetupCheck(
     };
   const problem = hookProblem[trust];
   if (problem !== undefined) return problem;
+  const advice = await agent.readSetupAdvice(ctx.env);
+  if (advice !== undefined) return { id, status: "warn", ...advice };
   const version = await agent.readPluginVersion(ctx.env);
   const order = version === undefined ? 0 : compareVersions(version, pkg.version);
   if (order > 0)

@@ -131,7 +131,7 @@ cogit → Enable auto-update. Claude Code leaves it off for marketplaces outside
 In Codex, from a terminal:
 
 ```bash
-codex plugin marketplace add erensrtky/cogit
+codex plugin marketplace add erensrtky/cogit --sparse .agents
 codex plugin add cogit@cogit
 ```
 

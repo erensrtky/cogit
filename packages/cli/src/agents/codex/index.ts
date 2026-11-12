@@ -13,11 +13,16 @@ import {
 } from "./hooks.js";
 import { run } from "./run.js";
 import {
+  MARKETPLACE_SPARSE,
   readHookTrust,
+  readMarketplaceSparse,
   readPluginEnabled,
   readPluginInstalled,
   readPluginVersion,
 } from "./settings.js";
+
+const ADD_MARKETPLACE = `codex plugin marketplace add ${MARKETPLACE_REPO} --sparse ${MARKETPLACE_SPARSE}`;
+
 import {
   codexHome,
   collectTranscriptIds,
@@ -56,9 +61,10 @@ export const codex: AgentAdapter = {
   skillRule: "$cogit:record",
   /**
    * Codex skips Claude's `github` marketplace source and reads `.agents/plugins/marketplace.json`
-   * first, which points at the same plugin branch. The hooks then wait for trust in `/hooks`.
+   * first, which points at the same plugin branch. `--sparse` keeps Codex from fetching the whole
+   * repository. The hooks then wait for trust in `/hooks`.
    */
-  installCommand: `codex plugin marketplace add ${MARKETPLACE_REPO} && codex plugin add cogit@cogit`,
+  installCommand: `${ADD_MARKETPLACE} && codex plugin add cogit@cogit`,
   /** Refreshes the marketplace's copy of the repository, then installs the plugin again from it. */
   updateCommand: "codex plugin marketplace upgrade cogit && codex plugin add cogit@cogit",
   /** Codex names no project directory for hooks; the payload's cwd is used. */
@@ -100,6 +106,15 @@ export const codex: AgentAdapter = {
   readSkillAllowed: async () => true,
   isPresent: (env) => agentPresent(codexHome(env), "codex", env),
   readHookTrust,
+  /** A marketplace added without `--sparse` fetches the whole repository on every update. */
+  readSetupAdvice: async (env) =>
+    (await readMarketplaceSparse(env)) === false
+      ? {
+          message:
+            "cogit's Codex marketplace downloads the whole repository on every update, which can time out on a slow connection",
+          fix: `codex plugin marketplace remove cogit && ${ADD_MARKETPLACE} (the installed plugin stays)`,
+        }
+      : undefined,
   settingsFile: (env) => join(codexHome(env), "config.toml"),
   unreadableTranscripts: (env) => unreadableTranscripts(env),
   setRetention: notYet("set transcript retention"),

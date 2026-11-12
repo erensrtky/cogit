@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Updating cogit in Codex could fail with "git clone marketplace source timed out after 30s": Codex fetched the whole repository (about 33 MB) for the marketplace. The install command now adds it with `--sparse .agents`, about 1 MB. If you installed 1.5.0 in Codex, `cogit doctor` gives the two commands that add it again; the installed plugin stays.
 
 ## [1.5.0] - 2026-11-12
 ### Added

@@ -91,6 +91,7 @@ export const claude: AgentAdapter = {
   isPresent: (env) => agentPresent(claudeConfigDir(env), "claude", env),
   /** Claude Code runs an enabled plugin's hooks without asking. */
   readHookTrust: async () => "trusted",
+  readSetupAdvice: async () => undefined,
   settingsFile: claudeSettingsPath,
   unreadableTranscripts: async () => [],
   setRetention,

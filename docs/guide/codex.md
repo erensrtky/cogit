@@ -17,9 +17,13 @@ Tested on Linux with Codex CLI 0.167.
 2. The plugin, in a terminal:
 
    ```bash
-   codex plugin marketplace add erensrtky/cogit
+   codex plugin marketplace add erensrtky/cogit --sparse .agents
    codex plugin add cogit@cogit
    ```
+
+   `--sparse .agents` makes Codex fetch only the folder that lists the plugin, about 1 MB,
+   instead of the whole repository (about 33 MB). Without it, `codex plugin marketplace
+   upgrade` can give up after 30 seconds on a slow connection.
 
 3. **Trust the hooks.** Start Codex in a project (`codex`). It says that cogit's hooks need
    review; accept them, or trust them later in `/hooks`. Until you do, Codex skips the hooks
@@ -51,6 +55,14 @@ codex plugin add cogit@cogit
 
 Then start Codex once and accept the review. `cogit doctor` notices when you have not:
 "cogit changed since you trusted its hooks".
+
+If you added the marketplace without `--sparse` (the command cogit 1.5.0 gave), add it again
+once; the installed plugin and your hooks review stay as they are, and `cogit doctor` reminds you:
+
+```bash
+codex plugin marketplace remove cogit
+codex plugin marketplace add erensrtky/cogit --sparse .agents
+```
 
 ## Recording
 

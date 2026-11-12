@@ -7,6 +7,7 @@ import {
   pluginContentHash,
   readConfigFile,
   readHookTrust,
+  readMarketplaceSparse,
   readPluginEnabled,
   readPluginInstalled,
   readPluginVersion,
@@ -79,6 +80,27 @@ describe("Codex's config.toml", () => {
     expect(await readPluginEnabled(env, join(dir, "other"))).toBe(false);
     await writeFile(join(codexHome(env), "config.toml"), "not toml [");
     expect(await readPluginEnabled(env)).toBeUndefined();
+  });
+});
+
+describe("Codex's marketplace", () => {
+  it("tells a marketplace that fetches only .agents from one that fetches the whole repository", async () => {
+    expect(await readMarketplaceSparse(env)).toBeUndefined();
+    await writeCodexConfig(env, { enabled: true });
+    expect(await readMarketplaceSparse(env)).toBe(true);
+    expect(await codex?.readSetupAdvice(env)).toBeUndefined();
+    await writeCodexConfig(env, { enabled: true, wholeRepo: true });
+    expect(await readMarketplaceSparse(env)).toBe(false);
+    expect(await codex?.readSetupAdvice(env)).toEqual({
+      message: expect.stringContaining("downloads the whole repository"),
+      fix: "codex plugin marketplace remove cogit && codex plugin marketplace add erensrtky/cogit --sparse .agents (the installed plugin stays)",
+    });
+    await writeFile(
+      join(codexHome(env), "config.toml"),
+      '[marketplaces.cogit]\nsource_type = "local"\nsource = "/somewhere"\n',
+    );
+    expect(await readMarketplaceSparse(env)).toBeUndefined();
+    expect(await AGENTS["claude-code"]?.readSetupAdvice(env)).toBeUndefined();
   });
 });
 

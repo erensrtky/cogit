@@ -15,6 +15,12 @@ import { codexHome } from "./transcripts.js";
 
 /** The plugin as Codex names it: `<plugin>@<marketplace>`. */
 export const PLUGIN_ID = "cogit@cogit";
+/**
+ * The one folder of the repository Codex needs to read the marketplace. With it
+ * (`--sparse`) Codex fetches about 1 MB instead of the whole repository, which
+ * `codex plugin marketplace upgrade` gives up on after 30 s on a slow connection.
+ */
+export const MARKETPLACE_SPARSE = ".agents";
 /** The plugin's hooks file, as `.codex-plugin/plugin.json` names it. */
 const HOOKS_FILE = "hooks/codex.json";
 /** The events in that file, as Codex keys their trust (`session_start`, …). */
@@ -154,6 +160,20 @@ function u64(value: number): Buffer {
 function updateBytes(hash: Hash, bytes: Buffer): void {
   hash.update(u64(bytes.length));
   hash.update(bytes);
+}
+
+/**
+ * Whether cogit's marketplace fetches only `.agents`: false when it is a git
+ * source that fetches the whole repository (added before `--sparse`), undefined
+ * when there is none, it is a local folder, or the config cannot be read.
+ */
+export async function readMarketplaceSparse(env: NodeJS.ProcessEnv): Promise<boolean | undefined> {
+  const config = await readConfig(env);
+  const marketplaces = isTable(config?.marketplaces) ? config.marketplaces : {};
+  const entry = marketplaces.cogit;
+  if (!isTable(entry) || entry.source_type !== "git") return undefined;
+  const sparse = Array.isArray(entry.sparse_paths) ? entry.sparse_paths : [];
+  return sparse.includes(MARKETPLACE_SPARSE);
 }
 
 /**

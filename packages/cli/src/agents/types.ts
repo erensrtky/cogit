@@ -208,6 +208,8 @@ export interface AgentAdapter {
   isPresent(env: NodeJS.ProcessEnv): Promise<boolean>;
   /** Whether the agent runs the plugin's hooks; undefined when its settings are unreadable. */
   readHookTrust(env: NodeJS.ProcessEnv): Promise<HookTrust | undefined>;
+  /** A setup detail that records fine today but will make the next update fail, with its fix. */
+  readSetupAdvice(env: NodeJS.ProcessEnv): Promise<{ message: string; fix: string } | undefined>;
   /** The user settings file cogit reads, for messages. */
   settingsFile(env: NodeJS.ProcessEnv): string;
   /** Transcripts on this machine cogit cannot read (Codex's compressed ones on an older Node). */
