@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.5.1] - 2026-11-12
 ### Added
 - cogit tells you when a newer version is out: at the start of a new chat, one line for you (not for the agent) with the commands for Claude Code or Codex, at most once a day per version, and in `cogit doctor`. To know, it asks npm once a day for the newest version of @cogit/cli, in the background so no chat waits for it; nothing else goes with that request. Turn it off in Settings or with `cogit config set updateCheck false`.
 
