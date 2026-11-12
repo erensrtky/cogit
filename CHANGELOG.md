@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Codex support.** cogit records [Codex CLI](https://github.com/openai/codex) sessions like Claude Code's: one node per message, linked commits, the same map. Install the plugin with `codex plugin marketplace add erensrtky/cogit && codex plugin add cogit@cogit`, then start Codex and accept the hooks review it shows. Codex asks for that review again after every cogit update, and until then it skips the hooks without a word. A new guide page, [Codex](docs/guide/codex.md), covers the install, `codex exec` and what differs from Claude Code.
+- `codex exec` runs follow the **Background work** setting like `claude -p`: with it on, a run a script starts is recorded, and its record is finished before `codex exec` returns.
+- cogit's own runs for a Codex session (the side runs and the closing pass) run on Codex with your Codex login, read-only and with hooks off. They use Codex's default model, since a ChatGPT account refuses Claude model names. Codex reports no price, so the spend log keeps their tokens and the map's dollar figure says it leaves them out.
+- `cogit doctor` and `cogit init` know Codex: whether the plugin is installed and on, whether its hooks are trusted or waiting for a review after an update, and how many Codex sessions in the project are recorded. A machine without Codex sees the same output as before.
+- The map labels the sessions that ran on Codex, and its Resume and Fork buttons copy `codex resume <id>` and `codex fork <id>` for them.
+
+### Changed
+- The record skill names the type of the fields that take a list (`done`, `work`, `commits`, `files`) and says `branch.open` is one string; Codex's model had sent them the other way round on its first write.
+- `cogit session show` prints the session's id in its output.
 
 ## [1.4.2] - 2026-11-11
 ### Changed

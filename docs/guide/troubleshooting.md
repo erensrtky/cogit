@@ -42,6 +42,10 @@ is shared; `cogit config git` shows which it is.
 4. **Did the side model fail?** Its output goes to `.cogit/state/detached.log`. The usual
    causes: `claude` is not on the `PATH` of the hook, or it is not logged in.
 
+5. **On Codex: are the hooks trusted?** Codex skips hooks it has not trusted without saying
+   so, and every cogit update asks for the review again. Start Codex in the project and
+   accept the hooks review; `cogit doctor` says when it is due. See [Codex](codex.md).
+
 A message without a record yet is picked up by the next side run or at the session end. With
 `sessionEndCatchUp` off, the map says how many messages of a session are not recorded.
 

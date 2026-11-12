@@ -12,6 +12,7 @@ part in detail.
 | [Teams and git](teams-and-git.md) | What is shared, the `Thought:` trailer, the git hooks, teammates' records |
 | [Recording and cost](recording-and-cost.md) | Who writes the record, the side model, what it costs |
 | [Loops, sandboxes and agent factories](loops-and-sandboxes.md) | Which `claude -p` sessions are recorded, what a loop or sandbox needs, the case cogit cannot cover |
+| [Codex](codex.md) | Installing in Codex, reviewing the hooks after each update, `codex exec`, what differs from Claude Code |
 | [Privacy](privacy.md) | What is recorded, what never is, what leaves your machine |
 | [Settings](settings.md) | Every setting with a plain-language explanation |
 | [Troubleshooting](troubleshooting.md) | Nothing is recorded, the map looks old, the port is taken, and more |

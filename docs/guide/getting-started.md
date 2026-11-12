@@ -3,7 +3,8 @@
 ## Requirements
 
 - Node 22.13 or later
-- Claude Code 2.1.275 or later
+- Claude Code 2.1.275 or later, or Codex CLI 0.167 or later ([Codex](codex.md) has its own
+  install steps)
 - A git repository: cogit ties its record to your commits, so `cogit init` stops in a
   directory that is not in one. Run `git init` first.
 - `git config user.name` and `git config user.email` set: cogit stamps each session with

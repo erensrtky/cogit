@@ -106,7 +106,7 @@ including the option that was rejected.*
 
 ## Install
 
-You need Node 22.13+, Claude Code 2.1.275+ and a git repository.
+You need Node 22.13+, a git repository, and Claude Code 2.1.275+ or Codex CLI 0.167+.
 
 ```bash
 npm install -g @cogit/cli
@@ -121,6 +121,16 @@ Then, in Claude Code:
 To get plugin updates on their own, turn on auto-update once: `/plugin` → Marketplaces →
 cogit → Enable auto-update. Claude Code leaves it off for marketplaces outside its own.
 
+In Codex, from a terminal:
+
+```bash
+codex plugin marketplace add erensrtky/cogit
+codex plugin add cogit@cogit
+```
+
+Then start Codex in a project and accept the hooks review it shows; Codex asks again after
+every cogit update. Details in [Codex](docs/guide/codex.md).
+
 If the map stays empty, run `cogit doctor`.
 
 ## Quick start
@@ -130,7 +140,7 @@ cd your-project
 cogit init        # a few questions: git, transcript retention, team setup, language
 ```
 
-Work with Claude Code as usual; recording needs nothing from you. Then open the map:
+Work with Claude Code or Codex as usual; recording needs nothing from you. Then open the map:
 
 ```bash
 cogit open .
@@ -150,6 +160,8 @@ cogit open .
   costs
 - [Loops, sandboxes and agent factories](docs/guide/loops-and-sandboxes.md): recording
   `claude -p` loops and sandboxed runs
+- [Codex](docs/guide/codex.md): installing in Codex, the hooks review after each update,
+  `codex exec`, limits
 - [Privacy](docs/guide/privacy.md): what is recorded and what never leaves your machine
 - [Settings](docs/guide/settings.md): every setting, explained
 - [Troubleshooting](docs/guide/troubleshooting.md)
