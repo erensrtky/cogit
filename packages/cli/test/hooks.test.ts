@@ -248,23 +248,29 @@ describe("runHook", () => {
     expect(started).toEqual([]);
   });
 
-  it("starts the chat as usual when the update notice cannot be saved", async () => {
-    await initialized(1);
-    const dir = join(env.COGIT_HOME as string, "state");
-    await mkdir(dir, { recursive: true });
-    await writeFile(
-      join(dir, "update-check.json"),
-      JSON.stringify({ checkedAt: T0, latest: "99.0.0" }),
-    );
-    await chmod(dir, 0o500);
-    try {
-      const out = JSON.parse((await sessionStart("startup")) ?? "{}");
-      expect(out.systemMessage).toBeUndefined();
-      expect(out.hookSpecificOutput.additionalContext).toContain("records this project's lineage");
-    } finally {
-      await chmod(dir, 0o700);
-    }
-  });
+  // Windows ignores the read-only mode bits, so the save there does not fail.
+  it.skipIf(process.platform === "win32")(
+    "starts the chat as usual when the update notice cannot be saved",
+    async () => {
+      await initialized(1);
+      const dir = join(env.COGIT_HOME as string, "state");
+      await mkdir(dir, { recursive: true });
+      await writeFile(
+        join(dir, "update-check.json"),
+        JSON.stringify({ checkedAt: T0, latest: "99.0.0" }),
+      );
+      await chmod(dir, 0o500);
+      try {
+        const out = JSON.parse((await sessionStart("startup")) ?? "{}");
+        expect(out.systemMessage).toBeUndefined();
+        expect(out.hookSpecificOutput.additionalContext).toContain(
+          "records this project's lineage",
+        );
+      } finally {
+        await chmod(dir, 0o700);
+      }
+    },
+  );
 
   it("offers no setup outside a git repository, where init would refuse", async () => {
     const outside = await noGitDir();
