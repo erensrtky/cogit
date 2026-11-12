@@ -4,17 +4,24 @@
 
 **Git for the intent behind agent-written code.**
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/@cogit/cli"><img src="https://img.shields.io/npm/v/@cogit/cli?label=npm" alt="npm version"></a>
+  <a href="https://github.com/erensrtky/cogit/stargazers"><img src="https://img.shields.io/github/stars/erensrtky/cogit" alt="GitHub stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/erensrtky/cogit" alt="MIT licence"></a>
+  <a href="docs/guide/getting-started.md"><img src="https://img.shields.io/badge/works_with-Claude_Code-D97757" alt="Works with Claude Code"></a>
+  <a href="docs/guide/codex.md"><img src="https://img.shields.io/badge/works_with-Codex_CLI-000000" alt="Works with Codex CLI"></a>
+</p>
+
 <p align="center"><img src="docs/images/cogit-descartes.jpg" width="360" alt="René Descartes with git branches running through his hair"><br><i>Cogito, ergo commit.</i></p>
 
 cogit records every message you send to an AI coding agent as a *thought commit*: what you
 asked, what came of it, and the message it answered. Your code commits point back to the
-thought behind them, so `cogit why` takes any line of code back to the reason it exists. It works
-with Claude Code and Codex CLI.
+thought behind them, so `cogit why` takes any line of code back to the reason it exists.
 
 Agent memory helps your agent remember. cogit helps you understand.
 
-It runs as a plugin in Claude Code or Codex and works through the agent's hooks, so the record is
-written while you work, not reconstructed from the diff afterwards.
+It runs as a plugin in your coding agent and works through its hooks, so the record is written
+while you work, not reconstructed from the diff afterwards.
 
 **[Click through a saved map](https://erensrtky.github.io/cogit/demo/)**: no install, no server.
 It's the page `cogit open` writes, built from sample data and read-only.
