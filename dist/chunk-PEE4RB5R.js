@@ -41,8 +41,174 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../../node_modules/boundary/lib/index.js
+// ../../node_modules/cli-width/index.js
+var require_cli_width = __commonJS({
+  "../../node_modules/cli-width/index.js"(exports, module) {
+    "use strict";
+    module.exports = cliWidth2;
+    function normalizeOpts(options) {
+      const defaultOpts = {
+        defaultWidth: 0,
+        output: process.stdout,
+        tty: __require("tty")
+      };
+      if (!options) {
+        return defaultOpts;
+      }
+      Object.keys(defaultOpts).forEach(function(key) {
+        if (!options[key]) {
+          options[key] = defaultOpts[key];
+        }
+      });
+      return options;
+    }
+    function cliWidth2(options) {
+      const opts = normalizeOpts(options);
+      if (opts.output.getWindowSize) {
+        return opts.output.getWindowSize()[0] || opts.defaultWidth;
+      }
+      if (opts.tty.getWindowSize) {
+        return opts.tty.getWindowSize()[1] || opts.defaultWidth;
+      }
+      if (opts.output.columns) {
+        return opts.output.columns;
+      }
+      if (process.env.CLI_WIDTH) {
+        const width = parseInt(process.env.CLI_WIDTH, 10);
+        if (!isNaN(width) && width !== 0) {
+          return width;
+        }
+      }
+      return opts.defaultWidth;
+    }
+  }
+});
+
+// ../../node_modules/mute-stream/lib/index.js
 var require_lib = __commonJS({
+  "../../node_modules/mute-stream/lib/index.js"(exports, module) {
+    "use strict";
+    var Stream = __require("stream");
+    var MuteStream2 = class extends Stream {
+      #isTTY = null;
+      constructor(opts = {}) {
+        super(opts);
+        this.writable = this.readable = true;
+        this.muted = false;
+        this.on("pipe", this._onpipe);
+        this.replace = opts.replace;
+        this._prompt = opts.prompt || null;
+        this._hadControl = false;
+      }
+      #destSrc(key, def) {
+        if (this._dest) {
+          return this._dest[key];
+        }
+        if (this._src) {
+          return this._src[key];
+        }
+        return def;
+      }
+      #proxy(method, ...args) {
+        if (typeof this._dest?.[method] === "function") {
+          this._dest[method](...args);
+        }
+        if (typeof this._src?.[method] === "function") {
+          this._src[method](...args);
+        }
+      }
+      get isTTY() {
+        if (this.#isTTY !== null) {
+          return this.#isTTY;
+        }
+        return this.#destSrc("isTTY", false);
+      }
+      // basically just get replace the getter/setter with a regular value
+      set isTTY(val) {
+        this.#isTTY = val;
+      }
+      get rows() {
+        return this.#destSrc("rows");
+      }
+      get columns() {
+        return this.#destSrc("columns");
+      }
+      mute() {
+        this.muted = true;
+      }
+      unmute() {
+        this.muted = false;
+      }
+      _onpipe(src) {
+        this._src = src;
+      }
+      pipe(dest, options) {
+        this._dest = dest;
+        return super.pipe(dest, options);
+      }
+      pause() {
+        if (this._src) {
+          return this._src.pause();
+        }
+      }
+      resume() {
+        if (this._src) {
+          return this._src.resume();
+        }
+      }
+      write(c) {
+        if (this.muted) {
+          if (!this.replace) {
+            return true;
+          }
+          if (c.match(/^\u001b/)) {
+            if (c.indexOf(this._prompt) === 0) {
+              c = c.slice(this._prompt.length);
+              c = c.replace(/./g, this.replace);
+              c = this._prompt + c;
+            }
+            this._hadControl = true;
+            return this.emit("data", c);
+          } else {
+            if (this._prompt && this._hadControl && c.indexOf(this._prompt) === 0) {
+              this._hadControl = false;
+              this.emit("data", this._prompt);
+              c = c.slice(this._prompt.length);
+            }
+            c = c.toString().replace(/./g, this.replace);
+          }
+        }
+        this.emit("data", c);
+      }
+      end(c) {
+        if (this.muted) {
+          if (c && this.replace) {
+            c = c.toString().replace(/./g, this.replace);
+          } else {
+            c = null;
+          }
+        }
+        if (c) {
+          this.emit("data", c);
+        }
+        this.emit("end");
+      }
+      destroy(...args) {
+        return this.#proxy("destroy", ...args);
+      }
+      destroySoon(...args) {
+        return this.#proxy("destroySoon", ...args);
+      }
+      close(...args) {
+        return this.#proxy("close", ...args);
+      }
+    };
+    module.exports = MuteStream2;
+  }
+});
+
+// ../../node_modules/boundary/lib/index.js
+var require_lib2 = __commonJS({
   "../../node_modules/boundary/lib/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -97,7 +263,7 @@ var require_structured_source = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.StructuredSource = void 0;
-    var boundary_1 = require_lib();
+    var boundary_1 = require_lib2();
     var StructuredSource2 = class {
       /**
        * @constructs StructuredSource
@@ -183,7 +349,7 @@ var require_ms = __commonJS({
       options = options || {};
       var type = typeof val;
       if (type === "string" && val.length > 0) {
-        return parse3(val);
+        return parse5(val);
       } else if (type === "number" && isFinite(val)) {
         return options.long ? fmtLong(val) : fmtShort(val);
       }
@@ -191,7 +357,7 @@ var require_ms = __commonJS({
         "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
       );
     };
-    function parse3(str) {
+    function parse5(str) {
       str = String(str);
       if (str.length > 100) {
         return;
@@ -380,8 +546,8 @@ var require_common = __commonJS({
         }
         return debug2;
       }
-      function extend2(namespace, delimiter2) {
-        const newDebug = createDebug(this.namespace + (typeof delimiter2 === "undefined" ? ":" : delimiter2) + namespace);
+      function extend2(namespace, delimiter3) {
+        const newDebug = createDebug(this.namespace + (typeof delimiter3 === "undefined" ? ":" : delimiter3) + namespace);
         newDebug.log = this.log;
         return newDebug;
       }
@@ -822,177 +988,11 @@ var require_src = __commonJS({
   }
 });
 
-// ../../node_modules/cli-width/index.js
-var require_cli_width = __commonJS({
-  "../../node_modules/cli-width/index.js"(exports, module) {
-    "use strict";
-    module.exports = cliWidth2;
-    function normalizeOpts(options) {
-      const defaultOpts = {
-        defaultWidth: 0,
-        output: process.stdout,
-        tty: __require("tty")
-      };
-      if (!options) {
-        return defaultOpts;
-      }
-      Object.keys(defaultOpts).forEach(function(key) {
-        if (!options[key]) {
-          options[key] = defaultOpts[key];
-        }
-      });
-      return options;
-    }
-    function cliWidth2(options) {
-      const opts = normalizeOpts(options);
-      if (opts.output.getWindowSize) {
-        return opts.output.getWindowSize()[0] || opts.defaultWidth;
-      }
-      if (opts.tty.getWindowSize) {
-        return opts.tty.getWindowSize()[1] || opts.defaultWidth;
-      }
-      if (opts.output.columns) {
-        return opts.output.columns;
-      }
-      if (process.env.CLI_WIDTH) {
-        const width = parseInt(process.env.CLI_WIDTH, 10);
-        if (!isNaN(width) && width !== 0) {
-          return width;
-        }
-      }
-      return opts.defaultWidth;
-    }
-  }
-});
-
-// ../../node_modules/mute-stream/lib/index.js
-var require_lib2 = __commonJS({
-  "../../node_modules/mute-stream/lib/index.js"(exports, module) {
-    "use strict";
-    var Stream = __require("stream");
-    var MuteStream2 = class extends Stream {
-      #isTTY = null;
-      constructor(opts = {}) {
-        super(opts);
-        this.writable = this.readable = true;
-        this.muted = false;
-        this.on("pipe", this._onpipe);
-        this.replace = opts.replace;
-        this._prompt = opts.prompt || null;
-        this._hadControl = false;
-      }
-      #destSrc(key, def) {
-        if (this._dest) {
-          return this._dest[key];
-        }
-        if (this._src) {
-          return this._src[key];
-        }
-        return def;
-      }
-      #proxy(method, ...args) {
-        if (typeof this._dest?.[method] === "function") {
-          this._dest[method](...args);
-        }
-        if (typeof this._src?.[method] === "function") {
-          this._src[method](...args);
-        }
-      }
-      get isTTY() {
-        if (this.#isTTY !== null) {
-          return this.#isTTY;
-        }
-        return this.#destSrc("isTTY", false);
-      }
-      // basically just get replace the getter/setter with a regular value
-      set isTTY(val) {
-        this.#isTTY = val;
-      }
-      get rows() {
-        return this.#destSrc("rows");
-      }
-      get columns() {
-        return this.#destSrc("columns");
-      }
-      mute() {
-        this.muted = true;
-      }
-      unmute() {
-        this.muted = false;
-      }
-      _onpipe(src) {
-        this._src = src;
-      }
-      pipe(dest, options) {
-        this._dest = dest;
-        return super.pipe(dest, options);
-      }
-      pause() {
-        if (this._src) {
-          return this._src.pause();
-        }
-      }
-      resume() {
-        if (this._src) {
-          return this._src.resume();
-        }
-      }
-      write(c) {
-        if (this.muted) {
-          if (!this.replace) {
-            return true;
-          }
-          if (c.match(/^\u001b/)) {
-            if (c.indexOf(this._prompt) === 0) {
-              c = c.slice(this._prompt.length);
-              c = c.replace(/./g, this.replace);
-              c = this._prompt + c;
-            }
-            this._hadControl = true;
-            return this.emit("data", c);
-          } else {
-            if (this._prompt && this._hadControl && c.indexOf(this._prompt) === 0) {
-              this._hadControl = false;
-              this.emit("data", this._prompt);
-              c = c.slice(this._prompt.length);
-            }
-            c = c.toString().replace(/./g, this.replace);
-          }
-        }
-        this.emit("data", c);
-      }
-      end(c) {
-        if (this.muted) {
-          if (c && this.replace) {
-            c = c.toString().replace(/./g, this.replace);
-          } else {
-            c = null;
-          }
-        }
-        if (c) {
-          this.emit("data", c);
-        }
-        this.emit("end");
-      }
-      destroy(...args) {
-        return this.#proxy("destroy", ...args);
-      }
-      destroySoon(...args) {
-        return this.#proxy("destroySoon", ...args);
-      }
-      close(...args) {
-        return this.#proxy("close", ...args);
-      }
-    };
-    module.exports = MuteStream2;
-  }
-});
-
 // src/git-hooks.ts
 import { execFile as execFile3 } from "child_process";
 import { existsSync as existsSync5, realpathSync } from "fs";
-import { chmod, mkdir as mkdir7, readFile as readFile10, realpath as realpath3, rm as rm5, stat as stat11 } from "fs/promises";
-import { dirname as dirname11, join as join13, resolve as resolve4 } from "path";
+import { chmod, mkdir as mkdir8, readFile as readFile12, realpath as realpath3, rm as rm5, stat as stat12 } from "fs/promises";
+import { dirname as dirname13, join as join17, resolve as resolve5 } from "path";
 import { promisify as promisify3 } from "util";
 
 // src/git.ts
@@ -1087,17 +1087,17 @@ async function ensureGitignore(root, policy) {
   const file2 = join2(root, ".gitignore");
   const text = await readFile2(file2, "utf8").catch(() => "");
   if (policy === "share") {
-    const lines = text.split(/\r?\n/);
-    const kept = lines.filter((line) => line.trim() !== IGNORE_ALL);
-    if (kept.length !== lines.length) await atomicWrite(file2, kept.join("\n"));
+    const lines2 = text.split(/\r?\n/);
+    const kept = lines2.filter((line) => line.trim() !== IGNORE_ALL);
+    if (kept.length !== lines2.length) await atomicWrite(file2, kept.join("\n"));
     return [];
   }
   const present = new Set(text.split(/\r?\n/).map((l) => l.trim()));
   const missing = gitignoreLines(policy).filter((l) => !present.has(l));
   if (missing.length === 0) return [];
   const block = [present.has(HEADER) ? [] : [HEADER], missing].flat().join("\n");
-  const sep5 = text === "" || text.endsWith("\n") ? "" : "\n";
-  await atomicWrite(file2, `${text}${sep5}${block}
+  const sep6 = text === "" || text.endsWith("\n") ? "" : "\n";
+  await atomicWrite(file2, `${text}${sep6}${block}
 `);
   return missing;
 }
@@ -1142,8 +1142,8 @@ async function knownCommits(root, hashes) {
     child.on("error", () => done(void 0));
     child.on("close", (code) => {
       if (code !== 0) return done(void 0);
-      const lines = out.split("\n");
-      done(new Set(hashes.filter((_, at) => lines[at]?.split(" ")[1] === "commit")));
+      const lines2 = out.split("\n");
+      done(new Set(hashes.filter((_, at) => lines2[at]?.split(" ")[1] === "commit")));
     });
     child.stdin.on("error", () => {
     });
@@ -1438,7 +1438,7 @@ async function gitHooksDir(root) {
 }
 
 // src/hooks/run.ts
-import { spawn as spawn3 } from "child_process";
+import { spawn as spawn4 } from "child_process";
 import {
   closeSync,
   existsSync as existsSync4,
@@ -1450,15 +1450,50 @@ import {
   writeSync
 } from "fs";
 import { tmpdir as tmpdir2 } from "os";
-import { dirname as dirname10, join as join12 } from "path";
+import { dirname as dirname12, join as join16 } from "path";
 import { fileURLToPath } from "url";
+
+// src/agents/index.ts
+import { relative as relative4, resolve, sep as sep3 } from "path";
+
+// src/view/agent-names.ts
+var AGENT_LABELS = {
+  "claude-code": "Claude Code",
+  codex: "Codex"
+};
+function agentLabel(agent) {
+  return AGENT_LABELS[agent] ?? agent;
+}
+
+// src/agents/presence.ts
+import { access, stat as stat3 } from "fs/promises";
+import { delimiter, join as join3 } from "path";
+async function onPath(name, env) {
+  const dirs = (env.PATH ?? env.Path ?? "").split(delimiter).filter((dir) => dir !== "");
+  const names = process.platform === "win32" ? [`${name}.cmd`, `${name}.exe`, `${name}.ps1`, name] : [name];
+  for (const dir of dirs) {
+    for (const file2 of names) {
+      try {
+        await access(join3(dir, file2));
+        return true;
+      } catch {
+      }
+    }
+  }
+  return false;
+}
+async function isDir(dir) {
+  return (await stat3(dir).catch(() => void 0))?.isDirectory() ?? false;
+}
+async function agentPresent(configDir, command, env) {
+  return await isDir(configDir) || await onPath(command, env);
+}
 
 // src/agents/types.ts
 var DEFAULT_AGENT = "claude-code";
 
 // src/agents/claude/hooks.ts
 import { appendFile } from "fs/promises";
-import { basename as basename3 } from "path";
 
 // ../../node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -2687,14 +2722,14 @@ function codePointLength(str) {
   const units = str.length;
   if (!highSurrogate.test(str))
     return units;
-  let count = units;
+  let count2 = units;
   for (let i = 0; i < units - 1; i++) {
     if ((str.charCodeAt(i) & 64512) === 55296 && (str.charCodeAt(i + 1) & 64512) === 56320) {
-      count--;
+      count2--;
       i++;
     }
   }
-  return count;
+  return count2;
 }
 function getLengthableOrigin(input2) {
   if (Array.isArray(input2))
@@ -3200,14 +3235,14 @@ function toDotPath(_path) {
   return segs.join("");
 }
 function prettifyError(error62) {
-  const lines = [];
+  const lines2 = [];
   const issues = [...error62.issues].sort((a, b) => (a.path ?? []).length - (b.path ?? []).length);
   for (const issue2 of issues) {
-    lines.push(`\u2716 ${issue2.message}`);
+    lines2.push(`\u2716 ${issue2.message}`);
     if (issue2.path?.length)
-      lines.push(`  \u2192 at ${toDotPath(issue2.path)}`);
+      lines2.push(`  \u2192 at ${toDotPath(issue2.path)}`);
   }
-  return lines.join("\n");
+  return lines2.join("\n");
 }
 
 // ../../node_modules/zod/v4/core/parse.js
@@ -3318,18 +3353,18 @@ var validateAsync = async (schema, value, _ctx) => {
   return result.issues.length === 0;
 };
 var _encode = (_Err) => {
-  const parse3 = _parse(_Err);
+  const parse5 = _parse(_Err);
   const fn = (schema, value, _ctx, _params) => {
     const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
-    return parse3(schema, value, ctx, finalizeParams(fn, _params));
+    return parse5(schema, value, ctx, finalizeParams(fn, _params));
   };
   return fn;
 };
 var encode = /* @__PURE__ */ _encode($ZodRealError);
 var _decode = (_Err) => {
-  const parse3 = _parse(_Err);
+  const parse5 = _parse(_Err);
   const fn = (schema, value, _ctx, _params) => {
-    return parse3(schema, value, _ctx, finalizeParams(fn, _params));
+    return parse5(schema, value, _ctx, finalizeParams(fn, _params));
   };
   return fn;
 };
@@ -3470,8 +3505,8 @@ function emoji() {
 }
 var ipv4 = /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$/;
 var ipv6 = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/;
-var mac = (delimiter2) => {
-  const escapedDelim = escapeRegex(delimiter2 ?? ":");
+var mac = (delimiter3) => {
+  const escapedDelim = escapeRegex(delimiter3 ?? ":");
   return new RegExp(`^(?:[0-9A-F]{2}${escapedDelim}){5}[0-9A-F]{2}$|^(?:[0-9a-f]{2}${escapedDelim}){5}[0-9a-f]{2}$`);
 };
 var cidrv4 = /^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\/([0-9]|[1-2][0-9]|3[0-2])$/;
@@ -4042,9 +4077,9 @@ var Doc = class {
       return;
     }
     const content = arg;
-    const lines = content.split("\n").filter((x) => x);
-    const minIndent = Math.min(...lines.map((x) => x.length - x.trimStart().length));
-    const dedented = lines.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
+    const lines2 = content.split("\n").filter((x) => x);
+    const minIndent = Math.min(...lines2.map((x) => x.length - x.trimStart().length));
+    const dedented = lines2.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
     for (const line of dedented) {
       this.content.push(line);
     }
@@ -4824,7 +4859,7 @@ function capSize(inst, size) {
   if (!caps.length)
     return;
   const cap = Math.min(...caps.map((c) => c[0]));
-  const parse3 = inst._zod.parse;
+  const parse5 = inst._zod.parse;
   inst._zod.parse = (payload, ctx) => {
     const n = size(payload.value);
     if (n > cap && !ctx?.skipChecks && ctx?.direction !== "backward") {
@@ -4838,7 +4873,7 @@ function capSize(inst, size) {
         }
       }
     }
-    return parse3(payload, ctx);
+    return parse5(payload, ctx);
   };
 }
 var arraySize = (input2) => Array.isArray(input2) ? input2.length : -1;
@@ -6527,7 +6562,7 @@ var recursive = /* @__PURE__ */ new WeakMap();
 var NONE = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
-function isRecursive(inst, stack, resolve5) {
+function isRecursive(inst, stack, resolve6) {
   const cached2 = recursive.get(inst);
   if (cached2 !== void 0)
     return cached2 ? PROVEN : NONE;
@@ -6537,7 +6572,7 @@ function isRecursive(inst, stack, resolve5) {
   let result = NONE;
   const check2 = (child) => {
     if (result !== PROVEN && child?._zod) {
-      const answer = isRecursive(child, stack, resolve5);
+      const answer = isRecursive(child, stack, resolve6);
       if (answer > result)
         result = answer;
     }
@@ -6548,7 +6583,7 @@ function isRecursive(inst, stack, resolve5) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
       if (spread && !desc.enumerable)
         continue;
-      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve5) : NONE;
+      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve6) : NONE;
       if (child > answer)
         answer = child;
     }
@@ -6612,7 +6647,7 @@ function isRecursive(inst, stack, resolve5) {
       break;
     // `$ZodLazy` caches its inner on the def, so a resolved edge is followed exactly
     case "lazy": {
-      const inner = def._cachedInner ?? (resolve5 ? inst._zod.innerType : void 0);
+      const inner = def._cachedInner ?? (resolve6 ? inst._zod.innerType : void 0);
       merge2(inner ? isRecursive(inner, stack, false) : ASSUMED);
       break;
     }
@@ -7077,8 +7112,8 @@ function az_default() {
 }
 
 // ../../node_modules/zod/v4/locales/be.js
-function getBelarusianPlural(count, one, few, many) {
-  const absCount = Math.abs(count);
+function getBelarusianPlural(count2, one, few, many) {
+  const absCount = Math.abs(count2);
   const lastDigit = absCount % 10;
   const lastTwoDigits = absCount % 100;
   if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
@@ -9725,8 +9760,8 @@ function hu_default() {
 }
 
 // ../../node_modules/zod/v4/locales/hy.js
-function getArmenianPlural(count, one, many) {
-  return Math.abs(count) === 1 ? one : many;
+function getArmenianPlural(count2, one, many) {
+  return Math.abs(count2) === 1 ? one : many;
 }
 function withDefiniteArticle(word) {
   if (!word)
@@ -10813,8 +10848,8 @@ function ko_default() {
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
-function getUnitTypeFromNumber(number4) {
-  const abs = Math.abs(number4);
+function getUnitTypeFromNumber(number5) {
+  const abs = Math.abs(number5);
   const last = abs % 10;
   const last2 = abs % 100;
   if (last2 >= 11 && last2 <= 19 || last === 0)
@@ -12464,8 +12499,8 @@ function ro_default() {
 }
 
 // ../../node_modules/zod/v4/locales/ru.js
-function getRussianPlural(count, one, few, many) {
-  const absCount = Math.abs(count);
+function getRussianPlural(count2, one, few, many) {
+  const absCount = Math.abs(count2);
   const lastDigit = absCount % 10;
   const lastTwoDigits = absCount % 100;
   if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
@@ -20963,7 +20998,7 @@ function visit(schema, fnOrHandlers) {
     return h ? h(node2, rewritten) : node2;
   };
   const cache = /* @__PURE__ */ new Map();
-  function run(s) {
+  function run3(s) {
     const cached2 = cache.get(s);
     if (cached2 === RESOLVING) {
       return new $ZodLazy({
@@ -20989,21 +21024,21 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newShape = {};
         for (const k of keys) {
-          const mapped = run(oldShape[k]);
+          const mapped = run3(oldShape[k]);
           if (mapped !== oldShape[k])
             changed = true;
           newShape[k] = mapped;
         }
         let newCatchall = def.catchall;
         if (def.catchall) {
-          newCatchall = run(def.catchall);
+          newCatchall = run3(def.catchall);
           if (newCatchall !== def.catchall)
             changed = true;
         }
         return changed ? clone(s, { ...def, shape: newShape, catchall: newCatchall }) : s;
       }
       case "array": {
-        const mapped = run(def.element);
+        const mapped = run3(def.element);
         return mapped === def.element ? s : clone(s, { ...def, element: mapped });
       }
       case "tuple": {
@@ -21011,14 +21046,14 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newItems = [];
         for (const item of oldItems) {
-          const mapped = run(item);
+          const mapped = run3(item);
           if (mapped !== item)
             changed = true;
           newItems.push(mapped);
         }
         let newRest = def.rest;
         if (def.rest) {
-          newRest = run(def.rest);
+          newRest = run3(def.rest);
           if (newRest !== def.rest)
             changed = true;
         }
@@ -21026,12 +21061,12 @@ function visit(schema, fnOrHandlers) {
       }
       case "record":
       case "map": {
-        const newKey = run(def.keyType);
-        const newVal = run(def.valueType);
+        const newKey = run3(def.keyType);
+        const newVal = run3(def.valueType);
         return newKey === def.keyType && newVal === def.valueType ? s : clone(s, { ...def, keyType: newKey, valueType: newVal });
       }
       case "set": {
-        const newVal = run(def.valueType);
+        const newVal = run3(def.valueType);
         return newVal === def.valueType ? s : clone(s, { ...def, valueType: newVal });
       }
       case "union": {
@@ -21039,7 +21074,7 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newOptions = [];
         for (const opt of oldOptions) {
-          const mapped = run(opt);
+          const mapped = run3(opt);
           if (mapped !== opt)
             changed = true;
           newOptions.push(mapped);
@@ -21047,8 +21082,8 @@ function visit(schema, fnOrHandlers) {
         return changed ? clone(s, { ...def, options: newOptions }) : s;
       }
       case "intersection": {
-        const newLeft = run(def.left);
-        const newRight = run(def.right);
+        const newLeft = run3(def.left);
+        const newRight = run3(def.right);
         return newLeft === def.left && newRight === def.right ? s : clone(s, { ...def, left: newLeft, right: newRight });
       }
       case "optional":
@@ -21060,23 +21095,23 @@ function visit(schema, fnOrHandlers) {
       case "nonoptional":
       case "promise":
       case "success": {
-        const newInner = run(def.innerType);
+        const newInner = run3(def.innerType);
         return newInner === def.innerType ? s : clone(s, { ...def, innerType: newInner });
       }
       case "pipe": {
-        const newIn = run(def.in);
-        const newOut = run(def.out);
+        const newIn = run3(def.in);
+        const newOut = run3(def.out);
         return newIn === def.in && newOut === def.out ? s : clone(s, { ...def, in: newIn, out: newOut });
       }
       case "function": {
-        const newInput = run(def.input);
-        const newOutput = run(def.output);
+        const newInput = run3(def.input);
+        const newOutput = run3(def.output);
         return newInput === def.input && newOutput === def.output ? s : clone(s, { ...def, input: newInput, output: newOutput });
       }
       case "lazy": {
         const original = def.getter;
         const { _cachedInner, ...rest } = def;
-        return clone(s, { ...rest, getter: () => run(original()) });
+        return clone(s, { ...rest, getter: () => run3(original()) });
       }
       // A leaf by choice: `parts` are regex fragments, not data positions.
       case "template_literal":
@@ -21107,7 +21142,7 @@ function visit(schema, fnOrHandlers) {
       }
     }
   }
-  return run(schema);
+  return run3(schema);
 }
 
 // ../../node_modules/zod/v4/classic/deep-partial.js
@@ -21177,6 +21212,9 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
+// src/agents/lineage.ts
+import { basename as basename3 } from "path";
+
 // src/push-command.ts
 import { spawnSync } from "child_process";
 import { readFileSync } from "fs";
@@ -21227,8 +21265,8 @@ function readProcess(pid, platform = process.platform) {
 }
 function readProc(pid) {
   try {
-    const stat12 = readFileSync(`/proc/${pid}/stat`, "utf8");
-    const ppid = Number(stat12.slice(stat12.lastIndexOf(")") + 2).split(" ")[1]);
+    const stat13 = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const ppid = Number(stat13.slice(stat13.lastIndexOf(")") + 2).split(" ")[1]);
     const args = readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0").filter(Boolean);
     return Number.isInteger(ppid) ? { ppid, args } : void 0;
   } catch {
@@ -21243,6 +21281,41 @@ function readPs(pid) {
   const match = /^(\d+)\s+([\s\S]*)$/.exec((out.stdout ?? "").trim());
   if (out.status !== 0 || match === null) return void 0;
   return { ppid: Number(match[1]), args: (match[2] ?? "").trim().split(/\s+/) };
+}
+
+// src/agents/lineage.ts
+function program(args) {
+  const path3 = (args[0] ?? "").replace(/\\/g, "/");
+  return { path: path3, name: basename3(path3).toLowerCase() };
+}
+function nodeRunning(args, script) {
+  return /^node(\.exe)?$/.test(program(args).name) && script.test((args[1] ?? "").replace(/\\/g, "/"));
+}
+function isClaudeProcess(args) {
+  const { path: path3, name } = program(args);
+  if (name === "claude" || name === "claude.exe" || path3.includes("/claude/versions/")) return true;
+  return nodeRunning(args, /claude-code\/cli\.m?js$/);
+}
+function isCodexProcess(args) {
+  const { name } = program(args);
+  return name === "codex" || name === "codex.exe" || nodeRunning(args, /@openai\/codex\/bin\/codex\.js$/);
+}
+function isAgentProcess(args) {
+  return isClaudeProcess(args) || isCodexProcess(args);
+}
+function walkLineage(own2, session, read = (pid) => readProcess(pid), start = process.ppid) {
+  let pid = start;
+  let found;
+  for (let depth = 0; depth < 64 && pid > 1; depth += 1) {
+    const info = read(pid);
+    if (info === void 0) break;
+    if (found === void 0 ? own2(info.args) : session(info.args)) {
+      if (found !== void 0) return { own: found, parent: pid };
+      found = pid;
+    }
+    pid = info.ppid;
+  }
+  return found === void 0 ? void 0 : { own: found, parent: null };
 }
 
 // src/agents/claude/hooks.ts
@@ -21268,26 +21341,8 @@ function parseHookInput(stdin) {
 function isHeadless(env) {
   return env.CLAUDE_CODE_ENTRYPOINT?.startsWith("sdk") ?? false;
 }
-function isClaudeProcess(args) {
-  const first = (args[0] ?? "").replace(/\\/g, "/");
-  const name = basename3(first).toLowerCase();
-  if (name === "claude" || name === "claude.exe" || first.includes("/claude/versions/"))
-    return true;
-  return /^node(\.exe)?$/.test(name) && /claude-code\/cli\.m?js$/.test((args[1] ?? "").replace(/\\/g, "/"));
-}
-function sessionLineage(read = (pid) => readProcess(pid), start = process.ppid) {
-  let pid = start;
-  let own2;
-  for (let depth = 0; depth < 64 && pid > 1; depth += 1) {
-    const info = read(pid);
-    if (info === void 0) break;
-    if (isClaudeProcess(info.args)) {
-      if (own2 !== void 0) return { own: own2, parent: pid };
-      own2 = pid;
-    }
-    pid = info.ppid;
-  }
-  return own2 === void 0 ? void 0 : { own: own2, parent: null };
+function sessionLineage(read, start) {
+  return walkLineage(isClaudeProcess, isClaudeProcess, read, start);
 }
 async function markChildren(env, own2) {
   const file2 = env.CLAUDE_ENV_FILE;
@@ -21301,13 +21356,2190 @@ function additionalContext(event, text) {
   return { hookSpecificOutput: { hookEventName: event, additionalContext: text } };
 }
 
+// ../../node_modules/@inquirer/core/dist/lib/key.js
+var keybindings = ["emacs", "vim"];
+var keybindingLookup = new Set(keybindings);
+function isKeybinding(value) {
+  return keybindingLookup.has(value);
+}
+function getDefaultKeybindings() {
+  const env = process.env["INQUIRER_KEYBINDINGS"];
+  if (!env)
+    return [];
+  return Array.from(new Set(env.toLowerCase().split(/[\s,]+/).filter(isKeybinding)));
+}
+var isUpKey = (key, keybindings2 = []) => (
+  // The up key
+  key.name === "up" || // Vim keybinding: hjkl keys map to left/down/up/right
+  keybindings2.includes("vim") && key.name === "k" || // Emacs keybinding: Ctrl+P means "previous" in Emacs navigation conventions
+  keybindings2.includes("emacs") && key.ctrl && key.name === "p"
+);
+var isDownKey = (key, keybindings2 = []) => (
+  // The down key
+  key.name === "down" || // Vim keybinding: hjkl keys map to left/down/up/right
+  keybindings2.includes("vim") && key.name === "j" || // Emacs keybinding: Ctrl+N means "next" in Emacs navigation conventions
+  keybindings2.includes("emacs") && key.ctrl && key.name === "n"
+);
+var isBackspaceKey = (key) => key.name === "backspace";
+var isTabKey = (key) => key.name === "tab";
+var isNumberKey = (key) => "1234567890".includes(key.name);
+var isEnterKey = (key) => key.name === "enter" || key.name === "return";
+
+// ../../node_modules/@inquirer/core/dist/lib/errors.js
+var AbortPromptError = class extends Error {
+  name = "AbortPromptError";
+  message = "Prompt was aborted";
+  constructor(options) {
+    super();
+    this.cause = options?.cause;
+  }
+};
+var CancelPromptError = class extends Error {
+  name = "CancelPromptError";
+  message = "Prompt was canceled";
+};
+var ExitPromptError = class extends Error {
+  name = "ExitPromptError";
+};
+var HookError = class extends Error {
+  name = "HookError";
+};
+var ValidationError = class extends Error {
+  name = "ValidationError";
+};
+
+// ../../node_modules/@inquirer/core/dist/lib/use-state.js
+import { AsyncResource as AsyncResource2 } from "async_hooks";
+
+// ../../node_modules/@inquirer/core/dist/lib/hook-engine.js
+import { AsyncLocalStorage, AsyncResource } from "async_hooks";
+var hookStorage = new AsyncLocalStorage();
+function createStore(rl) {
+  const store = {
+    rl,
+    hooks: [],
+    hooksCleanup: [],
+    hooksEffect: [],
+    index: 0,
+    handleChange() {
+    }
+  };
+  return store;
+}
+function withHooks(rl, cb) {
+  const store = createStore(rl);
+  function cycle(render) {
+    store.handleChange = () => {
+      store.index = 0;
+      render();
+    };
+    store.handleChange();
+  }
+  return hookStorage.run(store, () => cb(cycle));
+}
+function getStore() {
+  const store = hookStorage.getStore();
+  if (!store) {
+    throw new HookError("[Inquirer] Hook functions can only be called from within a prompt");
+  }
+  return store;
+}
+function readline() {
+  return getStore().rl;
+}
+function withUpdates(fn) {
+  const wrapped = (...args) => {
+    const store = getStore();
+    let shouldUpdate = false;
+    const oldHandleChange = store.handleChange;
+    store.handleChange = () => {
+      shouldUpdate = true;
+    };
+    const returnValue = fn(...args);
+    if (shouldUpdate) {
+      oldHandleChange();
+    }
+    store.handleChange = oldHandleChange;
+    return returnValue;
+  };
+  return AsyncResource.bind(wrapped);
+}
+function withPointer(cb) {
+  const store = getStore();
+  const { index } = store;
+  const pointer = {
+    get() {
+      return store.hooks[index];
+    },
+    set(value) {
+      store.hooks[index] = value;
+    },
+    initialized: index in store.hooks
+  };
+  const returnValue = cb(pointer);
+  store.index++;
+  return returnValue;
+}
+function handleChange() {
+  getStore().handleChange();
+}
+var effectScheduler = {
+  queue(cb) {
+    const store = getStore();
+    const { index } = store;
+    store.hooksEffect.push(() => {
+      store.hooksCleanup[index]?.();
+      const cleanFn = cb(readline());
+      if (cleanFn != null && typeof cleanFn !== "function") {
+        throw new ValidationError("useEffect return value must be a cleanup function or nothing.");
+      }
+      store.hooksCleanup[index] = cleanFn;
+    });
+  },
+  run() {
+    const store = getStore();
+    withUpdates(() => {
+      store.hooksEffect.forEach((effect) => {
+        effect();
+      });
+      store.hooksEffect.length = 0;
+    })();
+  },
+  clearAll() {
+    const store = getStore();
+    store.hooksCleanup.forEach((cleanFn) => {
+      cleanFn?.();
+    });
+    store.hooksEffect.length = 0;
+    store.hooksCleanup.length = 0;
+  }
+};
+
+// ../../node_modules/@inquirer/core/dist/lib/use-state.js
+function isFactory(value) {
+  return typeof value === "function";
+}
+function isReducer(value) {
+  return typeof value === "function";
+}
+function useState(defaultValue) {
+  return withPointer((pointer) => {
+    const setState = AsyncResource2.bind(function setState2(newValue) {
+      const currentValue = pointer.get();
+      const nextValue = isReducer(newValue) ? newValue(currentValue) : newValue;
+      if (!Object.is(currentValue, nextValue)) {
+        pointer.set(nextValue);
+        handleChange();
+      }
+    });
+    if (pointer.initialized) {
+      return [pointer.get(), setState];
+    }
+    const value = isFactory(defaultValue) ? defaultValue() : defaultValue;
+    pointer.set(value);
+    return [value, setState];
+  });
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/use-effect.js
+function useEffect(cb, depArray) {
+  withPointer((pointer) => {
+    const oldDeps = pointer.get();
+    const hasChanged = !Array.isArray(oldDeps) || depArray.some((dep, i) => !Object.is(dep, oldDeps[i]));
+    if (hasChanged) {
+      effectScheduler.queue(cb);
+    }
+    pointer.set(depArray);
+  });
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/theme.js
+import { styleText } from "util";
+
+// ../../node_modules/@inquirer/figures/dist/index.js
+import process2 from "process";
+function isUnicodeSupported() {
+  if (!process2.platform.startsWith("win")) {
+    return process2.env["TERM"] !== "linux";
+  }
+  return Boolean(process2.env["CI"]) || // CI environments generally support unicode
+  Boolean(process2.env["WT_SESSION"]) || // Windows Terminal
+  Boolean(process2.env["TERMINUS_SUBLIME"]) || // Terminus (<0.2.27)
+  process2.env["ConEmuTask"] === "{cmd::Cmder}" || // ConEmu and cmder
+  process2.env["TERM_PROGRAM"] === "Terminus-Sublime" || process2.env["TERM_PROGRAM"] === "vscode" || process2.env["TERM"] === "xterm-256color" || process2.env["TERM"] === "alacritty" || process2.env["TERMINAL_EMULATOR"] === "JetBrains-JediTerm";
+}
+var common = {
+  circleQuestionMark: "(?)",
+  questionMarkPrefix: "(?)",
+  square: "\u2588",
+  squareDarkShade: "\u2593",
+  squareMediumShade: "\u2592",
+  squareLightShade: "\u2591",
+  squareTop: "\u2580",
+  squareBottom: "\u2584",
+  squareLeft: "\u258C",
+  squareRight: "\u2590",
+  squareCenter: "\u25A0",
+  bullet: "\u25CF",
+  dot: "\u2024",
+  ellipsis: "\u2026",
+  pointerSmall: "\u203A",
+  triangleUp: "\u25B2",
+  triangleUpSmall: "\u25B4",
+  triangleDown: "\u25BC",
+  triangleDownSmall: "\u25BE",
+  triangleLeftSmall: "\u25C2",
+  triangleRightSmall: "\u25B8",
+  home: "\u2302",
+  heart: "\u2665",
+  musicNote: "\u266A",
+  musicNoteBeamed: "\u266B",
+  arrowUp: "\u2191",
+  arrowDown: "\u2193",
+  arrowLeft: "\u2190",
+  arrowRight: "\u2192",
+  arrowLeftRight: "\u2194",
+  arrowUpDown: "\u2195",
+  almostEqual: "\u2248",
+  notEqual: "\u2260",
+  lessOrEqual: "\u2264",
+  greaterOrEqual: "\u2265",
+  identical: "\u2261",
+  infinity: "\u221E",
+  subscriptZero: "\u2080",
+  subscriptOne: "\u2081",
+  subscriptTwo: "\u2082",
+  subscriptThree: "\u2083",
+  subscriptFour: "\u2084",
+  subscriptFive: "\u2085",
+  subscriptSix: "\u2086",
+  subscriptSeven: "\u2087",
+  subscriptEight: "\u2088",
+  subscriptNine: "\u2089",
+  oneHalf: "\xBD",
+  oneThird: "\u2153",
+  oneQuarter: "\xBC",
+  oneFifth: "\u2155",
+  oneSixth: "\u2159",
+  oneEighth: "\u215B",
+  twoThirds: "\u2154",
+  twoFifths: "\u2156",
+  threeQuarters: "\xBE",
+  threeFifths: "\u2157",
+  threeEighths: "\u215C",
+  fourFifths: "\u2158",
+  fiveSixths: "\u215A",
+  fiveEighths: "\u215D",
+  sevenEighths: "\u215E",
+  line: "\u2500",
+  lineBold: "\u2501",
+  lineDouble: "\u2550",
+  lineDashed0: "\u2504",
+  lineDashed1: "\u2505",
+  lineDashed2: "\u2508",
+  lineDashed3: "\u2509",
+  lineDashed4: "\u254C",
+  lineDashed5: "\u254D",
+  lineDashed6: "\u2574",
+  lineDashed7: "\u2576",
+  lineDashed8: "\u2578",
+  lineDashed9: "\u257A",
+  lineDashed10: "\u257C",
+  lineDashed11: "\u257E",
+  lineDashed12: "\u2212",
+  lineDashed13: "\u2013",
+  lineDashed14: "\u2010",
+  lineDashed15: "\u2043",
+  lineVertical: "\u2502",
+  lineVerticalBold: "\u2503",
+  lineVerticalDouble: "\u2551",
+  lineVerticalDashed0: "\u2506",
+  lineVerticalDashed1: "\u2507",
+  lineVerticalDashed2: "\u250A",
+  lineVerticalDashed3: "\u250B",
+  lineVerticalDashed4: "\u254E",
+  lineVerticalDashed5: "\u254F",
+  lineVerticalDashed6: "\u2575",
+  lineVerticalDashed7: "\u2577",
+  lineVerticalDashed8: "\u2579",
+  lineVerticalDashed9: "\u257B",
+  lineVerticalDashed10: "\u257D",
+  lineVerticalDashed11: "\u257F",
+  lineDownLeft: "\u2510",
+  lineDownLeftArc: "\u256E",
+  lineDownBoldLeftBold: "\u2513",
+  lineDownBoldLeft: "\u2512",
+  lineDownLeftBold: "\u2511",
+  lineDownDoubleLeftDouble: "\u2557",
+  lineDownDoubleLeft: "\u2556",
+  lineDownLeftDouble: "\u2555",
+  lineDownRight: "\u250C",
+  lineDownRightArc: "\u256D",
+  lineDownBoldRightBold: "\u250F",
+  lineDownBoldRight: "\u250E",
+  lineDownRightBold: "\u250D",
+  lineDownDoubleRightDouble: "\u2554",
+  lineDownDoubleRight: "\u2553",
+  lineDownRightDouble: "\u2552",
+  lineUpLeft: "\u2518",
+  lineUpLeftArc: "\u256F",
+  lineUpBoldLeftBold: "\u251B",
+  lineUpBoldLeft: "\u251A",
+  lineUpLeftBold: "\u2519",
+  lineUpDoubleLeftDouble: "\u255D",
+  lineUpDoubleLeft: "\u255C",
+  lineUpLeftDouble: "\u255B",
+  lineUpRight: "\u2514",
+  lineUpRightArc: "\u2570",
+  lineUpBoldRightBold: "\u2517",
+  lineUpBoldRight: "\u2516",
+  lineUpRightBold: "\u2515",
+  lineUpDoubleRightDouble: "\u255A",
+  lineUpDoubleRight: "\u2559",
+  lineUpRightDouble: "\u2558",
+  lineUpDownLeft: "\u2524",
+  lineUpBoldDownBoldLeftBold: "\u252B",
+  lineUpBoldDownBoldLeft: "\u2528",
+  lineUpDownLeftBold: "\u2525",
+  lineUpBoldDownLeftBold: "\u2529",
+  lineUpDownBoldLeftBold: "\u252A",
+  lineUpDownBoldLeft: "\u2527",
+  lineUpBoldDownLeft: "\u2526",
+  lineUpDoubleDownDoubleLeftDouble: "\u2563",
+  lineUpDoubleDownDoubleLeft: "\u2562",
+  lineUpDownLeftDouble: "\u2561",
+  lineUpDownRight: "\u251C",
+  lineUpBoldDownBoldRightBold: "\u2523",
+  lineUpBoldDownBoldRight: "\u2520",
+  lineUpDownRightBold: "\u251D",
+  lineUpBoldDownRightBold: "\u2521",
+  lineUpDownBoldRightBold: "\u2522",
+  lineUpDownBoldRight: "\u251F",
+  lineUpBoldDownRight: "\u251E",
+  lineUpDoubleDownDoubleRightDouble: "\u2560",
+  lineUpDoubleDownDoubleRight: "\u255F",
+  lineUpDownRightDouble: "\u255E",
+  lineDownLeftRight: "\u252C",
+  lineDownBoldLeftBoldRightBold: "\u2533",
+  lineDownLeftBoldRightBold: "\u252F",
+  lineDownBoldLeftRight: "\u2530",
+  lineDownBoldLeftBoldRight: "\u2531",
+  lineDownBoldLeftRightBold: "\u2532",
+  lineDownLeftRightBold: "\u252E",
+  lineDownLeftBoldRight: "\u252D",
+  lineDownDoubleLeftDoubleRightDouble: "\u2566",
+  lineDownDoubleLeftRight: "\u2565",
+  lineDownLeftDoubleRightDouble: "\u2564",
+  lineUpLeftRight: "\u2534",
+  lineUpBoldLeftBoldRightBold: "\u253B",
+  lineUpLeftBoldRightBold: "\u2537",
+  lineUpBoldLeftRight: "\u2538",
+  lineUpBoldLeftBoldRight: "\u2539",
+  lineUpBoldLeftRightBold: "\u253A",
+  lineUpLeftRightBold: "\u2536",
+  lineUpLeftBoldRight: "\u2535",
+  lineUpDoubleLeftDoubleRightDouble: "\u2569",
+  lineUpDoubleLeftRight: "\u2568",
+  lineUpLeftDoubleRightDouble: "\u2567",
+  lineUpDownLeftRight: "\u253C",
+  lineUpBoldDownBoldLeftBoldRightBold: "\u254B",
+  lineUpDownBoldLeftBoldRightBold: "\u2548",
+  lineUpBoldDownLeftBoldRightBold: "\u2547",
+  lineUpBoldDownBoldLeftRightBold: "\u254A",
+  lineUpBoldDownBoldLeftBoldRight: "\u2549",
+  lineUpBoldDownLeftRight: "\u2540",
+  lineUpDownBoldLeftRight: "\u2541",
+  lineUpDownLeftBoldRight: "\u253D",
+  lineUpDownLeftRightBold: "\u253E",
+  lineUpBoldDownBoldLeftRight: "\u2542",
+  lineUpDownLeftBoldRightBold: "\u253F",
+  lineUpBoldDownLeftBoldRight: "\u2543",
+  lineUpBoldDownLeftRightBold: "\u2544",
+  lineUpDownBoldLeftBoldRight: "\u2545",
+  lineUpDownBoldLeftRightBold: "\u2546",
+  lineUpDoubleDownDoubleLeftDoubleRightDouble: "\u256C",
+  lineUpDoubleDownDoubleLeftRight: "\u256B",
+  lineUpDownLeftDoubleRightDouble: "\u256A",
+  lineCross: "\u2573",
+  lineBackslash: "\u2572",
+  lineSlash: "\u2571"
+};
+var specialMainSymbols = {
+  tick: "\u2714",
+  info: "\u2139",
+  warning: "\u26A0",
+  cross: "\u2718",
+  squareSmall: "\u25FB",
+  squareSmallFilled: "\u25FC",
+  circle: "\u25EF",
+  circleFilled: "\u25C9",
+  circleDotted: "\u25CC",
+  circleDouble: "\u25CE",
+  circleCircle: "\u24DE",
+  circleCross: "\u24E7",
+  circlePipe: "\u24BE",
+  radioOn: "\u25C9",
+  radioOff: "\u25EF",
+  checkboxOn: "\u2612",
+  checkboxOff: "\u2610",
+  checkboxCircleOn: "\u24E7",
+  checkboxCircleOff: "\u24BE",
+  pointer: "\u276F",
+  triangleUpOutline: "\u25B3",
+  triangleLeft: "\u25C0",
+  triangleRight: "\u25B6",
+  lozenge: "\u25C6",
+  lozengeOutline: "\u25C7",
+  hamburger: "\u2630",
+  smiley: "\u32E1",
+  mustache: "\u0DF4",
+  star: "\u2605",
+  play: "\u25B6",
+  nodejs: "\u2B22",
+  oneSeventh: "\u2150",
+  oneNinth: "\u2151",
+  oneTenth: "\u2152"
+};
+var specialFallbackSymbols = {
+  tick: "\u221A",
+  info: "i",
+  warning: "\u203C",
+  cross: "\xD7",
+  squareSmall: "\u25A1",
+  squareSmallFilled: "\u25A0",
+  circle: "( )",
+  circleFilled: "(*)",
+  circleDotted: "( )",
+  circleDouble: "( )",
+  circleCircle: "(\u25CB)",
+  circleCross: "(\xD7)",
+  circlePipe: "(\u2502)",
+  radioOn: "(*)",
+  radioOff: "( )",
+  checkboxOn: "[\xD7]",
+  checkboxOff: "[ ]",
+  checkboxCircleOn: "(\xD7)",
+  checkboxCircleOff: "( )",
+  pointer: ">",
+  triangleUpOutline: "\u2206",
+  triangleLeft: "\u25C4",
+  triangleRight: "\u25BA",
+  lozenge: "\u2666",
+  lozengeOutline: "\u25CA",
+  hamburger: "\u2261",
+  smiley: "\u263A",
+  mustache: "\u250C\u2500\u2510",
+  star: "\u2736",
+  play: "\u25BA",
+  nodejs: "\u2666",
+  oneSeventh: "1/7",
+  oneNinth: "1/9",
+  oneTenth: "1/10"
+};
+var mainSymbols = {
+  ...common,
+  ...specialMainSymbols
+};
+var fallbackSymbols = {
+  ...common,
+  ...specialFallbackSymbols
+};
+var shouldUseMain = isUnicodeSupported();
+var figures = shouldUseMain ? mainSymbols : fallbackSymbols;
+var dist_default = figures;
+var replacements = Object.entries(specialMainSymbols);
+
+// ../../node_modules/@inquirer/core/dist/lib/theme.js
+var defaultTheme = {
+  prefix: {
+    idle: styleText("blue", "?"),
+    done: styleText("green", dist_default.tick)
+  },
+  spinner: {
+    interval: 80,
+    frames: ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"].map((frame) => styleText("yellow", frame))
+  },
+  keybindings: [],
+  style: {
+    answer: (text) => styleText("cyan", text),
+    message: (text) => styleText("bold", text),
+    error: (text) => styleText("red", `> ${text}`),
+    defaultAnswer: (text) => styleText("dim", `(${text})`),
+    help: (text) => styleText("dim", text),
+    highlight: (text) => styleText("cyan", text),
+    key: (text) => styleText("cyan", styleText("bold", `<${text}>`))
+  }
+};
+function getDefaultTheme() {
+  return {
+    ...defaultTheme,
+    keybindings: getDefaultKeybindings()
+  };
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/make-theme.js
+function isPlainObject2(value) {
+  if (typeof value !== "object" || value === null)
+    return false;
+  let proto = value;
+  while (Object.getPrototypeOf(proto) !== null) {
+    proto = Object.getPrototypeOf(proto);
+  }
+  return Object.getPrototypeOf(value) === proto;
+}
+function deepMerge(...objects) {
+  const output2 = {};
+  for (const obj of objects) {
+    for (const [key, value] of Object.entries(obj)) {
+      const prevValue = output2[key];
+      output2[key] = isPlainObject2(prevValue) && isPlainObject2(value) ? deepMerge(prevValue, value) : value;
+    }
+  }
+  return output2;
+}
+function makeTheme(...themes) {
+  const themesToMerge = [
+    getDefaultTheme(),
+    ...themes.filter((theme) => theme != null)
+  ];
+  return deepMerge(...themesToMerge);
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/use-prefix.js
+function usePrefix({ status = "idle", theme }) {
+  const [showLoader, setShowLoader] = useState(false);
+  const [tick, setTick] = useState(0);
+  const { prefix, spinner } = makeTheme(theme);
+  useEffect(() => {
+    if (status === "loading") {
+      let tickInterval;
+      let inc = -1;
+      const delayTimeout = setTimeout(() => {
+        setShowLoader(true);
+        tickInterval = setInterval(() => {
+          inc = inc + 1;
+          setTick(inc % spinner.frames.length);
+        }, spinner.interval);
+      }, 300);
+      return () => {
+        clearTimeout(delayTimeout);
+        clearInterval(tickInterval);
+      };
+    } else {
+      setShowLoader(false);
+    }
+  }, [status]);
+  if (showLoader) {
+    return spinner.frames[tick];
+  }
+  const iconName = status === "loading" ? "idle" : status;
+  return typeof prefix === "string" ? prefix : prefix[iconName] ?? prefix["idle"];
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/use-memo.js
+function useMemo(fn, dependencies) {
+  return withPointer((pointer) => {
+    const prev = pointer.get();
+    if (!pointer.initialized || prev.dependencies.length !== dependencies.length || prev.dependencies.some((dep, i) => dep !== dependencies[i])) {
+      const value = fn();
+      pointer.set({ value, dependencies });
+      return value;
+    }
+    return prev.value;
+  });
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/use-ref.js
+function useRef(val) {
+  return useState({ current: val })[0];
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/use-keypress.js
+function useKeypress(userHandler) {
+  const signal = useRef(userHandler);
+  signal.current = userHandler;
+  useEffect((rl) => {
+    let ignore = false;
+    const handler = withUpdates((_input, event) => {
+      if (ignore)
+        return;
+      void signal.current(event, rl);
+    });
+    rl.input.on("keypress", handler);
+    return () => {
+      ignore = true;
+      rl.input.removeListener("keypress", handler);
+    };
+  }, []);
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/utils.js
+var import_cli_width = __toESM(require_cli_width(), 1);
+
+// ../../node_modules/fast-string-truncated-width/dist/utils.js
+var getCodePointsLength = /* @__PURE__ */ (() => {
+  const SURROGATE_PAIR_RE = /[\uD800-\uDBFF][\uDC00-\uDFFF]/g;
+  return (input2) => {
+    let surrogatePairsNr = 0;
+    SURROGATE_PAIR_RE.lastIndex = 0;
+    while (SURROGATE_PAIR_RE.test(input2)) {
+      surrogatePairsNr += 1;
+    }
+    return input2.length - surrogatePairsNr;
+  };
+})();
+var isFullWidth = (x) => {
+  return x === 12288 || x >= 65281 && x <= 65376 || x >= 65504 && x <= 65510;
+};
+var isWideNotCJKTNotEmoji = (x) => {
+  return x === 8987 || x === 9001 || x >= 12272 && x <= 12287 || x >= 12289 && x <= 12350 || x >= 12441 && x <= 12543 || x >= 12549 && x <= 12591 || x >= 12593 && x <= 12686 || x >= 12688 && x <= 12771 || x >= 12783 && x <= 12830 || x >= 12832 && x <= 12871 || x >= 12880 && x <= 19903 || x >= 65040 && x <= 65049 || x >= 65072 && x <= 65106 || x >= 65108 && x <= 65126 || x >= 65128 && x <= 65131 || x >= 127488 && x <= 127490 || x >= 127504 && x <= 127547 || x >= 127552 && x <= 127560 || x >= 131072 && x <= 196605 || x >= 196608 && x <= 262141;
+};
+
+// ../../node_modules/fast-string-truncated-width/dist/index.js
+var ANSI_RE = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]|\u001b\]8;[^;]*;.*?(?:\u0007|\u001b\u005c)/y;
+var CONTROL_RE = /[\x00-\x08\x0A-\x1F\x7F-\x9F]{1,1000}/y;
+var CJKT_WIDE_RE = /(?:(?![\uFF61-\uFF9F\uFF00-\uFFEF])[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Tangut}]){1,1000}/yu;
+var TAB_RE = /\t{1,1000}/y;
+var EMOJI_RE = new RegExp("[\\u{1F1E6}-\\u{1F1FF}]{2}|\\u{1F3F4}[\\u{E0061}-\\u{E007A}]{2}[\\u{E0030}-\\u{E0039}\\u{E0061}-\\u{E007A}]{1,3}\\u{E007F}|(?:\\p{Emoji}\\uFE0F\\u20E3?|\\p{Emoji_Modifier_Base}\\p{Emoji_Modifier}?|\\p{Emoji_Presentation})(?:\\u200D(?:\\p{Emoji_Modifier_Base}\\p{Emoji_Modifier}?|\\p{Emoji_Presentation}|\\p{Emoji}\\uFE0F\\u20E3?))*", "yu");
+var LATIN_RE = /(?:[\x20-\x7E\xA0-\xFF](?!\uFE0F)){1,1000}/y;
+var MODIFIER_RE = new RegExp("\\p{M}+", "gu");
+var NO_TRUNCATION = { limit: Infinity, ellipsis: "" };
+var getStringTruncatedWidth = (input2, truncationOptions = {}, widthOptions = {}) => {
+  const LIMIT = truncationOptions.limit ?? Infinity;
+  const ELLIPSIS = truncationOptions.ellipsis ?? "";
+  const ELLIPSIS_WIDTH = truncationOptions?.ellipsisWidth ?? (ELLIPSIS ? getStringTruncatedWidth(ELLIPSIS, NO_TRUNCATION, widthOptions).width : 0);
+  const ANSI_WIDTH = 0;
+  const CONTROL_WIDTH = widthOptions.controlWidth ?? 0;
+  const TAB_WIDTH = widthOptions.tabWidth ?? 8;
+  const EMOJI_WIDTH = widthOptions.emojiWidth ?? 2;
+  const FULL_WIDTH_WIDTH = 2;
+  const REGULAR_WIDTH = widthOptions.regularWidth ?? 1;
+  const WIDE_WIDTH = widthOptions.wideWidth ?? FULL_WIDTH_WIDTH;
+  const PARSE_BLOCKS = [
+    [LATIN_RE, REGULAR_WIDTH],
+    [ANSI_RE, ANSI_WIDTH],
+    [CONTROL_RE, CONTROL_WIDTH],
+    [TAB_RE, TAB_WIDTH],
+    [EMOJI_RE, EMOJI_WIDTH],
+    [CJKT_WIDE_RE, WIDE_WIDTH]
+  ];
+  let indexPrev = 0;
+  let index = 0;
+  let length = input2.length;
+  let lengthExtra = 0;
+  let truncationEnabled = false;
+  let truncationIndex = length;
+  let truncationLimit = Math.max(0, LIMIT - ELLIPSIS_WIDTH);
+  let unmatchedStart = 0;
+  let unmatchedEnd = 0;
+  let width = 0;
+  let widthExtra = 0;
+  outer: while (true) {
+    if (unmatchedEnd > unmatchedStart || index >= length && index > indexPrev) {
+      const unmatched = input2.slice(unmatchedStart, unmatchedEnd) || input2.slice(indexPrev, index);
+      lengthExtra = 0;
+      for (const char of unmatched.replaceAll(MODIFIER_RE, "")) {
+        const codePoint = char.codePointAt(0) || 0;
+        if (isFullWidth(codePoint)) {
+          widthExtra = FULL_WIDTH_WIDTH;
+        } else if (isWideNotCJKTNotEmoji(codePoint)) {
+          widthExtra = WIDE_WIDTH;
+        } else {
+          widthExtra = REGULAR_WIDTH;
+        }
+        if (width + widthExtra > truncationLimit) {
+          truncationIndex = Math.min(truncationIndex, Math.max(unmatchedStart, indexPrev) + lengthExtra);
+        }
+        if (width + widthExtra > LIMIT) {
+          truncationEnabled = true;
+          break outer;
+        }
+        lengthExtra += char.length;
+        width += widthExtra;
+      }
+      unmatchedStart = unmatchedEnd = 0;
+    }
+    if (index >= length) {
+      break outer;
+    }
+    for (let i = 0, l = PARSE_BLOCKS.length; i < l; i++) {
+      const [BLOCK_RE, BLOCK_WIDTH] = PARSE_BLOCKS[i];
+      BLOCK_RE.lastIndex = index;
+      if (BLOCK_RE.test(input2)) {
+        lengthExtra = BLOCK_RE === CJKT_WIDE_RE ? getCodePointsLength(input2.slice(index, BLOCK_RE.lastIndex)) : BLOCK_RE === EMOJI_RE ? 1 : BLOCK_RE.lastIndex - index;
+        widthExtra = lengthExtra * BLOCK_WIDTH;
+        if (width + widthExtra > truncationLimit) {
+          truncationIndex = Math.min(truncationIndex, index + Math.floor((truncationLimit - width) / BLOCK_WIDTH));
+        }
+        if (width + widthExtra > LIMIT) {
+          truncationEnabled = true;
+          break outer;
+        }
+        width += widthExtra;
+        unmatchedStart = indexPrev;
+        unmatchedEnd = index;
+        index = indexPrev = BLOCK_RE.lastIndex;
+        continue outer;
+      }
+    }
+    index += 1;
+  }
+  return {
+    width: truncationEnabled ? truncationLimit : width,
+    index: truncationEnabled ? truncationIndex : length,
+    truncated: truncationEnabled,
+    ellipsed: truncationEnabled && LIMIT >= ELLIPSIS_WIDTH
+  };
+};
+var dist_default2 = getStringTruncatedWidth;
+
+// ../../node_modules/fast-string-width/dist/index.js
+var NO_TRUNCATION2 = {
+  limit: Infinity,
+  ellipsis: "",
+  ellipsisWidth: 0
+};
+var fastStringWidth = (input2, options = {}) => {
+  return dist_default2(input2, NO_TRUNCATION2, options).width;
+};
+var dist_default3 = fastStringWidth;
+
+// ../../node_modules/fast-wrap-ansi/lib/main.js
+var ESC = "\x1B";
+var CSI = "\x9B";
+var END_CODE = 39;
+var ANSI_ESCAPE_BELL = "\x07";
+var ANSI_CSI = "[";
+var ANSI_OSC = "]";
+var ANSI_SGR_TERMINATOR = "m";
+var ANSI_ESCAPE_LINK = `${ANSI_OSC}8;;`;
+var GROUP_REGEX = new RegExp(`(?:\\${ANSI_CSI}(?<code>\\d+)m|\\${ANSI_ESCAPE_LINK}(?<uri>.*)${ANSI_ESCAPE_BELL})`, "y");
+var getClosingCode = (openingCode) => {
+  if (openingCode >= 30 && openingCode <= 37)
+    return 39;
+  if (openingCode >= 90 && openingCode <= 97)
+    return 39;
+  if (openingCode >= 40 && openingCode <= 47)
+    return 49;
+  if (openingCode >= 100 && openingCode <= 107)
+    return 49;
+  if (openingCode === 1 || openingCode === 2)
+    return 22;
+  if (openingCode === 3)
+    return 23;
+  if (openingCode === 4)
+    return 24;
+  if (openingCode === 7)
+    return 27;
+  if (openingCode === 8)
+    return 28;
+  if (openingCode === 9)
+    return 29;
+  if (openingCode === 0)
+    return 0;
+  return void 0;
+};
+var wrapAnsiCode = (code) => `${ESC}${ANSI_CSI}${code}${ANSI_SGR_TERMINATOR}`;
+var wrapAnsiHyperlink = (url2) => `${ESC}${ANSI_ESCAPE_LINK}${url2}${ANSI_ESCAPE_BELL}`;
+var wrapWord = (rows, word, columns) => {
+  const characters = word[Symbol.iterator]();
+  let isInsideEscape = false;
+  let isInsideLinkEscape = false;
+  let lastRow = rows.at(-1);
+  let visible = lastRow === void 0 ? 0 : dist_default3(lastRow);
+  let currentCharacter = characters.next();
+  let nextCharacter = characters.next();
+  let rawCharacterIndex = 0;
+  while (!currentCharacter.done) {
+    const character = currentCharacter.value;
+    const characterLength = dist_default3(character);
+    if (visible + characterLength <= columns) {
+      rows[rows.length - 1] += character;
+    } else {
+      rows.push(character);
+      visible = 0;
+    }
+    if (character === ESC || character === CSI) {
+      isInsideEscape = true;
+      isInsideLinkEscape = word.startsWith(ANSI_ESCAPE_LINK, rawCharacterIndex + 1);
+    }
+    if (isInsideEscape) {
+      if (isInsideLinkEscape) {
+        if (character === ANSI_ESCAPE_BELL) {
+          isInsideEscape = false;
+          isInsideLinkEscape = false;
+        }
+      } else if (character === ANSI_SGR_TERMINATOR) {
+        isInsideEscape = false;
+      }
+    } else {
+      visible += characterLength;
+      if (visible === columns && !nextCharacter.done) {
+        rows.push("");
+        visible = 0;
+      }
+    }
+    currentCharacter = nextCharacter;
+    nextCharacter = characters.next();
+    rawCharacterIndex += character.length;
+  }
+  lastRow = rows.at(-1);
+  if (!visible && lastRow !== void 0 && lastRow.length && rows.length > 1) {
+    rows[rows.length - 2] += rows.pop();
+  }
+};
+var stringVisibleTrimSpacesRight = (string4) => {
+  const words = string4.split(" ");
+  let last = words.length;
+  while (last) {
+    if (dist_default3(words[last - 1])) {
+      break;
+    }
+    last--;
+  }
+  if (last === words.length) {
+    return string4;
+  }
+  return words.slice(0, last).join(" ") + words.slice(last).join("");
+};
+var exec2 = (string4, columns, options = {}) => {
+  if (options.trim !== false && string4.trim() === "") {
+    return "";
+  }
+  let returnValue = "";
+  let escapeCode;
+  let escapeUrl;
+  const words = string4.split(" ");
+  let rows = [""];
+  let rowLength = 0;
+  for (let index = 0; index < words.length; index++) {
+    const word = words[index];
+    if (options.trim !== false) {
+      const row = rows.at(-1) ?? "";
+      const trimmed = row.trimStart();
+      if (row.length !== trimmed.length) {
+        rows[rows.length - 1] = trimmed;
+        rowLength = dist_default3(trimmed);
+      }
+    }
+    if (index !== 0) {
+      if (rowLength >= columns && (options.wordWrap === false || options.trim === false)) {
+        rows.push("");
+        rowLength = 0;
+      }
+      if (rowLength || options.trim === false) {
+        rows[rows.length - 1] += " ";
+        rowLength++;
+      }
+    }
+    const wordLength = dist_default3(word);
+    if (options.hard && wordLength > columns) {
+      const remainingColumns = columns - rowLength;
+      const breaksStartingThisLine = 1 + Math.floor((wordLength - remainingColumns - 1) / columns);
+      const breaksStartingNextLine = Math.floor((wordLength - 1) / columns);
+      if (breaksStartingNextLine < breaksStartingThisLine) {
+        rows.push("");
+      }
+      wrapWord(rows, word, columns);
+      rowLength = dist_default3(rows.at(-1) ?? "");
+      continue;
+    }
+    if (rowLength + wordLength > columns && rowLength && wordLength) {
+      if (options.wordWrap === false && rowLength < columns) {
+        wrapWord(rows, word, columns);
+        rowLength = dist_default3(rows.at(-1) ?? "");
+        continue;
+      }
+      rows.push("");
+      rowLength = 0;
+    }
+    if (rowLength + wordLength > columns && options.wordWrap === false) {
+      wrapWord(rows, word, columns);
+      rowLength = dist_default3(rows.at(-1) ?? "");
+      continue;
+    }
+    rows[rows.length - 1] += word;
+    rowLength += wordLength;
+  }
+  if (options.trim !== false) {
+    rows = rows.map((row) => stringVisibleTrimSpacesRight(row));
+  }
+  const preString = rows.join("\n");
+  let inSurrogate = false;
+  for (let i = 0; i < preString.length; i++) {
+    const character = preString[i];
+    returnValue += character;
+    if (!inSurrogate) {
+      inSurrogate = character >= "\uD800" && character <= "\uDBFF";
+      if (inSurrogate) {
+        continue;
+      }
+    } else {
+      inSurrogate = false;
+    }
+    if (character === ESC || character === CSI) {
+      GROUP_REGEX.lastIndex = i + 1;
+      const groupsResult = GROUP_REGEX.exec(preString);
+      const groups = groupsResult?.groups;
+      if (groups?.code !== void 0) {
+        const code = Number.parseFloat(groups.code);
+        escapeCode = code === END_CODE ? void 0 : code;
+      } else if (groups?.uri !== void 0) {
+        escapeUrl = groups.uri.length === 0 ? void 0 : groups.uri;
+      }
+    }
+    if (preString[i + 1] === "\n") {
+      if (escapeUrl) {
+        returnValue += wrapAnsiHyperlink("");
+      }
+      const closingCode = escapeCode ? getClosingCode(escapeCode) : void 0;
+      if (escapeCode && closingCode) {
+        returnValue += wrapAnsiCode(closingCode);
+      }
+    } else if (character === "\n") {
+      if (escapeCode && getClosingCode(escapeCode)) {
+        returnValue += wrapAnsiCode(escapeCode);
+      }
+      if (escapeUrl) {
+        returnValue += wrapAnsiHyperlink(escapeUrl);
+      }
+    }
+  }
+  return returnValue;
+};
+var CRLF_OR_LF = /\r?\n/;
+function wrapAnsi(string4, columns, options) {
+  return String(string4).normalize().split(CRLF_OR_LF).map((line) => exec2(line, columns, options)).join("\n");
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/utils.js
+function breakLines(content, width) {
+  return content.split("\n").flatMap((line) => wrapAnsi(line, width, { trim: false, wordWrap: false }).split("\n").map((str) => str.trimEnd())).join("\n");
+}
+function readlineWidth() {
+  return (0, import_cli_width.default)({ defaultWidth: 80, output: readline().output });
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/pagination/use-pagination.js
+function usePointerPosition({ active, renderedItems, pageSize, loop }) {
+  const state = useRef({
+    lastPointer: active,
+    lastActive: void 0
+  });
+  const { lastPointer, lastActive: lastActive2 } = state.current;
+  const middle = Math.floor(pageSize / 2);
+  const renderedLength = renderedItems.reduce((acc, item) => acc + item.length, 0);
+  const defaultPointerPosition = renderedItems.slice(0, active).reduce((acc, item) => acc + item.length, 0);
+  let pointer = defaultPointerPosition;
+  if (renderedLength > pageSize) {
+    if (loop) {
+      pointer = lastPointer;
+      if (
+        // First render, skip this logic.
+        lastActive2 != null && // Only move the pointer down when the user moves down.
+        lastActive2 < active && // Check user didn't move up across page boundary.
+        active - lastActive2 < pageSize
+      ) {
+        pointer = Math.min(
+          // Furthest allowed position for the pointer is the middle of the list
+          middle,
+          Math.abs(active - lastActive2) === 1 ? Math.min(
+            // Move the pointer at most the height of the last active item.
+            lastPointer + (renderedItems[lastActive2]?.length ?? 0),
+            // If the user moved by one item, move the pointer to the natural position of the active item as
+            // long as it doesn't move the cursor up.
+            Math.max(defaultPointerPosition, lastPointer)
+          ) : (
+            // Otherwise, move the pointer down by the difference between the active and last active item.
+            lastPointer + active - lastActive2
+          )
+        );
+      }
+    } else {
+      const spaceUnderActive = renderedItems.slice(active).reduce((acc, item) => acc + item.length, 0);
+      pointer = spaceUnderActive < pageSize - middle ? (
+        // If the active item is near the end of the list, progressively move the cursor towards the end.
+        pageSize - spaceUnderActive
+      ) : (
+        // Otherwise, progressively move the pointer to the middle of the list.
+        Math.min(defaultPointerPosition, middle)
+      );
+    }
+  }
+  state.current.lastPointer = pointer;
+  state.current.lastActive = active;
+  return pointer;
+}
+function usePagination({ items, active, renderItem, pageSize, loop = true }) {
+  const width = readlineWidth();
+  const bound = (num) => (num % items.length + items.length) % items.length;
+  const renderedItems = items.map((item, index) => {
+    if (item == null)
+      return [];
+    return breakLines(renderItem({ item, index, isActive: index === active }), width).split("\n");
+  });
+  const renderedLength = renderedItems.reduce((acc, item) => acc + item.length, 0);
+  const renderItemAtIndex = (index) => renderedItems[index] ?? [];
+  const pointer = usePointerPosition({ active, renderedItems, pageSize, loop });
+  const activeItem = renderItemAtIndex(active).slice(0, pageSize);
+  const activeItemPosition = pointer + activeItem.length <= pageSize ? pointer : pageSize - activeItem.length;
+  const pageBuffer = Array.from({ length: pageSize });
+  pageBuffer.splice(activeItemPosition, activeItem.length, ...activeItem);
+  const itemVisited = /* @__PURE__ */ new Set([active]);
+  let bufferPointer = activeItemPosition + activeItem.length;
+  let itemPointer = bound(active + 1);
+  while (bufferPointer < pageSize && !itemVisited.has(itemPointer) && (loop && renderedLength > pageSize ? itemPointer !== active : itemPointer > active)) {
+    const lines2 = renderItemAtIndex(itemPointer);
+    const linesToAdd = lines2.slice(0, pageSize - bufferPointer);
+    pageBuffer.splice(bufferPointer, linesToAdd.length, ...linesToAdd);
+    itemVisited.add(itemPointer);
+    bufferPointer += linesToAdd.length;
+    itemPointer = bound(itemPointer + 1);
+  }
+  bufferPointer = activeItemPosition - 1;
+  itemPointer = bound(active - 1);
+  while (bufferPointer >= 0 && !itemVisited.has(itemPointer) && (loop && renderedLength > pageSize ? itemPointer !== active : itemPointer < active)) {
+    const lines2 = renderItemAtIndex(itemPointer);
+    const linesToAdd = lines2.slice(Math.max(0, lines2.length - bufferPointer - 1));
+    pageBuffer.splice(bufferPointer - linesToAdd.length + 1, linesToAdd.length, ...linesToAdd);
+    itemVisited.add(itemPointer);
+    bufferPointer -= linesToAdd.length;
+    itemPointer = bound(itemPointer - 1);
+  }
+  return pageBuffer.filter((line) => typeof line === "string").join("\n");
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/create-prompt.js
+import * as readline2 from "readline";
+import { AsyncResource as AsyncResource3 } from "async_hooks";
+
+// ../../node_modules/@inquirer/type/dist/utils.js
+function withResolver() {
+  let resolve6;
+  let reject;
+  const promise2 = new Promise((res, rej) => {
+    resolve6 = res;
+    reject = rej;
+  });
+  return { promise: promise2, resolve: resolve6, reject };
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/create-prompt.js
+var import_mute_stream = __toESM(require_lib(), 1);
+
+// ../../node_modules/signal-exit/dist/mjs/signals.js
+var signals = [];
+signals.push("SIGHUP", "SIGINT", "SIGTERM");
+if (process.platform !== "win32") {
+  signals.push(
+    "SIGALRM",
+    "SIGABRT",
+    "SIGVTALRM",
+    "SIGXCPU",
+    "SIGXFSZ",
+    "SIGUSR2",
+    "SIGTRAP",
+    "SIGSYS",
+    "SIGQUIT",
+    "SIGIOT"
+    // should detect profiler and enable/disable accordingly.
+    // see #21
+    // 'SIGPROF'
+  );
+}
+if (process.platform === "linux") {
+  signals.push("SIGIO", "SIGPOLL", "SIGPWR", "SIGSTKFLT");
+}
+
+// ../../node_modules/signal-exit/dist/mjs/index.js
+var processOk = (process4) => !!process4 && typeof process4 === "object" && typeof process4.removeListener === "function" && typeof process4.emit === "function" && typeof process4.reallyExit === "function" && typeof process4.listeners === "function" && typeof process4.kill === "function" && typeof process4.pid === "number" && typeof process4.on === "function";
+var kExitEmitter = /* @__PURE__ */ Symbol.for("signal-exit emitter");
+var global2 = globalThis;
+var ObjectDefineProperty = Object.defineProperty.bind(Object);
+var Emitter = class {
+  emitted = {
+    afterExit: false,
+    exit: false
+  };
+  listeners = {
+    afterExit: [],
+    exit: []
+  };
+  count = 0;
+  id = Math.random();
+  constructor() {
+    if (global2[kExitEmitter]) {
+      return global2[kExitEmitter];
+    }
+    ObjectDefineProperty(global2, kExitEmitter, {
+      value: this,
+      writable: false,
+      enumerable: false,
+      configurable: false
+    });
+  }
+  on(ev, fn) {
+    this.listeners[ev].push(fn);
+  }
+  removeListener(ev, fn) {
+    const list = this.listeners[ev];
+    const i = list.indexOf(fn);
+    if (i === -1) {
+      return;
+    }
+    if (i === 0 && list.length === 1) {
+      list.length = 0;
+    } else {
+      list.splice(i, 1);
+    }
+  }
+  emit(ev, code, signal) {
+    if (this.emitted[ev]) {
+      return false;
+    }
+    this.emitted[ev] = true;
+    let ret = false;
+    for (const fn of this.listeners[ev]) {
+      ret = fn(code, signal) === true || ret;
+    }
+    if (ev === "exit") {
+      ret = this.emit("afterExit", code, signal) || ret;
+    }
+    return ret;
+  }
+};
+var SignalExitBase = class {
+};
+var signalExitWrap = (handler) => {
+  return {
+    onExit(cb, opts) {
+      return handler.onExit(cb, opts);
+    },
+    load() {
+      return handler.load();
+    },
+    unload() {
+      return handler.unload();
+    }
+  };
+};
+var SignalExitFallback = class extends SignalExitBase {
+  onExit() {
+    return () => {
+    };
+  }
+  load() {
+  }
+  unload() {
+  }
+};
+var SignalExit = class extends SignalExitBase {
+  // "SIGHUP" throws an `ENOSYS` error on Windows,
+  // so use a supported signal instead
+  /* c8 ignore start */
+  #hupSig = process3.platform === "win32" ? "SIGINT" : "SIGHUP";
+  /* c8 ignore stop */
+  #emitter = new Emitter();
+  #process;
+  #originalProcessEmit;
+  #originalProcessReallyExit;
+  #sigListeners = {};
+  #loaded = false;
+  constructor(process4) {
+    super();
+    this.#process = process4;
+    this.#sigListeners = {};
+    for (const sig of signals) {
+      this.#sigListeners[sig] = () => {
+        const listeners = this.#process.listeners(sig);
+        let { count: count2 } = this.#emitter;
+        const p = process4;
+        if (typeof p.__signal_exit_emitter__ === "object" && typeof p.__signal_exit_emitter__.count === "number") {
+          count2 += p.__signal_exit_emitter__.count;
+        }
+        if (listeners.length === count2) {
+          this.unload();
+          const ret = this.#emitter.emit("exit", null, sig);
+          const s = sig === "SIGHUP" ? this.#hupSig : sig;
+          if (!ret)
+            process4.kill(process4.pid, s);
+        }
+      };
+    }
+    this.#originalProcessReallyExit = process4.reallyExit;
+    this.#originalProcessEmit = process4.emit;
+  }
+  onExit(cb, opts) {
+    if (!processOk(this.#process)) {
+      return () => {
+      };
+    }
+    if (this.#loaded === false) {
+      this.load();
+    }
+    const ev = opts?.alwaysLast ? "afterExit" : "exit";
+    this.#emitter.on(ev, cb);
+    return () => {
+      this.#emitter.removeListener(ev, cb);
+      if (this.#emitter.listeners["exit"].length === 0 && this.#emitter.listeners["afterExit"].length === 0) {
+        this.unload();
+      }
+    };
+  }
+  load() {
+    if (this.#loaded) {
+      return;
+    }
+    this.#loaded = true;
+    this.#emitter.count += 1;
+    for (const sig of signals) {
+      try {
+        const fn = this.#sigListeners[sig];
+        if (fn)
+          this.#process.on(sig, fn);
+      } catch (_) {
+      }
+    }
+    this.#process.emit = (ev, ...a) => {
+      return this.#processEmit(ev, ...a);
+    };
+    this.#process.reallyExit = (code) => {
+      return this.#processReallyExit(code);
+    };
+  }
+  unload() {
+    if (!this.#loaded) {
+      return;
+    }
+    this.#loaded = false;
+    signals.forEach((sig) => {
+      const listener = this.#sigListeners[sig];
+      if (!listener) {
+        throw new Error("Listener not defined for signal: " + sig);
+      }
+      try {
+        this.#process.removeListener(sig, listener);
+      } catch (_) {
+      }
+    });
+    this.#process.emit = this.#originalProcessEmit;
+    this.#process.reallyExit = this.#originalProcessReallyExit;
+    this.#emitter.count -= 1;
+  }
+  #processReallyExit(code) {
+    if (!processOk(this.#process)) {
+      return 0;
+    }
+    this.#process.exitCode = code || 0;
+    this.#emitter.emit("exit", this.#process.exitCode, null);
+    return this.#originalProcessReallyExit.call(this.#process, this.#process.exitCode);
+  }
+  #processEmit(ev, ...args) {
+    const og = this.#originalProcessEmit;
+    if (ev === "exit" && processOk(this.#process)) {
+      if (typeof args[0] === "number") {
+        this.#process.exitCode = args[0];
+      }
+      const ret = og.call(this.#process, ev, ...args);
+      this.#emitter.emit("exit", this.#process.exitCode, null);
+      return ret;
+    } else {
+      return og.call(this.#process, ev, ...args);
+    }
+  }
+};
+var process3 = globalThis.process;
+var {
+  /**
+   * Called when the process is exiting, whether via signal, explicit
+   * exit, or running out of stuff to do.
+   *
+   * If the global process object is not suitable for instrumentation,
+   * then this will be a no-op.
+   *
+   * Returns a function that may be used to unload signal-exit.
+   */
+  onExit,
+  /**
+   * Load the listeners.  Likely you never need to call this, unless
+   * doing a rather deep integration with signal-exit functionality.
+   * Mostly exposed for the benefit of testing.
+   *
+   * @internal
+   */
+  load,
+  /**
+   * Unload the listeners.  Likely you never need to call this, unless
+   * doing a rather deep integration with signal-exit functionality.
+   * Mostly exposed for the benefit of testing.
+   *
+   * @internal
+   */
+  unload
+} = signalExitWrap(processOk(process3) ? new SignalExit(process3) : new SignalExitFallback());
+
+// ../../node_modules/@inquirer/core/dist/lib/screen-manager.js
+import { stripVTControlCharacters } from "util";
+
+// ../../node_modules/@inquirer/ansi/dist/index.js
+var ESC2 = "\x1B[";
+var cursorLeft = ESC2 + "G";
+var cursorHide = ESC2 + "?25l";
+var cursorShow = ESC2 + "?25h";
+var cursorUp = (rows = 1) => rows > 0 ? `${ESC2}${rows}A` : "";
+var cursorDown = (rows = 1) => rows > 0 ? `${ESC2}${rows}B` : "";
+var cursorTo = (x, y) => {
+  if (typeof y === "number" && !Number.isNaN(y)) {
+    return `${ESC2}${y + 1};${x + 1}H`;
+  }
+  return `${ESC2}${x + 1}G`;
+};
+var eraseLine = ESC2 + "2K";
+var eraseLines = (lines2) => lines2 > 0 ? (eraseLine + cursorUp(1)).repeat(lines2 - 1) + eraseLine + cursorLeft : "";
+
+// ../../node_modules/@inquirer/core/dist/lib/screen-manager.js
+var height = (content) => content.split("\n").length;
+var lastLine = (content) => content.split("\n").pop() ?? "";
+var ScreenManager = class {
+  // These variables are keeping information to allow correct prompt re-rendering
+  height = 0;
+  extraLinesUnderPrompt = 0;
+  cursorPos;
+  rl;
+  constructor(rl) {
+    this.rl = rl;
+    this.cursorPos = rl.getCursorPos();
+  }
+  write(content) {
+    this.rl.output.unmute();
+    this.rl.output.write(content);
+    this.rl.output.mute();
+  }
+  render(content, bottomContent = "") {
+    const promptLine = lastLine(content);
+    const rawPromptLine = stripVTControlCharacters(promptLine);
+    let prompt = rawPromptLine;
+    if (this.rl.line.length > 0) {
+      prompt = prompt.slice(0, -this.rl.line.length);
+    }
+    this.rl.setPrompt(prompt);
+    this.cursorPos = this.rl.getCursorPos();
+    const width = readlineWidth();
+    content = breakLines(content, width);
+    bottomContent = breakLines(bottomContent, width);
+    if (rawPromptLine.length % width === 0) {
+      content += "\n";
+    }
+    let output2 = content + (bottomContent ? "\n" + bottomContent : "");
+    const promptLineUpDiff = Math.floor(rawPromptLine.length / width) - this.cursorPos.rows;
+    const bottomContentHeight = promptLineUpDiff + (bottomContent ? height(bottomContent) : 0);
+    if (bottomContentHeight > 0)
+      output2 += cursorUp(bottomContentHeight);
+    output2 += cursorTo(this.cursorPos.cols);
+    this.write(cursorDown(this.extraLinesUnderPrompt) + eraseLines(this.height) + output2);
+    this.extraLinesUnderPrompt = bottomContentHeight;
+    this.height = height(output2);
+  }
+  checkCursorPos() {
+    const cursorPos = this.rl.getCursorPos();
+    if (cursorPos.cols !== this.cursorPos.cols) {
+      this.write(cursorTo(cursorPos.cols));
+      this.cursorPos = cursorPos;
+    }
+  }
+  done({ clearContent }) {
+    this.rl.setPrompt("");
+    let output2 = cursorDown(this.extraLinesUnderPrompt);
+    output2 += clearContent ? eraseLines(this.height) : "\n";
+    output2 += cursorLeft;
+    output2 += cursorShow;
+    this.write(output2);
+    this.rl.close();
+  }
+};
+
+// ../../node_modules/@inquirer/core/dist/lib/create-prompt.js
+import path from "path";
+var nativeSetImmediate = globalThis.setImmediate;
+var nativeClearImmediate = globalThis.clearImmediate;
+function listenTo(target, event, listener) {
+  if ("on" in target) {
+    target.on(event, listener);
+    return () => target.removeListener(event, listener);
+  }
+  target.addEventListener(event, listener);
+  return () => target.removeEventListener(event, listener);
+}
+function getCallSites() {
+  const savedPrepareStackTrace = Error.prepareStackTrace;
+  let result = [];
+  try {
+    Error.prepareStackTrace = (_, callSites) => {
+      const callSitesWithoutCurrent = callSites.slice(1);
+      result = callSitesWithoutCurrent;
+      return callSitesWithoutCurrent;
+    };
+    new Error().stack;
+  } catch {
+    return result;
+  }
+  Error.prepareStackTrace = savedPrepareStackTrace;
+  return result;
+}
+function createPrompt(view) {
+  const callSites = getCallSites();
+  const prompt = (config2, context = {}) => {
+    const { input: input2 = process.stdin, signal } = context;
+    const cleanups = /* @__PURE__ */ new Set();
+    const output2 = new import_mute_stream.default();
+    output2.pipe(context.output ?? process.stdout);
+    const rl = readline2.createInterface({
+      terminal: true,
+      input: input2,
+      output: output2
+    });
+    output2.mute();
+    const screen = new ScreenManager(rl);
+    const { promise: promise2, resolve: resolve6, reject } = withResolver();
+    return withHooks(rl, (cycle) => {
+      const clearEffects = AsyncResource3.bind(() => effectScheduler.clearAll());
+      const settlePrompt = (settle2) => {
+        try {
+          clearEffects();
+          settle2();
+        } catch (error62) {
+          reject(error62);
+        }
+      };
+      const resolvePrompt = (value) => settlePrompt(() => resolve6(value));
+      const rejectPrompt = (error62) => settlePrompt(() => reject(error62));
+      const promptPromise = Object.assign(promise2.finally(() => {
+        cleanups.forEach((cleanup) => cleanup());
+        screen.done({ clearContent: Boolean(context.clearPromptOnDone) });
+        output2.end();
+      }).then(() => promise2), { cancel: () => rejectPrompt(new CancelPromptError()) });
+      if (signal) {
+        const abort = () => rejectPrompt(new AbortPromptError({ cause: signal.reason }));
+        if (signal.aborted) {
+          abort();
+          return promptPromise;
+        }
+        cleanups.add(listenTo(signal, "abort", abort));
+      }
+      cleanups.add(onExit((code, signal2) => {
+        rejectPrompt(new ExitPromptError(`User force closed the prompt with ${code} ${signal2}`));
+      }));
+      cleanups.add(listenTo(rl, "SIGINT", () => rejectPrompt(new ExitPromptError(`User force closed the prompt with SIGINT`))));
+      cleanups.add(listenTo(rl, "close", clearEffects));
+      const startCycle = () => {
+        cleanups.add(listenTo(rl.input, "keypress", () => screen.checkCursorPos()));
+        let pendingDone = null;
+        cycle(() => {
+          let effectsSettled = false;
+          try {
+            const nextView = view(config2, (value) => {
+              if (effectsSettled) {
+                resolvePrompt(value);
+              } else {
+                pendingDone = { value };
+              }
+            });
+            if (nextView === void 0) {
+              let callerFilename = callSites[1]?.getFileName();
+              if (callerFilename && !callerFilename.startsWith("file://")) {
+                callerFilename = path.resolve(callerFilename);
+              }
+              throw new Error(`Prompt functions must return a string.
+    at ${callerFilename}`);
+            }
+            const [content, bottomContent] = typeof nextView === "string" ? [nextView] : nextView;
+            screen.render(content, bottomContent);
+            effectScheduler.run();
+          } catch (error62) {
+            rejectPrompt(error62);
+          }
+          effectsSettled = true;
+          if (pendingDone !== null) {
+            const { value } = pendingDone;
+            pendingDone = null;
+            resolvePrompt(value);
+          }
+        });
+      };
+      if ("readableFlowing" in input2 && input2.isTTY) {
+        const immediate = nativeSetImmediate(startCycle);
+        cleanups.add(() => nativeClearImmediate(immediate));
+      } else {
+        startCycle();
+      }
+      return promptPromise;
+    });
+  };
+  return prompt;
+}
+
+// ../../node_modules/@inquirer/core/dist/lib/Separator.js
+import { styleText as styleText2 } from "util";
+var Separator = class {
+  separator = styleText2("dim", Array.from({ length: 15 }).join(dist_default.line));
+  type = "separator";
+  constructor(separator) {
+    if (separator) {
+      this.separator = separator;
+    }
+  }
+  static isSeparator(choice) {
+    return Boolean(choice && typeof choice === "object" && "type" in choice && choice.type === "separator");
+  }
+};
+
+// ../../node_modules/@inquirer/confirm/dist/index.js
+import { styleText as styleText3 } from "util";
+var confirmTheme = {
+  keywords: {
+    yes: "Yes",
+    no: "No",
+    error: ({ yes, no }) => `You must answer with "${yes}" or "${no}"`
+  },
+  style: {
+    confirmDefault: (text) => {
+      const first = text[0] ?? "";
+      if (first.toLowerCase() === first.toUpperCase()) {
+        return styleText3("cyan", text);
+      }
+      return first.toUpperCase() + text.slice(1);
+    }
+  }
+};
+var dist_default4 = createPrompt((config2, done) => {
+  const [status, setStatus] = useState("idle");
+  const [value, setValue] = useState("");
+  const [errorMsg, setError] = useState();
+  const theme = makeTheme(confirmTheme, config2.theme);
+  const prefix = usePrefix({ status, theme });
+  const { yes, no } = theme.keywords;
+  const yesHint = (yes[0] ?? "").toLowerCase();
+  const noHint = (no[0] ?? "").toLowerCase();
+  const hint = config2.default === false ? `${yesHint}/${theme.style.confirmDefault(noHint)}` : `${theme.style.confirmDefault(yesHint)}/${noHint}`;
+  function boolToString(value2) {
+    return value2 ? yes : no;
+  }
+  const { transformer = boolToString } = config2;
+  function getBooleanValue(value2) {
+    const v = value2.trim().toLowerCase();
+    if (v === "")
+      return config2.default !== false;
+    if (yes.toLowerCase().startsWith(v))
+      return true;
+    if (no.toLowerCase().startsWith(v))
+      return false;
+    if ("yes".startsWith(v))
+      return true;
+    if ("no".startsWith(v))
+      return false;
+    return void 0;
+  }
+  useKeypress((key, rl) => {
+    if (status !== "idle")
+      return;
+    if (isEnterKey(key)) {
+      const answer = getBooleanValue(value);
+      if (answer === void 0) {
+        rl.write(value);
+        setError(theme.keywords.error({ yes, no }));
+        return;
+      }
+      setValue(transformer(answer));
+      setStatus("done");
+      done(answer);
+    } else if (isTabKey(key)) {
+      const answer = boolToString(!(getBooleanValue(value) ?? config2.default !== false));
+      rl.clearLine(0);
+      rl.write(answer);
+      setValue(answer);
+    } else {
+      setValue(rl.line);
+      setError(void 0);
+    }
+  });
+  let formattedValue = value;
+  let defaultValue = "";
+  if (status === "done") {
+    formattedValue = theme.style.answer(value);
+  } else {
+    defaultValue = ` ${theme.style.defaultAnswer(hint)}`;
+  }
+  const message = theme.style.message(config2.message, status);
+  let error62 = "";
+  if (errorMsg) {
+    error62 = theme.style.error(errorMsg);
+  }
+  return [`${prefix} ${message}${defaultValue} ${formattedValue}`, error62];
+});
+
+// ../../node_modules/@inquirer/input/dist/index.js
+var inputTheme = {
+  validationFailureMode: "keep"
+};
+var dist_default5 = createPrompt((config2, done) => {
+  const { prefill = "tab" } = config2;
+  const theme = makeTheme(inputTheme, config2.theme);
+  const [status, setStatus] = useState("idle");
+  const [defaultValue, setDefaultValue] = useState(String(config2.default ?? ""));
+  const [errorMsg, setError] = useState();
+  const [value, setValue] = useState("");
+  const prefix = usePrefix({ status, theme });
+  async function validate2(value2) {
+    const { required: required2, pattern, patternError = "Invalid input" } = config2;
+    if (required2 && !value2) {
+      return "You must provide a value";
+    }
+    if (pattern && !pattern.test(value2)) {
+      return patternError;
+    }
+    if (typeof config2.validate === "function") {
+      return await config2.validate(value2) || "You must provide a valid value";
+    }
+    return true;
+  }
+  useKeypress(async (key, rl) => {
+    if (status !== "idle") {
+      return;
+    }
+    if (isEnterKey(key)) {
+      const answer = value || defaultValue;
+      setStatus("loading");
+      const isValid = await validate2(answer);
+      if (isValid === true) {
+        setValue(answer);
+        setStatus("done");
+        done(answer);
+      } else {
+        if (theme.validationFailureMode === "clear") {
+          setValue("");
+        } else {
+          rl.write(value);
+        }
+        setError(isValid);
+        setStatus("idle");
+      }
+    } else if (isBackspaceKey(key) && !value) {
+      setDefaultValue("");
+    } else if (isTabKey(key) && !value) {
+      setDefaultValue("");
+      rl.clearLine(0);
+      rl.write(defaultValue);
+      setValue(defaultValue);
+    } else {
+      setValue(rl.line);
+      setError(void 0);
+    }
+  });
+  useEffect((rl) => {
+    if (prefill === "editable" && defaultValue) {
+      rl.write(defaultValue);
+      setValue(defaultValue);
+    }
+  }, []);
+  const message = theme.style.message(config2.message, status);
+  let formattedValue = value;
+  if (typeof config2.transformer === "function") {
+    formattedValue = config2.transformer(value, { isFinal: status === "done" });
+  } else if (status === "done") {
+    formattedValue = theme.style.answer(value);
+  }
+  let defaultStr;
+  if (defaultValue && status !== "done" && !value) {
+    defaultStr = theme.style.defaultAnswer(defaultValue);
+  }
+  let error62 = "";
+  if (errorMsg) {
+    error62 = theme.style.error(errorMsg);
+  }
+  return [
+    [prefix, message, defaultStr, formattedValue].filter((v) => v !== void 0).join(" "),
+    error62
+  ];
+});
+
+// ../../node_modules/@inquirer/select/dist/index.js
+import { styleText as styleText4 } from "util";
+var selectTheme = {
+  icon: { cursor: dist_default.pointer },
+  style: {
+    disabled: (text) => styleText4("dim", text),
+    description: (text) => styleText4("cyan", text),
+    keysHelpTip: (keys) => keys.map(([key, action]) => `${styleText4("bold", key)} ${styleText4("dim", action)}`).join(styleText4("dim", " \u2022 "))
+  },
+  i18n: { disabledError: "This option is disabled and cannot be selected." },
+  indexMode: "hidden"
+};
+function isSelectable(item) {
+  return !Separator.isSeparator(item) && !item.disabled;
+}
+function isNavigable(item) {
+  return !Separator.isSeparator(item);
+}
+function normalizeChoices(choices) {
+  return choices.map((choice) => {
+    if (Separator.isSeparator(choice))
+      return choice;
+    if (typeof choice !== "object" || choice === null || !("value" in choice)) {
+      const name2 = String(choice);
+      return {
+        value: choice,
+        name: name2,
+        short: name2,
+        disabled: false
+      };
+    }
+    const name = choice.name ?? String(choice.value);
+    const normalizedChoice = {
+      value: choice.value,
+      name,
+      short: choice.short ?? name,
+      disabled: choice.disabled ?? false
+    };
+    if (choice.description) {
+      normalizedChoice.description = choice.description;
+    }
+    return normalizedChoice;
+  });
+}
+var dist_default6 = createPrompt((config2, done) => {
+  const { loop = true, pageSize = 7 } = config2;
+  const theme = makeTheme(selectTheme, config2.theme);
+  const { keybindings: keybindings2 } = theme;
+  const [status, setStatus] = useState("idle");
+  const prefix = usePrefix({ status, theme });
+  const searchTimeoutRef = useRef();
+  const searchEnabled = !keybindings2.includes("vim");
+  const items = useMemo(() => normalizeChoices(config2.choices), [config2.choices]);
+  const bounds = useMemo(() => {
+    const first = items.findIndex(isNavigable);
+    const last = items.findLastIndex(isNavigable);
+    if (first === -1) {
+      throw new ValidationError("[select prompt] No selectable choices. All choices are disabled.");
+    }
+    return { first, last };
+  }, [items]);
+  const defaultItemIndex = useMemo(() => {
+    if (!("default" in config2))
+      return -1;
+    return items.findIndex((item) => isSelectable(item) && item.value === config2.default);
+  }, [config2.default, items]);
+  const [active, setActive] = useState(defaultItemIndex === -1 ? bounds.first : defaultItemIndex);
+  const selectedChoice = items[active];
+  if (selectedChoice == null || Separator.isSeparator(selectedChoice)) {
+    throw new Error("Active index does not point to a choice");
+  }
+  const [errorMsg, setError] = useState();
+  useKeypress((key, rl) => {
+    clearTimeout(searchTimeoutRef.current);
+    if (errorMsg) {
+      setError(void 0);
+    }
+    if (isEnterKey(key)) {
+      if (selectedChoice.disabled) {
+        setError(theme.i18n.disabledError);
+      } else {
+        setStatus("done");
+        done(selectedChoice.value);
+      }
+    } else if (isUpKey(key, keybindings2) || isDownKey(key, keybindings2)) {
+      rl.clearLine(0);
+      if (loop || isUpKey(key, keybindings2) && active !== bounds.first || isDownKey(key, keybindings2) && active !== bounds.last) {
+        const offset = isUpKey(key, keybindings2) ? -1 : 1;
+        let next = active;
+        do {
+          next = (next + offset + items.length) % items.length;
+        } while (!isNavigable(items[next]));
+        setActive(next);
+      }
+    } else if (isNumberKey(key) && !Number.isNaN(Number(rl.line))) {
+      const selectedIndex = Number(rl.line) - 1;
+      let selectableIndex = -1;
+      const position = items.findIndex((item2) => {
+        if (Separator.isSeparator(item2))
+          return false;
+        selectableIndex++;
+        return selectableIndex === selectedIndex;
+      });
+      const item = items[position];
+      if (item != null && isSelectable(item)) {
+        setActive(position);
+      }
+      searchTimeoutRef.current = setTimeout(() => {
+        rl.clearLine(0);
+      }, 700);
+    } else if (isBackspaceKey(key)) {
+      rl.clearLine(0);
+    } else if (searchEnabled) {
+      const searchTerm = rl.line.toLowerCase();
+      const matchIndex = items.findIndex((item) => {
+        if (Separator.isSeparator(item) || !isSelectable(item))
+          return false;
+        return item.name.toLowerCase().startsWith(searchTerm);
+      });
+      if (matchIndex !== -1) {
+        setActive(matchIndex);
+      }
+      searchTimeoutRef.current = setTimeout(() => {
+        rl.clearLine(0);
+      }, 700);
+    }
+  });
+  useEffect(() => () => {
+    clearTimeout(searchTimeoutRef.current);
+  }, []);
+  const message = theme.style.message(config2.message, status);
+  const helpLine = theme.style.keysHelpTip([
+    ["\u2191\u2193", "navigate"],
+    ["\u23CE", "select"]
+  ]);
+  let separatorCount = 0;
+  const page = usePagination({
+    items,
+    active,
+    renderItem({ item, isActive: isActive2, index }) {
+      if (Separator.isSeparator(item)) {
+        separatorCount++;
+        return ` ${item.separator}`;
+      }
+      const cursor = isActive2 ? theme.icon.cursor : " ";
+      const indexLabel = theme.indexMode === "number" ? `${index + 1 - separatorCount}. ` : "";
+      if (item.disabled) {
+        const disabledLabel = typeof item.disabled === "string" ? item.disabled : "(disabled)";
+        const disabledCursor = isActive2 ? theme.icon.cursor : "-";
+        return theme.style.disabled(`${disabledCursor} ${indexLabel}${item.name} ${disabledLabel}`);
+      }
+      const color = isActive2 ? theme.style.highlight : (x) => x;
+      return color(`${cursor} ${indexLabel}${item.name}`);
+    },
+    pageSize,
+    loop
+  });
+  if (status === "done") {
+    return [prefix, message, theme.style.answer(selectedChoice.short)].filter(Boolean).join(" ");
+  }
+  const { description } = selectedChoice;
+  const lines2 = [
+    [prefix, message].filter(Boolean).join(" "),
+    page,
+    " ",
+    description ? theme.style.description(description) : "",
+    errorMsg ? theme.style.error(errorMsg) : "",
+    helpLine
+  ].filter(Boolean).join("\n").trimEnd();
+  return `${lines2}${cursorHide}`;
+});
+
+// src/io.ts
+var CliError = class extends Error {
+};
+var inquirerPrompter = {
+  select: (message, choices, fallback) => dist_default6({ message, choices, default: fallback }),
+  input: (message, fallback) => dist_default5({ message, default: fallback }),
+  confirm: (message, fallback) => dist_default4({ message, default: fallback })
+};
+var defaultsPrompter = {
+  select: async (_m, _c, fallback) => fallback,
+  input: async (_m, fallback) => fallback,
+  confirm: async (_m, fallback) => fallback
+};
+function processIo(interactive) {
+  return {
+    prompt: interactive ? inquirerPrompter : defaultsPrompter,
+    out: (line) => process.stdout.write(`${line}
+`),
+    warn: (line) => process.stderr.write(`warning: ${line}
+`),
+    env: process.env,
+    now: () => (/* @__PURE__ */ new Date()).toISOString()
+  };
+}
+function exitOnClosedPipe(stream = process.stdout, exit = process.exit) {
+  stream.on("error", (err) => {
+    if (err.code === "EPIPE") exit(0);
+    else throw err;
+  });
+}
+
+// src/store/spend.ts
+import { appendFile as appendFile2, mkdir as mkdir2, readFile as readFile3 } from "fs/promises";
+import { dirname as dirname3 } from "path";
+
+// src/store/paths.ts
+import { homedir } from "os";
+import { join as join4 } from "path";
+var DIR_NAME = ".cogit";
+var OLD_DIR_NAME = ".codelineage";
+var CONFIG_DIR_NAME = "cogit";
+var OLD_CONFIG_DIR_NAME = "codelineage";
+function configuredHome(env = process.env) {
+  return env.COGIT_HOME ?? env.CODELINEAGE_HOME;
+}
+function captureDisabled(env = process.env) {
+  return env.COGIT_DISABLE === "1" || env.CODELINEAGE_DISABLE === "1";
+}
+function projectPaths(root) {
+  const base = join4(root, DIR_NAME);
+  return {
+    base,
+    project: join4(base, "project.json"),
+    sessions: join4(base, "sessions"),
+    session: (id) => join4(base, "sessions", `${id}.json`),
+    /** Append-only structure events for a session (Story 8.5). */
+    events: (id) => join4(base, "sessions", `${id}.events.jsonl`),
+    /** Pre-migration copies of the record files. */
+    backup: (name) => join4(base, name),
+    /** The conversation store: what the drill-down needs, outliving the transcript. */
+    conversations: join4(base, "conversations"),
+    conversation: (id) => join4(base, "conversations", `${id}.jsonl.gz`),
+    state: (id) => join4(base, "state", `${id}.json`),
+    /** Inbox rows the user dismissed, per session (Story 11.1); also local. */
+    inboxState: join4(base, "state", "inbox.json"),
+    /** How the user left the map: open sessions and dragged row widths; also local. */
+    mapView: join4(base, "state", "map.json"),
+    /** The curated captured-work list (Story 15.1); local, never committed. */
+    captures: join4(base, "state", "captures.json"),
+    /** What cogit's own headless runs cost, one line per run; local. */
+    spend: join4(base, "state", "spend.jsonl"),
+    /** Search-by-meaning fingerprints of the messages, by the embedding model; local. */
+    embeddings: join4(base, "state", "embeddings.json"),
+    /** The project's numbers for the start page, written with each map build; local. */
+    overview: join4(base, "state", "overview.json"),
+    /** What the detached hook children (build, side run) printed; local, capped. */
+    detachedLog: join4(base, "state", "detached.log"),
+    /** What the record refs last looked like, and what waits to be sent; local. */
+    recordSync: join4(base, "state", "record-sync.json"),
+    /** Present after `cogit hooks uninstall`: the refresh then adds no block; local. */
+    hooksOff: join4(base, "state", "hooks-off"),
+    /** Present once `cogit pr` has suggested the pull request Action; local. */
+    actionHint: join4(base, "state", "action-hint"),
+    /** The code graph engine's file links, cut down for hooks; rebuilt when the graph changes; local. */
+    graphIndex: join4(base, "state", "graph-index.json"),
+    /** Commits waiting for their message's record before a Shape; local. */
+    shapeQueue: join4(base, "state", "shape-queue"),
+    locks: join4(base, "locks"),
+    /** Where the skill drops session JSON for `session write --file`. */
+    inbox: (id) => join4(base, "inbox", `${id}.json`),
+    lock: (name) => join4(base, "locks", `${name}.lock`),
+    html: join4(base, "map.html"),
+    /**
+     * The session whose next code commit carries its record (Story 9.3), written
+     * by the UserPromptSubmit hook. Local state, never committed.
+     */
+    head: join4(base, "HEAD"),
+    /** The project-scoped ignore rules that keep local state out of git. */
+    gitignore: join4(base, ".gitignore")
+  };
+}
+function defaultConfigBase(name, env = process.env) {
+  return join4(env.XDG_CONFIG_HOME ?? join4(homedir(), ".config"), name);
+}
+function globalPaths(env = process.env) {
+  const base = configuredHome(env) ?? defaultConfigBase(CONFIG_DIR_NAME, env);
+  return {
+    base,
+    config: join4(base, "config.json"),
+    registry: join4(base, "projects.json"),
+    lock: join4(base, "registry.lock"),
+    panel: join4(base, "panel.html")
+  };
+}
+
+// src/store/spend.ts
+var number4 = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
+function spendOf(stdout) {
+  let envelope;
+  try {
+    envelope = JSON.parse(stdout);
+  } catch {
+    return void 0;
+  }
+  if (envelope === null || typeof envelope !== "object") return void 0;
+  const { total_cost_usd: usd, usage } = envelope;
+  if (typeof usd !== "number" && (usage === null || typeof usage !== "object")) return void 0;
+  const tokens = usage ?? {};
+  return {
+    usd: number4(usd),
+    inputTokens: number4(tokens.input_tokens),
+    outputTokens: number4(tokens.output_tokens),
+    cacheReadTokens: number4(tokens.cache_read_input_tokens),
+    cacheWriteTokens: number4(tokens.cache_creation_input_tokens)
+  };
+}
+async function recordSpend(root, kind, model, spent, now = /* @__PURE__ */ new Date()) {
+  if (spent === void 0) return;
+  const entry = { at: now.toISOString(), kind, model, ...spent };
+  const file2 = projectPaths(root).spend;
+  try {
+    await mkdir2(dirname3(file2), { recursive: true });
+    await appendFile2(file2, `${JSON.stringify(entry)}
+`);
+  } catch {
+  }
+}
+async function readSpend(root) {
+  let text;
+  try {
+    text = await readFile3(projectPaths(root).spend, "utf8");
+  } catch {
+    return void 0;
+  }
+  const totals = {
+    runs: 0,
+    usd: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0
+  };
+  for (const line of text.split("\n")) {
+    if (line.trim() === "") continue;
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    totals.runs += 1;
+    totals.usd += number4(entry.usd);
+    if (number4(entry.usd) === 0) totals.unpriced = (totals.unpriced ?? 0) + 1;
+    totals.inputTokens += number4(entry.inputTokens);
+    totals.outputTokens += number4(entry.outputTokens);
+    totals.cacheReadTokens += number4(entry.cacheReadTokens);
+    totals.cacheWriteTokens += number4(entry.cacheWriteTokens);
+    if (typeof entry.at === "string" && (totals.since === void 0 || entry.at < totals.since))
+      totals.since = entry.at;
+  }
+  return totals.runs === 0 ? void 0 : totals;
+}
+
+// src/agents/headless.ts
+import { spawn as spawn2 } from "child_process";
+function headlessEnv(env) {
+  return { ...process.env, ...env, COGIT_DISABLE: "1" };
+}
+function stopTree(pid, kill, platform = process.platform, run3 = spawn2) {
+  if (platform !== "win32" || pid === void 0) return kill();
+  run3("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" }).on("error", kill);
+}
+var SHIM_SAFE = /^[\w.:@[\]/-]+$/;
+function shimCommand(name, args, shim, env = process.env) {
+  if (!shim) return { command: name, args, verbatim: false };
+  const unsafe = args.find((arg) => !SHIM_SAFE.test(arg));
+  if (unsafe !== void 0)
+    throw new CliError(`cannot pass ${JSON.stringify(unsafe)} to ${name}.cmd safely`);
+  return {
+    command: env.ComSpec ?? "cmd.exe",
+    args: ["/d", "/s", "/c", `"${name}.cmd ${args.join(" ")}"`],
+    verbatim: true
+  };
+}
+var HEADLESS_TIMEOUT_MS = 5 * 6e4;
+function headlessLimit(env) {
+  return Number(env.COGIT_CLAUDE_TIMEOUT_MS) || HEADLESS_TIMEOUT_MS;
+}
+var MissingAgentError = class extends CliError {
+};
+var AgentExitError = class extends CliError {
+  constructor(message, stdout) {
+    super(message);
+    this.stdout = stdout;
+  }
+  stdout;
+};
+function runHeadless(name, command, prompt, env, limit, cwd) {
+  return new Promise((resolve6, reject) => {
+    const child = spawn2(command.command, command.args, {
+      env: headlessEnv(env),
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsVerbatimArguments: command.verbatim,
+      ...cwd === void 0 ? {} : { cwd }
+    });
+    let out = "";
+    let err = "";
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      stopTree(child.pid, () => child.kill("SIGKILL"));
+    }, limit);
+    child.stdin.on("error", () => {
+    });
+    child.stdout.setEncoding("utf8").on("data", (chunk) => {
+      out += chunk;
+    });
+    child.stderr.setEncoding("utf8").on("data", (chunk) => {
+      err += chunk;
+    });
+    child.on("error", (error62) => {
+      clearTimeout(timer);
+      const message = `could not run ${name}: ${error62.message}`;
+      reject(error62.code === "ENOENT" ? new MissingAgentError(message) : new CliError(message));
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (timedOut)
+        reject(new CliError(`${name} did not answer within ${Math.round(limit / 1e3)} s`));
+      else if (code === 0) resolve6(out);
+      else
+        reject(
+          new AgentExitError(`${name} exited with ${code}: ${err.trim() || "no output"}`, out)
+        );
+    });
+    child.stdin.end(prompt);
+  });
+}
+function runWithShim(name, args, prompt, env, cwd) {
+  const limit = headlessLimit(env);
+  const run3 = (shim) => runHeadless(name, shimCommand(name, args, shim, env), prompt, env, limit, cwd);
+  if (process.platform !== "win32") return run3(false);
+  return run3(false).catch(
+    (error62) => error62 instanceof MissingAgentError ? run3(true) : Promise.reject(error62)
+  );
+}
+
+// src/agents/claude/run.ts
+function resultText(stdout) {
+  let envelope;
+  try {
+    envelope = JSON.parse(stdout);
+  } catch {
+    throw new CliError("claude did not print valid JSON");
+  }
+  const result = envelope.result;
+  if (typeof result !== "string") throw new CliError("claude returned no result text");
+  return result;
+}
+async function runClaude(prompt, model, env, resume, spend) {
+  const args = [
+    "-p",
+    // A resumed run reads the whole conversation; nothing is written back to it.
+    ...resume === void 0 ? [] : ["--resume", resume.sessionId],
+    "--safe-mode",
+    "--no-session-persistence",
+    "--model",
+    model,
+    "--output-format",
+    "json"
+  ];
+  const out = await runWithShim("claude", args, prompt, env, resume?.cwd);
+  if (spend !== void 0) await recordSpend(spend.root, spend.kind, model, spendOf(out));
+  return out;
+}
+async function run(prompt, model, env, resume, spend) {
+  return resultText(await runClaude(prompt, model, env, resume, spend));
+}
+
 // src/agents/claude/settings.ts
-import { constants, copyFile, mkdir as mkdir2, writeFile } from "fs/promises";
-import { homedir, tmpdir } from "os";
-import { join as join3 } from "path";
+import { constants, copyFile, mkdir as mkdir3, writeFile } from "fs/promises";
+import { homedir as homedir2, tmpdir } from "os";
+import { join as join5 } from "path";
 var CLAUDE_DEFAULT_RETENTION = 30;
 function claudeSettingsPath(env) {
-  return join3(env.CLAUDE_CONFIG_DIR ?? join3(homedir(), ".claude"), "settings.json");
+  return join5(env.CLAUDE_CONFIG_DIR ?? join5(homedir2(), ".claude"), "settings.json");
 }
 async function readSettings(file2) {
   const read = await readJson(file2);
@@ -21369,8 +23601,8 @@ var MARKETPLACE = "cogit";
 var MARKETPLACE_REPO = "erensrtky/cogit";
 var INSTALL_COMMAND = `claude plugin install cogit --marketplace ${MARKETPLACE_REPO}`;
 async function installedEntries(env) {
-  const base = env.CLAUDE_CONFIG_DIR ?? join3(homedir(), ".claude");
-  const read = await readJson(join3(base, "plugins", "installed_plugins.json"));
+  const base = env.CLAUDE_CONFIG_DIR ?? join5(homedir2(), ".claude");
+  const read = await readJson(join5(base, "plugins", "installed_plugins.json"));
   if (!read.found || "error" in read) return void 0;
   const plugins = isObject2(read.value) ? read.value.plugins : void 0;
   if (!isObject2(plugins)) return void 0;
@@ -21402,12 +23634,12 @@ async function readPluginEnabled(env, root) {
   return project !== void 0 && pluginEnabledIn(project);
 }
 function liveDir() {
-  return join3(tmpdir(), "cogit-live");
+  return join5(tmpdir(), "cogit-live");
 }
 async function markLive(sessionId) {
   if (!/^[\w-]+$/.test(sessionId)) return;
-  await mkdir2(liveDir(), { recursive: true });
-  await writeFile(join3(liveDir(), sessionId), "");
+  await mkdir3(liveDir(), { recursive: true });
+  await writeFile(join5(liveDir(), sessionId), "");
 }
 var GUARD_REASON = `cogit: this session started without the cogit plugin, so nothing in it is recorded. Install it once with \`${INSTALL_COMMAND}\` (or start claude with --plugin-dir), then open a new session. Send the message again to continue without recording.`;
 var GUARD_COMMAND = "node -e '" + [
@@ -21423,7 +23655,7 @@ var GUARD_COMMAND = "node -e '" + [
 ].join("") + "' # cogit:guard";
 var GUARD_TAG = "# cogit:guard";
 function projectSettingsPath(root) {
-  return join3(root, ".claude", "settings.json");
+  return join5(root, ".claude", "settings.json");
 }
 function isObject2(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -21489,23 +23721,65 @@ async function writeProjectSetup(root) {
     },
     hooks: hasCurrentGuard(settings) ? hooks : { ...hooks, UserPromptSubmit: withCurrentGuard(submit) }
   };
-  await mkdir2(join3(root, ".claude"), { recursive: true });
+  await mkdir3(join5(root, ".claude"), { recursive: true });
   await atomicWriteJson(file2, next);
   return { file: file2 };
 }
 
 // src/agents/claude/transcripts.ts
 import { createReadStream as createReadStream2 } from "fs";
-import { access, open as open3, readdir as readdir2, stat as stat5 } from "fs/promises";
-import { homedir as homedir3 } from "os";
-import { isAbsolute as isAbsolute2, join as join6, relative as relative2, sep as sep2 } from "path";
-import { createInterface as createInterface2 } from "readline";
+import { access as access2, open as open3, readdir as readdir2, stat as stat6 } from "fs/promises";
+import { homedir as homedir4 } from "os";
+import { join as join8 } from "path";
+import { createInterface as createInterface3 } from "readline";
+
+// src/agents/text.ts
+import { isAbsolute as isAbsolute2, relative as relative2, sep as sep2 } from "path";
+var CHAT_TEXT_LIMIT = 2e4;
+function capped(text) {
+  if (text.length <= CHAT_TEXT_LIMIT) return text;
+  return `${text.slice(0, CHAT_TEXT_LIMIT)}
+
+[\u2026 ${text.length - CHAT_TEXT_LIMIT} more characters not shown]`;
+}
+function oneLine(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
+function mapTurn(turn, text, roots) {
+  const fromRoot = (file2) => {
+    if (!isAbsolute2(file2)) return file2;
+    for (const root of roots) {
+      const rel = relative2(root, file2);
+      if (rel !== "" && !rel.startsWith("..") && !isAbsolute2(rel)) return rel.split(sep2).join("/");
+    }
+    return file2;
+  };
+  return {
+    ...turn,
+    text: capped(text),
+    replies: turn.replies.map(capped),
+    tools: {
+      commands: turn.tools.commands,
+      files: turn.tools.files.map(fromRoot),
+      other: turn.tools.other
+    }
+  };
+}
+async function readRange(handle, start, end) {
+  const buffer = Buffer.allocUnsafe(end - start);
+  let offset = 0;
+  while (offset < buffer.length) {
+    const { bytesRead } = await handle.read(buffer, offset, buffer.length - offset, start + offset);
+    offset += bytesRead;
+  }
+  return buffer.subarray(0, offset);
+}
 
 // src/agents/claude/fork.ts
 import { createReadStream } from "fs";
-import { readdir, stat as stat3 } from "fs/promises";
-import { basename as basename4, dirname as dirname3, join as join4 } from "path";
-import { createInterface } from "readline";
+import { readdir, stat as stat4 } from "fs/promises";
+import { basename as basename4, dirname as dirname4, join as join6 } from "path";
+import { createInterface as createInterface2 } from "readline";
 var MAX_DEPTH2 = 8;
 var USER_LINE = /"type":"user"/;
 var LINE_UUID = /"uuid":"([^"]+)"/;
@@ -21514,10 +23788,10 @@ async function firstMessageUuid(file2, isMessage) {
   const known = firstUuids.get(file2);
   if (known !== void 0) return known;
   const input2 = createReadStream(file2, "utf8");
-  const lines = createInterface({ input: input2, crlfDelay: Infinity });
+  const lines2 = createInterface2({ input: input2, crlfDelay: Infinity });
   let found = null;
   try {
-    for await (const raw of lines) {
+    for await (const raw of lines2) {
       if (!USER_LINE.test(raw)) continue;
       const line = parseLine(raw);
       if (line === null || !isMessage(line)) continue;
@@ -21525,7 +23799,7 @@ async function firstMessageUuid(file2, isMessage) {
       break;
     }
   } finally {
-    lines.close();
+    lines2.close();
     input2.destroy();
   }
   if (found !== null) firstUuids.set(file2, found);
@@ -21539,29 +23813,29 @@ function parseLine(raw) {
   }
 }
 async function bornAt(file2) {
-  const birth = (await stat3(file2).catch(() => null))?.birthtimeMs ?? 0;
+  const birth = (await stat4(file2).catch(() => null))?.birthtimeMs ?? 0;
   return birth > 0 ? birth : null;
 }
 function sharedPrefix(a, b) {
-  let count = 0;
-  while (count < a.length && count < b.length) {
-    const uuid3 = a[count]?.uuid;
-    if (uuid3 === void 0 || uuid3 !== b[count]?.uuid) break;
-    count++;
+  let count2 = 0;
+  while (count2 < a.length && count2 < b.length) {
+    const uuid3 = a[count2]?.uuid;
+    if (uuid3 === void 0 || uuid3 !== b[count2]?.uuid) break;
+    count2++;
   }
-  return count;
+  return count2;
 }
 async function forkOrigin(file2, turns, readTurns, isMessage, depth = 0) {
   const first = turns[0];
   if (first?.uuid === void 0 || depth > MAX_DEPTH2) return null;
   const born = await bornAt(file2);
-  const dir = dirname3(file2);
+  const dir = dirname4(file2);
   const names = (await readdir(dir).catch(() => [])).filter(
     (name) => name.endsWith(".jsonl")
   );
   let best = null;
   for (const name of names) {
-    const other = join4(dir, name);
+    const other = join6(dir, name);
     if (other === file2) continue;
     if (await firstMessageUuid(other, isMessage).catch(() => null) !== first.uuid) continue;
     const otherBorn = await bornAt(other) ?? 0;
@@ -21583,32 +23857,32 @@ async function forkOrigin(file2, turns, readTurns, isMessage, depth = 0) {
 
 // src/agents/claude/turn-cache.ts
 import { createHash, randomBytes as randomBytes2 } from "crypto";
-import { mkdir as mkdir3, readFile as readFile3, rename as rename2, rm as rm2, stat as stat4, writeFile as writeFile2 } from "fs/promises";
-import { homedir as homedir2 } from "os";
-import { join as join5 } from "path";
+import { mkdir as mkdir4, readFile as readFile4, rename as rename2, rm as rm2, stat as stat5, writeFile as writeFile2 } from "fs/promises";
+import { homedir as homedir3 } from "os";
+import { join as join7 } from "path";
 var TURN_CACHE_VERSION = 1;
 function turnCacheDir(env = process.env) {
-  const base = env.COGIT_CACHE_DIR ?? join5(env.XDG_CACHE_HOME ?? join5(homedir2(), ".cache"), "cogit");
-  return join5(base, "turns");
+  const base = env.COGIT_CACHE_DIR ?? join7(env.XDG_CACHE_HOME ?? join7(homedir3(), ".cache"), "cogit");
+  return join7(base, "turns");
 }
-async function cachedTurns(file2, parse3, env = process.env) {
-  const info = await stat4(file2);
+async function cachedTurns(file2, parse5, env = process.env) {
+  const info = await stat5(file2);
   const dir = turnCacheDir(env);
-  const entryFile = join5(
+  const entryFile = join7(
     dir,
     `${createHash("sha256").update(file2).digest("hex").slice(0, 32)}.json`
   );
   try {
-    const entry2 = JSON.parse(await readFile3(entryFile, "utf8"));
+    const entry2 = JSON.parse(await readFile4(entryFile, "utf8"));
     if (entry2.v === TURN_CACHE_VERSION && entry2.size === info.size && entry2.mtimeMs === info.mtimeMs && Array.isArray(entry2.turns))
       return entry2.turns;
   } catch {
   }
-  const turns = await parse3(file2);
+  const turns = await parse5(file2);
   const entry = { v: TURN_CACHE_VERSION, size: info.size, mtimeMs: info.mtimeMs, turns };
   const tmp = `${entryFile}.${process.pid}.${randomBytes2(4).toString("hex")}.tmp`;
   try {
-    await mkdir3(dir, { recursive: true });
+    await mkdir4(dir, { recursive: true });
     await writeFile2(tmp, JSON.stringify(entry));
     await rename2(tmp, entryFile);
   } catch {
@@ -21620,10 +23894,10 @@ async function cachedTurns(file2, parse3, env = process.env) {
 
 // src/agents/claude/transcripts.ts
 function claudeConfigDir(env = process.env) {
-  return env.CLAUDE_CONFIG_DIR ?? join6(homedir3(), ".claude");
+  return env.CLAUDE_CONFIG_DIR ?? join8(homedir4(), ".claude");
 }
 async function findTranscript(sessionId, env = process.env) {
-  const projectsDir = join6(claudeConfigDir(env), "projects");
+  const projectsDir = join8(claudeConfigDir(env), "projects");
   let dirs;
   try {
     dirs = await readdir2(projectsDir, { withFileTypes: true });
@@ -21632,9 +23906,9 @@ async function findTranscript(sessionId, env = process.env) {
   }
   for (const dir of dirs) {
     if (!dir.isDirectory()) continue;
-    const file2 = join6(projectsDir, dir.name, `${sessionId}.jsonl`);
+    const file2 = join8(projectsDir, dir.name, `${sessionId}.jsonl`);
     try {
-      await access(file2);
+      await access2(file2);
       return file2;
     } catch {
     }
@@ -21643,7 +23917,7 @@ async function findTranscript(sessionId, env = process.env) {
 }
 async function collectTranscripts(env = process.env) {
   const found = /* @__PURE__ */ new Map();
-  const projectsDir = join6(claudeConfigDir(env), "projects");
+  const projectsDir = join8(claudeConfigDir(env), "projects");
   let projectDirs;
   try {
     projectDirs = await readdir2(projectsDir, { withFileTypes: true });
@@ -21652,7 +23926,7 @@ async function collectTranscripts(env = process.env) {
   }
   for (const entry of projectDirs) {
     if (!entry.isDirectory()) continue;
-    const dir = join6(projectsDir, entry.name);
+    const dir = join8(projectsDir, entry.name);
     let files;
     try {
       files = await readdir2(dir);
@@ -21660,7 +23934,7 @@ async function collectTranscripts(env = process.env) {
       continue;
     }
     for (const file2 of files) {
-      if (file2.endsWith(".jsonl")) found.set(file2.slice(0, -".jsonl".length), join6(dir, file2));
+      if (file2.endsWith(".jsonl")) found.set(file2.slice(0, -".jsonl".length), join8(dir, file2));
     }
   }
   return found;
@@ -21697,13 +23971,6 @@ function messageText(line) {
   }
   return text.trim() === "" ? null : text;
 }
-var CHAT_TEXT_LIMIT = 2e4;
-function capped(text) {
-  if (text.length <= CHAT_TEXT_LIMIT) return text;
-  return `${text.slice(0, CHAT_TEXT_LIMIT)}
-
-[\u2026 ${text.length - CHAT_TEXT_LIMIT} more characters not shown]`;
-}
 function withoutReminders(text) {
   return text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "");
 }
@@ -21712,25 +23979,7 @@ function displayTurn(turn, roots) {
     /<pasted_content[^>]*>([\s\S]*?)<\/pasted_content[^>]*>/g,
     "\n[Pasted]\n$1\n[/Pasted]\n"
   ).trim();
-  const fromRoot = (file2) => {
-    if (!isAbsolute2(file2)) return file2;
-    for (const root of roots) {
-      const rel = relative2(root, file2);
-      if (rel !== "" && !rel.startsWith("..") && !isAbsolute2(rel)) return rel.split(sep2).join("/");
-    }
-    return file2;
-  };
-  return {
-    ...turn,
-    text: capped(text),
-    replies: turn.replies.map(capped),
-    // Steps and questions feed the recorder only; the map keeps the counts.
-    tools: {
-      commands: turn.tools.commands,
-      files: turn.tools.files.map(fromRoot),
-      other: turn.tools.other
-    }
-  };
+  return mapTurn(turn, text, roots);
 }
 var EDIT_TOOLS = /* @__PURE__ */ new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 var CLEAR = /<command-name>\s*\/clear\s*<\/command-name>/;
@@ -21780,26 +24029,26 @@ async function readConversation(file2) {
 }
 var ENTRYPOINT = /"entrypoint":"([^"]*)"/;
 async function isHeadlessTranscript(file2) {
-  const lines = createInterface2({ input: createReadStream2(file2, "utf8"), crlfDelay: Infinity });
+  const lines2 = createInterface3({ input: createReadStream2(file2, "utf8"), crlfDelay: Infinity });
   try {
     let read = 0;
-    for await (const raw of lines) {
+    for await (const raw of lines2) {
       const entrypoint = ENTRYPOINT.exec(raw)?.[1];
       if (entrypoint !== void 0) return entrypoint.startsWith("sdk");
       if ((read += 1) >= 50) break;
     }
     return false;
   } finally {
-    lines.close();
+    lines2.close();
   }
 }
 async function readSessionCwd(file2) {
   let stream;
   try {
     stream = createReadStream2(file2, { encoding: "utf8" });
-    const lines = createInterface2({ input: stream, crlfDelay: Number.POSITIVE_INFINITY });
+    const lines2 = createInterface3({ input: stream, crlfDelay: Number.POSITIVE_INFINITY });
     let read = 0;
-    for await (const text of lines) {
+    for await (const text of lines2) {
       if (++read > 50) break;
       try {
         const cwd = JSON.parse(text).cwd;
@@ -21822,7 +24071,7 @@ function isMessageLine(line) {
 }
 var turnCache = /* @__PURE__ */ new Map();
 async function readTranscriptTurns(file2) {
-  const size = (await stat5(file2)).size;
+  const size = (await stat6(file2)).size;
   const cached2 = turnCache.get(file2);
   if (cached2 && cached2.size === size) return cached2.turns;
   const turns = readAllTurns(file2);
@@ -21837,8 +24086,8 @@ async function parseAllTurns(file2) {
   const turns = [];
   const seen = /* @__PURE__ */ new Set();
   let pendingResume = false;
-  const lines = createInterface2({ input: createReadStream2(file2, "utf8"), crlfDelay: Infinity });
-  for await (const raw of lines) {
+  const lines2 = createInterface3({ input: createReadStream2(file2, "utf8"), crlfDelay: Infinity });
+  for await (const raw of lines2) {
     if (raw.includes("<command-name>") && CLEAR.test(raw)) pendingResume = true;
     const uuid3 = LINE_UUID2.exec(raw)?.[1];
     const parent = LINE_PARENT.exec(raw)?.[1];
@@ -21876,15 +24125,6 @@ async function parseAllTurns(file2) {
   return turns;
 }
 var LAST_TURN_TAIL_BYTES = 256 * 1024;
-async function readRange(handle, start, end) {
-  const buffer = Buffer.allocUnsafe(end - start);
-  let offset = 0;
-  while (offset < buffer.length) {
-    const { bytesRead } = await handle.read(buffer, offset, buffer.length - offset, start + offset);
-    offset += bytesRead;
-  }
-  return buffer.subarray(0, offset);
-}
 function scanLastTurn(raw, state) {
   for (const line of raw.split("\n")) {
     const user = line.includes('"type":"user"');
@@ -21929,11 +24169,11 @@ async function readSessionModel(file2) {
     while (end > 0 && size - end < 8 * LAST_TURN_TAIL_BYTES) {
       const start = Math.max(0, end - LAST_TURN_TAIL_BYTES);
       const text = (await readRange(handle, start, end)).toString("utf8") + carry;
-      const lines = text.split("\n");
-      carry = start > 0 ? lines.shift() ?? "" : "";
-      for (let i = lines.length - 1; i >= 0; i--) {
+      const lines2 = text.split("\n");
+      carry = start > 0 ? lines2.shift() ?? "" : "";
+      for (let i = lines2.length - 1; i >= 0; i--) {
         try {
-          const line = JSON.parse(lines[i] ?? "");
+          const line = JSON.parse(lines2[i] ?? "");
           const model = line.message?.model;
           if (line.type === "assistant" && typeof model === "string" && !model.startsWith("<"))
             return model;
@@ -21984,8 +24224,8 @@ async function readLastTurn(file2) {
   }
 }
 async function readsHandoff(file2) {
-  const lines = createInterface2({ input: createReadStream2(file2, "utf8"), crlfDelay: Infinity });
-  for await (const raw of lines) {
+  const lines2 = createInterface3({ input: createReadStream2(file2, "utf8"), crlfDelay: Infinity });
+  for await (const raw of lines2) {
     if (!raw.includes("handoff")) continue;
     if (/"name":"(?:Read|Bash)"/.test(raw) && /"file_path":"[^"]*handoff[^"]*"/i.test(raw))
       return true;
@@ -21994,22 +24234,19 @@ async function readsHandoff(file2) {
   return false;
 }
 async function countUserLines(file2) {
-  let count = 0;
-  const lines = createInterface2({ input: createReadStream2(file2, "utf8"), crlfDelay: Infinity });
-  for await (const raw of lines) {
+  let count2 = 0;
+  const lines2 = createInterface3({ input: createReadStream2(file2, "utf8"), crlfDelay: Infinity });
+  for await (const raw of lines2) {
     if (!raw.includes('"type":"user"')) continue;
     try {
-      if (JSON.parse(raw).type === "user") count += 1;
+      if (JSON.parse(raw).type === "user") count2 += 1;
     } catch {
     }
   }
-  return count;
+  return count2;
 }
 var EXCERPT_LENGTH = 300;
 var PASTE = /<pasted_content[^>]*>([\s\S]*?)<\/pasted_content[^>]*>/g;
-function oneLine(text) {
-  return text.replace(/\s+/g, " ").trim();
-}
 function excerpt(text, max = EXCERPT_LENGTH) {
   const without = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, " ");
   const own2 = oneLine(without.replace(PASTE, " "));
@@ -22025,9 +24262,11 @@ function excerpt(text, max = EXCERPT_LENGTH) {
 // src/agents/claude/index.ts
 var claude = {
   name: DEFAULT_AGENT,
+  displayName: agentLabel(DEFAULT_AGENT),
   skill: "/cogit:record",
   skillRule: SKILL_RULE,
   installCommand: INSTALL_COMMAND,
+  updateCommand: "claude plugin update cogit@cogit",
   projectDirEnv: "CLAUDE_PROJECT_DIR",
   pluginRootEnv: "CLAUDE_PLUGIN_ROOT",
   sessionIdEnv: "CLAUDE_SESSION_ID",
@@ -22047,7 +24286,7 @@ var claude = {
   displayTurn,
   excerpt,
   parseHookInput,
-  isHeadless,
+  isHeadless: async (env) => isHeadless(env),
   isHeadlessTranscript,
   sessionLineage: () => sessionLineage(),
   markChildren,
@@ -22058,17 +24297,1460 @@ var claude = {
   readPluginVersion,
   readPluginEnabled,
   readSkillAllowed,
+  isPresent: (env) => agentPresent(claudeConfigDir(env), "claude", env),
+  /** Claude Code runs an enabled plugin's hooks without asking. */
+  readHookTrust: async () => "trusted",
+  settingsFile: claudeSettingsPath,
+  unreadableTranscripts: async () => [],
   setRetention,
   allowSkill,
   readProjectSetup,
   writeProjectSetup,
   refreshProjectSetup,
-  markLive
+  markLive,
+  run
+};
+
+// src/agents/codex/index.ts
+import { join as join12 } from "path";
+
+// src/agents/codex/transcripts.ts
+import { createReadStream as createReadStream3 } from "fs";
+import { open as open4, readdir as readdir3 } from "fs/promises";
+import { homedir as homedir5 } from "os";
+import { basename as basename5, dirname as dirname5, join as join9 } from "path";
+import { createInterface as createInterface4 } from "readline";
+import * as zlib from "zlib";
+function codexHome(env = process.env) {
+  return env.CODEX_HOME ?? join9(homedir5(), ".codex");
+}
+var ROLLOUT = /^rollout-.+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl(\.zst)?$/;
+function hasZstd() {
+  return typeof zlib.createZstdDecompress === "function";
+}
+async function rollouts(dir) {
+  let entries;
+  try {
+    entries = await readdir3(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const files = [];
+  for (const entry of entries) {
+    const path3 = join9(dir, entry.name);
+    if (entry.isDirectory()) files.push(...await rollouts(path3));
+    else if (ROLLOUT.test(entry.name)) files.push(path3);
+  }
+  return files;
+}
+async function scan(env, zstd) {
+  const home = codexHome(env);
+  const found = /* @__PURE__ */ new Map();
+  const unreadable = [];
+  const files = [
+    ...await rollouts(join9(home, "sessions")),
+    ...await rollouts(join9(home, "archived_sessions"))
+  ];
+  for (const file2 of files) {
+    const [, id, compressed] = ROLLOUT.exec(basename5(file2));
+    if (compressed && !zstd) unreadable.push(file2);
+    else if (!compressed || !found.has(id)) found.set(id, file2);
+  }
+  return { found, unreadable };
+}
+async function collectTranscripts2(env = process.env, zstd = hasZstd()) {
+  return (await scan(env, zstd)).found;
+}
+async function collectTranscriptIds2(env = process.env) {
+  return new Set((await collectTranscripts2(env)).keys());
+}
+async function findTranscript2(sessionId, env = process.env) {
+  return (await collectTranscripts2(env)).get(sessionId) ?? null;
+}
+async function unreadableTranscripts(env = process.env, zstd = hasZstd()) {
+  return (await scan(env, zstd)).unreadable;
+}
+async function* lines(file2) {
+  let path3 = file2;
+  let input2;
+  try {
+    input2 = await opened(path3);
+  } catch (error62) {
+    if (error62.code !== "ENOENT" || path3.endsWith(".zst")) throw error62;
+    path3 = `${file2}.zst`;
+    input2 = await opened(path3);
+  }
+  if (path3.endsWith(".zst")) input2 = input2.pipe(zlib.createZstdDecompress());
+  const reader = createInterface4({ input: input2, crlfDelay: Number.POSITIVE_INFINITY });
+  try {
+    yield* reader;
+  } finally {
+    reader.close();
+    input2.destroy();
+  }
+}
+function opened(path3) {
+  return new Promise((resolve6, reject) => {
+    const stream = createReadStream3(path3);
+    stream.once("open", () => resolve6(stream));
+    stream.once("error", reject);
+  });
+}
+function parse3(raw) {
+  try {
+    const line = JSON.parse(raw);
+    return typeof line === "object" && line !== null ? line : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function completedItem(line) {
+  if (line.type !== "event_msg" || line.payload?.type !== "item_completed") return void 0;
+  const item = line.payload.item;
+  return typeof item === "object" && item !== null ? item : void 0;
+}
+function itemText(item) {
+  const content = Array.isArray(item.content) ? item.content : [];
+  const text = content.filter((part) => typeof part?.text === "string" && /^text$/i.test(String(part.type))).map((part) => part.text).join("\n");
+  if (text.trim() === "" && content.some((part) => /image/i.test(String(part?.type))))
+    return "[image]";
+  return text;
+}
+var OTHER_TOOLS = /* @__PURE__ */ new Set([
+  "McpToolCall",
+  "DynamicToolCall",
+  "CollabAgentToolCall",
+  "WebSearch",
+  "ImageView",
+  "ImageGeneration",
+  "Extension",
+  "Plan"
+]);
+async function sessionMeta(file2) {
+  for await (const raw of lines(file2)) {
+    const line = parse3(raw);
+    return line?.type === "session_meta" ? line.payload : void 0;
+  }
+  return void 0;
+}
+async function readConversation2(file2) {
+  const turns = [];
+  let pendingResume = false;
+  for await (const raw of lines(file2)) {
+    if (raw.includes('"thread_settings_applied"')) {
+      if (turns.length > 0 && parse3(raw)?.payload?.type === "thread_settings_applied")
+        pendingResume = true;
+      continue;
+    }
+    if (!raw.includes('"item_completed"')) continue;
+    const line = parse3(raw);
+    const item = line && completedItem(line);
+    if (!item) continue;
+    const current = turns.at(-1);
+    if (item.type === "UserMessage") {
+      const text = itemText(item);
+      if (text.trim() === "" || typeof line?.timestamp !== "string") continue;
+      turns.push({
+        id: `m${turns.length + 1}`,
+        at: line.timestamp,
+        text,
+        ...typeof item.id === "string" ? { uuid: item.id } : {},
+        replies: [],
+        tools: { commands: 0, files: [], other: 0 },
+        ...pendingResume ? { resumed: true } : {}
+      });
+      pendingResume = false;
+      continue;
+    }
+    if (!current) continue;
+    if (item.type === "AgentMessage") {
+      const text = itemText(item);
+      if (text.trim() !== "") current.replies.push(text);
+    } else if (item.type === "CommandExecution") {
+      current.tools.commands += 1;
+    } else if (item.type === "FileChange") {
+      const changes = item.changes ?? {};
+      for (const [path3, change] of Object.entries(changes))
+        for (const name of [path3, change?.move_path])
+          if (typeof name === "string" && !current.tools.files.includes(name))
+            current.tools.files.push(name);
+    } else if (OTHER_TOOLS.has(String(item.type))) {
+      current.tools.other += 1;
+    }
+  }
+  return turns;
+}
+function homeOf(file2) {
+  for (let dir = dirname5(file2); dir !== dirname5(dir); dir = dirname5(dir))
+    if (basename5(dir) === "sessions" || basename5(dir) === "archived_sessions") return dirname5(dir);
+  return void 0;
+}
+var FORK_DEPTH = 10;
+async function readForkOrigin2(file2) {
+  const home = homeOf(file2);
+  if (home === void 0) return null;
+  const known = await collectTranscripts2({ CODEX_HOME: home });
+  let meta3 = await sessionMeta(file2);
+  for (let depth = 0; depth < FORK_DEPTH; depth++) {
+    const sessionId = meta3?.forked_from_id;
+    if (typeof sessionId !== "string") return null;
+    const origin = known.get(sessionId);
+    if (origin === void 0) return null;
+    const base = meta3?.history_base;
+    const limit = meta3?.forked_from_ordinal_exclusive ?? base?.end_ordinal_exclusive;
+    const last = await lastMessage(origin, typeof limit === "number" ? limit : Infinity);
+    if (last) return { sessionId, copied: 0, last };
+    meta3 = await sessionMeta(origin);
+  }
+  return null;
+}
+async function lastMessage(file2, limit) {
+  let last;
+  let read = 0;
+  for await (const raw of lines(file2)) {
+    if (read++ >= limit) break;
+    if (!raw.includes('"UserMessage"')) continue;
+    const line = parse3(raw);
+    const item = line && completedItem(line);
+    if (item?.type !== "UserMessage" || typeof line?.timestamp !== "string") continue;
+    const text = itemText(item);
+    if (text.trim() !== "") last = { uuid: String(item.id ?? ""), at: line.timestamp, text };
+  }
+  return last;
+}
+async function readSessionCwd2(file2) {
+  try {
+    const cwd = (await sessionMeta(file2))?.cwd;
+    return typeof cwd === "string" && cwd !== "" ? cwd : void 0;
+  } catch {
+    return void 0;
+  }
+}
+async function readSessionModel2(file2) {
+  let model;
+  try {
+    for await (const raw of lines(file2)) {
+      if (!raw.includes('"turn_context"')) continue;
+      const line = parse3(raw);
+      const named = line?.type === "turn_context" ? line.payload?.model : void 0;
+      if (typeof named === "string" && named !== "") model = named;
+    }
+  } catch {
+  }
+  return model;
+}
+async function readOriginator(file2) {
+  const originator = (await sessionMeta(file2))?.originator;
+  return typeof originator === "string" ? originator : void 0;
+}
+async function isHeadlessTranscript2(file2) {
+  return await readOriginator(file2) === "codex_exec";
+}
+async function readsHandoff2(file2) {
+  for await (const raw of lines(file2)) {
+    if (!/handoff/i.test(raw) || !raw.includes('"CommandExecution"')) continue;
+    const line = parse3(raw);
+    const item = line && completedItem(line);
+    if (item?.type === "CommandExecution" && /handoff/i.test(JSON.stringify(item.command)))
+      return true;
+  }
+  return false;
+}
+async function countUserLines2(file2) {
+  let count2 = 0;
+  for await (const raw of lines(file2)) {
+    if (!raw.includes('"role":"user"')) continue;
+    const line = parse3(raw);
+    if (line?.type === "response_item" && line.payload?.role === "user") count2 += 1;
+  }
+  return count2;
+}
+var LAST_TURN_TAIL_BYTES2 = 256 * 1024;
+function lastTurnIn(raws) {
+  let turn = null;
+  for (const raw of raws) {
+    if (!raw.includes('"item_completed"')) continue;
+    const line = parse3(raw);
+    const item = line && completedItem(line);
+    if (!item || typeof line?.timestamp !== "string") continue;
+    const text = item.type === "AgentMessage" || item.type === "UserMessage" ? itemText(item) : "";
+    if (text.trim() === "") continue;
+    if (item.type === "UserMessage") turn = { speaker: "user", at: line.timestamp, text: "" };
+    else if (turn) turn = { speaker: "agent", at: line.timestamp, text };
+  }
+  return turn;
+}
+async function readLastTurn2(file2) {
+  if (file2.endsWith(".zst")) {
+    const all = [];
+    for await (const raw of lines(file2)) all.push(raw);
+    return lastTurnIn(all);
+  }
+  const handle = await open4(file2, "r");
+  try {
+    const { size } = await handle.stat();
+    const windows = [];
+    for (let end = size; end > 0; ) {
+      const start = Math.max(0, end - LAST_TURN_TAIL_BYTES2);
+      windows.unshift(await readRange(handle, start, end));
+      const text = Buffer.concat(windows).toString("utf8").split("\n");
+      const turn = lastTurnIn(start > 0 ? text.slice(1) : text);
+      if (turn) return turn;
+      end = start;
+    }
+    return null;
+  } finally {
+    await handle.close();
+  }
+}
+function displayTurn2(turn, roots) {
+  return mapTurn(turn, turn.text.trim(), roots);
+}
+var EXCERPT_LENGTH2 = 300;
+function excerpt2(text, max = EXCERPT_LENGTH2) {
+  const line = oneLine(text);
+  return line.length <= max ? line : `${line.slice(0, max - 1)}\u2026`;
+}
+
+// src/agents/codex/hooks.ts
+var CodexHookInput = external_exports.looseObject({
+  session_id: external_exports.string(),
+  cwd: external_exports.string().optional(),
+  transcript_path: external_exports.string().nullish(),
+  stop_hook_active: external_exports.boolean().optional(),
+  /** SessionStart only: `startup`, `resume` or `clear`. */
+  source: external_exports.string().optional()
+});
+function parseHookInput2(stdin) {
+  let raw;
+  try {
+    raw = JSON.parse(stdin);
+  } catch {
+    return void 0;
+  }
+  const parsed = CodexHookInput.safeParse(raw);
+  if (!parsed.success) return void 0;
+  const { transcript_path, ...rest } = parsed.data;
+  return transcript_path == null ? rest : { ...rest, transcript_path };
+}
+async function isHeadless2(input2, read = (pid) => readProcess(pid), start = process.ppid) {
+  const originator = input2.transcript_path === void 0 ? void 0 : await readOriginator(input2.transcript_path).catch(() => void 0);
+  if (originator !== void 0) return originator === "codex_exec";
+  let pid = start;
+  for (let depth = 0; depth < 64 && pid > 1; depth += 1) {
+    const info = read(pid);
+    if (info === void 0) return false;
+    if (isCodexProcess(info.args)) return info.args.slice(1).includes("exec");
+    pid = info.ppid;
+  }
+  return false;
+}
+function sessionLineage2(read, start) {
+  return walkLineage(isCodexProcess, isAgentProcess, read, start);
+}
+async function markChildren2() {
+}
+function userNotice2(text) {
+  return { systemMessage: text };
+}
+function additionalContext2(event, text) {
+  if (event === "Stop") return { decision: "block", reason: text };
+  return { hookSpecificOutput: { hookEventName: event, additionalContext: text } };
+}
+
+// src/agents/codex/run.ts
+var CLAUDE_MODEL = /^(claude-|haiku|sonnet|opus|default$|best$)/i;
+function codexModel(model) {
+  return CLAUDE_MODEL.test(model) ? void 0 : model;
+}
+function codexArgs(model, resume) {
+  const chosen = codexModel(model);
+  return [
+    "exec",
+    "--sandbox",
+    "read-only",
+    ...resume === void 0 ? [] : ["fork"],
+    "--disable",
+    "hooks",
+    "--ephemeral",
+    "--skip-git-repo-check",
+    "--json",
+    ...chosen === void 0 ? [] : ["--model", chosen],
+    ...resume === void 0 ? [] : [resume.sessionId],
+    // The prompt comes on stdin.
+    "-"
+  ];
+}
+var count = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
+function parseCodexOutput(stdout) {
+  const output2 = {};
+  for (const line of stdout.split("\n")) {
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (event === null || typeof event !== "object") continue;
+    const item = event.item;
+    if (event.type === "item.completed" && item?.type === "agent_message") {
+      if (typeof item.text === "string") output2.answer = item.text;
+    } else if (event.type === "turn.completed") {
+      const usage = event.usage ?? {};
+      const cached2 = count(usage.cached_input_tokens);
+      output2.spent = {
+        usd: 0,
+        inputTokens: Math.max(0, count(usage.input_tokens) - cached2),
+        outputTokens: count(usage.output_tokens),
+        cacheReadTokens: cached2,
+        cacheWriteTokens: count(usage.cache_write_input_tokens)
+      };
+    } else if (event.type === "turn.failed" || event.type === "error") {
+      const error62 = event.error ?? event;
+      if (typeof error62.message === "string") output2.error = error62.message;
+    }
+  }
+  return output2;
+}
+async function run2(prompt, model, env, resume, spend) {
+  let stdout;
+  try {
+    stdout = await runWithShim("codex", codexArgs(model, resume), prompt, env, resume?.cwd);
+  } catch (error62) {
+    const said = error62 instanceof AgentExitError ? parseCodexOutput(error62.stdout).error : void 0;
+    throw said === void 0 ? error62 : new CliError(`codex failed: ${said}`);
+  }
+  const output2 = parseCodexOutput(stdout);
+  if (spend !== void 0)
+    await recordSpend(spend.root, spend.kind, codexModel(model) ?? "codex", output2.spent);
+  if (output2.answer === void 0)
+    throw new CliError(`codex returned no reply${output2.error ? `: ${output2.error}` : ""}`);
+  return output2.answer;
+}
+
+// src/agents/codex/settings.ts
+import { createHash as createHash2 } from "crypto";
+import { lstat, readdir as readdir4, readFile as readFile6 } from "fs/promises";
+import { basename as basename6, join as join11, relative as relative3 } from "path";
+
+// ../../node_modules/smol-toml/dist/error.js
+function getLineColFromPtr(string4, ptr) {
+  let lines2 = string4.slice(0, ptr).split(/\r?\n/);
+  return [lines2.length, lines2.pop().length + 1];
+}
+function makeCodeBlock(string4, line, column) {
+  let lines2 = string4.split(/\r?\n/);
+  let codeblock = "";
+  let numberLen = (Math.log10(line + 1) | 0) + 1;
+  for (let i = line - 1; i <= line + 1; i++) {
+    let l = lines2[i - 1];
+    if (!l)
+      continue;
+    codeblock += i.toString().padEnd(numberLen, " ");
+    codeblock += ":  ";
+    codeblock += l;
+    codeblock += "\n";
+    if (i === line) {
+      codeblock += " ".repeat(numberLen + column + 2);
+      codeblock += "^\n";
+    }
+  }
+  return codeblock;
+}
+var TomlError = class _TomlError extends Error {
+  line;
+  column;
+  codeblock;
+  constructor(message, options) {
+    const [line, column] = getLineColFromPtr(options.toml, options.ptr);
+    const codeblock = makeCodeBlock(options.toml, line, column);
+    super(`Invalid TOML document: ${message}
+
+${codeblock}`, options);
+    this.line = line;
+    this.column = column;
+    this.codeblock = codeblock;
+  }
+  /** @internal */
+  static x(message, ctx, ptr) {
+    throw new _TomlError(message, { toml: ctx.s, ptr: ptr ?? ctx.p });
+  }
+};
+
+// ../../node_modules/smol-toml/dist/primitive.js
+function parseString(ctx) {
+  let startPtr = ctx.p;
+  let c = ctx.s.charCodeAt(ctx.p++);
+  let first = c;
+  let isLiteral = c === 39;
+  let isMultiline = c === ctx.s.charCodeAt(ctx.p) && c === ctx.s.charCodeAt(ctx.p + 1);
+  if (isMultiline) {
+    if ((c = ctx.s.charCodeAt(ctx.p += 2)) === 10)
+      ctx.p++;
+    else if (c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10)
+      ctx.p += 2;
+  }
+  let parsed = "";
+  let sliceStart = ctx.p;
+  let state = 0;
+  for (; ctx.p < ctx.s.length; ctx.p++) {
+    c = ctx.s.charCodeAt(ctx.p);
+    if (isMultiline && (c === 10 || c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10)) {
+      state = state && 3;
+    } else if (c < 32 && c !== 9 || c === 127) {
+      TomlError.x("control characters are not allowed in strings", ctx);
+    } else if ((!state || state === 3) && c === first && (!isMultiline || ctx.s.charCodeAt(ctx.p + 1) === first && ctx.s.charCodeAt(ctx.p + 2) === first)) {
+      if (isMultiline) {
+        if (ctx.s.charCodeAt(ctx.p + 3) === first)
+          ctx.p++;
+        if (ctx.s.charCodeAt(ctx.p + 3) === first)
+          ctx.p++;
+      }
+      if (!state) {
+        let s = ctx.s.slice(sliceStart, ctx.p);
+        parsed = parsed ? parsed + s : s;
+      }
+      ctx.p += isMultiline ? 3 : 1;
+      return parsed;
+    } else if (!state) {
+      if (!isLiteral && c === 92) {
+        parsed += ctx.s.slice(sliceStart, sliceStart = ctx.p);
+        state = 1;
+      }
+    } else if (state === 1) {
+      if (c === 120 || c === 117 || c === 85) {
+        let errPtr = ctx.p++ - 1;
+        let value = 0;
+        let len = c === 120 ? 2 : c === 117 ? 4 : 8;
+        for (let j = 0; j < len; j++, ctx.p++) {
+          let hex3 = ctx.s.charCodeAt(ctx.p);
+          let digit = (
+            /* 0-9 */
+            hex3 >= 48 && hex3 <= 57 ? hex3 - 48 : (
+              /* A-F */
+              hex3 >= 65 && hex3 <= 70 ? hex3 - 65 + 10 : (
+                /* a-f */
+                hex3 >= 97 && hex3 <= 102 ? hex3 - 97 + 10 : -1
+              )
+            )
+          );
+          if (digit < 0)
+            TomlError.x("invalid non-hex character in unicode escape", ctx);
+          value = value << 4 | digit;
+        }
+        if (value < 0 || value > 1114111 || value >= 55296 && value <= 57343) {
+          TomlError.x("invalid unicode escape", ctx, errPtr);
+        }
+        parsed += String.fromCodePoint(value);
+        sliceStart = ctx.p--;
+        state = 0;
+      } else if (isMultiline && (c === 32 || c === 9)) {
+        state = 2;
+      } else {
+        if (c === 98)
+          parsed += "\b";
+        else if (c === 116)
+          parsed += "	";
+        else if (c === 110)
+          parsed += "\n";
+        else if (c === 102)
+          parsed += "\f";
+        else if (c === 114)
+          parsed += "\r";
+        else if (c === 101)
+          parsed += "\x1B";
+        else if (c === 34)
+          parsed += '"';
+        else if (c === 92)
+          parsed += "\\";
+        else
+          TomlError.x("unrecognised escape sequence", ctx);
+        sliceStart = ctx.p + 1;
+        state = 0;
+      }
+    } else if (c !== 32 && c !== 9) {
+      if (state === 2)
+        TomlError.x("invalid escape: only line-ending whitespace may be escaped", ctx, sliceStart);
+      state = !isLiteral && c === 92 ? 1 : 0;
+      sliceStart = ctx.p;
+    }
+  }
+  TomlError.x("unfinished string", ctx, startPtr);
+}
+
+// ../../node_modules/smol-toml/dist/date.js
+var DATE_TIME_RE = /^(\d{4}-\d{2}-\d{2})?[Tt ]?(?:(\d{2}):\d{2}(?::\d{2}(?:\.\d+)?)?)?(Z|z|[-+]\d{2}:\d{2})?$/i;
+var TomlDate = class _TomlDate extends Date {
+  #hasDate = false;
+  #hasTime = false;
+  #offset = null;
+  constructor(date5, fasttype, unsafeDelim) {
+    let hasDate = true;
+    let hasTime = true;
+    let offset = "Z";
+    let c;
+    if (typeof date5 === "string") {
+      if (fasttype)
+        prep: {
+          if (fasttype < 3) {
+            if (+date5.slice(11, 13) > 23) {
+              date5 = "";
+              break prep;
+            }
+            if (fasttype === 2) {
+              offset = null;
+              date5 += "Z";
+            } else if ((c = date5.charCodeAt(date5.length - 1)) !== 90 && c !== 122) {
+              offset = date5.slice(date5.length - 6);
+            }
+            if (unsafeDelim)
+              date5 = date5.slice(0, 10) + "T" + date5.slice(11);
+          } else if (fasttype === 4) {
+            date5 = +date5.slice(0, 2) > 23 ? "" : `0000-01-01T${date5}Z`;
+          }
+          hasDate = fasttype !== 4;
+          hasTime = fasttype !== 3;
+        }
+      else {
+        let match = date5.match(DATE_TIME_RE);
+        if (match) {
+          if (!match[1]) {
+            hasDate = false;
+            date5 = `0000-01-01T${date5}`;
+          }
+          hasTime = !!match[2];
+          hasTime && date5[10] === " " && (date5 = date5.replace(" ", "T"));
+          if (match[2] && +match[2] > 23) {
+            date5 = "";
+          } else {
+            offset = match[3] || null;
+            if (!offset && hasTime)
+              date5 += "Z";
+          }
+        } else {
+          date5 = "";
+        }
+      }
+    }
+    super(date5);
+    if (!isNaN(this.getTime())) {
+      this.#hasDate = hasDate;
+      this.#hasTime = hasTime;
+      this.#offset = offset;
+    }
+  }
+  isDateTime() {
+    return this.#hasDate && this.#hasTime;
+  }
+  isLocal() {
+    return !this.#hasDate || !this.#hasTime || !this.#offset;
+  }
+  isDate() {
+    return this.#hasDate && !this.#hasTime;
+  }
+  isTime() {
+    return this.#hasTime && !this.#hasDate;
+  }
+  isValid() {
+    return this.#hasDate || this.#hasTime;
+  }
+  toISOString() {
+    let iso = super.toISOString();
+    if (this.isDate())
+      return iso.slice(0, 10);
+    if (this.isTime())
+      return iso.slice(11, 23);
+    if (this.#offset === null)
+      return iso.slice(0, -1);
+    if (this.#offset === "Z" || this.#offset === "z")
+      return iso;
+    let offset = +this.#offset.slice(1, 3) * 60 + +this.#offset.slice(4, 6);
+    offset = this.#offset[0] === "-" ? offset : -offset;
+    let offsetDate = new Date(this.getTime() - offset * 6e4);
+    return offsetDate.toISOString().slice(0, -1) + this.#offset;
+  }
+  static wrapAsOffsetDateTime(jsDate, offset = "Z") {
+    let date5 = new _TomlDate(jsDate);
+    date5.#offset = offset;
+    return date5;
+  }
+  static wrapAsLocalDateTime(jsDate) {
+    let date5 = new _TomlDate(jsDate);
+    date5.#offset = null;
+    return date5;
+  }
+  static wrapAsLocalDate(jsDate) {
+    let date5 = new _TomlDate(jsDate);
+    date5.#hasTime = false;
+    date5.#offset = null;
+    return date5;
+  }
+  static wrapAsLocalTime(jsDate) {
+    let date5 = new _TomlDate(jsDate);
+    date5.#hasDate = false;
+    date5.#offset = null;
+    return date5;
+  }
+};
+
+// ../../node_modules/smol-toml/dist/extract.js
+function isDigit(char, base = 10) {
+  return base === 16 ? char > 47 && char < 58 || char > 64 && char < 71 || char > 96 && char < 103 : char > 47 && char < 48 + base;
+}
+function isEndOfValue(char, delim) {
+  return char === 32 || char === 9 || char === 10 || char === 13 || // Structure end or next value delimiter
+  delim && (char === delim || char === 44) || // Comment
+  char === 35;
+}
+function extractValue(ctx, end) {
+  let errPtr = ctx.p;
+  let c = ctx.s.charCodeAt(ctx.p);
+  if (c === 91 || c === 123) {
+    ctx.d-- || TomlError.x("document contains excessively nested structures. aborting.", ctx);
+    let value = c === 91 ? parseArray(ctx) : parseInlineTable(ctx);
+    ctx.d++;
+    return value;
+  }
+  if (c === 34 || c === 39) {
+    return parseString(ctx);
+  }
+  if (c === 116) {
+    if (ctx.s.charCodeAt(++ctx.p) !== 114 || ctx.s.charCodeAt(++ctx.p) !== 117 || ctx.s.charCodeAt(++ctx.p) !== 101)
+      TomlError.x("invalid value", ctx, errPtr);
+    return ctx.p++, true;
+  }
+  if (c === 102) {
+    if (ctx.s.charCodeAt(++ctx.p) !== 97 || ctx.s.charCodeAt(++ctx.p) !== 108 || ctx.s.charCodeAt(++ctx.p) !== 115 || ctx.s.charCodeAt(++ctx.p) !== 101)
+      TomlError.x("invalid value", ctx, errPtr);
+    return ctx.p++, false;
+  }
+  if (c === 43 || c === 45) {
+    return parseNumber(ctx, ctx.p, ctx.s.charCodeAt(++ctx.p), 44 - c, end);
+  }
+  if (ctx.s.charCodeAt(ctx.p + 4) === 45 && ctx.s.charCodeAt(ctx.p + 7) === 45) {
+    return parseDate(ctx, c, end);
+  }
+  if (ctx.s.charCodeAt(ctx.p + 2) === 58) {
+    return parseTime(ctx, c, end);
+  }
+  return parseNumber(ctx, ctx.p, c, 0, end);
+}
+function parseNumber(ctx, startPtr, startChr, sign, endChr) {
+  let c = startChr;
+  let state = 0;
+  let hasUnderscores = false;
+  if (c === 105) {
+    if (ctx.s.charCodeAt(++ctx.p) !== 110 || ctx.s.charCodeAt(++ctx.p) !== 102)
+      TomlError.x("invalid value", ctx, startPtr);
+    return ctx.p++, (sign || 1) / 0;
+  }
+  if (c === 110) {
+    if (ctx.s.charCodeAt(++ctx.p) !== 97 || ctx.s.charCodeAt(++ctx.p) !== 110)
+      TomlError.x("invalid value", ctx, startPtr);
+    return ctx.p++, NaN;
+  }
+  if (c === 48) {
+    if (++ctx.p >= ctx.s.length || isEndOfValue(c = ctx.s.charCodeAt(ctx.p), endChr))
+      return ctx.bi === true ? 0n : 0;
+    if (!sign) {
+      if (c === 120)
+        return parseIntegerBaseN(ctx, startPtr, 16, endChr);
+      else if (c === 98)
+        return parseIntegerBaseN(ctx, startPtr, 2, endChr);
+      else if (c === 111)
+        return parseIntegerBaseN(ctx, startPtr, 8, endChr);
+    }
+    if (c === 46)
+      state = 2;
+    else if (c === 101 || c === 69)
+      state = 4;
+    else
+      TomlError.x("illegal leading zero", ctx, startPtr);
+  } else if (!isDigit(c))
+    TomlError.x("invalid value", ctx, startPtr);
+  while (++ctx.p < ctx.s.length && (c = ctx.s.charCodeAt(ctx.p), !isEndOfValue(c, endChr))) {
+    if (!state)
+      state = 1;
+    if (c === 95) {
+      if (!(state & 1))
+        TomlError.x("illegal underscore", ctx);
+      state += 11;
+      hasUnderscores = true;
+    } else if (state === 1 && c === 46)
+      state = 2;
+    else if ((state === 1 || state === 3) && (c === 101 || c === 69))
+      state = 4;
+    else if (state === 4 && (c === 43 || c === 45)) {
+      state = 6;
+    } else if (!isDigit(c))
+      TomlError.x(`illegal character in numeric literal`, ctx);
+    else if (state > 9)
+      state -= 11;
+    else if (!(state & 1))
+      state++;
+  }
+  if (!state) {
+    let val = (startChr - 48) * (sign || 1);
+    return ctx.bi === true ? BigInt(val) : val;
+  }
+  if (!(state & 1))
+    TomlError.x("unfinished numeric value", ctx, startPtr);
+  let str = ctx.s.slice(startPtr, ctx.p);
+  if (hasUnderscores)
+    str = str.replaceAll("_", "");
+  return state > 1 ? parseFloat(str) : parseInteger(ctx, str, 10, startPtr);
+}
+function parseIntegerBaseN(ctx, startPtr, base, endChr) {
+  let c, underscore = 1;
+  while (++ctx.p < ctx.s.length && (c = ctx.s.charCodeAt(ctx.p), !isEndOfValue(c, endChr))) {
+    if (c === 95) {
+      if (underscore & 1)
+        TomlError.x("illegal underscore", ctx);
+      underscore = 3;
+    } else if (!isDigit(c, base))
+      TomlError.x(`illegal character in numeric literal`, ctx);
+    else if (underscore & 1)
+      underscore--;
+  }
+  if (underscore & 1)
+    TomlError.x("unfinished numeric value", ctx);
+  let str = ctx.s.slice(startPtr + 2, ctx.p);
+  if (underscore)
+    str = str.replaceAll("_", "");
+  return parseInteger(ctx, str, base, startPtr);
+}
+function parseInteger(ctx, str, base, startPtr) {
+  if (ctx.bi !== true)
+    int: {
+      let val = parseInt(str, base);
+      if (!Number.isSafeInteger(val)) {
+        if (ctx.bi)
+          break int;
+        TomlError.x("integer value cannot be represented losslessly", ctx, startPtr);
+      }
+      return val;
+    }
+  return base === 10 ? BigInt(str) : BigInt((base === 2 ? "0b" : base === 8 ? "0o" : "0x") + str);
+}
+function parseDate(ctx, c, endChr) {
+  let startPtr = ctx.p++, unsafeSeparator;
+  if (!isDigit(c) || !isDigit(ctx.s.charCodeAt(ctx.p++)) || !isDigit(ctx.s.charCodeAt(ctx.p++)) || !isDigit(ctx.s.charCodeAt(ctx.p++))) {
+    return parseNumber(ctx, ctx.p = startPtr, c, 0, endChr);
+  }
+  ctx.p += 5;
+  if (!isDigit(ctx.s.charCodeAt(ctx.p++)))
+    TomlError.x("invalid date-time: date part is malformed", ctx, startPtr);
+  if (ctx.p >= ctx.s.length || ((c = ctx.s.charCodeAt(ctx.p)) !== 32 || (unsafeSeparator = true, !isDigit(ctx.s.charCodeAt(ctx.p + 1)))) && c !== 84 && c !== 116) {
+    let t2 = ctx.s.slice(startPtr, ctx.p);
+    return readDate(ctx, t2, 3, false, startPtr);
+  }
+  if (ctx.s.charCodeAt(ctx.p += 3) !== 58)
+    TomlError.x("invalid date-time: time part is malformed", ctx, startPtr);
+  if (ctx.s.charCodeAt(ctx.p += 3) === 58)
+    ctx.p += 3;
+  if (ctx.s.charCodeAt(ctx.p) === 46)
+    while (isDigit(ctx.s.charCodeAt(++ctx.p)))
+      ;
+  if (c = ctx.s.charCodeAt(ctx.p)) {
+    if (c === 90 || c === 122) {
+      let t2 = ctx.s.slice(startPtr, ++ctx.p);
+      return readDate(ctx, t2, 1, unsafeSeparator, startPtr, "[+00:00]");
+    }
+    if (c === 43 || c === 45) {
+      let t2 = ctx.s.slice(startPtr, ctx.p += 6);
+      return readDate(ctx, t2, 1, unsafeSeparator, startPtr, !ctx.ld && "[" + ctx.s.slice(ctx.p - 6, ctx.p) + "]");
+    }
+  }
+  let t = ctx.s.slice(startPtr, ctx.p);
+  return readDate(ctx, t, 2, unsafeSeparator, startPtr);
+}
+function parseTime(ctx, c, endChr) {
+  let start = ctx.p;
+  if (!isDigit(c) || !isDigit(ctx.s.charCodeAt(++ctx.p))) {
+    return parseNumber(ctx, --ctx.p, c, 0, endChr);
+  }
+  if (ctx.s.charCodeAt(ctx.p += 4) === 58)
+    ctx.p += 3;
+  if (ctx.s.charCodeAt(ctx.p) === 46)
+    while (isDigit(ctx.s.charCodeAt(++ctx.p)))
+      ;
+  let t = ctx.s.slice(start, ctx.p);
+  return readDate(ctx, t, 4, false, start);
+}
+function readDate(ctx, str, type, unsafeDelim, errPtr, temporalSuffix) {
+  if (ctx.ld) {
+    let date5 = new TomlDate(str, type, unsafeDelim);
+    if (!date5.isValid())
+      TomlError.x("invalid date", ctx, errPtr);
+    return date5;
+  }
+  try {
+    if (temporalSuffix)
+      str += temporalSuffix;
+    switch (type) {
+      case 1:
+        return Temporal.ZonedDateTime.from(str);
+      case 2:
+        return Temporal.PlainDateTime.from(str);
+      case 3:
+        return Temporal.PlainDate.from(str);
+      case 4:
+        return Temporal.PlainTime.from(str);
+    }
+  } catch (e) {
+    TomlError.x(e instanceof Error ? e.message : "" + e, ctx, errPtr);
+  }
+}
+
+// ../../node_modules/smol-toml/dist/util.js
+function skipComment(ctx) {
+  for (; ctx.p < ctx.s.length; ctx.p++) {
+    let c = ctx.s.charCodeAt(ctx.p);
+    if (c === 10)
+      break;
+    if (c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10) {
+      ctx.p++;
+      break;
+    }
+    if (c < 32 && c !== 9 || c === 127) {
+      TomlError.x("control characters are not allowed in comments", ctx);
+    }
+  }
+}
+function skipVoid(ctx, banNewLines, banComments) {
+  let c;
+  while (ctx.p < ctx.s.length) {
+    while (ctx.p < ctx.s.length && ((c = ctx.s.charCodeAt(ctx.p)) === 32 || c === 9 || !banNewLines && (c === 10 || c === 13 && ctx.s.charCodeAt(ctx.p + 1) === 10)))
+      ctx.p++;
+    if (banComments || c !== 35)
+      break;
+    skipComment(ctx);
+  }
+}
+
+// ../../node_modules/smol-toml/dist/struct.js
+function parseKey(ctx, end = 61) {
+  let startPtr;
+  let state = 0;
+  let parsed = [];
+  let sliceStart;
+  let c = ctx.s.charCodeAt(startPtr = ctx.p);
+  do {
+    if (c === end) {
+      if (!state)
+        TomlError.x("unexpected end of key", ctx);
+      if (state === 1)
+        parsed.push(ctx.s.slice(sliceStart, ctx.p));
+      return ctx.p++, parsed;
+    } else if (c === 46) {
+      if (!state)
+        TomlError.x("illegal empty bare key", ctx);
+      if (state === 1)
+        parsed.push(ctx.s.slice(sliceStart, ctx.p));
+      state = 0;
+    } else if (!state && (c === 34 || c === 39)) {
+      if (c === ctx.s.charCodeAt(ctx.p + 1) && c === ctx.s.charCodeAt(ctx.p + 2))
+        TomlError.x("illegal quoted key: multiline strings are not allowed", ctx);
+      parsed.push(parseString(ctx));
+      state = 2;
+      ctx.p--;
+    } else if (c === 32 || c === 9) {
+      if (state === 1) {
+        parsed.push(ctx.s.slice(sliceStart, ctx.p));
+        state = 2;
+      }
+    } else if (state === 2 || c < 48 && c !== 45 || c > 57 && c < 65 || c > 90 && c < 97 && c !== 95 || c > 122) {
+      TomlError.x("illegal character in key", ctx);
+    } else if (!state) {
+      state = 1;
+      sliceStart = ctx.p;
+    }
+  } while (c = ctx.s.charCodeAt(++ctx.p));
+  TomlError.x("incomplete key-value: cannot find end of key", ctx, startPtr);
+}
+function parseInlineTable(ctx) {
+  let startPtr = ctx.p++;
+  let res = /* @__PURE__ */ Object.create(null);
+  let seen = /* @__PURE__ */ new Set();
+  let c;
+  while (ctx.p < ctx.s.length) {
+    skipVoid(ctx);
+    if ((c = ctx.s.charCodeAt(ctx.p)) === 125) {
+      ctx.p++;
+      return res;
+    }
+    let k;
+    let t = res;
+    let hasOwn = false;
+    let errPtr = ctx.p;
+    let key = parseKey(ctx);
+    for (let i = 0; i < key.length; i++) {
+      if (i)
+        t = hasOwn ? t[k] : t[k] = /* @__PURE__ */ Object.create(null);
+      k = key[i];
+      if ((hasOwn = Object.hasOwn(t, k)) && (typeof t[k] !== "object" || seen.has(t[k]))) {
+        TomlError.x("trying to redefine an already defined value", ctx, errPtr);
+      }
+      let unsafe = k === "__proto__";
+      if (ctx.uk && (unsafe || k === "constructor")) {
+        t = ctx.uk !== 1 && TomlError.x("document contains an unsafe property", ctx, errPtr);
+        break;
+      }
+      if (!hasOwn && unsafe) {
+        Object.defineProperty(t, k, { enumerable: true, configurable: true, writable: true });
+      }
+    }
+    if (hasOwn) {
+      TomlError.x("trying to redefine an already defined value", ctx, errPtr);
+    }
+    skipVoid(ctx, true, true);
+    let value = extractValue(
+      ctx,
+      125
+      /* } */
+    );
+    if (t && typeof (t[k] = value) === "object")
+      seen.add(value);
+    skipVoid(ctx);
+    if ((c = ctx.s.charCodeAt(ctx.p++)) === 125) {
+      return res;
+    }
+    if (c !== 44)
+      TomlError.x("expected comma or end of structure", ctx, ctx.p - 1);
+  }
+  TomlError.x("unfinished table", ctx, startPtr);
+}
+function parseArray(ctx) {
+  let startPtr = ctx.p++;
+  let res = [];
+  let c;
+  while (ctx.p < ctx.s.length) {
+    skipVoid(ctx);
+    if ((c = ctx.s.charCodeAt(ctx.p)) === 93) {
+      ctx.p++;
+      return res;
+    }
+    res.push(extractValue(
+      ctx,
+      93
+      /* ] */
+    ));
+    skipVoid(ctx);
+    if ((c = ctx.s.charCodeAt(ctx.p++)) === 93) {
+      return res;
+    }
+    if (c !== 44)
+      TomlError.x("expected comma or end of structure", ctx, ctx.p - 1);
+  }
+  TomlError.x("unfinished array", ctx, startPtr);
+}
+
+// ../../node_modules/smol-toml/dist/parse.js
+function peekTable(ctx, key, table, meta3, type) {
+  let t = table;
+  let m = meta3;
+  let k;
+  let hasOwn = false;
+  let state;
+  for (let i = 0; i < key.length; i++) {
+    if (i) {
+      t = hasOwn ? t[k] : t[k] = /* @__PURE__ */ Object.create(null);
+      m = (state = m[k]).c;
+      if (type === 0 && (state.t === 1 || state.t === 2)) {
+        return null;
+      }
+      if (state.t === 2) {
+        let l = t.length - 1;
+        t = t[l];
+        m = m[l].c;
+      }
+    }
+    k = key[i];
+    if ((hasOwn = Object.hasOwn(t, k)) && m[k]?.t === 0 && m[k]?.d) {
+      return null;
+    }
+    if (!hasOwn) {
+      let unsafe = k === "__proto__";
+      if (ctx.uk && (unsafe || k === "constructor"))
+        return false;
+      if (unsafe) {
+        Object.defineProperty(t, k, { enumerable: true, configurable: true, writable: true });
+        Object.defineProperty(m, k, { enumerable: true, configurable: true, writable: true });
+      }
+      m[k] = {
+        t: i < key.length - 1 && type === 2 ? 3 : type,
+        d: false,
+        i: 0,
+        c: /* @__PURE__ */ Object.create(null)
+      };
+    }
+  }
+  state = m[k];
+  if (state.t !== type && !(type === 1 && state.t === 3)) {
+    return null;
+  }
+  if (type === 2) {
+    if (!state.d) {
+      state.d = true;
+      t[k] = [];
+    }
+    t[k].push(t = /* @__PURE__ */ Object.create(null));
+    state.c[state.i++] = state = { t: 1, d: false, i: 0, c: /* @__PURE__ */ Object.create(null) };
+  }
+  if (state.d) {
+    return null;
+  }
+  state.d = true;
+  if (type === 1) {
+    t = hasOwn ? t[k] : t[k] = /* @__PURE__ */ Object.create(null);
+  } else if (type === 0 && hasOwn) {
+    return null;
+  }
+  return [k, t, state.c];
+}
+function validateTablePeek(ctx, peek, ptr) {
+  if (peek === null || ctx.uk === 2)
+    TomlError.x(peek === null ? "trying to redefine an already defined table or value" : "document contains an unsafe property", ctx, ptr);
+}
+function parse4(toml, options = {}) {
+  let ctx = {
+    s: toml,
+    p: 0,
+    d: options.maxDepth ?? 1e3,
+    bi: options.integersAsBigInt ?? false,
+    ld: options.useLegacyDate ?? true,
+    uk: options.unsafeKeyBehaviour === "throw" ? 2 : options.unsafeKeyBehaviour === "drop" ? 1 : 0
+  };
+  let res = /* @__PURE__ */ Object.create(null);
+  let meta3 = /* @__PURE__ */ Object.create(null);
+  let tmp;
+  let skipping = false;
+  let tbl = res;
+  let m = meta3;
+  if (toml.charCodeAt(0) === 65279)
+    ctx.p++;
+  skipVoid(ctx);
+  while (ctx.p < toml.length) {
+    if (toml.charCodeAt(ctx.p) === 91) {
+      let isTableArray = toml.charCodeAt(++ctx.p) === 91;
+      tmp = ctx.p += +isTableArray;
+      skipping = false;
+      let k = parseKey(
+        ctx,
+        93
+        /* ] */
+      );
+      if (isTableArray) {
+        if (toml.charCodeAt(ctx.p) !== 93) {
+          TomlError.x("expected end of table array declaration", ctx);
+        }
+        ctx.p++;
+      }
+      let p = peekTable(
+        ctx,
+        k,
+        res,
+        meta3,
+        isTableArray ? 2 : 1
+        /* Type.EXPLICIT */
+      );
+      if (!p) {
+        validateTablePeek(ctx, p, tmp);
+        skipping = true;
+      } else {
+        m = p[2];
+        tbl = p[1];
+      }
+    } else {
+      tmp = ctx.p;
+      let k = parseKey(ctx);
+      let p = peekTable(
+        ctx,
+        k,
+        tbl,
+        m,
+        0
+        /* Type.DOTTED */
+      );
+      if (!p && !skipping)
+        validateTablePeek(ctx, p, tmp);
+      skipVoid(ctx, true, true);
+      let v = extractValue(ctx, void 0);
+      if (p && !skipping)
+        p[1][p[0]] = v;
+    }
+    skipVoid(ctx, true);
+    if (ctx.p < toml.length && (tmp = toml.charCodeAt(ctx.p)) !== 10 && (tmp !== 13 || toml.charCodeAt(ctx.p + 1) !== 10)) {
+      TomlError.x("each key-value declaration must be followed by an end-of-line", ctx);
+    }
+    skipVoid(ctx);
+  }
+  return res;
+}
+
+// ../../node_modules/smol-toml/dist/stringify.js
+var HAS_WELLFORMED = !!"".isWellFormed;
+
+// src/cli-version.ts
+import { readFile as readFile5, realpath, stat as stat7 } from "fs/promises";
+import { delimiter as delimiter2, dirname as dirname6, join as join10 } from "path";
+var PACKAGE = "@cogit/cli";
+async function installedCliVersion(env) {
+  for (const dir of (env.PATH ?? "").split(delimiter2)) {
+    if (dir === "") continue;
+    const bin = join10(dir, "cogit");
+    try {
+      if (!(await stat7(bin)).isFile()) continue;
+    } catch {
+      continue;
+    }
+    const manifests = [
+      // npm links bin/cogit to <package>/dist/cli.js...
+      async () => join10(dirname6(dirname6(await realpath(bin))), "package.json"),
+      // ...and on Windows writes shims beside <prefix>/node_modules instead.
+      async () => join10(dir, "node_modules", ...PACKAGE.split("/"), "package.json")
+    ];
+    for (const manifest of manifests) {
+      try {
+        const pkg = JSON.parse(await readFile5(await manifest(), "utf8"));
+        if (pkg.name === PACKAGE && typeof pkg.version === "string") return pkg.version;
+      } catch {
+      }
+    }
+    return void 0;
+  }
+  return void 0;
+}
+function compareVersions(a, b) {
+  const parts = (v) => (v.split("-")[0] ?? "").split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const [x, y] = [parts(a), parts(b)];
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0);
+    if (d !== 0) return Math.sign(d);
+  }
+  return 0;
+}
+function versionNotice(running, installed) {
+  if (installed === void 0) return void 0;
+  const order = compareVersions(running, installed);
+  if (order > 0)
+    return `cogit: the cogit command is ${installed}, the plugin ${running}. Update the command with \`npm install -g ${PACKAGE}\`.`;
+  if (order < 0)
+    return `cogit: the plugin is ${running}, the cogit command ${installed}. Update the plugin with \`claude plugin update cogit@cogit\`, or turn on auto-update in /plugin \u2192 Marketplaces \u2192 cogit.`;
+  return void 0;
+}
+
+// src/agents/codex/settings.ts
+var PLUGIN_ID2 = "cogit@cogit";
+var HOOKS_FILE = "hooks/codex.json";
+var HOOK_EVENTS = ["session_start", "user_prompt_submit", "stop", "session_end"];
+function isTable(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+async function readConfigFile(file2) {
+  let text;
+  try {
+    text = await readFile6(file2, "utf8");
+  } catch (err) {
+    return err.code === "ENOENT" ? {} : void 0;
+  }
+  try {
+    return parse4(text);
+  } catch {
+    return void 0;
+  }
+}
+function readConfig(env) {
+  return readConfigFile(join11(codexHome(env), "config.toml"));
+}
+async function installedPlugin(env) {
+  const base = join11(codexHome(env), "plugins", "cache", "cogit", "cogit");
+  const found = [];
+  for (const name of await readdir4(base).catch(() => [])) {
+    const root = join11(base, name);
+    const manifest = await readConfigJson(join11(root, ".codex-plugin", "plugin.json"));
+    if (manifest === void 0) continue;
+    found.push({ root, version: typeof manifest.version === "string" ? manifest.version : name });
+  }
+  found.sort((a, b) => compareVersions(b.version, a.version));
+  return found[0];
+}
+async function readConfigJson(file2) {
+  try {
+    const json2 = JSON.parse(await readFile6(file2, "utf8"));
+    return isTable(json2) ? json2 : void 0;
+  } catch {
+    return void 0;
+  }
+}
+async function readPluginInstalled2(env) {
+  return await installedPlugin(env) !== void 0;
+}
+async function readPluginVersion2(env) {
+  return (await installedPlugin(env))?.version;
+}
+function pluginEnabledIn2(config2) {
+  const entry = isTable(config2.plugins) ? config2.plugins[PLUGIN_ID2] : void 0;
+  return isTable(entry) ? entry.enabled !== false : void 0;
+}
+async function readPluginEnabled2(env, root) {
+  const user = await readConfig(env);
+  if (user === void 0) return void 0;
+  const project = root === void 0 ? void 0 : await readConfigFile(join11(root, ".codex", "config.toml"));
+  return (project && pluginEnabledIn2(project)) ?? pluginEnabledIn2(user) ?? false;
+}
+async function pluginContentHash(root) {
+  const hash2 = createHash2("sha256");
+  hash2.update("codex-plugin-bundle-v1");
+  const pending = [root];
+  while (pending.length > 0) {
+    const path3 = pending.pop();
+    const rel = relative3(root, path3);
+    const name = rel === "" ? "" : basename6(path3);
+    if (name === "__pycache__" || name === ".venv" || name.endsWith(".pyc") || name.endsWith(".egg-info"))
+      continue;
+    updateBytes(hash2, Buffer.from(rel));
+    const info = await lstat(path3);
+    if (info.isDirectory()) {
+      hash2.update("directory");
+      const names = (await readdir4(path3)).sort(
+        (a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b))
+      );
+      for (const entry of names.reverse()) pending.push(join11(path3, entry));
+    } else if (info.isFile()) {
+      hash2.update("file");
+      hash2.update(u64(info.size));
+      hash2.update(await readFile6(path3));
+    } else {
+      throw new Error(`unsupported plugin entry: ${path3}`);
+    }
+  }
+  return `sha256:${hash2.digest("hex")}`;
+}
+function u64(value) {
+  const bytes = Buffer.alloc(8);
+  bytes.writeBigUInt64LE(BigInt(value));
+  return bytes;
+}
+function updateBytes(hash2, bytes) {
+  hash2.update(u64(bytes.length));
+  hash2.update(bytes);
+}
+async function readHookTrust(env) {
+  const config2 = await readConfig(env);
+  if (config2 === void 0) return void 0;
+  const features = isTable(config2.features) ? config2.features : {};
+  if (features.hooks === false) return "off";
+  const hooks = isTable(config2.hooks) ? config2.hooks : {};
+  const state = isTable(hooks.state) ? hooks.state : {};
+  const entries = HOOK_EVENTS.map((event) => state[`${PLUGIN_ID2}:${HOOKS_FILE}:${event}:0:0`]);
+  if (entries.some((entry) => isTable(entry) && entry.enabled === false)) return "disabled";
+  if (entries.some((entry) => !isTable(entry) || typeof entry.trusted_hash !== "string"))
+    return "untrusted";
+  const plugin = await installedPlugin(env);
+  if (plugin === void 0) return "untrusted";
+  const pinned = entries.map((entry) => entry.trusted_content_hash);
+  if (pinned.every((value) => typeof value !== "string")) return "trusted";
+  const current = await pluginContentHash(plugin.root).catch(() => void 0);
+  return pinned.every((value) => value === current) ? "trusted" : "review";
+}
+
+// src/agents/codex/index.ts
+function notYet(what) {
+  return () => Promise.reject(new Error(`cogit cannot ${what} for Codex yet`));
+}
+var unknown2 = async () => void 0;
+var codex = {
+  name: "codex",
+  displayName: agentLabel("codex"),
+  skill: "$cogit:record",
+  skillRule: "$cogit:record",
+  /**
+   * Codex skips Claude's `github` marketplace source and reads `.agents/plugins/marketplace.json`
+   * first, which points at the same plugin branch. The hooks then wait for trust in `/hooks`.
+   */
+  installCommand: `codex plugin marketplace add ${MARKETPLACE_REPO} && codex plugin add cogit@cogit`,
+  /** Refreshes the marketplace's copy of the repository, then installs the plugin again from it. */
+  updateCommand: "codex plugin marketplace upgrade cogit && codex plugin add cogit@cogit",
+  /** Codex names no project directory for hooks; the payload's cwd is used. */
+  projectDirEnv: "CODEX_PROJECT_DIR",
+  pluginRootEnv: "PLUGIN_ROOT",
+  sessionIdEnv: "CODEX_THREAD_ID",
+  commitSessionEnv: "CODEX_THREAD_ID",
+  /** Codex keeps rollouts until the user deletes them. */
+  defaultRetention: Number.POSITIVE_INFINITY,
+  configDir: codexHome,
+  findTranscript: findTranscript2,
+  collectTranscripts: (env) => collectTranscripts2(env),
+  collectTranscriptIds: collectTranscriptIds2,
+  readConversation: readConversation2,
+  readForkOrigin: readForkOrigin2,
+  readSessionCwd: readSessionCwd2,
+  readSessionModel: readSessionModel2,
+  readsHandoff: readsHandoff2,
+  readLastTurn: readLastTurn2,
+  countUserLines: countUserLines2,
+  displayTurn: displayTurn2,
+  excerpt: (text, max) => excerpt2(text, max),
+  parseHookInput: parseHookInput2,
+  isHeadless: (_env, input2) => isHeadless2(input2),
+  isHeadlessTranscript: isHeadlessTranscript2,
+  sessionLineage: () => sessionLineage2(),
+  markChildren: markChildren2,
+  additionalContext: additionalContext2,
+  userNotice: userNotice2,
+  /** Codex deletes no rollout on its own; it only compresses cold ones. */
+  readRetention: async () => Number.POSITIVE_INFINITY,
+  readPluginInstalled: readPluginInstalled2,
+  readPluginVersion: readPluginVersion2,
+  readPluginEnabled: readPluginEnabled2,
+  /** Codex asks nothing before a skill: the model reads its file like any other. */
+  readSkillAllowed: async () => true,
+  isPresent: (env) => agentPresent(codexHome(env), "codex", env),
+  readHookTrust,
+  settingsFile: (env) => join12(codexHome(env), "config.toml"),
+  unreadableTranscripts: (env) => unreadableTranscripts(env),
+  setRetention: notYet("set transcript retention"),
+  allowSkill: notYet("allow the record skill"),
+  readProjectSetup: unknown2,
+  writeProjectSetup: notYet("write project settings"),
+  refreshProjectSetup: unknown2,
+  markLive: async () => {
+  },
+  run: run2
 };
 
 // src/agents/index.ts
+var AGENTS = {
+  "claude-code": claude,
+  codex
+};
 function defaultAgent() {
   return claude;
+}
+function agentNamed(name) {
+  return (name !== void 0 ? AGENTS[name] : void 0) ?? claude;
+}
+function inside(dir, file2) {
+  const rel = relative4(resolve(dir), resolve(file2));
+  return rel !== "" && !rel.startsWith(`..${sep3}`) && rel !== ".." && !rel.startsWith(sep3);
+}
+function agentOfTranscript(file2, env) {
+  return Object.values(AGENTS).find((agent) => inside(agent.configDir(env), file2)) ?? claude;
+}
+async function findSession(sessionId, env) {
+  for (const agent of Object.values(AGENTS)) {
+    const file2 = await agent.findTranscript(sessionId, env);
+    if (file2 !== null) return { agent, file: file2 };
+  }
+  return null;
+}
+async function collectAllTranscripts(env) {
+  const all = /* @__PURE__ */ new Map();
+  for (const agent of Object.values(AGENTS))
+    for (const [id, file2] of await agent.collectTranscripts(env))
+      if (!all.has(id)) all.set(id, file2);
+  return all;
 }
 
 // src/schema/common.ts
@@ -22083,95 +25765,15 @@ function parseMessageRef(ref) {
   return at === -1 ? { sessionId: null, id: ref } : { sessionId: ref.slice(0, at), id: ref.slice(at + 1) };
 }
 
-// src/store/paths.ts
-import { homedir as homedir4 } from "os";
-import { join as join7 } from "path";
-var DIR_NAME = ".cogit";
-var OLD_DIR_NAME = ".codelineage";
-var CONFIG_DIR_NAME = "cogit";
-var OLD_CONFIG_DIR_NAME = "codelineage";
-function configuredHome(env = process.env) {
-  return env.COGIT_HOME ?? env.CODELINEAGE_HOME;
-}
-function captureDisabled(env = process.env) {
-  return env.COGIT_DISABLE === "1" || env.CODELINEAGE_DISABLE === "1";
-}
-function projectPaths(root) {
-  const base = join7(root, DIR_NAME);
-  return {
-    base,
-    project: join7(base, "project.json"),
-    sessions: join7(base, "sessions"),
-    session: (id) => join7(base, "sessions", `${id}.json`),
-    /** Append-only structure events for a session (Story 8.5). */
-    events: (id) => join7(base, "sessions", `${id}.events.jsonl`),
-    /** Pre-migration copies of the record files. */
-    backup: (name) => join7(base, name),
-    /** The conversation store: what the drill-down needs, outliving the transcript. */
-    conversations: join7(base, "conversations"),
-    conversation: (id) => join7(base, "conversations", `${id}.jsonl.gz`),
-    state: (id) => join7(base, "state", `${id}.json`),
-    /** Inbox rows the user dismissed, per session (Story 11.1); also local. */
-    inboxState: join7(base, "state", "inbox.json"),
-    /** How the user left the map: open sessions and dragged row widths; also local. */
-    mapView: join7(base, "state", "map.json"),
-    /** The curated captured-work list (Story 15.1); local, never committed. */
-    captures: join7(base, "state", "captures.json"),
-    /** What cogit's own headless runs cost, one line per run; local. */
-    spend: join7(base, "state", "spend.jsonl"),
-    /** Search-by-meaning fingerprints of the messages, by the embedding model; local. */
-    embeddings: join7(base, "state", "embeddings.json"),
-    /** The project's numbers for the start page, written with each map build; local. */
-    overview: join7(base, "state", "overview.json"),
-    /** What the detached hook children (build, side run) printed; local, capped. */
-    detachedLog: join7(base, "state", "detached.log"),
-    /** What the record refs last looked like, and what waits to be sent; local. */
-    recordSync: join7(base, "state", "record-sync.json"),
-    /** Present after `cogit hooks uninstall`: the refresh then adds no block; local. */
-    hooksOff: join7(base, "state", "hooks-off"),
-    /** Present once `cogit pr` has suggested the pull request Action; local. */
-    actionHint: join7(base, "state", "action-hint"),
-    /** The code graph engine's file links, cut down for hooks; rebuilt when the graph changes; local. */
-    graphIndex: join7(base, "state", "graph-index.json"),
-    /** Commits waiting for their message's record before a Shape; local. */
-    shapeQueue: join7(base, "state", "shape-queue"),
-    locks: join7(base, "locks"),
-    /** Where the skill drops session JSON for `session write --file`. */
-    inbox: (id) => join7(base, "inbox", `${id}.json`),
-    lock: (name) => join7(base, "locks", `${name}.lock`),
-    html: join7(base, "map.html"),
-    /**
-     * The session whose next code commit carries its record (Story 9.3), written
-     * by the UserPromptSubmit hook. Local state, never committed.
-     */
-    head: join7(base, "HEAD"),
-    /** The project-scoped ignore rules that keep local state out of git. */
-    gitignore: join7(base, ".gitignore")
-  };
-}
-function defaultConfigBase(name, env = process.env) {
-  return join7(env.XDG_CONFIG_HOME ?? join7(homedir4(), ".config"), name);
-}
-function globalPaths(env = process.env) {
-  const base = configuredHome(env) ?? defaultConfigBase(CONFIG_DIR_NAME, env);
-  return {
-    base,
-    config: join7(base, "config.json"),
-    registry: join7(base, "projects.json"),
-    lock: join7(base, "registry.lock"),
-    panel: join7(base, "panel.html")
-  };
-}
-
 // src/store/root.ts
 import { existsSync as existsSync2 } from "fs";
-import { readFile as readFile5, stat as stat7 } from "fs/promises";
-import { dirname as dirname4, join as join9, relative as relative3, resolve as resolve2 } from "path";
+import { readFile as readFile8, stat as stat9 } from "fs/promises";
+import { dirname as dirname7, join as join14, relative as relative5, resolve as resolve3 } from "path";
 
 // src/store/migrate.ts
 import { existsSync } from "fs";
-import { readFile as readFile4, rename as rename3, stat as stat6 } from "fs/promises";
-import { join as join8, resolve, sep as sep3 } from "path";
+import { readFile as readFile7, rename as rename3, stat as stat8 } from "fs/promises";
+import { join as join13, resolve as resolve2, sep as sep4 } from "path";
 var checkedProjects = /* @__PURE__ */ new Set();
 var checkedGlobals = /* @__PURE__ */ new Set();
 var pendingWarnings = [];
@@ -22188,7 +25790,7 @@ function renameGitignoreLines(text) {
   }).join("\n");
 }
 async function isDirectory2(path3) {
-  return stat6(path3).then(
+  return stat8(path3).then(
     (info) => info.isDirectory(),
     () => false
   );
@@ -22202,11 +25804,11 @@ async function moveDir(from, to) {
   }
 }
 async function migrateProject(root) {
-  const dir = resolve(root);
+  const dir = resolve2(root);
   if (checkedProjects.has(dir)) return false;
   checkedProjects.add(dir);
-  const oldDir = join8(dir, OLD_DIR_NAME);
-  const newDir = join8(dir, DIR_NAME);
+  const oldDir = join13(dir, OLD_DIR_NAME);
+  const newDir = join13(dir, DIR_NAME);
   const oldIsDir = await isDirectory2(oldDir);
   if (!oldIsDir) return false;
   if (existsSync(newDir)) {
@@ -22216,18 +25818,18 @@ async function migrateProject(root) {
     return false;
   }
   if (!await moveDir(oldDir, newDir)) return false;
-  const gitignore = join8(dir, ".gitignore");
-  const text = await readFile4(gitignore, "utf8").catch(() => void 0);
+  const gitignore = join13(dir, ".gitignore");
+  const text = await readFile7(gitignore, "utf8").catch(() => void 0);
   if (text !== void 0) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-O36X5PKF.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-GBMH2RE2.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
 async function rewriteRegistryPaths(file2, oldBase, newBase) {
-  const text = await readFile4(file2, "utf8").catch(() => void 0);
+  const text = await readFile7(file2, "utf8").catch(() => void 0);
   if (text === void 0) return;
   let json2;
   try {
@@ -22239,7 +25841,7 @@ async function rewriteRegistryPaths(file2, oldBase, newBase) {
   let changed = false;
   for (const project of json2.projects) {
     if (typeof project.path !== "string") continue;
-    if (project.path !== oldBase && !project.path.startsWith(`${oldBase}${sep3}`)) continue;
+    if (project.path !== oldBase && !project.path.startsWith(`${oldBase}${sep4}`)) continue;
     project.path = `${newBase}${project.path.slice(oldBase.length)}`;
     changed = true;
   }
@@ -22261,29 +25863,29 @@ async function migrateGlobal(env = process.env) {
     return false;
   }
   if (!await moveDir(oldBase, newBase)) return false;
-  await rewriteRegistryPaths(join8(newBase, "projects.json"), oldBase, newBase);
+  await rewriteRegistryPaths(join13(newBase, "projects.json"), oldBase, newBase);
   return true;
 }
 
 // src/store/root.ts
 async function findLinkedWorktree(start) {
-  for (let dir = start; ; dir = dirname4(dir)) {
-    const dotGit = join9(dir, ".git");
-    const info = await stat7(dotGit).catch(() => void 0);
+  for (let dir = start; ; dir = dirname7(dir)) {
+    const dotGit = join14(dir, ".git");
+    const info = await stat9(dotGit).catch(() => void 0);
     if (info?.isFile()) {
-      const match = /^gitdir:\s*(.+?)\s*$/m.exec(await readFile5(dotGit, "utf8"));
-      return match ? { top: dir, gitdir: resolve2(dir, match[1]) } : void 0;
+      const match = /^gitdir:\s*(.+?)\s*$/m.exec(await readFile8(dotGit, "utf8"));
+      return match ? { top: dir, gitdir: resolve3(dir, match[1]) } : void 0;
     }
-    if (info || dirname4(dir) === dir) return void 0;
+    if (info || dirname7(dir) === dir) return void 0;
   }
 }
 async function readBranch(gitdir) {
-  const head = await readFile5(join9(gitdir, "HEAD"), "utf8").catch(() => "");
+  const head = await readFile8(join14(gitdir, "HEAD"), "utf8").catch(() => "");
   const match = /^ref:\s*refs\/heads\/(.+?)\s*$/m.exec(head);
   return match ? match[1] : null;
 }
 async function resolveProjectRoot(dir) {
-  const start = resolve2(dir);
+  const start = resolve3(dir);
   try {
     const linked = await findLinkedWorktree(start);
     if (!linked) {
@@ -22292,9 +25894,9 @@ async function resolveProjectRoot(dir) {
     }
     const worktree = { path: linked.top, branch: await readBranch(linked.gitdir) };
     await migrateProject(start);
-    const common2 = (await readFile5(join9(linked.gitdir, "commondir"), "utf8")).trim();
-    const mainTop = dirname4(resolve2(linked.gitdir, common2));
-    const root = join9(mainTop, relative3(linked.top, start));
+    const common2 = (await readFile8(join14(linked.gitdir, "commondir"), "utf8")).trim();
+    const mainTop = dirname7(resolve3(linked.gitdir, common2));
+    const root = join14(mainTop, relative5(linked.top, start));
     await migrateProject(root);
     if (!existsSync2(projectPaths(root).project) && existsSync2(projectPaths(start).project))
       return { root: start, worktree };
@@ -22305,7 +25907,7 @@ async function resolveProjectRoot(dir) {
 }
 
 // src/store/stores.ts
-import { readdir as readdir3 } from "fs/promises";
+import { readdir as readdir5 } from "fs/promises";
 
 // src/schema/config.ts
 var CONFIG_SCHEMA = 1;
@@ -22682,8 +26284,8 @@ function parseVersioned(raw, schema, current, migrations = {}) {
 }
 
 // src/store/lock.ts
-import { mkdir as mkdir4, readFile as readFile6, rm as rm3, stat as stat8, writeFile as writeFile3 } from "fs/promises";
-import { dirname as dirname5, join as join10 } from "path";
+import { mkdir as mkdir5, readFile as readFile9, rm as rm3, stat as stat10, writeFile as writeFile3 } from "fs/promises";
+import { dirname as dirname8, join as join15 } from "path";
 import { setTimeout as sleep } from "timers/promises";
 var LockBusyError = class extends Error {
   constructor(lockPath) {
@@ -22702,21 +26304,21 @@ function alive(pid) {
 }
 async function isStale(lockPath, staleMs) {
   try {
-    const owner = Number.parseInt(await readFile6(join10(lockPath, "owner"), "utf8"), 10);
+    const owner = Number.parseInt(await readFile9(join15(lockPath, "owner"), "utf8"), 10);
     if (Number.isInteger(owner) && owner > 0 && !alive(owner)) return true;
   } catch {
   }
-  const info = await stat8(lockPath).catch(() => void 0);
+  const info = await stat10(lockPath).catch(() => void 0);
   return info !== void 0 && Date.now() - info.mtimeMs > staleMs;
 }
 async function acquire(lockPath, opts) {
   const { timeoutMs = 1e4, staleMs = 6e4 } = opts;
   const deadline = Date.now() + timeoutMs;
-  await mkdir4(dirname5(lockPath), { recursive: true });
+  await mkdir5(dirname8(lockPath), { recursive: true });
   for (let delay = 20; ; delay = Math.min(delay * 2, 250)) {
     try {
-      await mkdir4(lockPath);
-      await writeFile3(join10(lockPath, "owner"), String(process.pid));
+      await mkdir5(lockPath);
+      await writeFile3(join15(lockPath, "owner"), String(process.pid));
       return;
     } catch (err) {
       if (err.code !== "EEXIST") throw err;
@@ -22730,7 +26332,7 @@ async function acquire(lockPath, opts) {
   }
 }
 async function isLockHeld(lockPath, staleMs = 6e4) {
-  const info = await stat8(lockPath).catch(() => void 0);
+  const info = await stat10(lockPath).catch(() => void 0);
   if (info === void 0) return false;
   return !await isStale(lockPath, staleMs);
 }
@@ -22744,7 +26346,7 @@ async function withLock(lockPath, fn, opts = {}) {
 }
 
 // src/store/stores.ts
-async function load(file2, schema, version2) {
+async function load2(file2, schema, version2) {
   const read = await readJson(file2);
   if (!read.found) return { found: false };
   if ("error" in read) return { found: true, ok: false, error: read.error, warnings: [] };
@@ -22754,7 +26356,7 @@ async function update(file2, lockPath, schema, version2, fn, opts, resetUnreadab
   return withLock(
     lockPath,
     async () => {
-      const cur = await load(file2, schema, version2);
+      const cur = await load2(file2, schema, version2);
       if (cur.found && !cur.ok && !resetUnreadable) throw new Error(`${file2}: ${cur.error}`);
       const next = await fn(cur.found && cur.ok ? cur.data : void 0);
       await atomicWriteJson(file2, schema.parse(next));
@@ -22763,7 +26365,7 @@ async function update(file2, lockPath, schema, version2, fn, opts, resetUnreadab
     opts
   );
 }
-var loadProject = (root) => load(projectPaths(root).project, Project, PROJECT_SCHEMA);
+var loadProject = (root) => load2(projectPaths(root).project, Project, PROJECT_SCHEMA);
 function projectJson(project) {
   return `${["{", `  "name": ${JSON.stringify(project.name)},`, `  "schema": ${project.schema}`, "}"].join("\n")}
 `;
@@ -22778,11 +26380,11 @@ var updateProject = async (root, fn) => {
     return next;
   });
 };
-var loadSession = (root, id) => load(projectPaths(root).session(id), Session, SESSION_SCHEMA);
+var loadSession = (root, id) => load2(projectPaths(root).session(id), Session, SESSION_SCHEMA);
 async function listSessionIds(dir) {
   let entries;
   try {
-    entries = await readdir3(dir, { withFileTypes: true });
+    entries = await readdir5(dir, { withFileTypes: true });
   } catch (err) {
     if (err.code === "ENOENT") return [];
     throw err;
@@ -22819,7 +26421,7 @@ function salvageConfig(raw) {
 }
 var loadConfig = async (env) => {
   const file2 = globalPaths(env).config;
-  const cur = await load(file2, Config, CONFIG_SCHEMA);
+  const cur = await load2(file2, Config, CONFIG_SCHEMA);
   if (cur.found && cur.ok) return migrateConfig(cur.data);
   if (!cur.found) return migrateConfig(Config.parse({ schema: CONFIG_SCHEMA }));
   const read = await readJson(file2);
@@ -22836,7 +26438,7 @@ var updateConfig = (fn, env, opts) => {
     opts
   );
 };
-var loadRegistry = (env) => load(globalPaths(env).registry, Registry, CONFIG_SCHEMA);
+var loadRegistry = (env) => load2(globalPaths(env).registry, Registry, CONFIG_SCHEMA);
 var updateRegistry = (fn, env) => {
   const g = globalPaths(env);
   return update(
@@ -22847,7 +26449,7 @@ var updateRegistry = (fn, env) => {
     (cur) => fn(cur ?? Registry.parse({ schema: CONFIG_SCHEMA }))
   );
 };
-var loadState = (root, id) => load(projectPaths(root).state(id), HookState, STATE_SCHEMA);
+var loadState = (root, id) => load2(projectPaths(root).state(id), HookState, STATE_SCHEMA);
 var updateState = (root, id, fn, opts) => {
   const p = projectPaths(root);
   return update(p.state(id), p.lock(`state-${id}`), HookState, STATE_SCHEMA, fn, opts, true);
@@ -22874,11 +26476,11 @@ async function onPromptSubmit(ctx) {
 }
 
 // src/messages.ts
-import { createHash as createHash2 } from "crypto";
+import { createHash as createHash3 } from "crypto";
 
 // src/store/conversations.ts
-import { appendFile as appendFile2, mkdir as mkdir5, readFile as readFile7 } from "fs/promises";
-import { dirname as dirname6 } from "path";
+import { appendFile as appendFile3, mkdir as mkdir6, readFile as readFile10 } from "fs/promises";
+import { dirname as dirname9 } from "path";
 import { constants as constants2, gunzipSync, gzipSync } from "zlib";
 
 // ../../node_modules/@secretlint/core/module/SecretLintSourceCodeImpl.js
@@ -23705,7 +27307,7 @@ var registerRule = ({ sourceCode, config: config2, descriptorRule, contextEvents
 };
 
 // ../../node_modules/@secretlint/secretlint-rule-preset-recommend/module/index.js
-import path from "path";
+import path2 from "path";
 var commonjsGlobal = typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : {};
 var regexpStringMatcher = {};
 var lodash_uniq;
@@ -25168,8 +28770,8 @@ function requireLodash_sortby() {
       if (reLeadingDot.test(string4)) {
         result.push("");
       }
-      string4.replace(rePropName, function(match, number4, quote, string5) {
-        result.push(quote ? string5.replace(reEscapeChar, "$1") : number4 || match);
+      string4.replace(rePropName, function(match, number5, quote, string5) {
+        result.push(quote ? string5.replace(reEscapeChar, "$1") : number5 || match);
       });
       return result;
     });
@@ -25647,9 +29249,9 @@ var NODE_HASH_NAMES = {
 };
 async function createDigest(hash2) {
   try {
-    const { createHash: createHash4 } = await import("crypto");
+    const { createHash: createHash5 } = await import("crypto");
     const algorithm = NODE_HASH_NAMES[hash2.name];
-    return (data) => new Uint8Array(createHash4(algorithm).update(data).digest());
+    return (data) => new Uint8Array(createHash5(algorithm).update(data).digest());
   } catch {
     return async (data) => new Uint8Array(await globalThis.crypto.subtle.digest(hash2.name, toBufferSource(data)));
   }
@@ -25758,7 +29360,7 @@ function reportIfFoundPrivateKeyJSONFormat({ source, options, context, t }) {
     }
     context.report({
       message: t("PrivateKeyJSON", {
-        FILE_NAME: source.filePath ? path.basename(source.filePath) : ""
+        FILE_NAME: source.filePath ? path2.basename(source.filePath) : ""
       }),
       range: [0, source.content.length]
     });
@@ -27685,9 +31287,9 @@ var CURL_USER = new RegExp(
 );
 var URL_CREDENTIALS = /(\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)[^\s@/]+@/gi;
 function redactText(text) {
-  let count = 0;
+  let count2 = 0;
   const hit = () => {
-    count++;
+    count2++;
     return MASK;
   };
   let out = text;
@@ -27705,7 +31307,7 @@ function redactText(text) {
     (_m, prefix, q, quotedUser, bareUser) => q === void 0 ? `${prefix}${bareUser}${hit()}` : `${prefix}${q}${quotedUser}${hit()}${q}`
   );
   out = out.replace(URL_CREDENTIALS, (_m, prefix) => `${prefix}${hit()}@`);
-  return { text: out, count };
+  return { text: out, count: count2 };
 }
 function mapStrings(value, f) {
   if (typeof value === "string") return f(value);
@@ -27730,37 +31332,37 @@ async function maskProviderTokens(texts) {
   });
   const ranges = result.messages.filter((m) => !OURS.has(m.ruleId)).map((m) => m.range);
   if (ranges.length === 0) return { texts, count: 0 };
-  let count = 0;
+  let count2 = 0;
   let start = 0;
   const out = texts.map((text) => {
     const end = start + text.length;
-    const inside = ranges.filter(([a, b]) => a >= start && b <= end).sort((x, y) => y[0] - x[0]);
+    const inside2 = ranges.filter(([a, b]) => a >= start && b <= end).sort((x, y) => y[0] - x[0]);
     let masked = text;
     let before = Number.POSITIVE_INFINITY;
-    for (const [a, b] of inside) {
+    for (const [a, b] of inside2) {
       if (b > before) continue;
       masked = `${masked.slice(0, a - start)}${MASK}${masked.slice(b - start)}`;
       before = a;
-      count++;
+      count2++;
     }
     start = end + SEPARATOR.length;
     return masked;
   });
-  return { texts: out, count };
+  return { texts: out, count: count2 };
 }
 async function redactDeep(value) {
-  let count = 0;
+  let count2 = 0;
   const texts = [];
   const ours = mapStrings(value, (text) => {
     const r = redactText(text);
-    count += r.count;
+    count2 += r.count;
     texts.push(r.text);
     return r.text;
   });
   const providers = await maskProviderTokens(texts);
   let i = 0;
   const masked = mapStrings(ours, () => providers.texts[i++]);
-  return { value: masked, count: count + providers.count };
+  return { value: masked, count: count2 + providers.count };
 }
 
 // src/store/conversations.ts
@@ -27775,7 +31377,7 @@ function answerSize(turn) {
 async function readConversationStore(root, sessionId) {
   let text;
   try {
-    text = gunzipSync(await readFile7(projectPaths(root).conversation(sessionId)), {
+    text = gunzipSync(await readFile10(projectPaths(root).conversation(sessionId)), {
       finishFlush: constants2.Z_SYNC_FLUSH
     }).toString("utf8");
   } catch {
@@ -27838,8 +31440,8 @@ async function appendConversationTurns(root, sessionId, turns) {
   const chunk = `${value.map((turn) => JSON.stringify(turn)).join("\n")}
 `;
   const file2 = projectPaths(root).conversation(sessionId);
-  await mkdir5(dirname6(file2), { recursive: true });
-  await appendFile2(file2, gzipSync(Buffer.from(chunk, "utf8")));
+  await mkdir6(dirname9(file2), { recursive: true });
+  await appendFile3(file2, gzipSync(Buffer.from(chunk, "utf8")));
   return value.length;
 }
 async function appendConversationHashes(root, sessionId, hashes) {
@@ -27850,8 +31452,8 @@ async function appendConversationHashes(root, sessionId, hashes) {
   const chunk = `${fresh.map((turn) => JSON.stringify(turn)).join("\n")}
 `;
   const file2 = projectPaths(root).conversation(sessionId);
-  await mkdir5(dirname6(file2), { recursive: true });
-  await appendFile2(file2, gzipSync(Buffer.from(chunk, "utf8")));
+  await mkdir6(dirname9(file2), { recursive: true });
+  await appendFile3(file2, gzipSync(Buffer.from(chunk, "utf8")));
   return fresh.length;
 }
 
@@ -27866,7 +31468,7 @@ function canonicalMessage(sessionId, message) {
   });
 }
 function messageHash(sessionId, message) {
-  return `h${createHash2("sha256").update(canonicalMessage(sessionId, message)).digest("hex").slice(0, 12)}`;
+  return `h${createHash3("sha256").update(canonicalMessage(sessionId, message)).digest("hex").slice(0, 12)}`;
 }
 function messageLabel(index) {
   return `m${index + 1}`;
@@ -27879,11 +31481,10 @@ function hashTurns(sessionId, turns) {
   }));
 }
 async function readSessionMessages(root, sessionId, env = process.env) {
-  const agent = defaultAgent();
-  const file2 = await agent.findTranscript(sessionId, env);
-  if (file2) {
+  const found = await findSession(sessionId, env);
+  if (found) {
     try {
-      const turns = await agent.readConversation(file2);
+      const turns = await found.agent.readConversation(found.file);
       if (turns.length > 0) return hashTurns(sessionId, turns);
       const stored2 = await readConversationStore(root, sessionId);
       if (stored2.length > 0) return storedMessages(sessionId, stored2);
@@ -27950,7 +31551,7 @@ function upgradeSessionIds(session, messages2) {
 
 // src/hooks/close-retry.ts
 import { statSync } from "fs";
-import { dirname as dirname7 } from "path";
+import { dirname as dirname10 } from "path";
 var CLOSE_RETRY_IDLE_MS = 10 * 6e4;
 var CLOSE_RETRY_WINDOW_MS = 3 * 24 * 60 * 6e4;
 var CLOSE_RETRY_LIMIT = 2;
@@ -27984,7 +31585,7 @@ async function retryUnclosed(ctx) {
   }
 }
 async function markedPending(ctx) {
-  const ids = await listSessionIds(dirname7(projectPaths(ctx.root).state("x")));
+  const ids = await listSessionIds(dirname10(projectPaths(ctx.root).state("x")));
   const marked = [];
   for (const id of ids) {
     if (id === ctx.sessionId || !Slug.safeParse(id).success) continue;
@@ -28039,7 +31640,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "1.4.2",
+  version: "1.5.0",
   description: "Git for the intent behind agent-written code.",
   license: "MIT",
   keywords: [
@@ -28047,6 +31648,7 @@ var package_default = {
     "ai",
     "coding-agent",
     "claude-code",
+    "codex",
     "history",
     "lineage",
     "commit",
@@ -28067,6 +31669,7 @@ var package_default = {
   files: [
     "dist",
     ".claude-plugin",
+    ".codex-plugin",
     "skills",
     "hooks"
   ],
@@ -28087,1972 +31690,15 @@ var package_default = {
     "@secretlint/secretlint-rule-preset-recommend": "^13.1.0",
     commander: "^15.1.0",
     mermaid: "^11.17.2",
+    "smol-toml": "^1.9.1",
     tsup: "^9.0.0",
     zod: "^4.6.7"
   }
 };
 
-// src/cli-version.ts
-import { readFile as readFile8, realpath, stat as stat9 } from "fs/promises";
-import { delimiter, dirname as dirname8, join as join11 } from "path";
-var PACKAGE = "@cogit/cli";
-async function installedCliVersion(env) {
-  for (const dir of (env.PATH ?? "").split(delimiter)) {
-    if (dir === "") continue;
-    const bin = join11(dir, "cogit");
-    try {
-      if (!(await stat9(bin)).isFile()) continue;
-    } catch {
-      continue;
-    }
-    const manifests = [
-      // npm links bin/cogit to <package>/dist/cli.js...
-      async () => join11(dirname8(dirname8(await realpath(bin))), "package.json"),
-      // ...and on Windows writes shims beside <prefix>/node_modules instead.
-      async () => join11(dir, "node_modules", ...PACKAGE.split("/"), "package.json")
-    ];
-    for (const manifest of manifests) {
-      try {
-        const pkg = JSON.parse(await readFile8(await manifest(), "utf8"));
-        if (pkg.name === PACKAGE && typeof pkg.version === "string") return pkg.version;
-      } catch {
-      }
-    }
-    return void 0;
-  }
-  return void 0;
-}
-function compareVersions(a, b) {
-  const parts = (v) => (v.split("-")[0] ?? "").split(".").map((n) => Number.parseInt(n, 10) || 0);
-  const [x, y] = [parts(a), parts(b)];
-  for (let i = 0; i < Math.max(x.length, y.length); i++) {
-    const d = (x[i] ?? 0) - (y[i] ?? 0);
-    if (d !== 0) return Math.sign(d);
-  }
-  return 0;
-}
-function versionNotice(running, installed) {
-  if (installed === void 0) return void 0;
-  const order = compareVersions(running, installed);
-  if (order > 0)
-    return `cogit: the cogit command is ${installed}, the plugin ${running}. Update the command with \`npm install -g ${PACKAGE}\`.`;
-  if (order < 0)
-    return `cogit: the plugin is ${running}, the cogit command ${installed}. Update the plugin with \`claude plugin update cogit@cogit\`, or turn on auto-update in /plugin \u2192 Marketplaces \u2192 cogit.`;
-  return void 0;
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/key.js
-var keybindings = ["emacs", "vim"];
-var keybindingLookup = new Set(keybindings);
-function isKeybinding(value) {
-  return keybindingLookup.has(value);
-}
-function getDefaultKeybindings() {
-  const env = process.env["INQUIRER_KEYBINDINGS"];
-  if (!env)
-    return [];
-  return Array.from(new Set(env.toLowerCase().split(/[\s,]+/).filter(isKeybinding)));
-}
-var isUpKey = (key, keybindings2 = []) => (
-  // The up key
-  key.name === "up" || // Vim keybinding: hjkl keys map to left/down/up/right
-  keybindings2.includes("vim") && key.name === "k" || // Emacs keybinding: Ctrl+P means "previous" in Emacs navigation conventions
-  keybindings2.includes("emacs") && key.ctrl && key.name === "p"
-);
-var isDownKey = (key, keybindings2 = []) => (
-  // The down key
-  key.name === "down" || // Vim keybinding: hjkl keys map to left/down/up/right
-  keybindings2.includes("vim") && key.name === "j" || // Emacs keybinding: Ctrl+N means "next" in Emacs navigation conventions
-  keybindings2.includes("emacs") && key.ctrl && key.name === "n"
-);
-var isBackspaceKey = (key) => key.name === "backspace";
-var isTabKey = (key) => key.name === "tab";
-var isNumberKey = (key) => "1234567890".includes(key.name);
-var isEnterKey = (key) => key.name === "enter" || key.name === "return";
-
-// ../../node_modules/@inquirer/core/dist/lib/errors.js
-var AbortPromptError = class extends Error {
-  name = "AbortPromptError";
-  message = "Prompt was aborted";
-  constructor(options) {
-    super();
-    this.cause = options?.cause;
-  }
-};
-var CancelPromptError = class extends Error {
-  name = "CancelPromptError";
-  message = "Prompt was canceled";
-};
-var ExitPromptError = class extends Error {
-  name = "ExitPromptError";
-};
-var HookError = class extends Error {
-  name = "HookError";
-};
-var ValidationError = class extends Error {
-  name = "ValidationError";
-};
-
-// ../../node_modules/@inquirer/core/dist/lib/use-state.js
-import { AsyncResource as AsyncResource2 } from "async_hooks";
-
-// ../../node_modules/@inquirer/core/dist/lib/hook-engine.js
-import { AsyncLocalStorage, AsyncResource } from "async_hooks";
-var hookStorage = new AsyncLocalStorage();
-function createStore(rl) {
-  const store = {
-    rl,
-    hooks: [],
-    hooksCleanup: [],
-    hooksEffect: [],
-    index: 0,
-    handleChange() {
-    }
-  };
-  return store;
-}
-function withHooks(rl, cb) {
-  const store = createStore(rl);
-  function cycle(render) {
-    store.handleChange = () => {
-      store.index = 0;
-      render();
-    };
-    store.handleChange();
-  }
-  return hookStorage.run(store, () => cb(cycle));
-}
-function getStore() {
-  const store = hookStorage.getStore();
-  if (!store) {
-    throw new HookError("[Inquirer] Hook functions can only be called from within a prompt");
-  }
-  return store;
-}
-function readline() {
-  return getStore().rl;
-}
-function withUpdates(fn) {
-  const wrapped = (...args) => {
-    const store = getStore();
-    let shouldUpdate = false;
-    const oldHandleChange = store.handleChange;
-    store.handleChange = () => {
-      shouldUpdate = true;
-    };
-    const returnValue = fn(...args);
-    if (shouldUpdate) {
-      oldHandleChange();
-    }
-    store.handleChange = oldHandleChange;
-    return returnValue;
-  };
-  return AsyncResource.bind(wrapped);
-}
-function withPointer(cb) {
-  const store = getStore();
-  const { index } = store;
-  const pointer = {
-    get() {
-      return store.hooks[index];
-    },
-    set(value) {
-      store.hooks[index] = value;
-    },
-    initialized: index in store.hooks
-  };
-  const returnValue = cb(pointer);
-  store.index++;
-  return returnValue;
-}
-function handleChange() {
-  getStore().handleChange();
-}
-var effectScheduler = {
-  queue(cb) {
-    const store = getStore();
-    const { index } = store;
-    store.hooksEffect.push(() => {
-      store.hooksCleanup[index]?.();
-      const cleanFn = cb(readline());
-      if (cleanFn != null && typeof cleanFn !== "function") {
-        throw new ValidationError("useEffect return value must be a cleanup function or nothing.");
-      }
-      store.hooksCleanup[index] = cleanFn;
-    });
-  },
-  run() {
-    const store = getStore();
-    withUpdates(() => {
-      store.hooksEffect.forEach((effect) => {
-        effect();
-      });
-      store.hooksEffect.length = 0;
-    })();
-  },
-  clearAll() {
-    const store = getStore();
-    store.hooksCleanup.forEach((cleanFn) => {
-      cleanFn?.();
-    });
-    store.hooksEffect.length = 0;
-    store.hooksCleanup.length = 0;
-  }
-};
-
-// ../../node_modules/@inquirer/core/dist/lib/use-state.js
-function isFactory(value) {
-  return typeof value === "function";
-}
-function isReducer(value) {
-  return typeof value === "function";
-}
-function useState(defaultValue) {
-  return withPointer((pointer) => {
-    const setState = AsyncResource2.bind(function setState2(newValue) {
-      const currentValue = pointer.get();
-      const nextValue = isReducer(newValue) ? newValue(currentValue) : newValue;
-      if (!Object.is(currentValue, nextValue)) {
-        pointer.set(nextValue);
-        handleChange();
-      }
-    });
-    if (pointer.initialized) {
-      return [pointer.get(), setState];
-    }
-    const value = isFactory(defaultValue) ? defaultValue() : defaultValue;
-    pointer.set(value);
-    return [value, setState];
-  });
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/use-effect.js
-function useEffect(cb, depArray) {
-  withPointer((pointer) => {
-    const oldDeps = pointer.get();
-    const hasChanged = !Array.isArray(oldDeps) || depArray.some((dep, i) => !Object.is(dep, oldDeps[i]));
-    if (hasChanged) {
-      effectScheduler.queue(cb);
-    }
-    pointer.set(depArray);
-  });
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/theme.js
-import { styleText } from "util";
-
-// ../../node_modules/@inquirer/figures/dist/index.js
-import process2 from "process";
-function isUnicodeSupported() {
-  if (!process2.platform.startsWith("win")) {
-    return process2.env["TERM"] !== "linux";
-  }
-  return Boolean(process2.env["CI"]) || // CI environments generally support unicode
-  Boolean(process2.env["WT_SESSION"]) || // Windows Terminal
-  Boolean(process2.env["TERMINUS_SUBLIME"]) || // Terminus (<0.2.27)
-  process2.env["ConEmuTask"] === "{cmd::Cmder}" || // ConEmu and cmder
-  process2.env["TERM_PROGRAM"] === "Terminus-Sublime" || process2.env["TERM_PROGRAM"] === "vscode" || process2.env["TERM"] === "xterm-256color" || process2.env["TERM"] === "alacritty" || process2.env["TERMINAL_EMULATOR"] === "JetBrains-JediTerm";
-}
-var common = {
-  circleQuestionMark: "(?)",
-  questionMarkPrefix: "(?)",
-  square: "\u2588",
-  squareDarkShade: "\u2593",
-  squareMediumShade: "\u2592",
-  squareLightShade: "\u2591",
-  squareTop: "\u2580",
-  squareBottom: "\u2584",
-  squareLeft: "\u258C",
-  squareRight: "\u2590",
-  squareCenter: "\u25A0",
-  bullet: "\u25CF",
-  dot: "\u2024",
-  ellipsis: "\u2026",
-  pointerSmall: "\u203A",
-  triangleUp: "\u25B2",
-  triangleUpSmall: "\u25B4",
-  triangleDown: "\u25BC",
-  triangleDownSmall: "\u25BE",
-  triangleLeftSmall: "\u25C2",
-  triangleRightSmall: "\u25B8",
-  home: "\u2302",
-  heart: "\u2665",
-  musicNote: "\u266A",
-  musicNoteBeamed: "\u266B",
-  arrowUp: "\u2191",
-  arrowDown: "\u2193",
-  arrowLeft: "\u2190",
-  arrowRight: "\u2192",
-  arrowLeftRight: "\u2194",
-  arrowUpDown: "\u2195",
-  almostEqual: "\u2248",
-  notEqual: "\u2260",
-  lessOrEqual: "\u2264",
-  greaterOrEqual: "\u2265",
-  identical: "\u2261",
-  infinity: "\u221E",
-  subscriptZero: "\u2080",
-  subscriptOne: "\u2081",
-  subscriptTwo: "\u2082",
-  subscriptThree: "\u2083",
-  subscriptFour: "\u2084",
-  subscriptFive: "\u2085",
-  subscriptSix: "\u2086",
-  subscriptSeven: "\u2087",
-  subscriptEight: "\u2088",
-  subscriptNine: "\u2089",
-  oneHalf: "\xBD",
-  oneThird: "\u2153",
-  oneQuarter: "\xBC",
-  oneFifth: "\u2155",
-  oneSixth: "\u2159",
-  oneEighth: "\u215B",
-  twoThirds: "\u2154",
-  twoFifths: "\u2156",
-  threeQuarters: "\xBE",
-  threeFifths: "\u2157",
-  threeEighths: "\u215C",
-  fourFifths: "\u2158",
-  fiveSixths: "\u215A",
-  fiveEighths: "\u215D",
-  sevenEighths: "\u215E",
-  line: "\u2500",
-  lineBold: "\u2501",
-  lineDouble: "\u2550",
-  lineDashed0: "\u2504",
-  lineDashed1: "\u2505",
-  lineDashed2: "\u2508",
-  lineDashed3: "\u2509",
-  lineDashed4: "\u254C",
-  lineDashed5: "\u254D",
-  lineDashed6: "\u2574",
-  lineDashed7: "\u2576",
-  lineDashed8: "\u2578",
-  lineDashed9: "\u257A",
-  lineDashed10: "\u257C",
-  lineDashed11: "\u257E",
-  lineDashed12: "\u2212",
-  lineDashed13: "\u2013",
-  lineDashed14: "\u2010",
-  lineDashed15: "\u2043",
-  lineVertical: "\u2502",
-  lineVerticalBold: "\u2503",
-  lineVerticalDouble: "\u2551",
-  lineVerticalDashed0: "\u2506",
-  lineVerticalDashed1: "\u2507",
-  lineVerticalDashed2: "\u250A",
-  lineVerticalDashed3: "\u250B",
-  lineVerticalDashed4: "\u254E",
-  lineVerticalDashed5: "\u254F",
-  lineVerticalDashed6: "\u2575",
-  lineVerticalDashed7: "\u2577",
-  lineVerticalDashed8: "\u2579",
-  lineVerticalDashed9: "\u257B",
-  lineVerticalDashed10: "\u257D",
-  lineVerticalDashed11: "\u257F",
-  lineDownLeft: "\u2510",
-  lineDownLeftArc: "\u256E",
-  lineDownBoldLeftBold: "\u2513",
-  lineDownBoldLeft: "\u2512",
-  lineDownLeftBold: "\u2511",
-  lineDownDoubleLeftDouble: "\u2557",
-  lineDownDoubleLeft: "\u2556",
-  lineDownLeftDouble: "\u2555",
-  lineDownRight: "\u250C",
-  lineDownRightArc: "\u256D",
-  lineDownBoldRightBold: "\u250F",
-  lineDownBoldRight: "\u250E",
-  lineDownRightBold: "\u250D",
-  lineDownDoubleRightDouble: "\u2554",
-  lineDownDoubleRight: "\u2553",
-  lineDownRightDouble: "\u2552",
-  lineUpLeft: "\u2518",
-  lineUpLeftArc: "\u256F",
-  lineUpBoldLeftBold: "\u251B",
-  lineUpBoldLeft: "\u251A",
-  lineUpLeftBold: "\u2519",
-  lineUpDoubleLeftDouble: "\u255D",
-  lineUpDoubleLeft: "\u255C",
-  lineUpLeftDouble: "\u255B",
-  lineUpRight: "\u2514",
-  lineUpRightArc: "\u2570",
-  lineUpBoldRightBold: "\u2517",
-  lineUpBoldRight: "\u2516",
-  lineUpRightBold: "\u2515",
-  lineUpDoubleRightDouble: "\u255A",
-  lineUpDoubleRight: "\u2559",
-  lineUpRightDouble: "\u2558",
-  lineUpDownLeft: "\u2524",
-  lineUpBoldDownBoldLeftBold: "\u252B",
-  lineUpBoldDownBoldLeft: "\u2528",
-  lineUpDownLeftBold: "\u2525",
-  lineUpBoldDownLeftBold: "\u2529",
-  lineUpDownBoldLeftBold: "\u252A",
-  lineUpDownBoldLeft: "\u2527",
-  lineUpBoldDownLeft: "\u2526",
-  lineUpDoubleDownDoubleLeftDouble: "\u2563",
-  lineUpDoubleDownDoubleLeft: "\u2562",
-  lineUpDownLeftDouble: "\u2561",
-  lineUpDownRight: "\u251C",
-  lineUpBoldDownBoldRightBold: "\u2523",
-  lineUpBoldDownBoldRight: "\u2520",
-  lineUpDownRightBold: "\u251D",
-  lineUpBoldDownRightBold: "\u2521",
-  lineUpDownBoldRightBold: "\u2522",
-  lineUpDownBoldRight: "\u251F",
-  lineUpBoldDownRight: "\u251E",
-  lineUpDoubleDownDoubleRightDouble: "\u2560",
-  lineUpDoubleDownDoubleRight: "\u255F",
-  lineUpDownRightDouble: "\u255E",
-  lineDownLeftRight: "\u252C",
-  lineDownBoldLeftBoldRightBold: "\u2533",
-  lineDownLeftBoldRightBold: "\u252F",
-  lineDownBoldLeftRight: "\u2530",
-  lineDownBoldLeftBoldRight: "\u2531",
-  lineDownBoldLeftRightBold: "\u2532",
-  lineDownLeftRightBold: "\u252E",
-  lineDownLeftBoldRight: "\u252D",
-  lineDownDoubleLeftDoubleRightDouble: "\u2566",
-  lineDownDoubleLeftRight: "\u2565",
-  lineDownLeftDoubleRightDouble: "\u2564",
-  lineUpLeftRight: "\u2534",
-  lineUpBoldLeftBoldRightBold: "\u253B",
-  lineUpLeftBoldRightBold: "\u2537",
-  lineUpBoldLeftRight: "\u2538",
-  lineUpBoldLeftBoldRight: "\u2539",
-  lineUpBoldLeftRightBold: "\u253A",
-  lineUpLeftRightBold: "\u2536",
-  lineUpLeftBoldRight: "\u2535",
-  lineUpDoubleLeftDoubleRightDouble: "\u2569",
-  lineUpDoubleLeftRight: "\u2568",
-  lineUpLeftDoubleRightDouble: "\u2567",
-  lineUpDownLeftRight: "\u253C",
-  lineUpBoldDownBoldLeftBoldRightBold: "\u254B",
-  lineUpDownBoldLeftBoldRightBold: "\u2548",
-  lineUpBoldDownLeftBoldRightBold: "\u2547",
-  lineUpBoldDownBoldLeftRightBold: "\u254A",
-  lineUpBoldDownBoldLeftBoldRight: "\u2549",
-  lineUpBoldDownLeftRight: "\u2540",
-  lineUpDownBoldLeftRight: "\u2541",
-  lineUpDownLeftBoldRight: "\u253D",
-  lineUpDownLeftRightBold: "\u253E",
-  lineUpBoldDownBoldLeftRight: "\u2542",
-  lineUpDownLeftBoldRightBold: "\u253F",
-  lineUpBoldDownLeftBoldRight: "\u2543",
-  lineUpBoldDownLeftRightBold: "\u2544",
-  lineUpDownBoldLeftBoldRight: "\u2545",
-  lineUpDownBoldLeftRightBold: "\u2546",
-  lineUpDoubleDownDoubleLeftDoubleRightDouble: "\u256C",
-  lineUpDoubleDownDoubleLeftRight: "\u256B",
-  lineUpDownLeftDoubleRightDouble: "\u256A",
-  lineCross: "\u2573",
-  lineBackslash: "\u2572",
-  lineSlash: "\u2571"
-};
-var specialMainSymbols = {
-  tick: "\u2714",
-  info: "\u2139",
-  warning: "\u26A0",
-  cross: "\u2718",
-  squareSmall: "\u25FB",
-  squareSmallFilled: "\u25FC",
-  circle: "\u25EF",
-  circleFilled: "\u25C9",
-  circleDotted: "\u25CC",
-  circleDouble: "\u25CE",
-  circleCircle: "\u24DE",
-  circleCross: "\u24E7",
-  circlePipe: "\u24BE",
-  radioOn: "\u25C9",
-  radioOff: "\u25EF",
-  checkboxOn: "\u2612",
-  checkboxOff: "\u2610",
-  checkboxCircleOn: "\u24E7",
-  checkboxCircleOff: "\u24BE",
-  pointer: "\u276F",
-  triangleUpOutline: "\u25B3",
-  triangleLeft: "\u25C0",
-  triangleRight: "\u25B6",
-  lozenge: "\u25C6",
-  lozengeOutline: "\u25C7",
-  hamburger: "\u2630",
-  smiley: "\u32E1",
-  mustache: "\u0DF4",
-  star: "\u2605",
-  play: "\u25B6",
-  nodejs: "\u2B22",
-  oneSeventh: "\u2150",
-  oneNinth: "\u2151",
-  oneTenth: "\u2152"
-};
-var specialFallbackSymbols = {
-  tick: "\u221A",
-  info: "i",
-  warning: "\u203C",
-  cross: "\xD7",
-  squareSmall: "\u25A1",
-  squareSmallFilled: "\u25A0",
-  circle: "( )",
-  circleFilled: "(*)",
-  circleDotted: "( )",
-  circleDouble: "( )",
-  circleCircle: "(\u25CB)",
-  circleCross: "(\xD7)",
-  circlePipe: "(\u2502)",
-  radioOn: "(*)",
-  radioOff: "( )",
-  checkboxOn: "[\xD7]",
-  checkboxOff: "[ ]",
-  checkboxCircleOn: "(\xD7)",
-  checkboxCircleOff: "( )",
-  pointer: ">",
-  triangleUpOutline: "\u2206",
-  triangleLeft: "\u25C4",
-  triangleRight: "\u25BA",
-  lozenge: "\u2666",
-  lozengeOutline: "\u25CA",
-  hamburger: "\u2261",
-  smiley: "\u263A",
-  mustache: "\u250C\u2500\u2510",
-  star: "\u2736",
-  play: "\u25BA",
-  nodejs: "\u2666",
-  oneSeventh: "1/7",
-  oneNinth: "1/9",
-  oneTenth: "1/10"
-};
-var mainSymbols = {
-  ...common,
-  ...specialMainSymbols
-};
-var fallbackSymbols = {
-  ...common,
-  ...specialFallbackSymbols
-};
-var shouldUseMain = isUnicodeSupported();
-var figures = shouldUseMain ? mainSymbols : fallbackSymbols;
-var dist_default = figures;
-var replacements = Object.entries(specialMainSymbols);
-
-// ../../node_modules/@inquirer/core/dist/lib/theme.js
-var defaultTheme = {
-  prefix: {
-    idle: styleText("blue", "?"),
-    done: styleText("green", dist_default.tick)
-  },
-  spinner: {
-    interval: 80,
-    frames: ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"].map((frame) => styleText("yellow", frame))
-  },
-  keybindings: [],
-  style: {
-    answer: (text) => styleText("cyan", text),
-    message: (text) => styleText("bold", text),
-    error: (text) => styleText("red", `> ${text}`),
-    defaultAnswer: (text) => styleText("dim", `(${text})`),
-    help: (text) => styleText("dim", text),
-    highlight: (text) => styleText("cyan", text),
-    key: (text) => styleText("cyan", styleText("bold", `<${text}>`))
-  }
-};
-function getDefaultTheme() {
-  return {
-    ...defaultTheme,
-    keybindings: getDefaultKeybindings()
-  };
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/make-theme.js
-function isPlainObject2(value) {
-  if (typeof value !== "object" || value === null)
-    return false;
-  let proto = value;
-  while (Object.getPrototypeOf(proto) !== null) {
-    proto = Object.getPrototypeOf(proto);
-  }
-  return Object.getPrototypeOf(value) === proto;
-}
-function deepMerge(...objects) {
-  const output2 = {};
-  for (const obj of objects) {
-    for (const [key, value] of Object.entries(obj)) {
-      const prevValue = output2[key];
-      output2[key] = isPlainObject2(prevValue) && isPlainObject2(value) ? deepMerge(prevValue, value) : value;
-    }
-  }
-  return output2;
-}
-function makeTheme(...themes) {
-  const themesToMerge = [
-    getDefaultTheme(),
-    ...themes.filter((theme) => theme != null)
-  ];
-  return deepMerge(...themesToMerge);
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/use-prefix.js
-function usePrefix({ status = "idle", theme }) {
-  const [showLoader, setShowLoader] = useState(false);
-  const [tick, setTick] = useState(0);
-  const { prefix, spinner } = makeTheme(theme);
-  useEffect(() => {
-    if (status === "loading") {
-      let tickInterval;
-      let inc = -1;
-      const delayTimeout = setTimeout(() => {
-        setShowLoader(true);
-        tickInterval = setInterval(() => {
-          inc = inc + 1;
-          setTick(inc % spinner.frames.length);
-        }, spinner.interval);
-      }, 300);
-      return () => {
-        clearTimeout(delayTimeout);
-        clearInterval(tickInterval);
-      };
-    } else {
-      setShowLoader(false);
-    }
-  }, [status]);
-  if (showLoader) {
-    return spinner.frames[tick];
-  }
-  const iconName = status === "loading" ? "idle" : status;
-  return typeof prefix === "string" ? prefix : prefix[iconName] ?? prefix["idle"];
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/use-memo.js
-function useMemo(fn, dependencies) {
-  return withPointer((pointer) => {
-    const prev = pointer.get();
-    if (!pointer.initialized || prev.dependencies.length !== dependencies.length || prev.dependencies.some((dep, i) => dep !== dependencies[i])) {
-      const value = fn();
-      pointer.set({ value, dependencies });
-      return value;
-    }
-    return prev.value;
-  });
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/use-ref.js
-function useRef(val) {
-  return useState({ current: val })[0];
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/use-keypress.js
-function useKeypress(userHandler) {
-  const signal = useRef(userHandler);
-  signal.current = userHandler;
-  useEffect((rl) => {
-    let ignore = false;
-    const handler = withUpdates((_input, event) => {
-      if (ignore)
-        return;
-      void signal.current(event, rl);
-    });
-    rl.input.on("keypress", handler);
-    return () => {
-      ignore = true;
-      rl.input.removeListener("keypress", handler);
-    };
-  }, []);
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/utils.js
-var import_cli_width = __toESM(require_cli_width(), 1);
-
-// ../../node_modules/fast-string-truncated-width/dist/utils.js
-var getCodePointsLength = /* @__PURE__ */ (() => {
-  const SURROGATE_PAIR_RE = /[\uD800-\uDBFF][\uDC00-\uDFFF]/g;
-  return (input2) => {
-    let surrogatePairsNr = 0;
-    SURROGATE_PAIR_RE.lastIndex = 0;
-    while (SURROGATE_PAIR_RE.test(input2)) {
-      surrogatePairsNr += 1;
-    }
-    return input2.length - surrogatePairsNr;
-  };
-})();
-var isFullWidth = (x) => {
-  return x === 12288 || x >= 65281 && x <= 65376 || x >= 65504 && x <= 65510;
-};
-var isWideNotCJKTNotEmoji = (x) => {
-  return x === 8987 || x === 9001 || x >= 12272 && x <= 12287 || x >= 12289 && x <= 12350 || x >= 12441 && x <= 12543 || x >= 12549 && x <= 12591 || x >= 12593 && x <= 12686 || x >= 12688 && x <= 12771 || x >= 12783 && x <= 12830 || x >= 12832 && x <= 12871 || x >= 12880 && x <= 19903 || x >= 65040 && x <= 65049 || x >= 65072 && x <= 65106 || x >= 65108 && x <= 65126 || x >= 65128 && x <= 65131 || x >= 127488 && x <= 127490 || x >= 127504 && x <= 127547 || x >= 127552 && x <= 127560 || x >= 131072 && x <= 196605 || x >= 196608 && x <= 262141;
-};
-
-// ../../node_modules/fast-string-truncated-width/dist/index.js
-var ANSI_RE = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]|\u001b\]8;[^;]*;.*?(?:\u0007|\u001b\u005c)/y;
-var CONTROL_RE = /[\x00-\x08\x0A-\x1F\x7F-\x9F]{1,1000}/y;
-var CJKT_WIDE_RE = /(?:(?![\uFF61-\uFF9F\uFF00-\uFFEF])[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Tangut}]){1,1000}/yu;
-var TAB_RE = /\t{1,1000}/y;
-var EMOJI_RE = new RegExp("[\\u{1F1E6}-\\u{1F1FF}]{2}|\\u{1F3F4}[\\u{E0061}-\\u{E007A}]{2}[\\u{E0030}-\\u{E0039}\\u{E0061}-\\u{E007A}]{1,3}\\u{E007F}|(?:\\p{Emoji}\\uFE0F\\u20E3?|\\p{Emoji_Modifier_Base}\\p{Emoji_Modifier}?|\\p{Emoji_Presentation})(?:\\u200D(?:\\p{Emoji_Modifier_Base}\\p{Emoji_Modifier}?|\\p{Emoji_Presentation}|\\p{Emoji}\\uFE0F\\u20E3?))*", "yu");
-var LATIN_RE = /(?:[\x20-\x7E\xA0-\xFF](?!\uFE0F)){1,1000}/y;
-var MODIFIER_RE = new RegExp("\\p{M}+", "gu");
-var NO_TRUNCATION = { limit: Infinity, ellipsis: "" };
-var getStringTruncatedWidth = (input2, truncationOptions = {}, widthOptions = {}) => {
-  const LIMIT = truncationOptions.limit ?? Infinity;
-  const ELLIPSIS = truncationOptions.ellipsis ?? "";
-  const ELLIPSIS_WIDTH = truncationOptions?.ellipsisWidth ?? (ELLIPSIS ? getStringTruncatedWidth(ELLIPSIS, NO_TRUNCATION, widthOptions).width : 0);
-  const ANSI_WIDTH = 0;
-  const CONTROL_WIDTH = widthOptions.controlWidth ?? 0;
-  const TAB_WIDTH = widthOptions.tabWidth ?? 8;
-  const EMOJI_WIDTH = widthOptions.emojiWidth ?? 2;
-  const FULL_WIDTH_WIDTH = 2;
-  const REGULAR_WIDTH = widthOptions.regularWidth ?? 1;
-  const WIDE_WIDTH = widthOptions.wideWidth ?? FULL_WIDTH_WIDTH;
-  const PARSE_BLOCKS = [
-    [LATIN_RE, REGULAR_WIDTH],
-    [ANSI_RE, ANSI_WIDTH],
-    [CONTROL_RE, CONTROL_WIDTH],
-    [TAB_RE, TAB_WIDTH],
-    [EMOJI_RE, EMOJI_WIDTH],
-    [CJKT_WIDE_RE, WIDE_WIDTH]
-  ];
-  let indexPrev = 0;
-  let index = 0;
-  let length = input2.length;
-  let lengthExtra = 0;
-  let truncationEnabled = false;
-  let truncationIndex = length;
-  let truncationLimit = Math.max(0, LIMIT - ELLIPSIS_WIDTH);
-  let unmatchedStart = 0;
-  let unmatchedEnd = 0;
-  let width = 0;
-  let widthExtra = 0;
-  outer: while (true) {
-    if (unmatchedEnd > unmatchedStart || index >= length && index > indexPrev) {
-      const unmatched = input2.slice(unmatchedStart, unmatchedEnd) || input2.slice(indexPrev, index);
-      lengthExtra = 0;
-      for (const char of unmatched.replaceAll(MODIFIER_RE, "")) {
-        const codePoint = char.codePointAt(0) || 0;
-        if (isFullWidth(codePoint)) {
-          widthExtra = FULL_WIDTH_WIDTH;
-        } else if (isWideNotCJKTNotEmoji(codePoint)) {
-          widthExtra = WIDE_WIDTH;
-        } else {
-          widthExtra = REGULAR_WIDTH;
-        }
-        if (width + widthExtra > truncationLimit) {
-          truncationIndex = Math.min(truncationIndex, Math.max(unmatchedStart, indexPrev) + lengthExtra);
-        }
-        if (width + widthExtra > LIMIT) {
-          truncationEnabled = true;
-          break outer;
-        }
-        lengthExtra += char.length;
-        width += widthExtra;
-      }
-      unmatchedStart = unmatchedEnd = 0;
-    }
-    if (index >= length) {
-      break outer;
-    }
-    for (let i = 0, l = PARSE_BLOCKS.length; i < l; i++) {
-      const [BLOCK_RE, BLOCK_WIDTH] = PARSE_BLOCKS[i];
-      BLOCK_RE.lastIndex = index;
-      if (BLOCK_RE.test(input2)) {
-        lengthExtra = BLOCK_RE === CJKT_WIDE_RE ? getCodePointsLength(input2.slice(index, BLOCK_RE.lastIndex)) : BLOCK_RE === EMOJI_RE ? 1 : BLOCK_RE.lastIndex - index;
-        widthExtra = lengthExtra * BLOCK_WIDTH;
-        if (width + widthExtra > truncationLimit) {
-          truncationIndex = Math.min(truncationIndex, index + Math.floor((truncationLimit - width) / BLOCK_WIDTH));
-        }
-        if (width + widthExtra > LIMIT) {
-          truncationEnabled = true;
-          break outer;
-        }
-        width += widthExtra;
-        unmatchedStart = indexPrev;
-        unmatchedEnd = index;
-        index = indexPrev = BLOCK_RE.lastIndex;
-        continue outer;
-      }
-    }
-    index += 1;
-  }
-  return {
-    width: truncationEnabled ? truncationLimit : width,
-    index: truncationEnabled ? truncationIndex : length,
-    truncated: truncationEnabled,
-    ellipsed: truncationEnabled && LIMIT >= ELLIPSIS_WIDTH
-  };
-};
-var dist_default2 = getStringTruncatedWidth;
-
-// ../../node_modules/fast-string-width/dist/index.js
-var NO_TRUNCATION2 = {
-  limit: Infinity,
-  ellipsis: "",
-  ellipsisWidth: 0
-};
-var fastStringWidth = (input2, options = {}) => {
-  return dist_default2(input2, NO_TRUNCATION2, options).width;
-};
-var dist_default3 = fastStringWidth;
-
-// ../../node_modules/fast-wrap-ansi/lib/main.js
-var ESC = "\x1B";
-var CSI = "\x9B";
-var END_CODE = 39;
-var ANSI_ESCAPE_BELL = "\x07";
-var ANSI_CSI = "[";
-var ANSI_OSC = "]";
-var ANSI_SGR_TERMINATOR = "m";
-var ANSI_ESCAPE_LINK = `${ANSI_OSC}8;;`;
-var GROUP_REGEX = new RegExp(`(?:\\${ANSI_CSI}(?<code>\\d+)m|\\${ANSI_ESCAPE_LINK}(?<uri>.*)${ANSI_ESCAPE_BELL})`, "y");
-var getClosingCode = (openingCode) => {
-  if (openingCode >= 30 && openingCode <= 37)
-    return 39;
-  if (openingCode >= 90 && openingCode <= 97)
-    return 39;
-  if (openingCode >= 40 && openingCode <= 47)
-    return 49;
-  if (openingCode >= 100 && openingCode <= 107)
-    return 49;
-  if (openingCode === 1 || openingCode === 2)
-    return 22;
-  if (openingCode === 3)
-    return 23;
-  if (openingCode === 4)
-    return 24;
-  if (openingCode === 7)
-    return 27;
-  if (openingCode === 8)
-    return 28;
-  if (openingCode === 9)
-    return 29;
-  if (openingCode === 0)
-    return 0;
-  return void 0;
-};
-var wrapAnsiCode = (code) => `${ESC}${ANSI_CSI}${code}${ANSI_SGR_TERMINATOR}`;
-var wrapAnsiHyperlink = (url2) => `${ESC}${ANSI_ESCAPE_LINK}${url2}${ANSI_ESCAPE_BELL}`;
-var wrapWord = (rows, word, columns) => {
-  const characters = word[Symbol.iterator]();
-  let isInsideEscape = false;
-  let isInsideLinkEscape = false;
-  let lastRow = rows.at(-1);
-  let visible = lastRow === void 0 ? 0 : dist_default3(lastRow);
-  let currentCharacter = characters.next();
-  let nextCharacter = characters.next();
-  let rawCharacterIndex = 0;
-  while (!currentCharacter.done) {
-    const character = currentCharacter.value;
-    const characterLength = dist_default3(character);
-    if (visible + characterLength <= columns) {
-      rows[rows.length - 1] += character;
-    } else {
-      rows.push(character);
-      visible = 0;
-    }
-    if (character === ESC || character === CSI) {
-      isInsideEscape = true;
-      isInsideLinkEscape = word.startsWith(ANSI_ESCAPE_LINK, rawCharacterIndex + 1);
-    }
-    if (isInsideEscape) {
-      if (isInsideLinkEscape) {
-        if (character === ANSI_ESCAPE_BELL) {
-          isInsideEscape = false;
-          isInsideLinkEscape = false;
-        }
-      } else if (character === ANSI_SGR_TERMINATOR) {
-        isInsideEscape = false;
-      }
-    } else {
-      visible += characterLength;
-      if (visible === columns && !nextCharacter.done) {
-        rows.push("");
-        visible = 0;
-      }
-    }
-    currentCharacter = nextCharacter;
-    nextCharacter = characters.next();
-    rawCharacterIndex += character.length;
-  }
-  lastRow = rows.at(-1);
-  if (!visible && lastRow !== void 0 && lastRow.length && rows.length > 1) {
-    rows[rows.length - 2] += rows.pop();
-  }
-};
-var stringVisibleTrimSpacesRight = (string4) => {
-  const words = string4.split(" ");
-  let last = words.length;
-  while (last) {
-    if (dist_default3(words[last - 1])) {
-      break;
-    }
-    last--;
-  }
-  if (last === words.length) {
-    return string4;
-  }
-  return words.slice(0, last).join(" ") + words.slice(last).join("");
-};
-var exec2 = (string4, columns, options = {}) => {
-  if (options.trim !== false && string4.trim() === "") {
-    return "";
-  }
-  let returnValue = "";
-  let escapeCode;
-  let escapeUrl;
-  const words = string4.split(" ");
-  let rows = [""];
-  let rowLength = 0;
-  for (let index = 0; index < words.length; index++) {
-    const word = words[index];
-    if (options.trim !== false) {
-      const row = rows.at(-1) ?? "";
-      const trimmed = row.trimStart();
-      if (row.length !== trimmed.length) {
-        rows[rows.length - 1] = trimmed;
-        rowLength = dist_default3(trimmed);
-      }
-    }
-    if (index !== 0) {
-      if (rowLength >= columns && (options.wordWrap === false || options.trim === false)) {
-        rows.push("");
-        rowLength = 0;
-      }
-      if (rowLength || options.trim === false) {
-        rows[rows.length - 1] += " ";
-        rowLength++;
-      }
-    }
-    const wordLength = dist_default3(word);
-    if (options.hard && wordLength > columns) {
-      const remainingColumns = columns - rowLength;
-      const breaksStartingThisLine = 1 + Math.floor((wordLength - remainingColumns - 1) / columns);
-      const breaksStartingNextLine = Math.floor((wordLength - 1) / columns);
-      if (breaksStartingNextLine < breaksStartingThisLine) {
-        rows.push("");
-      }
-      wrapWord(rows, word, columns);
-      rowLength = dist_default3(rows.at(-1) ?? "");
-      continue;
-    }
-    if (rowLength + wordLength > columns && rowLength && wordLength) {
-      if (options.wordWrap === false && rowLength < columns) {
-        wrapWord(rows, word, columns);
-        rowLength = dist_default3(rows.at(-1) ?? "");
-        continue;
-      }
-      rows.push("");
-      rowLength = 0;
-    }
-    if (rowLength + wordLength > columns && options.wordWrap === false) {
-      wrapWord(rows, word, columns);
-      rowLength = dist_default3(rows.at(-1) ?? "");
-      continue;
-    }
-    rows[rows.length - 1] += word;
-    rowLength += wordLength;
-  }
-  if (options.trim !== false) {
-    rows = rows.map((row) => stringVisibleTrimSpacesRight(row));
-  }
-  const preString = rows.join("\n");
-  let inSurrogate = false;
-  for (let i = 0; i < preString.length; i++) {
-    const character = preString[i];
-    returnValue += character;
-    if (!inSurrogate) {
-      inSurrogate = character >= "\uD800" && character <= "\uDBFF";
-      if (inSurrogate) {
-        continue;
-      }
-    } else {
-      inSurrogate = false;
-    }
-    if (character === ESC || character === CSI) {
-      GROUP_REGEX.lastIndex = i + 1;
-      const groupsResult = GROUP_REGEX.exec(preString);
-      const groups = groupsResult?.groups;
-      if (groups?.code !== void 0) {
-        const code = Number.parseFloat(groups.code);
-        escapeCode = code === END_CODE ? void 0 : code;
-      } else if (groups?.uri !== void 0) {
-        escapeUrl = groups.uri.length === 0 ? void 0 : groups.uri;
-      }
-    }
-    if (preString[i + 1] === "\n") {
-      if (escapeUrl) {
-        returnValue += wrapAnsiHyperlink("");
-      }
-      const closingCode = escapeCode ? getClosingCode(escapeCode) : void 0;
-      if (escapeCode && closingCode) {
-        returnValue += wrapAnsiCode(closingCode);
-      }
-    } else if (character === "\n") {
-      if (escapeCode && getClosingCode(escapeCode)) {
-        returnValue += wrapAnsiCode(escapeCode);
-      }
-      if (escapeUrl) {
-        returnValue += wrapAnsiHyperlink(escapeUrl);
-      }
-    }
-  }
-  return returnValue;
-};
-var CRLF_OR_LF = /\r?\n/;
-function wrapAnsi(string4, columns, options) {
-  return String(string4).normalize().split(CRLF_OR_LF).map((line) => exec2(line, columns, options)).join("\n");
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/utils.js
-function breakLines(content, width) {
-  return content.split("\n").flatMap((line) => wrapAnsi(line, width, { trim: false, wordWrap: false }).split("\n").map((str) => str.trimEnd())).join("\n");
-}
-function readlineWidth() {
-  return (0, import_cli_width.default)({ defaultWidth: 80, output: readline().output });
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/pagination/use-pagination.js
-function usePointerPosition({ active, renderedItems, pageSize, loop }) {
-  const state = useRef({
-    lastPointer: active,
-    lastActive: void 0
-  });
-  const { lastPointer, lastActive: lastActive2 } = state.current;
-  const middle = Math.floor(pageSize / 2);
-  const renderedLength = renderedItems.reduce((acc, item) => acc + item.length, 0);
-  const defaultPointerPosition = renderedItems.slice(0, active).reduce((acc, item) => acc + item.length, 0);
-  let pointer = defaultPointerPosition;
-  if (renderedLength > pageSize) {
-    if (loop) {
-      pointer = lastPointer;
-      if (
-        // First render, skip this logic.
-        lastActive2 != null && // Only move the pointer down when the user moves down.
-        lastActive2 < active && // Check user didn't move up across page boundary.
-        active - lastActive2 < pageSize
-      ) {
-        pointer = Math.min(
-          // Furthest allowed position for the pointer is the middle of the list
-          middle,
-          Math.abs(active - lastActive2) === 1 ? Math.min(
-            // Move the pointer at most the height of the last active item.
-            lastPointer + (renderedItems[lastActive2]?.length ?? 0),
-            // If the user moved by one item, move the pointer to the natural position of the active item as
-            // long as it doesn't move the cursor up.
-            Math.max(defaultPointerPosition, lastPointer)
-          ) : (
-            // Otherwise, move the pointer down by the difference between the active and last active item.
-            lastPointer + active - lastActive2
-          )
-        );
-      }
-    } else {
-      const spaceUnderActive = renderedItems.slice(active).reduce((acc, item) => acc + item.length, 0);
-      pointer = spaceUnderActive < pageSize - middle ? (
-        // If the active item is near the end of the list, progressively move the cursor towards the end.
-        pageSize - spaceUnderActive
-      ) : (
-        // Otherwise, progressively move the pointer to the middle of the list.
-        Math.min(defaultPointerPosition, middle)
-      );
-    }
-  }
-  state.current.lastPointer = pointer;
-  state.current.lastActive = active;
-  return pointer;
-}
-function usePagination({ items, active, renderItem, pageSize, loop = true }) {
-  const width = readlineWidth();
-  const bound = (num) => (num % items.length + items.length) % items.length;
-  const renderedItems = items.map((item, index) => {
-    if (item == null)
-      return [];
-    return breakLines(renderItem({ item, index, isActive: index === active }), width).split("\n");
-  });
-  const renderedLength = renderedItems.reduce((acc, item) => acc + item.length, 0);
-  const renderItemAtIndex = (index) => renderedItems[index] ?? [];
-  const pointer = usePointerPosition({ active, renderedItems, pageSize, loop });
-  const activeItem = renderItemAtIndex(active).slice(0, pageSize);
-  const activeItemPosition = pointer + activeItem.length <= pageSize ? pointer : pageSize - activeItem.length;
-  const pageBuffer = Array.from({ length: pageSize });
-  pageBuffer.splice(activeItemPosition, activeItem.length, ...activeItem);
-  const itemVisited = /* @__PURE__ */ new Set([active]);
-  let bufferPointer = activeItemPosition + activeItem.length;
-  let itemPointer = bound(active + 1);
-  while (bufferPointer < pageSize && !itemVisited.has(itemPointer) && (loop && renderedLength > pageSize ? itemPointer !== active : itemPointer > active)) {
-    const lines = renderItemAtIndex(itemPointer);
-    const linesToAdd = lines.slice(0, pageSize - bufferPointer);
-    pageBuffer.splice(bufferPointer, linesToAdd.length, ...linesToAdd);
-    itemVisited.add(itemPointer);
-    bufferPointer += linesToAdd.length;
-    itemPointer = bound(itemPointer + 1);
-  }
-  bufferPointer = activeItemPosition - 1;
-  itemPointer = bound(active - 1);
-  while (bufferPointer >= 0 && !itemVisited.has(itemPointer) && (loop && renderedLength > pageSize ? itemPointer !== active : itemPointer < active)) {
-    const lines = renderItemAtIndex(itemPointer);
-    const linesToAdd = lines.slice(Math.max(0, lines.length - bufferPointer - 1));
-    pageBuffer.splice(bufferPointer - linesToAdd.length + 1, linesToAdd.length, ...linesToAdd);
-    itemVisited.add(itemPointer);
-    bufferPointer -= linesToAdd.length;
-    itemPointer = bound(itemPointer - 1);
-  }
-  return pageBuffer.filter((line) => typeof line === "string").join("\n");
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/create-prompt.js
-import * as readline2 from "readline";
-import { AsyncResource as AsyncResource3 } from "async_hooks";
-
-// ../../node_modules/@inquirer/type/dist/utils.js
-function withResolver() {
-  let resolve5;
-  let reject;
-  const promise2 = new Promise((res, rej) => {
-    resolve5 = res;
-    reject = rej;
-  });
-  return { promise: promise2, resolve: resolve5, reject };
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/create-prompt.js
-var import_mute_stream = __toESM(require_lib2(), 1);
-
-// ../../node_modules/signal-exit/dist/mjs/signals.js
-var signals = [];
-signals.push("SIGHUP", "SIGINT", "SIGTERM");
-if (process.platform !== "win32") {
-  signals.push(
-    "SIGALRM",
-    "SIGABRT",
-    "SIGVTALRM",
-    "SIGXCPU",
-    "SIGXFSZ",
-    "SIGUSR2",
-    "SIGTRAP",
-    "SIGSYS",
-    "SIGQUIT",
-    "SIGIOT"
-    // should detect profiler and enable/disable accordingly.
-    // see #21
-    // 'SIGPROF'
-  );
-}
-if (process.platform === "linux") {
-  signals.push("SIGIO", "SIGPOLL", "SIGPWR", "SIGSTKFLT");
-}
-
-// ../../node_modules/signal-exit/dist/mjs/index.js
-var processOk = (process4) => !!process4 && typeof process4 === "object" && typeof process4.removeListener === "function" && typeof process4.emit === "function" && typeof process4.reallyExit === "function" && typeof process4.listeners === "function" && typeof process4.kill === "function" && typeof process4.pid === "number" && typeof process4.on === "function";
-var kExitEmitter = /* @__PURE__ */ Symbol.for("signal-exit emitter");
-var global2 = globalThis;
-var ObjectDefineProperty = Object.defineProperty.bind(Object);
-var Emitter = class {
-  emitted = {
-    afterExit: false,
-    exit: false
-  };
-  listeners = {
-    afterExit: [],
-    exit: []
-  };
-  count = 0;
-  id = Math.random();
-  constructor() {
-    if (global2[kExitEmitter]) {
-      return global2[kExitEmitter];
-    }
-    ObjectDefineProperty(global2, kExitEmitter, {
-      value: this,
-      writable: false,
-      enumerable: false,
-      configurable: false
-    });
-  }
-  on(ev, fn) {
-    this.listeners[ev].push(fn);
-  }
-  removeListener(ev, fn) {
-    const list = this.listeners[ev];
-    const i = list.indexOf(fn);
-    if (i === -1) {
-      return;
-    }
-    if (i === 0 && list.length === 1) {
-      list.length = 0;
-    } else {
-      list.splice(i, 1);
-    }
-  }
-  emit(ev, code, signal) {
-    if (this.emitted[ev]) {
-      return false;
-    }
-    this.emitted[ev] = true;
-    let ret = false;
-    for (const fn of this.listeners[ev]) {
-      ret = fn(code, signal) === true || ret;
-    }
-    if (ev === "exit") {
-      ret = this.emit("afterExit", code, signal) || ret;
-    }
-    return ret;
-  }
-};
-var SignalExitBase = class {
-};
-var signalExitWrap = (handler) => {
-  return {
-    onExit(cb, opts) {
-      return handler.onExit(cb, opts);
-    },
-    load() {
-      return handler.load();
-    },
-    unload() {
-      return handler.unload();
-    }
-  };
-};
-var SignalExitFallback = class extends SignalExitBase {
-  onExit() {
-    return () => {
-    };
-  }
-  load() {
-  }
-  unload() {
-  }
-};
-var SignalExit = class extends SignalExitBase {
-  // "SIGHUP" throws an `ENOSYS` error on Windows,
-  // so use a supported signal instead
-  /* c8 ignore start */
-  #hupSig = process3.platform === "win32" ? "SIGINT" : "SIGHUP";
-  /* c8 ignore stop */
-  #emitter = new Emitter();
-  #process;
-  #originalProcessEmit;
-  #originalProcessReallyExit;
-  #sigListeners = {};
-  #loaded = false;
-  constructor(process4) {
-    super();
-    this.#process = process4;
-    this.#sigListeners = {};
-    for (const sig of signals) {
-      this.#sigListeners[sig] = () => {
-        const listeners = this.#process.listeners(sig);
-        let { count } = this.#emitter;
-        const p = process4;
-        if (typeof p.__signal_exit_emitter__ === "object" && typeof p.__signal_exit_emitter__.count === "number") {
-          count += p.__signal_exit_emitter__.count;
-        }
-        if (listeners.length === count) {
-          this.unload();
-          const ret = this.#emitter.emit("exit", null, sig);
-          const s = sig === "SIGHUP" ? this.#hupSig : sig;
-          if (!ret)
-            process4.kill(process4.pid, s);
-        }
-      };
-    }
-    this.#originalProcessReallyExit = process4.reallyExit;
-    this.#originalProcessEmit = process4.emit;
-  }
-  onExit(cb, opts) {
-    if (!processOk(this.#process)) {
-      return () => {
-      };
-    }
-    if (this.#loaded === false) {
-      this.load();
-    }
-    const ev = opts?.alwaysLast ? "afterExit" : "exit";
-    this.#emitter.on(ev, cb);
-    return () => {
-      this.#emitter.removeListener(ev, cb);
-      if (this.#emitter.listeners["exit"].length === 0 && this.#emitter.listeners["afterExit"].length === 0) {
-        this.unload();
-      }
-    };
-  }
-  load() {
-    if (this.#loaded) {
-      return;
-    }
-    this.#loaded = true;
-    this.#emitter.count += 1;
-    for (const sig of signals) {
-      try {
-        const fn = this.#sigListeners[sig];
-        if (fn)
-          this.#process.on(sig, fn);
-      } catch (_) {
-      }
-    }
-    this.#process.emit = (ev, ...a) => {
-      return this.#processEmit(ev, ...a);
-    };
-    this.#process.reallyExit = (code) => {
-      return this.#processReallyExit(code);
-    };
-  }
-  unload() {
-    if (!this.#loaded) {
-      return;
-    }
-    this.#loaded = false;
-    signals.forEach((sig) => {
-      const listener = this.#sigListeners[sig];
-      if (!listener) {
-        throw new Error("Listener not defined for signal: " + sig);
-      }
-      try {
-        this.#process.removeListener(sig, listener);
-      } catch (_) {
-      }
-    });
-    this.#process.emit = this.#originalProcessEmit;
-    this.#process.reallyExit = this.#originalProcessReallyExit;
-    this.#emitter.count -= 1;
-  }
-  #processReallyExit(code) {
-    if (!processOk(this.#process)) {
-      return 0;
-    }
-    this.#process.exitCode = code || 0;
-    this.#emitter.emit("exit", this.#process.exitCode, null);
-    return this.#originalProcessReallyExit.call(this.#process, this.#process.exitCode);
-  }
-  #processEmit(ev, ...args) {
-    const og = this.#originalProcessEmit;
-    if (ev === "exit" && processOk(this.#process)) {
-      if (typeof args[0] === "number") {
-        this.#process.exitCode = args[0];
-      }
-      const ret = og.call(this.#process, ev, ...args);
-      this.#emitter.emit("exit", this.#process.exitCode, null);
-      return ret;
-    } else {
-      return og.call(this.#process, ev, ...args);
-    }
-  }
-};
-var process3 = globalThis.process;
-var {
-  /**
-   * Called when the process is exiting, whether via signal, explicit
-   * exit, or running out of stuff to do.
-   *
-   * If the global process object is not suitable for instrumentation,
-   * then this will be a no-op.
-   *
-   * Returns a function that may be used to unload signal-exit.
-   */
-  onExit,
-  /**
-   * Load the listeners.  Likely you never need to call this, unless
-   * doing a rather deep integration with signal-exit functionality.
-   * Mostly exposed for the benefit of testing.
-   *
-   * @internal
-   */
-  load: load2,
-  /**
-   * Unload the listeners.  Likely you never need to call this, unless
-   * doing a rather deep integration with signal-exit functionality.
-   * Mostly exposed for the benefit of testing.
-   *
-   * @internal
-   */
-  unload
-} = signalExitWrap(processOk(process3) ? new SignalExit(process3) : new SignalExitFallback());
-
-// ../../node_modules/@inquirer/core/dist/lib/screen-manager.js
-import { stripVTControlCharacters } from "util";
-
-// ../../node_modules/@inquirer/ansi/dist/index.js
-var ESC2 = "\x1B[";
-var cursorLeft = ESC2 + "G";
-var cursorHide = ESC2 + "?25l";
-var cursorShow = ESC2 + "?25h";
-var cursorUp = (rows = 1) => rows > 0 ? `${ESC2}${rows}A` : "";
-var cursorDown = (rows = 1) => rows > 0 ? `${ESC2}${rows}B` : "";
-var cursorTo = (x, y) => {
-  if (typeof y === "number" && !Number.isNaN(y)) {
-    return `${ESC2}${y + 1};${x + 1}H`;
-  }
-  return `${ESC2}${x + 1}G`;
-};
-var eraseLine = ESC2 + "2K";
-var eraseLines = (lines) => lines > 0 ? (eraseLine + cursorUp(1)).repeat(lines - 1) + eraseLine + cursorLeft : "";
-
-// ../../node_modules/@inquirer/core/dist/lib/screen-manager.js
-var height = (content) => content.split("\n").length;
-var lastLine = (content) => content.split("\n").pop() ?? "";
-var ScreenManager = class {
-  // These variables are keeping information to allow correct prompt re-rendering
-  height = 0;
-  extraLinesUnderPrompt = 0;
-  cursorPos;
-  rl;
-  constructor(rl) {
-    this.rl = rl;
-    this.cursorPos = rl.getCursorPos();
-  }
-  write(content) {
-    this.rl.output.unmute();
-    this.rl.output.write(content);
-    this.rl.output.mute();
-  }
-  render(content, bottomContent = "") {
-    const promptLine = lastLine(content);
-    const rawPromptLine = stripVTControlCharacters(promptLine);
-    let prompt = rawPromptLine;
-    if (this.rl.line.length > 0) {
-      prompt = prompt.slice(0, -this.rl.line.length);
-    }
-    this.rl.setPrompt(prompt);
-    this.cursorPos = this.rl.getCursorPos();
-    const width = readlineWidth();
-    content = breakLines(content, width);
-    bottomContent = breakLines(bottomContent, width);
-    if (rawPromptLine.length % width === 0) {
-      content += "\n";
-    }
-    let output2 = content + (bottomContent ? "\n" + bottomContent : "");
-    const promptLineUpDiff = Math.floor(rawPromptLine.length / width) - this.cursorPos.rows;
-    const bottomContentHeight = promptLineUpDiff + (bottomContent ? height(bottomContent) : 0);
-    if (bottomContentHeight > 0)
-      output2 += cursorUp(bottomContentHeight);
-    output2 += cursorTo(this.cursorPos.cols);
-    this.write(cursorDown(this.extraLinesUnderPrompt) + eraseLines(this.height) + output2);
-    this.extraLinesUnderPrompt = bottomContentHeight;
-    this.height = height(output2);
-  }
-  checkCursorPos() {
-    const cursorPos = this.rl.getCursorPos();
-    if (cursorPos.cols !== this.cursorPos.cols) {
-      this.write(cursorTo(cursorPos.cols));
-      this.cursorPos = cursorPos;
-    }
-  }
-  done({ clearContent }) {
-    this.rl.setPrompt("");
-    let output2 = cursorDown(this.extraLinesUnderPrompt);
-    output2 += clearContent ? eraseLines(this.height) : "\n";
-    output2 += cursorLeft;
-    output2 += cursorShow;
-    this.write(output2);
-    this.rl.close();
-  }
-};
-
-// ../../node_modules/@inquirer/core/dist/lib/create-prompt.js
-import path2 from "path";
-var nativeSetImmediate = globalThis.setImmediate;
-var nativeClearImmediate = globalThis.clearImmediate;
-function listenTo(target, event, listener) {
-  if ("on" in target) {
-    target.on(event, listener);
-    return () => target.removeListener(event, listener);
-  }
-  target.addEventListener(event, listener);
-  return () => target.removeEventListener(event, listener);
-}
-function getCallSites() {
-  const savedPrepareStackTrace = Error.prepareStackTrace;
-  let result = [];
-  try {
-    Error.prepareStackTrace = (_, callSites) => {
-      const callSitesWithoutCurrent = callSites.slice(1);
-      result = callSitesWithoutCurrent;
-      return callSitesWithoutCurrent;
-    };
-    new Error().stack;
-  } catch {
-    return result;
-  }
-  Error.prepareStackTrace = savedPrepareStackTrace;
-  return result;
-}
-function createPrompt(view) {
-  const callSites = getCallSites();
-  const prompt = (config2, context = {}) => {
-    const { input: input2 = process.stdin, signal } = context;
-    const cleanups = /* @__PURE__ */ new Set();
-    const output2 = new import_mute_stream.default();
-    output2.pipe(context.output ?? process.stdout);
-    const rl = readline2.createInterface({
-      terminal: true,
-      input: input2,
-      output: output2
-    });
-    output2.mute();
-    const screen = new ScreenManager(rl);
-    const { promise: promise2, resolve: resolve5, reject } = withResolver();
-    return withHooks(rl, (cycle) => {
-      const clearEffects = AsyncResource3.bind(() => effectScheduler.clearAll());
-      const settlePrompt = (settle2) => {
-        try {
-          clearEffects();
-          settle2();
-        } catch (error62) {
-          reject(error62);
-        }
-      };
-      const resolvePrompt = (value) => settlePrompt(() => resolve5(value));
-      const rejectPrompt = (error62) => settlePrompt(() => reject(error62));
-      const promptPromise = Object.assign(promise2.finally(() => {
-        cleanups.forEach((cleanup) => cleanup());
-        screen.done({ clearContent: Boolean(context.clearPromptOnDone) });
-        output2.end();
-      }).then(() => promise2), { cancel: () => rejectPrompt(new CancelPromptError()) });
-      if (signal) {
-        const abort = () => rejectPrompt(new AbortPromptError({ cause: signal.reason }));
-        if (signal.aborted) {
-          abort();
-          return promptPromise;
-        }
-        cleanups.add(listenTo(signal, "abort", abort));
-      }
-      cleanups.add(onExit((code, signal2) => {
-        rejectPrompt(new ExitPromptError(`User force closed the prompt with ${code} ${signal2}`));
-      }));
-      cleanups.add(listenTo(rl, "SIGINT", () => rejectPrompt(new ExitPromptError(`User force closed the prompt with SIGINT`))));
-      cleanups.add(listenTo(rl, "close", clearEffects));
-      const startCycle = () => {
-        cleanups.add(listenTo(rl.input, "keypress", () => screen.checkCursorPos()));
-        let pendingDone = null;
-        cycle(() => {
-          let effectsSettled = false;
-          try {
-            const nextView = view(config2, (value) => {
-              if (effectsSettled) {
-                resolvePrompt(value);
-              } else {
-                pendingDone = { value };
-              }
-            });
-            if (nextView === void 0) {
-              let callerFilename = callSites[1]?.getFileName();
-              if (callerFilename && !callerFilename.startsWith("file://")) {
-                callerFilename = path2.resolve(callerFilename);
-              }
-              throw new Error(`Prompt functions must return a string.
-    at ${callerFilename}`);
-            }
-            const [content, bottomContent] = typeof nextView === "string" ? [nextView] : nextView;
-            screen.render(content, bottomContent);
-            effectScheduler.run();
-          } catch (error62) {
-            rejectPrompt(error62);
-          }
-          effectsSettled = true;
-          if (pendingDone !== null) {
-            const { value } = pendingDone;
-            pendingDone = null;
-            resolvePrompt(value);
-          }
-        });
-      };
-      if ("readableFlowing" in input2 && input2.isTTY) {
-        const immediate = nativeSetImmediate(startCycle);
-        cleanups.add(() => nativeClearImmediate(immediate));
-      } else {
-        startCycle();
-      }
-      return promptPromise;
-    });
-  };
-  return prompt;
-}
-
-// ../../node_modules/@inquirer/core/dist/lib/Separator.js
-import { styleText as styleText2 } from "util";
-var Separator = class {
-  separator = styleText2("dim", Array.from({ length: 15 }).join(dist_default.line));
-  type = "separator";
-  constructor(separator) {
-    if (separator) {
-      this.separator = separator;
-    }
-  }
-  static isSeparator(choice) {
-    return Boolean(choice && typeof choice === "object" && "type" in choice && choice.type === "separator");
-  }
-};
-
-// ../../node_modules/@inquirer/confirm/dist/index.js
-import { styleText as styleText3 } from "util";
-var confirmTheme = {
-  keywords: {
-    yes: "Yes",
-    no: "No",
-    error: ({ yes, no }) => `You must answer with "${yes}" or "${no}"`
-  },
-  style: {
-    confirmDefault: (text) => {
-      const first = text[0] ?? "";
-      if (first.toLowerCase() === first.toUpperCase()) {
-        return styleText3("cyan", text);
-      }
-      return first.toUpperCase() + text.slice(1);
-    }
-  }
-};
-var dist_default4 = createPrompt((config2, done) => {
-  const [status, setStatus] = useState("idle");
-  const [value, setValue] = useState("");
-  const [errorMsg, setError] = useState();
-  const theme = makeTheme(confirmTheme, config2.theme);
-  const prefix = usePrefix({ status, theme });
-  const { yes, no } = theme.keywords;
-  const yesHint = (yes[0] ?? "").toLowerCase();
-  const noHint = (no[0] ?? "").toLowerCase();
-  const hint = config2.default === false ? `${yesHint}/${theme.style.confirmDefault(noHint)}` : `${theme.style.confirmDefault(yesHint)}/${noHint}`;
-  function boolToString(value2) {
-    return value2 ? yes : no;
-  }
-  const { transformer = boolToString } = config2;
-  function getBooleanValue(value2) {
-    const v = value2.trim().toLowerCase();
-    if (v === "")
-      return config2.default !== false;
-    if (yes.toLowerCase().startsWith(v))
-      return true;
-    if (no.toLowerCase().startsWith(v))
-      return false;
-    if ("yes".startsWith(v))
-      return true;
-    if ("no".startsWith(v))
-      return false;
-    return void 0;
-  }
-  useKeypress((key, rl) => {
-    if (status !== "idle")
-      return;
-    if (isEnterKey(key)) {
-      const answer = getBooleanValue(value);
-      if (answer === void 0) {
-        rl.write(value);
-        setError(theme.keywords.error({ yes, no }));
-        return;
-      }
-      setValue(transformer(answer));
-      setStatus("done");
-      done(answer);
-    } else if (isTabKey(key)) {
-      const answer = boolToString(!(getBooleanValue(value) ?? config2.default !== false));
-      rl.clearLine(0);
-      rl.write(answer);
-      setValue(answer);
-    } else {
-      setValue(rl.line);
-      setError(void 0);
-    }
-  });
-  let formattedValue = value;
-  let defaultValue = "";
-  if (status === "done") {
-    formattedValue = theme.style.answer(value);
-  } else {
-    defaultValue = ` ${theme.style.defaultAnswer(hint)}`;
-  }
-  const message = theme.style.message(config2.message, status);
-  let error62 = "";
-  if (errorMsg) {
-    error62 = theme.style.error(errorMsg);
-  }
-  return [`${prefix} ${message}${defaultValue} ${formattedValue}`, error62];
-});
-
-// ../../node_modules/@inquirer/input/dist/index.js
-var inputTheme = {
-  validationFailureMode: "keep"
-};
-var dist_default5 = createPrompt((config2, done) => {
-  const { prefill = "tab" } = config2;
-  const theme = makeTheme(inputTheme, config2.theme);
-  const [status, setStatus] = useState("idle");
-  const [defaultValue, setDefaultValue] = useState(String(config2.default ?? ""));
-  const [errorMsg, setError] = useState();
-  const [value, setValue] = useState("");
-  const prefix = usePrefix({ status, theme });
-  async function validate2(value2) {
-    const { required: required2, pattern, patternError = "Invalid input" } = config2;
-    if (required2 && !value2) {
-      return "You must provide a value";
-    }
-    if (pattern && !pattern.test(value2)) {
-      return patternError;
-    }
-    if (typeof config2.validate === "function") {
-      return await config2.validate(value2) || "You must provide a valid value";
-    }
-    return true;
-  }
-  useKeypress(async (key, rl) => {
-    if (status !== "idle") {
-      return;
-    }
-    if (isEnterKey(key)) {
-      const answer = value || defaultValue;
-      setStatus("loading");
-      const isValid = await validate2(answer);
-      if (isValid === true) {
-        setValue(answer);
-        setStatus("done");
-        done(answer);
-      } else {
-        if (theme.validationFailureMode === "clear") {
-          setValue("");
-        } else {
-          rl.write(value);
-        }
-        setError(isValid);
-        setStatus("idle");
-      }
-    } else if (isBackspaceKey(key) && !value) {
-      setDefaultValue("");
-    } else if (isTabKey(key) && !value) {
-      setDefaultValue("");
-      rl.clearLine(0);
-      rl.write(defaultValue);
-      setValue(defaultValue);
-    } else {
-      setValue(rl.line);
-      setError(void 0);
-    }
-  });
-  useEffect((rl) => {
-    if (prefill === "editable" && defaultValue) {
-      rl.write(defaultValue);
-      setValue(defaultValue);
-    }
-  }, []);
-  const message = theme.style.message(config2.message, status);
-  let formattedValue = value;
-  if (typeof config2.transformer === "function") {
-    formattedValue = config2.transformer(value, { isFinal: status === "done" });
-  } else if (status === "done") {
-    formattedValue = theme.style.answer(value);
-  }
-  let defaultStr;
-  if (defaultValue && status !== "done" && !value) {
-    defaultStr = theme.style.defaultAnswer(defaultValue);
-  }
-  let error62 = "";
-  if (errorMsg) {
-    error62 = theme.style.error(errorMsg);
-  }
-  return [
-    [prefix, message, defaultStr, formattedValue].filter((v) => v !== void 0).join(" "),
-    error62
-  ];
-});
-
-// ../../node_modules/@inquirer/select/dist/index.js
-import { styleText as styleText4 } from "util";
-var selectTheme = {
-  icon: { cursor: dist_default.pointer },
-  style: {
-    disabled: (text) => styleText4("dim", text),
-    description: (text) => styleText4("cyan", text),
-    keysHelpTip: (keys) => keys.map(([key, action]) => `${styleText4("bold", key)} ${styleText4("dim", action)}`).join(styleText4("dim", " \u2022 "))
-  },
-  i18n: { disabledError: "This option is disabled and cannot be selected." },
-  indexMode: "hidden"
-};
-function isSelectable(item) {
-  return !Separator.isSeparator(item) && !item.disabled;
-}
-function isNavigable(item) {
-  return !Separator.isSeparator(item);
-}
-function normalizeChoices(choices) {
-  return choices.map((choice) => {
-    if (Separator.isSeparator(choice))
-      return choice;
-    if (typeof choice !== "object" || choice === null || !("value" in choice)) {
-      const name2 = String(choice);
-      return {
-        value: choice,
-        name: name2,
-        short: name2,
-        disabled: false
-      };
-    }
-    const name = choice.name ?? String(choice.value);
-    const normalizedChoice = {
-      value: choice.value,
-      name,
-      short: choice.short ?? name,
-      disabled: choice.disabled ?? false
-    };
-    if (choice.description) {
-      normalizedChoice.description = choice.description;
-    }
-    return normalizedChoice;
-  });
-}
-var dist_default6 = createPrompt((config2, done) => {
-  const { loop = true, pageSize = 7 } = config2;
-  const theme = makeTheme(selectTheme, config2.theme);
-  const { keybindings: keybindings2 } = theme;
-  const [status, setStatus] = useState("idle");
-  const prefix = usePrefix({ status, theme });
-  const searchTimeoutRef = useRef();
-  const searchEnabled = !keybindings2.includes("vim");
-  const items = useMemo(() => normalizeChoices(config2.choices), [config2.choices]);
-  const bounds = useMemo(() => {
-    const first = items.findIndex(isNavigable);
-    const last = items.findLastIndex(isNavigable);
-    if (first === -1) {
-      throw new ValidationError("[select prompt] No selectable choices. All choices are disabled.");
-    }
-    return { first, last };
-  }, [items]);
-  const defaultItemIndex = useMemo(() => {
-    if (!("default" in config2))
-      return -1;
-    return items.findIndex((item) => isSelectable(item) && item.value === config2.default);
-  }, [config2.default, items]);
-  const [active, setActive] = useState(defaultItemIndex === -1 ? bounds.first : defaultItemIndex);
-  const selectedChoice = items[active];
-  if (selectedChoice == null || Separator.isSeparator(selectedChoice)) {
-    throw new Error("Active index does not point to a choice");
-  }
-  const [errorMsg, setError] = useState();
-  useKeypress((key, rl) => {
-    clearTimeout(searchTimeoutRef.current);
-    if (errorMsg) {
-      setError(void 0);
-    }
-    if (isEnterKey(key)) {
-      if (selectedChoice.disabled) {
-        setError(theme.i18n.disabledError);
-      } else {
-        setStatus("done");
-        done(selectedChoice.value);
-      }
-    } else if (isUpKey(key, keybindings2) || isDownKey(key, keybindings2)) {
-      rl.clearLine(0);
-      if (loop || isUpKey(key, keybindings2) && active !== bounds.first || isDownKey(key, keybindings2) && active !== bounds.last) {
-        const offset = isUpKey(key, keybindings2) ? -1 : 1;
-        let next = active;
-        do {
-          next = (next + offset + items.length) % items.length;
-        } while (!isNavigable(items[next]));
-        setActive(next);
-      }
-    } else if (isNumberKey(key) && !Number.isNaN(Number(rl.line))) {
-      const selectedIndex = Number(rl.line) - 1;
-      let selectableIndex = -1;
-      const position = items.findIndex((item2) => {
-        if (Separator.isSeparator(item2))
-          return false;
-        selectableIndex++;
-        return selectableIndex === selectedIndex;
-      });
-      const item = items[position];
-      if (item != null && isSelectable(item)) {
-        setActive(position);
-      }
-      searchTimeoutRef.current = setTimeout(() => {
-        rl.clearLine(0);
-      }, 700);
-    } else if (isBackspaceKey(key)) {
-      rl.clearLine(0);
-    } else if (searchEnabled) {
-      const searchTerm = rl.line.toLowerCase();
-      const matchIndex = items.findIndex((item) => {
-        if (Separator.isSeparator(item) || !isSelectable(item))
-          return false;
-        return item.name.toLowerCase().startsWith(searchTerm);
-      });
-      if (matchIndex !== -1) {
-        setActive(matchIndex);
-      }
-      searchTimeoutRef.current = setTimeout(() => {
-        rl.clearLine(0);
-      }, 700);
-    }
-  });
-  useEffect(() => () => {
-    clearTimeout(searchTimeoutRef.current);
-  }, []);
-  const message = theme.style.message(config2.message, status);
-  const helpLine = theme.style.keysHelpTip([
-    ["\u2191\u2193", "navigate"],
-    ["\u23CE", "select"]
-  ]);
-  let separatorCount = 0;
-  const page = usePagination({
-    items,
-    active,
-    renderItem({ item, isActive: isActive2, index }) {
-      if (Separator.isSeparator(item)) {
-        separatorCount++;
-        return ` ${item.separator}`;
-      }
-      const cursor = isActive2 ? theme.icon.cursor : " ";
-      const indexLabel = theme.indexMode === "number" ? `${index + 1 - separatorCount}. ` : "";
-      if (item.disabled) {
-        const disabledLabel = typeof item.disabled === "string" ? item.disabled : "(disabled)";
-        const disabledCursor = isActive2 ? theme.icon.cursor : "-";
-        return theme.style.disabled(`${disabledCursor} ${indexLabel}${item.name} ${disabledLabel}`);
-      }
-      const color = isActive2 ? theme.style.highlight : (x) => x;
-      return color(`${cursor} ${indexLabel}${item.name}`);
-    },
-    pageSize,
-    loop
-  });
-  if (status === "done") {
-    return [prefix, message, theme.style.answer(selectedChoice.short)].filter(Boolean).join(" ");
-  }
-  const { description } = selectedChoice;
-  const lines = [
-    [prefix, message].filter(Boolean).join(" "),
-    page,
-    " ",
-    description ? theme.style.description(description) : "",
-    errorMsg ? theme.style.error(errorMsg) : "",
-    helpLine
-  ].filter(Boolean).join("\n").trimEnd();
-  return `${lines}${cursorHide}`;
-});
-
-// src/io.ts
-var CliError = class extends Error {
-};
-var inquirerPrompter = {
-  select: (message, choices, fallback) => dist_default6({ message, choices, default: fallback }),
-  input: (message, fallback) => dist_default5({ message, default: fallback }),
-  confirm: (message, fallback) => dist_default4({ message, default: fallback })
-};
-var defaultsPrompter = {
-  select: async (_m, _c, fallback) => fallback,
-  input: async (_m, fallback) => fallback,
-  confirm: async (_m, fallback) => fallback
-};
-function processIo(interactive) {
-  return {
-    prompt: interactive ? inquirerPrompter : defaultsPrompter,
-    out: (line) => process.stdout.write(`${line}
-`),
-    warn: (line) => process.stderr.write(`warning: ${line}
-`),
-    env: process.env,
-    now: () => (/* @__PURE__ */ new Date()).toISOString()
-  };
-}
-function exitOnClosedPipe(stream = process.stdout, exit = process.exit) {
-  stream.on("error", (err) => {
-    if (err.code === "EPIPE") exit(0);
-    else throw err;
-  });
-}
-
 // src/store/events.ts
-import { appendFile as appendFile3, mkdir as mkdir6, readFile as readFile9 } from "fs/promises";
-import { dirname as dirname9 } from "path";
+import { appendFile as appendFile4, mkdir as mkdir7, readFile as readFile11 } from "fs/promises";
+import { dirname as dirname11 } from "path";
 
 // src/schema/events.ts
 var SessionEvent = external_exports.object({
@@ -30071,7 +31717,7 @@ var SessionEvent = external_exports.object({
 async function readEvents(root, sessionId) {
   let text;
   try {
-    text = await readFile9(projectPaths(root).events(sessionId), "utf8");
+    text = await readFile11(projectPaths(root).events(sessionId), "utf8");
   } catch (err) {
     const code = err.code;
     if (code === "ENOENT" || code === "ENOTDIR") return [];
@@ -30094,8 +31740,8 @@ async function readEvents(root, sessionId) {
 async function appendEvents(root, sessionId, events) {
   if (events.length === 0) return 0;
   const file2 = projectPaths(root).events(sessionId);
-  await mkdir6(dirname9(file2), { recursive: true });
-  await appendFile3(file2, `${events.map((event) => JSON.stringify(event)).join("\n")}
+  await mkdir7(dirname11(file2), { recursive: true });
+  await appendFile4(file2, `${events.map((event) => JSON.stringify(event)).join("\n")}
 `);
   return events.length;
 }
@@ -30159,8 +31805,8 @@ function seedEvents(nodes, at) {
 
 // src/thought.ts
 import { execFile as execFile2 } from "child_process";
-import { access as access2, realpath as realpath2 } from "fs/promises";
-import { isAbsolute as isAbsolute3, relative as relative4, resolve as resolve3 } from "path";
+import { access as access3, realpath as realpath2 } from "fs/promises";
+import { isAbsolute as isAbsolute3, relative as relative6, resolve as resolve4 } from "path";
 import { promisify as promisify2 } from "util";
 
 // src/session-git.ts
@@ -30185,13 +31831,13 @@ var THOUGHT_LINE = new RegExp(`^[ \\t]*${THOUGHT_TRAILER}:[ \\t]*(h[0-9a-f]{12})
 var COMMIT_MARK = "";
 var LOG_MAX_BUFFER = 256 * 1024 * 1024;
 async function readable(path3) {
-  return access2(path3).then(
+  return access3(path3).then(
     () => true,
     () => false
   );
 }
 function messagePath(file2) {
-  return isAbsolute3(file2) ? file2 : resolve3(process.cwd(), file2);
+  return isAbsolute3(file2) ? file2 : resolve4(process.cwd(), file2);
 }
 async function sessionRunsIn(agent, transcript, dir) {
   const cwd = await agent.readSessionCwd(transcript);
@@ -30199,13 +31845,13 @@ async function sessionRunsIn(agent, transcript, dir) {
   const session = await realOrSame(cwd);
   for (const place of [dir, process.cwd()]) {
     const root = await realOrSame(await findGitRoot(place) ?? place);
-    const inside = relative4(root, session);
-    if (inside === "" || !inside.startsWith("..") && !isAbsolute3(inside)) return true;
+    const inside2 = relative6(root, session);
+    if (inside2 === "" || !inside2.startsWith("..") && !isAbsolute3(inside2)) return true;
   }
   return false;
 }
 async function realOrSame(path3) {
-  return realpath2(path3).catch(() => resolve3(path3));
+  return realpath2(path3).catch(() => resolve4(path3));
 }
 async function newestThought(agent, transcript, sessionId) {
   const turns = await agent.readConversation(transcript);
@@ -30233,7 +31879,7 @@ async function replayingCommits(dir, env) {
     return false;
   }
   const states = ["rebase-merge", "rebase-apply", "CHERRY_PICK_HEAD"];
-  const found = await Promise.all(states.map((state) => readable(resolve3(gitDir, state))));
+  const found = await Promise.all(states.map((state) => readable(resolve4(gitDir, state))));
   return found.includes(true);
 }
 async function addThoughtTrailer(opts) {
@@ -30241,9 +31887,12 @@ async function addThoughtTrailer(opts) {
   if (captureDisabled(env)) return false;
   if (opts.source === "merge" || opts.source === "squash") return false;
   if (await replayingCommits(opts.dir, env)) return false;
-  const agent = defaultAgent();
-  const named = (env[agent.commitSessionEnv] ?? "").trim();
-  if (named !== "") {
+  const naming = Object.values(AGENTS).find(
+    (agent) => (env[agent.commitSessionEnv] ?? "").trim() !== ""
+  );
+  if (naming !== void 0) {
+    const agent = naming;
+    const named = (env[agent.commitSessionEnv] ?? "").trim();
     const transcript2 = await agent.findTranscript(named, env);
     if (transcript2 === null) return false;
     if (!await sessionRunsIn(agent, transcript2, opts.dir)) return false;
@@ -30252,7 +31901,7 @@ async function addThoughtTrailer(opts) {
     await writeTrailer(opts.messageFile, value2);
     return true;
   }
-  const root = resolve3(opts.dir);
+  const root = resolve4(opts.dir);
   const head = await readSessionHead(root);
   if (head === void 0 || head.at === void 0) return false;
   const written = Date.parse(head.at);
@@ -30260,9 +31909,9 @@ async function addThoughtTrailer(opts) {
   const config2 = await loadConfig(env);
   const age = (opts.now ?? /* @__PURE__ */ new Date()).getTime() - written;
   if (age > config2.trailerMaxAgeHours * 36e5 || age < -5 * 6e4) return false;
-  const transcript = head.transcriptPath !== void 0 && await readable(head.transcriptPath) ? head.transcriptPath : await agent.findTranscript(head.sessionId, env);
+  const transcript = head.transcriptPath !== void 0 && await readable(head.transcriptPath) ? head.transcriptPath : (await findSession(head.sessionId, env))?.file ?? null;
   if (transcript === null) return false;
-  const value = await newestThought(agent, transcript, head.sessionId);
+  const value = await newestThought(agentOfTranscript(transcript, env), transcript, head.sessionId);
   if (value === void 0) return false;
   await writeTrailer(opts.messageFile, value);
   return true;
@@ -30404,9 +32053,9 @@ function buildFileHistory(sessions, commitFiles = /* @__PURE__ */ new Map()) {
         }
       }
       const paths = /* @__PURE__ */ new Set([...message.files ?? [], ...fromCommits.keys()]);
-      const unknown2 = commits.filter((hash2) => !commitFiles.has(hash2));
+      const unknown3 = commits.filter((hash2) => !commitFiles.has(hash2));
       for (const path3 of paths) {
-        const touching = [...fromCommits.get(path3) ?? [], ...unknown2];
+        const touching = [...fromCommits.get(path3) ?? [], ...unknown3];
         const hit = {
           sessionId: session.sessionId,
           sessionTitle: sessionTitle2,
@@ -30895,9 +32544,9 @@ function sessionHeading(session) {
   return `## ${title}${author} \xB7 ${stamp(session.startedAt)} \u2192 ${stamp(session.updatedAt)}`;
 }
 function branchLines(branch) {
-  const count = `${branch.count} message${branch.count === 1 ? "" : "s"}`;
+  const count2 = `${branch.count} message${branch.count === 1 ? "" : "s"}`;
   return [
-    `  \u256D ${branch.title}  ${branch.start.label}\u2013${branch.end.label}, ${count}`,
+    `  \u256D ${branch.title}  ${branch.start.label}\u2013${branch.end.label}, ${count2}`,
     `    asked: ${branch.asked}`,
     `    outcome: ${branch.outcome}`,
     `    open: ${branch.open === "" ? "\u2014" : branch.open}`
@@ -30914,21 +32563,21 @@ function messageLine(message) {
 }
 function formatLog(model, branchesOnly = false) {
   if (model.sessions.length === 0) return ["No recorded sessions yet."];
-  const lines = [];
+  const lines2 = [];
   for (const session of model.sessions) {
-    lines.push(sessionHeading(session));
+    lines2.push(sessionHeading(session));
     if (branchesOnly) {
-      if (session.branches.length === 0) lines.push("  (no branch summaries)");
-      for (const branch of session.branches) lines.push(...branchLines(branch));
+      if (session.branches.length === 0) lines2.push("  (no branch summaries)");
+      for (const branch of session.branches) lines2.push(...branchLines(branch));
     } else if (session.messages.length === 0) {
-      lines.push("  (no recorded messages)");
+      lines2.push("  (no recorded messages)");
     } else {
-      for (const message of session.messages) lines.push(messageLine(message));
+      for (const message of session.messages) lines2.push(messageLine(message));
     }
-    lines.push("");
+    lines2.push("");
   }
-  lines.pop();
-  return lines;
+  lines2.pop();
+  return lines2;
 }
 var HASH_REF = /^h[0-9a-f]{6,12}$/;
 var SESSION_LABEL_REF = /^([A-Za-z0-9][A-Za-z0-9_.-]{0,127}):m([1-9][0-9]*)$/;
@@ -31120,69 +32769,69 @@ function refText(ref, selfSessionId) {
 }
 function formatShow(model) {
   const title = oneLine2(model.sessionTitle) || model.sessionId;
-  const lines = [
+  const lines2 = [
     `${model.id}  ${model.label}  ${model.title}`,
     `Session: ${title} (${model.sessionId}) \xB7 ${stamp(model.at)}`
   ];
-  if (model.parent !== null) lines.push(`Parent: ${refText(model.parent, model.sessionId)}`);
+  if (model.parent !== null) lines2.push(`Parent: ${refText(model.parent, model.sessionId)}`);
   if (model.children.length > 0)
-    lines.push(
+    lines2.push(
       `Children: ${model.children.map((ref) => refText(ref, model.sessionId)).join(", ")}`
     );
   if (model.links.length > 0)
-    lines.push(`Returns to: ${model.links.map((ref) => refText(ref, model.sessionId)).join(", ")}`);
+    lines2.push(`Returns to: ${model.links.map((ref) => refText(ref, model.sessionId)).join(", ")}`);
   if (model.branch !== null) {
-    const count = `${model.branch.count} message${model.branch.count === 1 ? "" : "s"}`;
-    lines.push(
-      `Branch: ${model.branch.title} (${model.branch.start.label}\u2013${model.branch.end.label}, ${count})`
+    const count2 = `${model.branch.count} message${model.branch.count === 1 ? "" : "s"}`;
+    lines2.push(
+      `Branch: ${model.branch.title} (${model.branch.start.label}\u2013${model.branch.end.label}, ${count2})`
     );
-    lines.push(`  asked: ${model.branch.asked}`);
-    lines.push(`  outcome: ${model.branch.outcome}`);
-    lines.push(`  open: ${model.branch.open === "" ? "\u2014" : model.branch.open}`);
+    lines2.push(`  asked: ${model.branch.asked}`);
+    lines2.push(`  outcome: ${model.branch.outcome}`);
+    lines2.push(`  open: ${model.branch.open === "" ? "\u2014" : model.branch.open}`);
   }
-  if (model.decidedBy !== void 0) lines.push(`Decided by: ${model.decidedBy}`);
-  if (model.why !== void 0) lines.push(`Why: ${model.why}`);
+  if (model.decidedBy !== void 0) lines2.push(`Decided by: ${model.decidedBy}`);
+  if (model.why !== void 0) lines2.push(`Why: ${model.why}`);
   if (model.alternatives !== void 0 && model.alternatives.length > 0) {
-    lines.push("Considered and rejected:");
+    lines2.push("Considered and rejected:");
     for (const alt of model.alternatives)
-      lines.push(`  - ${alt.option}${alt.why === "" ? "" : ` \u2014 ${alt.why}`}`);
+      lines2.push(`  - ${alt.option}${alt.why === "" ? "" : ` \u2014 ${alt.why}`}`);
   }
   if (model.agentDecisions !== void 0 && model.agentDecisions.length > 0) {
-    lines.push("Agent decisions:");
+    lines2.push("Agent decisions:");
     for (const decision of model.agentDecisions) {
-      lines.push(`  - ${decision.title}${decision.why === "" ? "" : ` \u2014 ${decision.why}`}`);
+      lines2.push(`  - ${decision.title}${decision.why === "" ? "" : ` \u2014 ${decision.why}`}`);
       for (const alt of decision.alternatives ?? [])
-        lines.push(`    not: ${alt.option}${alt.why === "" ? "" : ` \u2014 ${alt.why}`}`);
+        lines2.push(`    not: ${alt.option}${alt.why === "" ? "" : ` \u2014 ${alt.why}`}`);
     }
   }
   if (model.work !== void 0 && model.work.length > 0) {
-    lines.push("What the agent did:");
-    for (const item of model.work) lines.push(`  - ${item}`);
+    lines2.push("What the agent did:");
+    for (const item of model.work) lines2.push(`  - ${item}`);
   }
   if (model.commits.length > 0) {
-    lines.push("Commits:");
+    lines2.push("Commits:");
     for (const commit of model.commits)
-      lines.push(
+      lines2.push(
         `  ${commit.hash}${commit.subject === void 0 ? " (not in this repository)" : ` ${commit.subject}`}`
       );
   }
   if (model.files !== void 0 && model.files.length > 0) {
-    lines.push("Files:");
-    for (const file2 of model.files) lines.push(`  ${file2}`);
+    lines2.push("Files:");
+    for (const file2 of model.files) lines2.push(`  ${file2}`);
   }
   if (model.chat === null) {
-    lines.push("Conversation: not available (the transcript is gone and nothing was stored)");
+    lines2.push("Conversation: not available (the transcript is gone and nothing was stored)");
   } else if (model.chat !== void 0) {
-    lines.push("Conversation:");
-    lines.push(`  User: ${model.chat.text}`);
-    for (const reply of model.chat.replies) lines.push(`  Agent: ${reply}`);
+    lines2.push("Conversation:");
+    lines2.push(`  User: ${model.chat.text}`);
+    for (const reply of model.chat.replies) lines2.push(`  Agent: ${reply}`);
     const { commands, files, other } = model.chat.tools;
     const fileText = files.length === 0 ? "" : `, ${files.length} file${files.length === 1 ? "" : "s"}`;
-    lines.push(
+    lines2.push(
       `  Tools: ${commands} command${commands === 1 ? "" : "s"}${fileText}, ${other} other`
     );
   }
-  return lines;
+  return lines2;
 }
 async function log(opts) {
   const root = await openProject(opts.dir);
@@ -31199,8 +32848,8 @@ function normalizeFilePath(file2) {
   return file2.replace(/\\/g, "/").replace(/^(\.\/)+/, "").replace(/\/+$/, "");
 }
 function formatFileHistory(file2) {
-  const count = `${file2.count} message${file2.count === 1 ? "" : "s"}`;
-  const lines = [`${file2.path}  ${count}  (newest first)`];
+  const count2 = `${file2.count} message${file2.count === 1 ? "" : "s"}`;
+  const lines2 = [`${file2.path}  ${count2}  (newest first)`];
   for (const hit of file2.hits) {
     const parts = [
       `  ${stamp(hit.at)}  ${shortHash(hit.messageId)}  ${hit.label}  ${oneLine2(hit.title)}`
@@ -31209,9 +32858,9 @@ function formatFileHistory(file2) {
     if (hit.branch !== void 0) parts.push(` \u256D ${oneLine2(hit.branch)}`);
     if (hit.commits.length > 0)
       parts.push(`  [${hit.commits.map((hash2) => hash2.slice(0, 7)).join(" ")}]`);
-    lines.push(parts.join(""));
+    lines2.push(parts.join(""));
   }
-  return lines;
+  return lines2;
 }
 async function logFile(opts) {
   const root = await openProject(opts.dir);
@@ -31245,11 +32894,11 @@ async function logFile(opts) {
 }
 
 // src/record-sync.ts
-import { spawn as spawn2 } from "child_process";
-import { createHash as createHash3 } from "crypto";
+import { spawn as spawn3 } from "child_process";
+import { createHash as createHash4 } from "crypto";
 import { existsSync as existsSync3 } from "fs";
-import { rm as rm4, stat as stat10 } from "fs/promises";
-import { relative as relative5, sep as sep4 } from "path";
+import { rm as rm4, stat as stat11 } from "fs/promises";
+import { relative as relative7, sep as sep5 } from "path";
 import { setTimeout as sleep2 } from "timers/promises";
 var LOCAL = "refs/cogit";
 var TRACKING = "refs/cogit-remote";
@@ -31278,7 +32927,7 @@ var SyncState = external_exports.object({
 });
 function runGit(root, args, env, input2) {
   return new Promise((done) => {
-    const child = spawn2("git", ["-C", root, ...args], {
+    const child = spawn3("git", ["-C", root, ...args], {
       env,
       stdio: [input2 === void 0 ? "ignore" : "pipe", "pipe", "pipe"]
     });
@@ -31305,8 +32954,8 @@ function quietEnv(env) {
   return { ...env, GIT_TERMINAL_PROMPT: "0", SSH_ASKPASS_REQUIRE: "never" };
 }
 function gitError(text) {
-  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "");
-  const reason = lines.find((line) => line.startsWith("fatal:")) ?? lines.find((line) => line.startsWith("error:")) ?? lines.at(-1) ?? "git failed";
+  const lines2 = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "");
+  const reason = lines2.find((line) => line.startsWith("fatal:")) ?? lines2.find((line) => line.startsWith("error:")) ?? lines2.at(-1) ?? "git failed";
   return reason.slice(0, 300);
 }
 function parseGitVersion(text) {
@@ -31332,9 +32981,9 @@ async function syncRemote(root, env) {
 }
 async function sessionScope(root) {
   const gitRoot = await findGitRoot(root);
-  const prefix = gitRoot === void 0 ? "" : relative5(gitRoot, root).split(sep4).join("/");
+  const prefix = gitRoot === void 0 ? "" : relative7(gitRoot, root).split(sep5).join("/");
   if (prefix === "") return "sessions";
-  return `projects/${createHash3("sha256").update(prefix).digest("hex").slice(0, 16)}/sessions`;
+  return `projects/${createHash4("sha256").update(prefix).digest("hex").slice(0, 16)}/sessions`;
 }
 async function listRefs(root, base, scope, env) {
   const result = await runGit(
@@ -31384,7 +33033,7 @@ async function sessionFiles(root, id, conversations) {
 async function stampOf(files, conversations) {
   const parts = [conversations ? "c" : "-"];
   for (const [name, path3] of files) {
-    const info = await stat10(path3);
+    const info = await stat11(path3);
     parts.push(`${name}:${info.mtimeMs}:${info.size}`);
   }
   return parts.join("|");
@@ -31617,7 +33266,7 @@ async function downloadRecords(root, env, showProgress = false) {
 var REF_LINE = /^(From | .* -> )/;
 function fetchWithProgress(root, args, env) {
   return new Promise((done) => {
-    const child = spawn2("git", ["-C", root, ...args], {
+    const child = spawn3("git", ["-C", root, ...args], {
       env,
       stdio: ["inherit", "inherit", "pipe"]
     });
@@ -31844,13 +33493,13 @@ async function sessionStartOutput(ctx) {
     const config3 = await loadConfig(ctx.env);
     if (config3.setupHintOff.includes(ctx.root)) return void 0;
     if (await findGitRoot(ctx.root) === void 0) return void 0;
-    return additionalContext2(ctx, setupHint(ctx));
+    return additionalContext3(ctx, setupHint(ctx));
   }
   await retryUnclosed(ctx).catch(() => void 0);
   await syncRecordsAtStart(ctx).catch(() => void 0);
   const config2 = await loadConfig(ctx.env);
   if (!config2.startupContext) return void 0;
-  return additionalContext2(ctx, await startupContext(ctx));
+  return additionalContext3(ctx, await startupContext(ctx));
 }
 async function syncRecordsAtStart(ctx) {
   if (!await isSharing(ctx.root)) return;
@@ -31864,7 +33513,7 @@ async function syncRecordsAtStart(ctx) {
   await reconcileRecords(ctx.root, ctx.env);
   if (status.pending > 0) ctx.spawnDetached(["record-sync", "send", "-C", ctx.root]);
 }
-function additionalContext2(ctx, text) {
+function additionalContext3(ctx, text) {
   return ctx.agent.additionalContext("SessionStart", text);
 }
 async function compactRequest(ctx) {
@@ -31879,7 +33528,7 @@ async function compactRequest(ctx) {
     recorded = new Set(applyEvents(upgraded.nodes, events).map((node2) => node2.id));
   }
   if (messages2.every((message) => isRecorded(recorded, message))) return void 0;
-  return additionalContext2(ctx, COMPACT_REQUEST);
+  return additionalContext3(ctx, compactRequestText(ctx.agent.skill));
 }
 function oneLine3(text) {
   return text.replace(/\s+/g, " ").trim();
@@ -31922,23 +33571,23 @@ function composeStartupContext(header, session, branches) {
 }
 function statusLines(session) {
   const title = session.title.trim() === "" ? session.sessionId : clip(oneLine3(session.title), 120);
-  const lines = [`Earlier session: ${title} (${session.sessionId})`];
+  const lines2 = [`Earlier session: ${title} (${session.sessionId})`];
   const { goal, pending, next } = session.status;
-  if (goal.trim() !== "") lines.push(`  goal: ${clip(oneLine3(goal), 400)}`);
+  if (goal.trim() !== "") lines2.push(`  goal: ${clip(oneLine3(goal), 400)}`);
   const shown = pending.slice(0, 5);
   for (const item of shown) {
     const needsUser = item.needsUser ? " (needs the user)" : "";
-    lines.push(`  pending: ${clip(oneLine3(item.text), 200)}${needsUser}`);
+    lines2.push(`  pending: ${clip(oneLine3(item.text), 200)}${needsUser}`);
   }
   if (pending.length > shown.length)
-    lines.push(`  pending: \u2026 ${pending.length - shown.length} more`);
-  if (next.trim() !== "") lines.push(`  next: ${clip(oneLine3(next), 400)}`);
-  return lines;
+    lines2.push(`  pending: \u2026 ${pending.length - shown.length} more`);
+  if (next.trim() !== "") lines2.push(`  next: ${clip(oneLine3(next), 400)}`);
+  return lines2;
 }
 function branchLines2(branch) {
-  const count = `${branch.count} message${branch.count === 1 ? "" : "s"}`;
+  const count2 = `${branch.count} message${branch.count === 1 ? "" : "s"}`;
   return [
-    `  \u256D ${clip(oneLine3(branch.title), 80)}  ${branch.start.label}\u2013${branch.end.label}, ${count}`,
+    `  \u256D ${clip(oneLine3(branch.title), 80)}  ${branch.start.label}\u2013${branch.end.label}, ${count2}`,
     `    asked: ${clip(oneLine3(branch.asked), 300)}`,
     `    outcome: ${clip(oneLine3(branch.outcome), 600)}`,
     `    open: ${branch.open.trim() === "" ? "\u2014" : clip(oneLine3(branch.open), 300)}`
@@ -32011,7 +33660,7 @@ async function onStop(ctx) {
     },
     { timeoutMs: 2e3 }
   );
-  if (ctx.agent.isHeadless(ctx.env) && config2.sessionEndCatchUp) {
+  if (ctx.headless && config2.sessionEndCatchUp) {
     const review = config2.recorder === "mixed" ? ["--review"] : [];
     await markClosePending(root, sessionId, ctx.now);
     await ctx.runAndWait(["backfill", sessionId, "--tail", "--close", ...review, "-C", root]);
@@ -32019,15 +33668,15 @@ async function onStop(ctx) {
   }
   if (side) ctx.spawnDetached(["backfill", sessionId, "--tail", "-C", root]);
   if (!request) return void 0;
-  return ctx.agent.additionalContext("Stop", UPDATE_REQUEST);
+  return ctx.agent.additionalContext("Stop", updateRequestText(ctx.agent.skill));
 }
 
 // src/hooks/run.ts
 function lineageCacheDir() {
-  return join12(tmpdir2(), "cogit-headless");
+  return join16(tmpdir2(), "cogit-headless");
 }
 function rememberedLineage(dir, sessionId, read) {
-  const file2 = join12(dir, sessionId);
+  const file2 = join16(dir, sessionId);
   try {
     const kept = JSON.parse(readFileSync2(file2, "utf8"));
     if (kept === "unknown") return void 0;
@@ -32058,11 +33707,11 @@ var HANDLERS = {
   sessionend: onSessionEnd,
   promptsubmit: onPromptSubmit
 };
-var HOOK_EVENTS = Object.keys(HANDLERS);
+var HOOK_EVENTS2 = Object.keys(HANDLERS);
 var LOG_LIMIT = 256 * 1024;
 function openLog(log2, args) {
   try {
-    mkdirSync(dirname10(log2), { recursive: true });
+    mkdirSync(dirname12(log2), { recursive: true });
     let flag = "a";
     try {
       if (statSync2(log2).size > LOG_LIMIT) flag = "w";
@@ -32081,13 +33730,13 @@ var RUN_AND_WAIT_LIMIT_MS = 9 * 6e4;
 function runAndWaitProcess(cli2, args, env, log2, limit = RUN_AND_WAIT_LIMIT_MS) {
   const fd = log2 === void 0 ? void 0 : openLog(log2, args);
   const out = fd ?? "ignore";
-  return new Promise((resolve5) => {
+  return new Promise((resolve6) => {
     const done = () => {
       clearTimeout(timer);
       if (fd !== void 0) closeSync(fd);
-      resolve5();
+      resolve6();
     };
-    const child = spawn3(process.execPath, [cli2, ...args], {
+    const child = spawn4(process.execPath, [cli2, ...args], {
       stdio: ["ignore", out, out],
       env: { ...env, COGIT_DISABLE: "1" }
     });
@@ -32100,7 +33749,7 @@ function spawnDetachedProcess(cli2, args, env, log2) {
   const fd = log2 === void 0 ? void 0 : openLog(log2, args);
   const out = fd ?? "ignore";
   try {
-    spawn3(process.execPath, [cli2, ...args], {
+    spawn4(process.execPath, [cli2, ...args], {
       detached: true,
       stdio: ["ignore", out, out],
       env: { ...env, COGIT_DISABLE: "1" }
@@ -32114,7 +33763,11 @@ async function runHook(event, stdin, env, now, debug2, deps = {}) {
     if (captureDisabled(env)) return void 0;
     const handler = HANDLERS[event];
     if (!handler) return void 0;
-    const agent = defaultAgent();
+    const agent = deps.agent === void 0 ? defaultAgent() : AGENTS[deps.agent];
+    if (agent === void 0) {
+      debug2(`cogit ${event} hook: unknown agent ${deps.agent}`);
+      return void 0;
+    }
     const input2 = agent.parseHookInput(stdin);
     if (input2 === void 0) {
       debug2(`cogit ${event} hook: unreadable hook input`);
@@ -32125,7 +33778,8 @@ async function runHook(event, stdin, env, now, debug2, deps = {}) {
       await agent.markLive(input2.session_id).catch((err) => debug2(`cogit mark: ${err.message}`));
     const { recordHeadless } = await loadConfig(env);
     const lineage = deps.sessionLineage ?? (() => rememberedLineage(lineageCacheDir(), input2.session_id, () => agent.sessionLineage()));
-    if (agent.isHeadless(env) && !recordsHeadless(recordHeadless, env, lineage)) return void 0;
+    const headless = await agent.isHeadless(env, input2);
+    if (headless && !recordsHeadless(recordHeadless, env, lineage)) return void 0;
     if (handler === onSessionStart && recordHeadless)
       await agent.markChildren(env, lineage()?.own).catch((err) => debug2(`cogit mark: ${err.message}`));
     const { root } = await resolveProjectRoot(env[agent.projectDirEnv] ?? input2.cwd ?? ".");
@@ -32138,6 +33792,7 @@ async function runHook(event, stdin, env, now, debug2, deps = {}) {
       input: input2,
       sessionId: input2.session_id,
       root,
+      headless,
       initialized,
       env,
       now,
@@ -32196,16 +33851,16 @@ function hookBlock(event, projectRoot, cliPath = currentCliPath() ?? null) {
 }
 function cogitCall(event, projectRoot, cliPath, pipe2, indent) {
   const args = `hook ${event} --dir ${shellQuote(projectRoot)} "$@"`;
-  const lines = ["if command -v cogit >/dev/null 2>&1; then", `  ${pipe2}cogit ${args} || true`];
+  const lines2 = ["if command -v cogit >/dev/null 2>&1; then", `  ${pipe2}cogit ${args} || true`];
   if (cliPath !== null) {
     const cli2 = shellQuote(cliPath);
-    lines.push(
+    lines2.push(
       `elif command -v node >/dev/null 2>&1 && [ -f ${cli2} ]; then`,
       `  ${pipe2}node ${cli2} ${args} || true`
     );
   }
-  lines.push("fi");
-  return lines.map((line) => `${indent}${line}`);
+  lines2.push("fi");
+  return lines2.map((line) => `${indent}${line}`);
 }
 function hookCommandLine(event, projectRoot) {
   return hookBlock(event, projectRoot, null).split("\n").find((line) => line.includes("cogit hook ")) ?? "";
@@ -32246,13 +33901,13 @@ async function installGitHook(root, event) {
   if (gitRoot === void 0) return false;
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return false;
-  await mkdir7(dir, { recursive: true });
-  const file2 = join13(dir, event);
-  const exists = await stat11(file2).then(
+  await mkdir8(dir, { recursive: true });
+  const file2 = join17(dir, event);
+  const exists = await stat12(file2).then(
     () => true,
     () => false
   );
-  const current = exists ? await readFile10(file2, "utf8") : "";
+  const current = exists ? await readFile12(file2, "utf8") : "";
   if (!isShellHook(current)) return false;
   const next = withHookBlock(current, hookBlock(event, root));
   if (exists && next === current) return false;
@@ -32279,7 +33934,7 @@ async function refreshGitHooks(root) {
   const dir = await gitHooksDir(gitRoot);
   if (dir === void 0) return [];
   const refreshed = [];
-  const hasBlock = async (event) => (await readFile10(join13(dir, event), "utf8").catch(() => void 0) ?? "").includes(BLOCK_START);
+  const hasBlock = async (event) => (await readFile12(join17(dir, event), "utf8").catch(() => void 0) ?? "").includes(BLOCK_START);
   const installed = !existsSync5(projectPaths(root).hooksOff) || await hasBlock("prepare-commit-msg");
   for (const event of GIT_HOOK_EVENTS) {
     if (!installed && !await hasBlock(event)) continue;
@@ -32297,7 +33952,7 @@ async function uninstallGitHooks(root) {
   const removed = await removeHookBlocks(dir, GIT_HOOK_EVENTS);
   const paths = projectPaths(root);
   if (existsSync5(paths.project)) {
-    await mkdir7(dirname11(paths.hooksOff), { recursive: true });
+    await mkdir8(dirname13(paths.hooksOff), { recursive: true });
     await atomicWrite(paths.hooksOff, `${(/* @__PURE__ */ new Date()).toISOString()}
 `);
   }
@@ -32306,8 +33961,8 @@ async function uninstallGitHooks(root) {
 async function removeHookBlocks(dir, events) {
   const removed = [];
   for (const event of events) {
-    const file2 = join13(dir, event);
-    const current = await readFile10(file2, "utf8").catch(() => void 0);
+    const file2 = join17(dir, event);
+    const current = await readFile12(file2, "utf8").catch(() => void 0);
     if (current === void 0 || !current.includes(BLOCK_START)) continue;
     const next = withoutHookBlock(current);
     if (onlyGeneratedShebang(next)) await rm5(file2, { force: true });
@@ -32317,12 +33972,12 @@ async function removeHookBlocks(dir, events) {
   return removed;
 }
 var NO_OBJECT = /^0+$/;
-async function sendWithPush(dir, env, pushedRemote, pushedRefs, spawn4, dryRun) {
+async function sendWithPush(dir, env, pushedRemote, pushedRefs, spawn5, dryRun) {
   if (captureDisabled(env)) return;
   if (dryRun()) return;
-  const lines = pushedRefs.split("\n").filter(Boolean);
-  const going = lines.map((line) => line.split(" ")).find((part) => !NO_OBJECT.test(part[1] ?? "0"));
-  if (lines.length > 0 && going === void 0) return;
+  const lines2 = pushedRefs.split("\n").filter(Boolean);
+  const going = lines2.map((line) => line.split(" ")).find((part) => !NO_OBJECT.test(part[1] ?? "0"));
+  if (lines2.length > 0 && going === void 0) return;
   const unsent = await countUnsentRecords(dir, env, pushedRemote);
   if (unsent === 0) return;
   const cli2 = currentCliPath();
@@ -32332,14 +33987,14 @@ async function sendWithPush(dir, env, pushedRemote, pushedRefs, spawn4, dryRun) 
 `
   );
   const after = going === void 0 ? [] : ["--after", `${going[2]}=${going[1]}`];
-  spawn4(
+  spawn5(
     cli2,
     ["record-sync", "send-pushed", ...after, "-C", dir],
     env,
     projectPaths(dir).detachedLog
   );
 }
-async function queueShape(dir, env, spawn4) {
+async function queueShape(dir, env, spawn5) {
   if (captureDisabled(env)) return;
   const config2 = await loadConfig(env).catch(() => void 0);
   if (config2 === void 0 || !config2.shapes || config2.recorder === "agent") return;
@@ -32349,13 +34004,13 @@ async function queueShape(dir, env, spawn4) {
   if (commit === void 0) return;
   const cli2 = currentCliPath();
   if (cli2 === void 0) return;
-  spawn4(cli2, ["shape", "--commit", commit, "-C", dir], env, projectPaths(dir).detachedLog);
+  spawn5(cli2, ["shape", "--commit", commit, "-C", dir], env, projectPaths(dir).detachedLog);
 }
 var GIT_REPO_ENV = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"];
 async function commonDir(cwd, env) {
   try {
     const { stdout } = await execGit(["rev-parse", "--git-common-dir"], { cwd, env });
-    const dir = resolve4(cwd, String(stdout).trim());
+    const dir = resolve5(cwd, String(stdout).trim());
     return await realpath3(dir).catch(() => dir);
   } catch {
     return void 0;
@@ -32371,14 +34026,14 @@ async function sameRepository(hookCwd, dir) {
   ]);
   return here === void 0 || project === void 0 || here === project;
 }
-async function runGitHook(event, dir, env = process.env, args = [], now = /* @__PURE__ */ new Date(), spawn4 = spawnDetachedProcess, pushedRefs = async () => "", dryRun = pushIsDryRun, hookCwd) {
+async function runGitHook(event, dir, env = process.env, args = [], now = /* @__PURE__ */ new Date(), spawn5 = spawnDetachedProcess, pushedRefs = async () => "", dryRun = pushIsDryRun, hookCwd) {
   if (hookCwd !== void 0 && !await sameRepository(hookCwd, dir)) return;
   if (event === "pre-push") {
-    await sendWithPush(dir, env, args[0], await pushedRefs(), spawn4, dryRun);
+    await sendWithPush(dir, env, args[0], await pushedRefs(), spawn5, dryRun);
     return;
   }
   if (event === "post-commit") {
-    await queueShape(dir, env, spawn4);
+    await queueShape(dir, env, spawn5);
     return;
   }
   const [messageFile, source] = args;
@@ -32399,18 +34054,26 @@ export {
   exitOnClosedPipe,
   package_default,
   external_exports,
+  projectPaths,
+  globalPaths,
+  readSpend,
   isDirectory,
   atomicWrite,
   atomicWriteJson,
   readJson,
+  compareVersions,
+  versionNotice,
+  AGENTS,
   defaultAgent,
+  agentNamed,
+  agentOfTranscript,
+  findSession,
+  collectAllTranscripts,
   Slug,
   IsoDate,
   parseMessageRef,
   STATE_SCHEMA,
   HookState,
-  projectPaths,
-  globalPaths,
   Config,
   SESSION_SCHEMA,
   MESSAGE_ID,
@@ -32467,8 +34130,6 @@ export {
   gitUserEmail,
   commitBetween,
   gitHooksDir,
-  compareVersions,
-  versionNotice,
   readSessionHead,
   readThoughtTrailers,
   readCommitThought,
@@ -32535,3 +34196,42 @@ export {
   migrateGlobal,
   resolveProjectRoot
 };
+/*! Bundled license information:
+
+smol-toml/dist/error.js:
+smol-toml/dist/primitive.js:
+smol-toml/dist/date.js:
+smol-toml/dist/extract.js:
+smol-toml/dist/util.js:
+smol-toml/dist/struct.js:
+smol-toml/dist/parse.js:
+smol-toml/dist/stringify.js:
+smol-toml/dist/index.js:
+  (*!
+   * Copyright (c) Squirrel Chat et al., All rights reserved.
+   * SPDX-License-Identifier: BSD-3-Clause
+   *
+   * Redistribution and use in source and binary forms, with or without
+   * modification, are permitted provided that the following conditions are met:
+   *
+   * 1. Redistributions of source code must retain the above copyright notice, this
+   *    list of conditions and the following disclaimer.
+   * 2. Redistributions in binary form must reproduce the above copyright notice,
+   *    this list of conditions and the following disclaimer in the
+   *    documentation and/or other materials provided with the distribution.
+   * 3. Neither the name of the copyright holder nor the names of its contributors
+   *    may be used to endorse or promote products derived from this software without
+   *    specific prior written permission.
+   *
+   * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+   * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+   * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+   * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+   * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+   * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+   * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+   * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+   * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+   *)
+*/

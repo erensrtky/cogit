@@ -37,8 +37,8 @@ One JSON object:
 
 - `sessionId`: always `"${CLAUDE_SESSION_ID}"`.
 - `title`: a few words; on the first write or when the focus changed.
-- `status`: replaces all four fields, so send each: `goal` (one sentence), `done` (what
-  finished, as outcomes), `pending` (the work still open, one item per ask in the user's
+- `status`: replaces all four fields, so send each: `goal` (one sentence), `done` (a list of
+  what finished, as outcomes), `pending` (the work still open, one item per ask in the user's
   words — never a checklist of commands; a release and the restart it needs are one item, and
   a step that serves nothing is dropped; `{ "text", "needsUser": true }` when it waits on the
   user), `next` (concrete step).
@@ -63,7 +63,8 @@ transcript is unreadable: send only `status`.
   run (which tool or agent does it, this chat or a new one, when to post or release). `"agreed"` needs the user approving the proposal in this message;
   a proposal the user has not answered is not a decision.
 - Your work belongs to the message that caused it: `work`, `agentDecisions`
-  (`{ "title", "why", "alternatives" }`), `commits` (short hashes), `files` (a few paths).
+  (`{ "title", "why", "alternatives" }`), `commits` (short hashes), `files` (a few paths);
+  `work`, `commits` and `files` are lists of strings.
   Work spanning messages goes on the one it ended in; update an earlier node only to correct it.
 
 ## What the side model recorded
@@ -161,7 +162,7 @@ language; the CLI validates each output and keeps an invalid output as text.
 ## Branch summary
 
 A branch starts at a root or where a message gets a second child. Its first message carries a
-short `branch`: `{ "title", "asked", "outcome", "open" }`. Write it when the branch ends or
+short `branch`: `{ "title", "asked", "outcome", "open" }`, each one string (`open` too, not a list). Write it when the branch ends or
 with the status at session end, not every turn. New records send no `phase`, `step`,
 `decision` or `question` nodes; old ones keep rendering, leave them alone.
 
