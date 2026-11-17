@@ -45,7 +45,7 @@
     "prepack": "npm --prefix ../.. run build && node ../../scripts/copy-docs.mjs"
   },
   "devDependencies": {
-    "@inquirer/prompts": "^8.7.5",
+    "@inquirer/prompts": "^8.8.0",
     "@secretlint/core": "^13.1.0",
     "@secretlint/secretlint-rule-preset-recommend": "^13.1.0",
     "commander": "^15.1.0",
