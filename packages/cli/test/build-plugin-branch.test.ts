@@ -2,9 +2,17 @@ import { execFileSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-// @ts-expect-error plain ESM script without types
-import { run, stagePlugin, writePluginBranch } from "../../../scripts/build-plugin-branch.mjs";
+import {
+  AGENT_FOLDERS,
+  run,
+  stagePlugin,
+  writePluginBranch,
+  // @ts-expect-error plain ESM script without types
+} from "../../../scripts/build-plugin-branch.mjs";
+import { AGENTS } from "../src/agents/index.js";
 import { tempDir } from "./helpers.js";
+
+const folders = AGENT_FOLDERS as Record<string, { dir: string; files: string[] }>;
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -55,6 +63,17 @@ describe("build-plugin-branch", () => {
       ".codex-plugin/plugin.json",
       "LICENSE",
       "README.md",
+      "claude/.claude-plugin/plugin.json",
+      "claude/LICENSE",
+      "claude/README.md",
+      "claude/dist/cli.js",
+      "claude/hooks/hooks.json",
+      "claude/skills/record/SKILL.md",
+      "codex/.codex-plugin/plugin.json",
+      "codex/LICENSE",
+      "codex/README.md",
+      "codex/dist/cli.js",
+      "codex/hooks/codex.json",
       "dist/cli.js",
       "hooks/codex.json",
       "hooks/hooks.json",
@@ -78,5 +97,36 @@ describe("build-plugin-branch", () => {
 
     run((line: string) => lines.push(line), root);
     expect(lines[1]).toBe(`plugin: v1.2.3 unchanged at ${next.commit.slice(0, 7)}`);
+  });
+
+  it("gives every agent cogit records a folder of its own on the branch", () => {
+    // A new agent in src/agents needs a row in AGENT_FOLDERS before it can be installed.
+    expect(Object.keys(folders).sort()).toEqual(Object.keys(AGENTS).sort());
+    const dirs = Object.values(folders).map((agent) => agent.dir);
+    expect(new Set(dirs).size).toBe(dirs.length);
+  });
+
+  it("puts in each agent's folder its own manifest and hooks and none of another's", async () => {
+    const root = await builtRepo();
+    writePluginBranch(root);
+    const tree = git(root, "ls-tree", "-r", "--name-only", "plugin").split("\n");
+    for (const [id, { dir, files }] of Object.entries(folders)) {
+      const inFolder = tree.filter((path) => path.startsWith(`${dir}/`));
+      // The folder alone is a whole plugin: the CLI it runs, its manifest and its hooks.
+      expect(inFolder, id).toContain(`${dir}/dist/cli.js`);
+      for (const rel of files)
+        expect(
+          inFolder.some((path) => path.startsWith(`${dir}/${rel}`)),
+          `${id}: ${rel}`,
+        ).toBe(true);
+      for (const [other, theirs] of Object.entries(folders)) {
+        if (other === id) continue;
+        for (const rel of theirs.files.filter((file) => !files.includes(file)))
+          expect(
+            inFolder.some((path) => path.startsWith(`${dir}/${rel}`)),
+            `${id}: ${rel}`,
+          ).toBe(false);
+      }
+    }
   });
 });

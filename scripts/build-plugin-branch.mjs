@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Both marketplaces install the plugin from the `plugin` branch: only what Claude Code and Codex load,
-// built, with no source. main keeps dist/ out of git, so this writes the branch with git
+// Every agent's marketplace installs the plugin from the `plugin` branch: only what the agents
+// load, built, with no source, one folder per agent (AGENT_FOLDERS). main keeps dist/ out of git, so this writes the branch with git
 // plumbing (a private index, no checkout) after `npm run build`. The release Action runs it on
 // every v* tag; run it by hand to create the branch the first time.
 import { execFileSync } from "node:child_process";
@@ -9,25 +9,54 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** What the branch holds, relative to packages/cli; README and LICENSE come from the root. */
-export const PLUGIN_FILES = [
-  ".claude-plugin/plugin.json",
-  ".codex-plugin/plugin.json",
-  "dist",
-  "hooks/hooks.json",
-  "hooks/codex.json",
-  "skills",
-];
+/**
+ * Each agent's own folder on the branch, keyed like AGENTS in src/agents: the files that agent
+ * loads, relative to packages/cli, plus SHARED_FILES. Every agent installs the same way, from
+ * this branch with only its folder fetched (a `git-subdir` source), so a new agent gets a row
+ * here; a test fails while one is missing.
+ */
+export const AGENT_FOLDERS = {
+  "claude-code": {
+    dir: "claude",
+    files: [".claude-plugin/plugin.json", "hooks/hooks.json", "skills"],
+    marketplace: ".claude-plugin/marketplace.json",
+  },
+  codex: {
+    dir: "codex",
+    files: [".codex-plugin/plugin.json", "hooks/codex.json"],
+    marketplace: ".agents/plugins/marketplace.json",
+  },
+};
+
+/** The source every agent's marketplace (`marketplace`, from the repository root) lists. */
+export function pluginSource(dir) {
+  return { source: "git-subdir", url: "https://github.com/erensrtky/cogit.git", ref: "plugin", path: dir };
+}
+/** What every agent folder holds besides its own files. */
+export const SHARED_FILES = ["dist"];
 export const ROOT_FILES = ["README.md", "LICENSE"];
+
+/**
+ * What the branch root holds: every agent's files together, as before the folders. Installs
+ * whose marketplace still names the root (no `path`) read it; drop it once those are gone.
+ */
+export const PLUGIN_FILES = [
+  ...new Set([...Object.values(AGENT_FOLDERS).flatMap((agent) => agent.files), ...SHARED_FILES]),
+].sort();
 
 /** Copies the built plugin into `target`; throws when the build is missing. */
 export function stagePlugin(root, target) {
   const pkg = join(root, "packages/cli");
   if (!existsSync(join(pkg, "dist/cli.js")))
     throw new Error("packages/cli/dist/cli.js is missing: run `npm run build` first");
-  for (const rel of PLUGIN_FILES) cpSync(join(pkg, rel), join(target, rel), { recursive: true });
-  for (const rel of ROOT_FILES) cpSync(join(root, rel), join(target, rel));
-  return [...PLUGIN_FILES, ...ROOT_FILES];
+  const copy = (from, to) => cpSync(from, join(target, to), { recursive: true });
+  for (const rel of PLUGIN_FILES) copy(join(pkg, rel), rel);
+  for (const rel of ROOT_FILES) copy(join(root, rel), rel);
+  for (const { dir, files } of Object.values(AGENT_FOLDERS)) {
+    for (const rel of [...files, ...SHARED_FILES]) copy(join(pkg, rel), join(dir, rel));
+    for (const rel of ROOT_FILES) copy(join(root, rel), join(dir, rel));
+  }
+  return [...PLUGIN_FILES, ...ROOT_FILES, ...Object.values(AGENT_FOLDERS).map((agent) => agent.dir)];
 }
 
 /**

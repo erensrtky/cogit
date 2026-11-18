@@ -5,7 +5,12 @@
   "plugins": [
     {
       "name": "cogit",
-      "source": { "source": "github", "repo": "erensrtky/cogit", "ref": "plugin" },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/erensrtky/cogit.git",
+        "ref": "plugin",
+        "path": "claude"
+      },
       "description": "Records what each session decided and why, and renders it as a static map."
     }
   ]

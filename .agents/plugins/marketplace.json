@@ -5,9 +5,10 @@
     {
       "name": "cogit",
       "source": {
-        "source": "url",
+        "source": "git-subdir",
         "url": "https://github.com/erensrtky/cogit.git",
-        "ref": "plugin"
+        "ref": "plugin",
+        "path": "codex"
       },
       "description": "Records what each session decided and why, and renders it as a static map."
     }

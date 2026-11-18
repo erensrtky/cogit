@@ -1,6 +1,10 @@
 import { access, readdir, readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+// @ts-expect-error plain ESM script without types
+import { AGENT_FOLDERS, pluginSource } from "../../../scripts/build-plugin-branch.mjs";
 import { codex } from "../src/agents/codex/index.js";
+
+const folders = AGENT_FOLDERS as Record<string, { dir: string; marketplace: string }>;
 
 const read = async (path: string) =>
   JSON.parse(await readFile(new URL(path, import.meta.url), "utf8")) as Record<string, unknown>;
@@ -71,16 +75,19 @@ describe("plugin packaging", () => {
     expect(hooks.Stop?.[0]?.hooks[0]?.timeout).toBe(600);
   });
 
-  it("lists the plugin for Codex from the same branch, in a source Codex reads", async () => {
-    const marketplace = await read("../../../.agents/plugins/marketplace.json");
-    // Codex skips Claude's `github` source; it looks in .agents/plugins before .claude-plugin.
-    expect(marketplace.name).toBe("cogit");
-    expect(marketplace.plugins).toEqual([
-      expect.objectContaining({
-        name: "cogit",
-        source: { source: "url", url: "https://github.com/erensrtky/cogit.git", ref: "plugin" },
-      }),
-    ]);
+  it("lists the plugin for every agent the same way: the plugin branch, only its own folder", async () => {
+    // One channel for all agents: GitHub, the `plugin` branch (not npm: npm 12 refuses the
+    // tarball URL Claude Code fetches by, EALLOWREMOTE). Each fetches only its folder:
+    // measured 2026-11-18, Codex with the whole repository took 93 s and 34 MB, with
+    // `git-subdir` 6.7 s and 2.2 MB; Claude Code clones it at depth 1. Codex reads
+    // .agents/plugins, Claude Code .claude-plugin.
+    for (const [id, { dir, marketplace: file }] of Object.entries(folders)) {
+      const marketplace = await read(`../../../${file}`);
+      expect(marketplace.name, id).toBe("cogit");
+      expect(marketplace.plugins, id).toEqual([
+        expect.objectContaining({ name: "cogit", source: pluginSource(dir) }),
+      ]);
+    }
   });
 
   it("tells a Codex user the two commands that install from that marketplace", () => {
@@ -90,18 +97,6 @@ describe("plugin packaging", () => {
     expect(codex.installCommand).toBe(
       "codex plugin marketplace add erensrtky/cogit --sparse .agents && codex plugin add cogit@cogit",
     );
-  });
-
-  it("lists the plugin in the marketplace under its manifest name, from the plugin branch", async () => {
-    const marketplace = await read("../../../.claude-plugin/marketplace.json");
-    // Not the npm package: npm 12 refuses the tarball URL Claude Code fetches it by
-    // (EALLOWREMOTE). The branch holds the build; scripts/build-plugin-branch.mjs writes it.
-    expect(marketplace.plugins).toEqual([
-      expect.objectContaining({
-        name: "cogit",
-        source: { source: "github", repo: "erensrtky/cogit", ref: "plugin" },
-      }),
-    ]);
   });
 
   it("carries the npm metadata a publish needs", async () => {

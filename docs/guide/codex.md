@@ -23,7 +23,8 @@ Tested on Linux with Codex CLI 0.167.
 
    `--sparse .agents` makes Codex fetch only the folder that lists the plugin, about 1 MB,
    instead of the whole repository (about 33 MB). Without it, `codex plugin marketplace
-   upgrade` can give up after 30 seconds on a slow connection.
+   upgrade` can give up after 30 seconds on a slow connection. The plugin itself comes the
+   same way: only its Codex folder of the `plugin` branch, about 2 MB.
 
 3. **Trust the hooks.** Start Codex in a project (`codex`). It says that cogit's hooks need
    review; accept them, or trust them later in `/hooks`. Until you do, Codex skips the hooks
