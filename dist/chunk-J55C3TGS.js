@@ -21891,6 +21891,8 @@ function deepMerge(...objects) {
   const output2 = {};
   for (const obj of objects) {
     for (const [key, value] of Object.entries(obj)) {
+      if (value === void 0)
+        continue;
       const prevValue = output2[key];
       output2[key] = isPlainObject2(prevValue) && isPlainObject2(value) ? deepMerge(prevValue, value) : value;
     }
@@ -23064,6 +23066,7 @@ var dist_default5 = createPrompt((config2, done) => {
 
 // ../../node_modules/@inquirer/select/dist/index.js
 import { styleText as styleText4 } from "util";
+var numberLineRegex = /^\d+$/;
 var selectTheme = {
   icon: { cursor: dist_default.pointer },
   style: {
@@ -23156,7 +23159,7 @@ var dist_default6 = createPrompt((config2, done) => {
         } while (!isNavigable(items[next]));
         setActive(next);
       }
-    } else if (isNumberKey(key) && !Number.isNaN(Number(rl.line))) {
+    } else if (isNumberKey(key) && numberLineRegex.test(rl.line)) {
       const selectedIndex = Number(rl.line) - 1;
       let selectableIndex = -1;
       const position = items.findIndex((item2) => {
@@ -25844,7 +25847,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-HZXKENBY.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-WMXYPTL6.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -31665,7 +31668,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "1.5.1",
+  version: "1.5.2",
   description: "Git for the intent behind agent-written code.",
   license: "MIT",
   keywords: [
@@ -31710,7 +31713,7 @@ var package_default = {
     prepack: "npm --prefix ../.. run build && node ../../scripts/copy-docs.mjs"
   },
   devDependencies: {
-    "@inquirer/prompts": "^8.7.5",
+    "@inquirer/prompts": "^8.8.0",
     "@secretlint/core": "^13.1.0",
     "@secretlint/secretlint-rule-preset-recommend": "^13.1.0",
     commander: "^15.1.0",
