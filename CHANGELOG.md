@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.5.2] - 2026-11-19
 ### Changed
 - Installing or updating the plugin fetches only what your agent loads. Codex fetched the whole repository for it (about 34 MB; 93 s on a slow line), now about 2 MB (7 s on the same line); Claude Code also takes only its own folder. Each agent has its own folder on the `plugin` branch, and both marketplaces list it the same way. Nothing to do on your side: the next plugin update moves over.
 - The home page shows cogit's own use in tokens, not dollars: the tokens its background runs used, about how many a message, and apart from them the tokens re-read from cache, the cheapest kind. The dollar figure Claude Code reports for a review run could be far above what its tokens cost, and Codex reports no price at all.
