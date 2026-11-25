@@ -1,5 +1,5 @@
 import { lintSource } from "@secretlint/core";
-import { creator as recommended } from "@secretlint/secretlint-rule-preset-recommend";
+import { presetRecommend as recommended } from "@secretlint/core/builtin";
 
 /**
  * Best-effort secret redaction. The skill already tells the agent not to record
