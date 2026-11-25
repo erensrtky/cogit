@@ -145,11 +145,11 @@ import {
   upgradeSessionIds,
   versionNotice,
   withLock
-} from "./chunk-J55C3TGS.js";
+} from "./chunk-HV5RNR7D.js";
 
 // src/program.ts
 import { existsSync as existsSync4 } from "fs";
-import { dirname as dirname5, resolve as resolve9 } from "path";
+import { dirname as dirname5, resolve as resolve10 } from "path";
 
 // node_modules/commander/lib/error.js
 var CommanderError = class extends Error {
@@ -3525,7 +3525,7 @@ var program = new Command();
 
 // src/commands/build.ts
 import { readdir, stat as stat2 } from "fs/promises";
-import { dirname, resolve as resolve2 } from "path";
+import { dirname, resolve as resolve3 } from "path";
 
 // src/graph/graphify.ts
 import { constants } from "fs";
@@ -4609,6 +4609,7 @@ function time(value) {
 
 // src/commands/pr.ts
 import { execFile, spawn } from "child_process";
+import { resolve as resolve2 } from "path";
 import { promisify } from "util";
 
 // src/view/shape.ts
@@ -5145,12 +5146,12 @@ var CLIPBOARD_TOOLS = [
   ["clip", []]
 ];
 function pipe(command, args, text, env) {
-  return new Promise((resolve10) => {
+  return new Promise((resolve11) => {
     let settled = false;
     const done = (ok) => {
       if (settled) return;
       settled = true;
-      resolve10(ok);
+      resolve11(ok);
     };
     const child = spawn(command, args, { env, stdio: ["pipe", "ignore", "ignore"] });
     child.on("error", () => done(false));
@@ -5228,7 +5229,7 @@ function currentPullRequest(root, io) {
 }
 async function pr(opts) {
   const root = await openProject(opts.dir);
-  const gitRoot = await findGitRoot(root);
+  const gitRoot = await findGitRoot(resolve2(opts.dir));
   if (gitRoot === void 0) throw new CliError("not in a git repository");
   const env = opts.io.env;
   const head = await revParse(gitRoot, "HEAD", env);
@@ -5285,7 +5286,7 @@ async function unrecordedSessions(root, sessions, transcripts, env) {
     if (!name.endsWith(".json")) continue;
     const id = name.slice(0, -".json".length);
     if (known.has(id) || !transcripts.has(id) || !Slug.safeParse(id).success) continue;
-    const info = await stat2(resolve2(dir, name)).catch(() => void 0);
+    const info = await stat2(resolve3(dir, name)).catch(() => void 0);
     if (!info) continue;
     const startedAt = (info.birthtimeMs > 0 ? info.birthtime : info.mtime).toISOString();
     found.push({
@@ -5470,9 +5471,9 @@ async function buildProject(opts) {
       built.rowWidths = view.rowWidths;
       built.openSessions = view.open;
       const registered = panelData.projects.some(
-        (candidate) => resolve2(candidate.path) === resolve2(root)
+        (candidate) => resolve3(candidate.path) === resolve3(root)
       );
-      built.inbox = registered ? panelData.inbox.filter((row) => resolve2(row.projectPath) === resolve2(root)) : await collectInboxForProject(
+      built.inbox = registered ? panelData.inbox.filter((row) => resolve3(row.projectPath) === resolve3(root)) : await collectInboxForProject(
         { name: project.data.name, path: root },
         views.sessions,
         transcripts,
@@ -5723,7 +5724,7 @@ function formatProposal(proposal) {
 
 // src/commands/session.ts
 import { readFile as readFile3, rm as rm2 } from "fs/promises";
-import { resolve as resolve3 } from "path";
+import { resolve as resolve4 } from "path";
 
 // src/schema/merge.ts
 var SIDE_FIELDS = [
@@ -6451,7 +6452,7 @@ function structureChanges(merged, before, at, by = "agent") {
 }
 async function sessionShow(dir, sessionId, io, opts = {}) {
   if (!Slug.safeParse(sessionId).success) throw new CliError(`invalid session id: ${sessionId}`);
-  const given = resolve3(dir);
+  const given = resolve4(dir);
   const { root } = await resolveProjectRoot(given);
   const store = root === given ? {} : { store: root };
   const project = await loadProject(root);
@@ -7237,7 +7238,7 @@ async function backfillTail(dir, sessionId, io, opts = {}) {
 
 // src/commands/blame.ts
 import { stat as stat4 } from "fs/promises";
-import { isAbsolute as isAbsolute2, relative as relative2, resolve as resolve4, sep as sep2 } from "path";
+import { isAbsolute as isAbsolute2, relative as relative2, resolve as resolve5, sep as sep2 } from "path";
 import { pathToFileURL as pathToFileURL2 } from "url";
 function parseBlameTarget(target) {
   const match = /^(.*):([1-9][0-9]*)$/.exec(target);
@@ -7302,7 +7303,7 @@ async function blame(opts) {
   if (gitRoot === void 0)
     throw new CliError(`${root} is not inside a git repository; blame needs one`);
   const { file, line: line2 } = parseBlameTarget(opts.target);
-  const absolute = resolve4(root, file);
+  const absolute = resolve5(root, file);
   const path2 = relative2(gitRoot, absolute);
   if (path2 === "" || path2.startsWith("..") || isAbsolute2(path2))
     throw new CliError(`${file} is outside ${gitRoot}`);
@@ -7593,7 +7594,7 @@ import {
   createServer as createHttpServer
 } from "http";
 import { createRequire } from "module";
-import { basename, join as join3, resolve as resolve6 } from "path";
+import { basename, join as join3, resolve as resolve7 } from "path";
 import { fileURLToPath } from "url";
 
 // src/commands/shape.ts
@@ -7821,7 +7822,7 @@ async function sessionAgent(root, sessionId) {
 
 // src/diff.ts
 import { execFile as execFile2 } from "child_process";
-import { relative as relative3, resolve as resolve5, sep as sep3 } from "path";
+import { relative as relative3, resolve as resolve6, sep as sep3 } from "path";
 import { promisify as promisify2 } from "util";
 var exec2 = promisify2(execFile2);
 var DIFF_MAX_BYTES = 400 * 1024;
@@ -7868,7 +7869,7 @@ async function readCommitDiff(root, input, file) {
   let repoFile;
   if (file !== void 0) {
     const wanted = file.split("\\").join("/").replace(/^\.\//, "");
-    repoFile = relative3(gitRoot, resolve5(root, wanted)).split(sep3).join("/");
+    repoFile = relative3(gitRoot, resolve6(root, wanted)).split(sep3).join("/");
     const kept = projectFiles(gitRoot, root, /* @__PURE__ */ new Map([[sha, files]])).get(sha) ?? [];
     if (!kept.includes(wanted)) return { ok: false, reason: "file-not-in-commit" };
   }
@@ -8087,10 +8088,10 @@ function respondJson(res, status, body) {
   res.end(JSON.stringify(body));
 }
 async function registeredRoot(env, dir) {
-  const requested = resolve6(dir);
+  const requested = resolve7(dir);
   const registry = await loadRegistry(env);
   if (!registry.found || !registry.ok) return null;
-  return registry.data.projects.some((entry) => resolve6(entry.path) === requested) ? requested : null;
+  return registry.data.projects.some((entry) => resolve7(entry.path) === requested) ? requested : null;
 }
 async function pageTarget(env, url) {
   const panel = () => {
@@ -9593,7 +9594,7 @@ async function hooksUninstall(dir, io) {
 // src/commands/init.ts
 import { execFile as execFile3 } from "child_process";
 import { mkdir as mkdir2 } from "fs/promises";
-import { basename as basename3, resolve as resolve7 } from "path";
+import { basename as basename3, resolve as resolve8 } from "path";
 import { promisify as promisify3, styleText } from "util";
 var agent2 = defaultAgent();
 var exec3 = promisify3(execFile3);
@@ -9791,7 +9792,7 @@ async function refreshGitIntegration(io, root) {
   });
 }
 async function init(dir, opts, io) {
-  const root = resolve7(dir);
+  const root = resolve8(dir);
   await migrateProject(root);
   const existing = await loadProject(root);
   if (existing.found) {
@@ -10353,12 +10354,12 @@ async function search(opts) {
 // src/commands/why.ts
 import { existsSync as existsSync3 } from "fs";
 import { stat as stat6 } from "fs/promises";
-import { dirname as dirname4, isAbsolute as isAbsolute3, join as join7, relative as relative5, resolve as resolve8, sep as sep4 } from "path";
+import { dirname as dirname4, isAbsolute as isAbsolute3, join as join7, relative as relative5, resolve as resolve9, sep as sep4 } from "path";
 function oneLine6(text) {
   return text.replace(/\s+/g, " ").trim();
 }
 function repositoryPath(gitRoot, root, file) {
-  const rel = relative5(gitRoot, resolve8(root, file));
+  const rel = relative5(gitRoot, resolve9(root, file));
   if (rel === "" || rel.startsWith("..") || isAbsolute3(rel)) return void 0;
   return rel.split(sep4).join("/");
 }
@@ -10445,7 +10446,7 @@ function formatWhy(hits) {
   return lines;
 }
 async function nearestProjectDir(start) {
-  for (let dir = resolve8(start); ; dir = dirname4(dir)) {
+  for (let dir = resolve9(start); ; dir = dirname4(dir)) {
     if (existsSync3(projectPaths(dir).project) || existsSync3(join7(dir, ".git"))) return dir;
     if (dirname4(dir) === dir) return void 0;
   }
@@ -10458,7 +10459,7 @@ async function why(opts) {
   let target = opts.file;
   if (opts.cwd !== void 0) {
     start = await nearestProjectDir(opts.cwd) ?? opts.cwd;
-    target = relative5(start, resolve8(opts.cwd, opts.file));
+    target = relative5(start, resolve9(opts.cwd, opts.file));
   }
   const parsed2 = parseBlameTarget(target);
   const file = parsed2.file;
@@ -10469,7 +10470,7 @@ async function why(opts) {
   if (!project.ok) throw new CliError(project.error);
   if (await findGitRoot(root) === void 0)
     throw new CliError(`${root} is not inside a git repository; why needs one`);
-  const exists = await stat6(resolve8(root, file)).then(
+  const exists = await stat6(resolve9(root, file)).then(
     (info) => info.isFile(),
     () => false
   );
@@ -10531,7 +10532,7 @@ ${commands.map((command) => `  $ ${command}`).join("\n")}
 `;
 }
 async function readyToRead(dir, io) {
-  for (let cur = resolve9(dir); ; cur = dirname5(cur)) {
+  for (let cur = resolve10(dir); ; cur = dirname5(cur)) {
     const { root } = await resolveProjectRoot(cur);
     if (existsSync4(projectPaths(root).project)) {
       await prepareRecords(root, io.env, io.warn);
@@ -10540,12 +10541,24 @@ async function readyToRead(dir, io) {
     if (dirname5(cur) === cur) return;
   }
 }
+function unwritableRecord(err) {
+  const { code, path: path2 } = err ?? {};
+  if (code !== "EROFS" && code !== "EACCES" && code !== "EPERM") return void 0;
+  if (path2 === void 0) return void 0;
+  const match = /^(.*[\\/]\.cogit)(?:[\\/]|$)/.exec(path2);
+  if (match === null) return void 0;
+  const store = match[1];
+  const why2 = code === "EROFS" ? "read-only file system" : "permission denied";
+  return `cannot write the record in ${store} (${why2}); a sandbox must mount it writable`;
+}
 function createProgram(makeIo = processIo, deps = {}) {
   const program2 = new Command().name("cogit").description(package_default.description).version(package_default.version);
   const run = (fn) => async (...args) => {
     try {
       await fn(...args);
     } catch (err) {
+      const unwritable = unwritableRecord(err);
+      if (unwritable !== void 0) program2.error(`error: ${unwritable}`, { exitCode: 1 });
       if (!(err instanceof CliError)) throw err;
       program2.error(`error: ${err.message}`, { exitCode: 1 });
     } finally {

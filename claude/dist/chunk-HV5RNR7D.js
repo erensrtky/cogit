@@ -485,16 +485,16 @@ var require_common = __commonJS({
         let enableOverride = null;
         let namespacesCache;
         let enabledCache;
-        function debug2(...args) {
-          if (!debug2.enabled) {
+        function debug3(...args) {
+          if (!debug3.enabled) {
             return;
           }
-          const self2 = debug2;
+          const self = debug3;
           const curr = Number(/* @__PURE__ */ new Date());
           const ms = curr - (prevTime || curr);
-          self2.diff = ms;
-          self2.prev = prevTime;
-          self2.curr = curr;
+          self.diff = ms;
+          self.prev = prevTime;
+          self.curr = curr;
           prevTime = curr;
           args[0] = createDebug.coerce(args[0]);
           if (typeof args[0] !== "string") {
@@ -509,22 +509,22 @@ var require_common = __commonJS({
             const formatter = createDebug.formatters[format];
             if (typeof formatter === "function") {
               const val = args[index];
-              match = formatter.call(self2, val);
+              match = formatter.call(self, val);
               args.splice(index, 1);
               index--;
             }
             return match;
           });
-          createDebug.formatArgs.call(self2, args);
-          const logFn = self2.log || createDebug.log;
-          logFn.apply(self2, args);
+          createDebug.formatArgs.call(self, args);
+          const logFn = self.log || createDebug.log;
+          logFn.apply(self, args);
         }
-        debug2.namespace = namespace;
-        debug2.useColors = createDebug.useColors();
-        debug2.color = createDebug.selectColor(namespace);
-        debug2.extend = extend2;
-        debug2.destroy = createDebug.destroy;
-        Object.defineProperty(debug2, "enabled", {
+        debug3.namespace = namespace;
+        debug3.useColors = createDebug.useColors();
+        debug3.color = createDebug.selectColor(namespace);
+        debug3.extend = extend2;
+        debug3.destroy = createDebug.destroy;
+        Object.defineProperty(debug3, "enabled", {
           enumerable: true,
           configurable: false,
           get: () => {
@@ -542,9 +542,9 @@ var require_common = __commonJS({
           }
         });
         if (typeof createDebug.init === "function") {
-          createDebug.init(debug2);
+          createDebug.init(debug3);
         }
-        return debug2;
+        return debug3;
       }
       function extend2(namespace, delimiter3) {
         const newDebug = createDebug(this.namespace + (typeof delimiter3 === "undefined" ? ":" : delimiter3) + namespace);
@@ -956,11 +956,11 @@ var require_node = __commonJS({
     function load3() {
       return process.env.DEBUG;
     }
-    function init(debug2) {
-      debug2.inspectOpts = {};
+    function init(debug3) {
+      debug3.inspectOpts = {};
       const keys = Object.keys(exports.inspectOpts);
       for (let i = 0; i < keys.length; i++) {
-        debug2.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
+        debug3.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
       }
     }
     module.exports = require_common()(exports);
@@ -988,6 +988,1884 @@ var require_src = __commonJS({
   }
 });
 
+// ../../node_modules/@textlint/regexp-string-matcher/lib/regexp-parse.js
+var require_regexp_parse = __commonJS({
+  "../../node_modules/@textlint/regexp-string-matcher/lib/regexp-parse.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.isRegExpString = exports.parseRegExpString = void 0;
+    var REGEXP_LITERAL_PATTERN = /^\/(.+)\/([guimysd]*)$/;
+    var parseRegExpString = function(str) {
+      var result = str.match(REGEXP_LITERAL_PATTERN);
+      if (!result) {
+        return null;
+      }
+      return {
+        source: result[1],
+        flagString: result[2]
+      };
+    };
+    exports.parseRegExpString = parseRegExpString;
+    var isRegExpString = function(str) {
+      return REGEXP_LITERAL_PATTERN.test(str);
+    };
+    exports.isRegExpString = isRegExpString;
+  }
+});
+
+// ../../node_modules/@textlint/regexp-string-matcher/lib/regexp-string-matcher.js
+var require_regexp_string_matcher = __commonJS({
+  "../../node_modules/@textlint/regexp-string-matcher/lib/regexp-string-matcher.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.matchPatterns = exports.createRegExp = void 0;
+    var regexp_parse_1 = require_regexp_parse();
+    var DEFAULT_FLAGS = "ug";
+    var escapeStringRegexp = function(string4) {
+      return string4.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&").replace(/-/g, "\\x2d");
+    };
+    var defaultFlags = function(flagsString) {
+      if (flagsString.length === 0) {
+        return DEFAULT_FLAGS;
+      }
+      return Array.from(new Set((flagsString + DEFAULT_FLAGS).split(""))).join("");
+    };
+    var createRegExp2 = function(patternString, defaultFlag) {
+      if (defaultFlag === void 0) {
+        defaultFlag = DEFAULT_FLAGS;
+      }
+      if (patternString.length === 0) {
+        throw new Error("Empty string can not handled");
+      }
+      if ((0, regexp_parse_1.isRegExpString)(patternString)) {
+        var regExpStructure = (0, regexp_parse_1.parseRegExpString)(patternString);
+        if (regExpStructure) {
+          return new RegExp(regExpStructure.source, defaultFlags(regExpStructure.flagString));
+        }
+        throw new Error('"'.concat(patternString, '" can not parse as RegExp.'));
+      } else {
+        return new RegExp(escapeStringRegexp(patternString), defaultFlag);
+      }
+    };
+    exports.createRegExp = createRegExp2;
+    var matchPatterns31 = function(text, regExpLikeStrings) {
+      var regExps = regExpLikeStrings.map(function(patternString) {
+        return (0, exports.createRegExp)(patternString);
+      });
+      var matchPatternResults = [];
+      var seen = /* @__PURE__ */ new Set();
+      regExps.forEach(function(regExp) {
+        var results = text.matchAll(regExp);
+        var next = results.next();
+        while (!next.done) {
+          var result = next.value;
+          next = results.next();
+          if (result.index === void 0) {
+            continue;
+          }
+          var match = result[0];
+          var index = result.index;
+          var endIndex = index + match.length;
+          var key = "".concat(index, ":").concat(endIndex);
+          if (seen.has(key)) {
+            continue;
+          }
+          seen.add(key);
+          matchPatternResults.push({
+            match,
+            captures: result.slice(1),
+            startIndex: index,
+            endIndex
+          });
+        }
+      });
+      return matchPatternResults.sort(function(a, b) {
+        if (a.startIndex !== b.startIndex) {
+          return a.startIndex - b.startIndex;
+        }
+        return a.endIndex - b.endIndex;
+      });
+    };
+    exports.matchPatterns = matchPatterns31;
+  }
+});
+
+// ../../node_modules/picomatch/lib/constants.js
+var require_constants = __commonJS({
+  "../../node_modules/picomatch/lib/constants.js"(exports, module) {
+    "use strict";
+    var WIN_SLASH = "\\\\/";
+    var WIN_NO_SLASH = `[^${WIN_SLASH}]`;
+    var DEFAULT_MAX_EXTGLOB_RECURSION = 0;
+    var DOT_LITERAL = "\\.";
+    var PLUS_LITERAL = "\\+";
+    var QMARK_LITERAL = "\\?";
+    var SLASH_LITERAL = "\\/";
+    var ONE_CHAR = "(?=.)";
+    var QMARK = "[^/]";
+    var END_ANCHOR = `(?:${SLASH_LITERAL}|$)`;
+    var START_ANCHOR = `(?:^|${SLASH_LITERAL})`;
+    var DOTS_SLASH = `${DOT_LITERAL}{1,2}${END_ANCHOR}`;
+    var NO_DOT = `(?!${DOT_LITERAL})`;
+    var NO_DOTS = `(?!${START_ANCHOR}${DOTS_SLASH})`;
+    var NO_DOT_SLASH = `(?!${DOT_LITERAL}{0,1}${END_ANCHOR})`;
+    var NO_DOTS_SLASH = `(?!${DOTS_SLASH})`;
+    var QMARK_NO_DOT = `[^.${SLASH_LITERAL}]`;
+    var STAR = `${QMARK}*?`;
+    var SEP = "/";
+    var POSIX_CHARS = {
+      DOT_LITERAL,
+      PLUS_LITERAL,
+      QMARK_LITERAL,
+      SLASH_LITERAL,
+      ONE_CHAR,
+      QMARK,
+      END_ANCHOR,
+      DOTS_SLASH,
+      NO_DOT,
+      NO_DOTS,
+      NO_DOT_SLASH,
+      NO_DOTS_SLASH,
+      QMARK_NO_DOT,
+      STAR,
+      START_ANCHOR,
+      SEP
+    };
+    var WINDOWS_CHARS = {
+      ...POSIX_CHARS,
+      SLASH_LITERAL: `[${WIN_SLASH}]`,
+      QMARK: WIN_NO_SLASH,
+      STAR: `${WIN_NO_SLASH}*?`,
+      DOTS_SLASH: `${DOT_LITERAL}{1,2}(?:[${WIN_SLASH}]|$)`,
+      NO_DOT: `(?!${DOT_LITERAL})`,
+      NO_DOTS: `(?!(?:^|[${WIN_SLASH}])${DOT_LITERAL}{1,2}(?:[${WIN_SLASH}]|$))`,
+      NO_DOT_SLASH: `(?!${DOT_LITERAL}{0,1}(?:[${WIN_SLASH}]|$))`,
+      NO_DOTS_SLASH: `(?!${DOT_LITERAL}{1,2}(?:[${WIN_SLASH}]|$))`,
+      QMARK_NO_DOT: `[^.${WIN_SLASH}]`,
+      START_ANCHOR: `(?:^|[${WIN_SLASH}])`,
+      END_ANCHOR: `(?:[${WIN_SLASH}]|$)`,
+      SEP: "\\"
+    };
+    var POSIX_REGEX_SOURCE = {
+      __proto__: null,
+      alnum: "a-zA-Z0-9",
+      alpha: "a-zA-Z",
+      ascii: "\\x00-\\x7F",
+      blank: " \\t",
+      cntrl: "\\x00-\\x1F\\x7F",
+      digit: "0-9",
+      graph: "\\x21-\\x7E",
+      lower: "a-z",
+      print: "\\x20-\\x7E ",
+      punct: "\\-!\"#$%&'()\\*+,./:;<=>?@[\\]^_`{|}~",
+      space: " \\t\\r\\n\\v\\f",
+      upper: "A-Z",
+      word: "A-Za-z0-9_",
+      xdigit: "A-Fa-f0-9"
+    };
+    module.exports = {
+      DEFAULT_MAX_EXTGLOB_RECURSION,
+      MAX_LENGTH: 1024 * 64,
+      POSIX_REGEX_SOURCE,
+      // regular expressions
+      REGEX_BACKSLASH: /\\(?![*+?^${}(|)[\]])/g,
+      REGEX_NON_SPECIAL_CHARS: /^[^@![\].,$*+?^{}()|\\/]+/,
+      REGEX_SPECIAL_CHARS: /[-*+?.^${}(|)[\]]/,
+      REGEX_SPECIAL_CHARS_BACKREF: /(\\?)((\W)(\3*))/g,
+      REGEX_SPECIAL_CHARS_GLOBAL: /([-*+?.^${}(|)[\]])/g,
+      REGEX_REMOVE_BACKSLASH: /(?:\[.*?[^\\]\]|\\(?=.))/g,
+      // Replace globs with equivalent patterns to reduce parsing time.
+      REPLACEMENTS: {
+        __proto__: null,
+        "***": "*",
+        "**/**": "**",
+        "**/**/**": "**"
+      },
+      // Digits
+      CHAR_0: 48,
+      /* 0 */
+      CHAR_9: 57,
+      /* 9 */
+      // Alphabet chars.
+      CHAR_UPPERCASE_A: 65,
+      /* A */
+      CHAR_LOWERCASE_A: 97,
+      /* a */
+      CHAR_UPPERCASE_Z: 90,
+      /* Z */
+      CHAR_LOWERCASE_Z: 122,
+      /* z */
+      CHAR_LEFT_PARENTHESES: 40,
+      /* ( */
+      CHAR_RIGHT_PARENTHESES: 41,
+      /* ) */
+      CHAR_ASTERISK: 42,
+      /* * */
+      // Non-alphabetic chars.
+      CHAR_AMPERSAND: 38,
+      /* & */
+      CHAR_AT: 64,
+      /* @ */
+      CHAR_BACKWARD_SLASH: 92,
+      /* \ */
+      CHAR_CARRIAGE_RETURN: 13,
+      /* \r */
+      CHAR_CIRCUMFLEX_ACCENT: 94,
+      /* ^ */
+      CHAR_COLON: 58,
+      /* : */
+      CHAR_COMMA: 44,
+      /* , */
+      CHAR_DOT: 46,
+      /* . */
+      CHAR_DOUBLE_QUOTE: 34,
+      /* " */
+      CHAR_EQUAL: 61,
+      /* = */
+      CHAR_EXCLAMATION_MARK: 33,
+      /* ! */
+      CHAR_FORM_FEED: 12,
+      /* \f */
+      CHAR_FORWARD_SLASH: 47,
+      /* / */
+      CHAR_GRAVE_ACCENT: 96,
+      /* ` */
+      CHAR_HASH: 35,
+      /* # */
+      CHAR_HYPHEN_MINUS: 45,
+      /* - */
+      CHAR_LEFT_ANGLE_BRACKET: 60,
+      /* < */
+      CHAR_LEFT_CURLY_BRACE: 123,
+      /* { */
+      CHAR_LEFT_SQUARE_BRACKET: 91,
+      /* [ */
+      CHAR_LINE_FEED: 10,
+      /* \n */
+      CHAR_NO_BREAK_SPACE: 160,
+      /* \u00A0 */
+      CHAR_PERCENT: 37,
+      /* % */
+      CHAR_PLUS: 43,
+      /* + */
+      CHAR_QUESTION_MARK: 63,
+      /* ? */
+      CHAR_RIGHT_ANGLE_BRACKET: 62,
+      /* > */
+      CHAR_RIGHT_CURLY_BRACE: 125,
+      /* } */
+      CHAR_RIGHT_SQUARE_BRACKET: 93,
+      /* ] */
+      CHAR_SEMICOLON: 59,
+      /* ; */
+      CHAR_SINGLE_QUOTE: 39,
+      /* ' */
+      CHAR_SPACE: 32,
+      /*   */
+      CHAR_TAB: 9,
+      /* \t */
+      CHAR_UNDERSCORE: 95,
+      /* _ */
+      CHAR_VERTICAL_LINE: 124,
+      /* | */
+      CHAR_ZERO_WIDTH_NOBREAK_SPACE: 65279,
+      /* \uFEFF */
+      /**
+       * Create EXTGLOB_CHARS
+       */
+      extglobChars(chars) {
+        return {
+          "!": { type: "negate", open: "(?:(?!(?:", close: `))${chars.STAR})` },
+          "?": { type: "qmark", open: "(?:", close: ")?" },
+          "+": { type: "plus", open: "(?:", close: ")+" },
+          "*": { type: "star", open: "(?:", close: ")*" },
+          "@": { type: "at", open: "(?:", close: ")" }
+        };
+      },
+      /**
+       * Create GLOB_CHARS
+       */
+      globChars(win32) {
+        return win32 === true ? WINDOWS_CHARS : POSIX_CHARS;
+      }
+    };
+  }
+});
+
+// ../../node_modules/picomatch/lib/utils.js
+var require_utils = __commonJS({
+  "../../node_modules/picomatch/lib/utils.js"(exports) {
+    "use strict";
+    var {
+      REGEX_BACKSLASH,
+      REGEX_REMOVE_BACKSLASH,
+      REGEX_SPECIAL_CHARS,
+      REGEX_SPECIAL_CHARS_GLOBAL
+    } = require_constants();
+    exports.isObject = (val) => val !== null && typeof val === "object" && !Array.isArray(val);
+    exports.hasRegexChars = (str) => REGEX_SPECIAL_CHARS.test(str);
+    exports.isRegexChar = (str) => str.length === 1 && exports.hasRegexChars(str);
+    exports.escapeRegex = (str) => str.replace(REGEX_SPECIAL_CHARS_GLOBAL, "\\$1");
+    exports.toPosixSlashes = (str) => str.replace(REGEX_BACKSLASH, "/");
+    exports.isWindows = () => {
+      if (typeof navigator !== "undefined" && navigator.platform) {
+        const platform = navigator.platform.toLowerCase();
+        return platform === "win32" || platform === "windows";
+      }
+      if (typeof process !== "undefined" && process.platform) {
+        return process.platform === "win32";
+      }
+      return false;
+    };
+    exports.removeBackslashes = (str) => {
+      return str.replace(REGEX_REMOVE_BACKSLASH, (match) => {
+        return match === "\\" ? "" : match;
+      });
+    };
+    exports.escapeLast = (input2, char, lastIdx) => {
+      const idx = input2.lastIndexOf(char, lastIdx);
+      if (idx === -1) return input2;
+      if (input2[idx - 1] === "\\") return exports.escapeLast(input2, char, idx - 1);
+      return `${input2.slice(0, idx)}\\${input2.slice(idx)}`;
+    };
+    exports.removePrefix = (input2, state = {}) => {
+      let output2 = input2;
+      if (output2.startsWith("./")) {
+        output2 = output2.slice(2);
+        state.prefix = "./";
+      }
+      return output2;
+    };
+    exports.wrapOutput = (input2, state = {}, options = {}) => {
+      const prepend = options.contains ? "" : "^";
+      const append = options.contains ? "" : "$";
+      let output2 = `${prepend}(?:${input2})${append}`;
+      if (state.negated === true) {
+        output2 = `(?:^(?!${output2}).*$)`;
+      }
+      return output2;
+    };
+    exports.basename = (path2, { windows } = {}) => {
+      const segs = path2.split(windows ? /[\\/]/ : "/");
+      const last = segs[segs.length - 1];
+      if (last === "") {
+        return segs[segs.length - 2];
+      }
+      return last;
+    };
+  }
+});
+
+// ../../node_modules/picomatch/lib/scan.js
+var require_scan = __commonJS({
+  "../../node_modules/picomatch/lib/scan.js"(exports, module) {
+    "use strict";
+    var utils = require_utils();
+    var {
+      CHAR_ASTERISK,
+      /* * */
+      CHAR_AT,
+      /* @ */
+      CHAR_BACKWARD_SLASH,
+      /* \ */
+      CHAR_COMMA,
+      /* , */
+      CHAR_DOT,
+      /* . */
+      CHAR_EXCLAMATION_MARK,
+      /* ! */
+      CHAR_FORWARD_SLASH,
+      /* / */
+      CHAR_LEFT_CURLY_BRACE,
+      /* { */
+      CHAR_LEFT_PARENTHESES,
+      /* ( */
+      CHAR_LEFT_SQUARE_BRACKET,
+      /* [ */
+      CHAR_PLUS,
+      /* + */
+      CHAR_QUESTION_MARK,
+      /* ? */
+      CHAR_RIGHT_CURLY_BRACE,
+      /* } */
+      CHAR_RIGHT_PARENTHESES,
+      /* ) */
+      CHAR_RIGHT_SQUARE_BRACKET
+      /* ] */
+    } = require_constants();
+    var isPathSeparator = (code) => {
+      return code === CHAR_FORWARD_SLASH || code === CHAR_BACKWARD_SLASH;
+    };
+    var depth = (token) => {
+      if (token.isPrefix !== true) {
+        token.depth = token.isGlobstar ? Infinity : 1;
+      }
+    };
+    var scan2 = (input2, options) => {
+      const opts = options || {};
+      const length = input2.length - 1;
+      const scanToEnd = opts.parts === true || opts.tokens === true || opts.scanToEnd === true;
+      const slashes = [];
+      const tokens = [];
+      const parts = [];
+      let str = input2;
+      let index = -1;
+      let start = 0;
+      let lastIndex = 0;
+      let isBrace = false;
+      let isBracket = false;
+      let isGlob = false;
+      let isExtglob = false;
+      let isGlobstar = false;
+      let braceEscaped = false;
+      let backslashes = false;
+      let negated = false;
+      let negatedExtglob = false;
+      let finished = false;
+      let braces = 0;
+      let prev;
+      let code;
+      let token = { value: "", depth: 0, isGlob: false };
+      const eos = () => index >= length;
+      const peek = () => str.charCodeAt(index + 1);
+      const advance = () => {
+        prev = code;
+        return str.charCodeAt(++index);
+      };
+      while (index < length) {
+        code = advance();
+        let next;
+        if (code === CHAR_BACKWARD_SLASH) {
+          backslashes = token.backslashes = true;
+          code = advance();
+          if (code === CHAR_LEFT_CURLY_BRACE) {
+            braceEscaped = true;
+          }
+          continue;
+        }
+        if (braceEscaped === true || code === CHAR_LEFT_CURLY_BRACE) {
+          braces++;
+          while (eos() !== true && (code = advance())) {
+            if (code === CHAR_BACKWARD_SLASH) {
+              backslashes = token.backslashes = true;
+              advance();
+              continue;
+            }
+            if (code === CHAR_LEFT_CURLY_BRACE) {
+              braces++;
+              continue;
+            }
+            if (braceEscaped !== true && code === CHAR_DOT && (code = advance()) === CHAR_DOT) {
+              isBrace = token.isBrace = true;
+              isGlob = token.isGlob = true;
+              finished = true;
+              if (scanToEnd === true) {
+                continue;
+              }
+              break;
+            }
+            if (braceEscaped !== true && code === CHAR_COMMA) {
+              isBrace = token.isBrace = true;
+              isGlob = token.isGlob = true;
+              finished = true;
+              if (scanToEnd === true) {
+                continue;
+              }
+              break;
+            }
+            if (code === CHAR_RIGHT_CURLY_BRACE) {
+              braces--;
+              if (braces === 0) {
+                braceEscaped = false;
+                isBrace = token.isBrace = true;
+                finished = true;
+                break;
+              }
+            }
+          }
+          if (scanToEnd === true) {
+            continue;
+          }
+          break;
+        }
+        if (code === CHAR_FORWARD_SLASH) {
+          slashes.push(index);
+          tokens.push(token);
+          token = { value: "", depth: 0, isGlob: false };
+          if (finished === true) continue;
+          if (prev === CHAR_DOT && index === start + 1) {
+            start += 2;
+            continue;
+          }
+          lastIndex = index + 1;
+          continue;
+        }
+        if (opts.noext !== true) {
+          const isExtglobChar = code === CHAR_PLUS || code === CHAR_AT || code === CHAR_ASTERISK || code === CHAR_QUESTION_MARK || code === CHAR_EXCLAMATION_MARK;
+          if (isExtglobChar === true && peek() === CHAR_LEFT_PARENTHESES) {
+            isGlob = token.isGlob = true;
+            isExtglob = token.isExtglob = true;
+            finished = true;
+            if (code === CHAR_EXCLAMATION_MARK && index === start) {
+              negatedExtglob = true;
+            }
+            if (scanToEnd === true) {
+              let parens = 0;
+              while (eos() !== true && (code = advance())) {
+                if (code === CHAR_BACKWARD_SLASH) {
+                  backslashes = token.backslashes = true;
+                  advance();
+                  continue;
+                }
+                if (code === CHAR_LEFT_PARENTHESES) {
+                  parens++;
+                  continue;
+                }
+                if (code === CHAR_RIGHT_PARENTHESES && --parens === 0) {
+                  finished = true;
+                  break;
+                }
+              }
+              continue;
+            }
+            break;
+          }
+        }
+        if (code === CHAR_ASTERISK) {
+          if (prev === CHAR_ASTERISK) isGlobstar = token.isGlobstar = true;
+          isGlob = token.isGlob = true;
+          finished = true;
+          if (scanToEnd === true) {
+            continue;
+          }
+          break;
+        }
+        if (code === CHAR_QUESTION_MARK) {
+          isGlob = token.isGlob = true;
+          finished = true;
+          if (scanToEnd === true) {
+            continue;
+          }
+          break;
+        }
+        if (code === CHAR_LEFT_SQUARE_BRACKET) {
+          while (eos() !== true && (next = advance())) {
+            if (next === CHAR_BACKWARD_SLASH) {
+              backslashes = token.backslashes = true;
+              advance();
+              continue;
+            }
+            if (next === CHAR_RIGHT_SQUARE_BRACKET) {
+              isBracket = token.isBracket = true;
+              isGlob = token.isGlob = true;
+              finished = true;
+              break;
+            }
+          }
+          if (scanToEnd === true) {
+            continue;
+          }
+          break;
+        }
+        if (opts.nonegate !== true && code === CHAR_EXCLAMATION_MARK && index === start) {
+          negated = token.negated = true;
+          start++;
+          continue;
+        }
+        if (opts.noparen !== true && code === CHAR_LEFT_PARENTHESES) {
+          isGlob = token.isGlob = true;
+          if (scanToEnd === true) {
+            let parens = 1;
+            while (eos() !== true && (code = advance())) {
+              if (code === CHAR_BACKWARD_SLASH) {
+                backslashes = token.backslashes = true;
+                advance();
+                continue;
+              }
+              if (code === CHAR_LEFT_PARENTHESES) {
+                parens++;
+                continue;
+              }
+              if (code === CHAR_RIGHT_PARENTHESES && --parens === 0) {
+                finished = true;
+                break;
+              }
+            }
+            continue;
+          }
+          break;
+        }
+        if (isGlob === true) {
+          finished = true;
+          if (scanToEnd === true) {
+            continue;
+          }
+          break;
+        }
+      }
+      if (opts.noext === true) {
+        isExtglob = false;
+        isGlob = false;
+      }
+      let base = str;
+      let prefix = "";
+      let glob = "";
+      if (start > 0) {
+        prefix = str.slice(0, start);
+        str = str.slice(start);
+        lastIndex -= start;
+      }
+      if (base && isGlob === true && lastIndex > 0) {
+        base = str.slice(0, lastIndex);
+        glob = str.slice(lastIndex);
+      } else if (isGlob === true) {
+        base = "";
+        glob = str;
+      } else {
+        base = str;
+      }
+      if (base && base !== "" && base !== "/" && base !== str) {
+        if (isPathSeparator(base.charCodeAt(base.length - 1))) {
+          base = base.slice(0, -1);
+        }
+      }
+      if (opts.unescape === true) {
+        if (glob) glob = utils.removeBackslashes(glob);
+        if (base && backslashes === true) {
+          base = utils.removeBackslashes(base);
+        }
+      }
+      const state = {
+        prefix,
+        input: input2,
+        start,
+        base,
+        glob,
+        isBrace,
+        isBracket,
+        isGlob,
+        isExtglob,
+        isGlobstar,
+        negated,
+        negatedExtglob
+      };
+      if (opts.tokens === true) {
+        state.maxDepth = 0;
+        if (!isPathSeparator(code)) {
+          tokens.push(token);
+        }
+        state.tokens = tokens;
+      }
+      if (opts.parts === true || opts.tokens === true) {
+        let prevIndex;
+        for (let idx = 0; idx < slashes.length; idx++) {
+          const n2 = prevIndex !== void 0 ? prevIndex + 1 : start;
+          const i = slashes[idx];
+          const value2 = input2.slice(n2, i);
+          if (opts.tokens) {
+            if (idx === 0 && start !== 0) {
+              tokens[idx].isPrefix = true;
+              tokens[idx].value = prefix;
+            } else {
+              tokens[idx].value = value2;
+            }
+            depth(tokens[idx]);
+            state.maxDepth += tokens[idx].depth;
+          }
+          if (i >= start) {
+            parts.push(value2);
+            prevIndex = i;
+          }
+        }
+        const n = prevIndex !== void 0 ? prevIndex + 1 : start;
+        const value = input2.slice(n);
+        parts.push(value);
+        if (opts.tokens && prevIndex && prevIndex + 1 < input2.length) {
+          tokens[tokens.length - 1].value = value;
+          depth(tokens[tokens.length - 1]);
+          state.maxDepth += tokens[tokens.length - 1].depth;
+        }
+        state.slashes = slashes;
+        state.parts = parts;
+      }
+      return state;
+    };
+    module.exports = scan2;
+  }
+});
+
+// ../../node_modules/picomatch/lib/parse.js
+var require_parse = __commonJS({
+  "../../node_modules/picomatch/lib/parse.js"(exports, module) {
+    "use strict";
+    var constants3 = require_constants();
+    var utils = require_utils();
+    var {
+      MAX_LENGTH,
+      POSIX_REGEX_SOURCE,
+      REGEX_NON_SPECIAL_CHARS,
+      REGEX_SPECIAL_CHARS_BACKREF,
+      REPLACEMENTS
+    } = constants3;
+    var expandRange = (args, options) => {
+      if (typeof options.expandRange === "function") {
+        return options.expandRange(...args, options);
+      }
+      args.sort();
+      const value = `[${args.join("-")}]`;
+      try {
+        new RegExp(value);
+      } catch (ex) {
+        return args.map((v) => utils.escapeRegex(v)).join("..");
+      }
+      return value;
+    };
+    var syntaxError = (type, char) => {
+      return `Missing ${type}: "${char}" - use "\\\\${char}" to match literal characters`;
+    };
+    var splitTopLevel = (input2) => {
+      const parts = [];
+      let bracket = 0;
+      let paren = 0;
+      let quote = 0;
+      let value = "";
+      let escaped = false;
+      for (const ch of input2) {
+        if (escaped === true) {
+          value += ch;
+          escaped = false;
+          continue;
+        }
+        if (ch === "\\") {
+          value += ch;
+          escaped = true;
+          continue;
+        }
+        if (ch === '"') {
+          quote = quote === 1 ? 0 : 1;
+          value += ch;
+          continue;
+        }
+        if (quote === 0) {
+          if (ch === "[") {
+            bracket++;
+          } else if (ch === "]" && bracket > 0) {
+            bracket--;
+          } else if (bracket === 0) {
+            if (ch === "(") {
+              paren++;
+            } else if (ch === ")" && paren > 0) {
+              paren--;
+            } else if (ch === "|" && paren === 0) {
+              parts.push(value);
+              value = "";
+              continue;
+            }
+          }
+        }
+        value += ch;
+      }
+      parts.push(value);
+      return parts;
+    };
+    var isPlainBranch = (branch) => {
+      let escaped = false;
+      for (const ch of branch) {
+        if (escaped === true) {
+          escaped = false;
+          continue;
+        }
+        if (ch === "\\") {
+          escaped = true;
+          continue;
+        }
+        if (/[?*+@!()[\]{}]/.test(ch)) {
+          return false;
+        }
+      }
+      return true;
+    };
+    var normalizeSimpleBranch = (branch) => {
+      let value = branch.trim();
+      let changed = true;
+      while (changed === true) {
+        changed = false;
+        if (/^@\([^\\()[\]{}|]+\)$/.test(value)) {
+          value = value.slice(2, -1);
+          changed = true;
+        }
+      }
+      if (!isPlainBranch(value)) {
+        return;
+      }
+      return value.replace(/\\(.)/g, "$1");
+    };
+    var hasRepeatedCharPrefixOverlap = (branches) => {
+      const values = branches.map(normalizeSimpleBranch).filter(Boolean);
+      for (let i = 0; i < values.length; i++) {
+        for (let j = i + 1; j < values.length; j++) {
+          const a = values[i];
+          const b = values[j];
+          const char = a[0];
+          if (!char || a !== char.repeat(a.length) || b !== char.repeat(b.length)) {
+            continue;
+          }
+          if (a === b || a.startsWith(b) || b.startsWith(a)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+    var parseRepeatedExtglob = (pattern, requireEnd = true) => {
+      if (pattern[0] !== "+" && pattern[0] !== "*" || pattern[1] !== "(") {
+        return;
+      }
+      let bracket = 0;
+      let paren = 0;
+      let quote = 0;
+      let escaped = false;
+      for (let i = 1; i < pattern.length; i++) {
+        const ch = pattern[i];
+        if (escaped === true) {
+          escaped = false;
+          continue;
+        }
+        if (ch === "\\") {
+          escaped = true;
+          continue;
+        }
+        if (ch === '"') {
+          quote = quote === 1 ? 0 : 1;
+          continue;
+        }
+        if (quote === 1) {
+          continue;
+        }
+        if (ch === "[") {
+          bracket++;
+          continue;
+        }
+        if (ch === "]" && bracket > 0) {
+          bracket--;
+          continue;
+        }
+        if (bracket > 0) {
+          continue;
+        }
+        if (ch === "(") {
+          paren++;
+          continue;
+        }
+        if (ch === ")") {
+          paren--;
+          if (paren === 0) {
+            if (requireEnd === true && i !== pattern.length - 1) {
+              return;
+            }
+            return {
+              type: pattern[0],
+              body: pattern.slice(2, i),
+              end: i
+            };
+          }
+        }
+      }
+    };
+    var buildCharClassStar = (chars) => {
+      const source = chars.length === 1 ? utils.escapeRegex(chars[0]) : `[${chars.map((ch) => utils.escapeRegex(ch)).join("")}]`;
+      return `${source}*`;
+    };
+    var getStarExtglobSequenceChars = (pattern) => {
+      let index = 0;
+      const chars = [];
+      while (index < pattern.length) {
+        const match = parseRepeatedExtglob(pattern.slice(index), false);
+        if (!match || match.type !== "*") {
+          return;
+        }
+        const branches = splitTopLevel(match.body).map((branch2) => branch2.trim());
+        if (branches.length !== 1) {
+          return;
+        }
+        const branch = normalizeSimpleBranch(branches[0]);
+        if (!branch || branch.length !== 1) {
+          return;
+        }
+        chars.push(branch);
+        index += match.end + 1;
+      }
+      if (chars.length < 1) {
+        return;
+      }
+      return chars;
+    };
+    var repeatedExtglobRecursion = (pattern) => {
+      let depth = 0;
+      let value = pattern.trim();
+      let match = parseRepeatedExtglob(value);
+      while (match) {
+        depth++;
+        value = match.body.trim();
+        match = parseRepeatedExtglob(value);
+      }
+      return depth;
+    };
+    var analyzeRepeatedExtglob = (body, options) => {
+      if (options.maxExtglobRecursion === false) {
+        return { risky: false };
+      }
+      const max = typeof options.maxExtglobRecursion === "number" ? options.maxExtglobRecursion : constants3.DEFAULT_MAX_EXTGLOB_RECURSION;
+      const branches = splitTopLevel(body).map((branch) => branch.trim());
+      if (branches.length > 1) {
+        if (branches.some((branch) => branch === "") || branches.some((branch) => /^[*?]+$/.test(branch)) || hasRepeatedCharPrefixOverlap(branches)) {
+          return { risky: true };
+        }
+      }
+      const safeChars = [];
+      let sawStarSequence = false;
+      let combinable = true;
+      for (const branch of branches) {
+        const chars = getStarExtglobSequenceChars(branch);
+        if (chars) {
+          sawStarSequence = true;
+          safeChars.push(...chars);
+          continue;
+        }
+        const literal2 = normalizeSimpleBranch(branch);
+        if (literal2 && literal2.length === 1) {
+          safeChars.push(literal2);
+          continue;
+        }
+        combinable = false;
+        if (repeatedExtglobRecursion(branch) > max) {
+          return { risky: true };
+        }
+      }
+      if (sawStarSequence) {
+        return combinable ? { risky: true, safeOutput: buildCharClassStar([...new Set(safeChars)]) } : { risky: true };
+      }
+      return { risky: false };
+    };
+    var parse5 = (input2, options) => {
+      if (typeof input2 !== "string") {
+        throw new TypeError("Expected a string");
+      }
+      input2 = REPLACEMENTS[input2] || input2;
+      const opts = { ...options };
+      const max = typeof opts.maxLength === "number" ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;
+      let len = input2.length;
+      if (len > max) {
+        throw new SyntaxError(`Input length: ${len}, exceeds maximum allowed length: ${max}`);
+      }
+      const bos = { type: "bos", value: "", output: opts.prepend || "" };
+      const tokens = [bos];
+      const capture = opts.capture ? "" : "?:";
+      const PLATFORM_CHARS = constants3.globChars(opts.windows);
+      const EXTGLOB_CHARS = constants3.extglobChars(PLATFORM_CHARS);
+      const {
+        DOT_LITERAL,
+        PLUS_LITERAL,
+        SLASH_LITERAL,
+        ONE_CHAR,
+        DOTS_SLASH,
+        NO_DOT,
+        NO_DOT_SLASH,
+        NO_DOTS_SLASH,
+        QMARK,
+        QMARK_NO_DOT,
+        STAR,
+        START_ANCHOR
+      } = PLATFORM_CHARS;
+      const globstar = (opts2) => {
+        return `(${capture}(?:(?!${START_ANCHOR}${opts2.dot ? DOTS_SLASH : DOT_LITERAL}).)*?)`;
+      };
+      const nodot = opts.dot ? "" : NO_DOT;
+      const qmarkNoDot = opts.dot ? QMARK : QMARK_NO_DOT;
+      let star = opts.bash === true ? globstar(opts) : STAR;
+      if (opts.capture) {
+        star = `(${star})`;
+      }
+      if (typeof opts.noext === "boolean") {
+        opts.noextglob = opts.noext;
+      }
+      const state = {
+        input: input2,
+        index: -1,
+        start: 0,
+        dot: opts.dot === true,
+        consumed: "",
+        output: "",
+        prefix: "",
+        backtrack: false,
+        negated: false,
+        brackets: 0,
+        braces: 0,
+        parens: 0,
+        quotes: 0,
+        globstar: false,
+        tokens
+      };
+      input2 = utils.removePrefix(input2, state);
+      len = input2.length;
+      const extglobs = [];
+      const braces = [];
+      const stack = [];
+      let prev = bos;
+      let value;
+      const eos = () => state.index === len - 1;
+      const peek = state.peek = (n = 1) => input2[state.index + n];
+      const advance = state.advance = () => input2[++state.index] || "";
+      const remaining = () => input2.slice(state.index + 1);
+      const consume = (value2 = "", num = 0) => {
+        state.consumed += value2;
+        state.index += num;
+      };
+      const append = (token) => {
+        state.output += token.output != null ? token.output : token.value;
+        consume(token.value);
+      };
+      const negate = () => {
+        let count2 = 1;
+        while (peek() === "!" && (peek(2) !== "(" || peek(3) === "?")) {
+          advance();
+          state.start++;
+          count2++;
+        }
+        if (count2 % 2 === 0) {
+          return false;
+        }
+        state.negated = true;
+        state.start++;
+        return true;
+      };
+      const increment = (type) => {
+        state[type]++;
+        stack.push(type);
+      };
+      const decrement = (type) => {
+        state[type]--;
+        stack.pop();
+      };
+      const push = (tok) => {
+        if (prev.type === "globstar") {
+          const isBrace = state.braces > 0 && (tok.type === "comma" || tok.type === "brace");
+          const isExtglob = tok.extglob === true || extglobs.length && (tok.type === "pipe" || tok.type === "paren");
+          if (tok.type !== "slash" && tok.type !== "paren" && !isBrace && !isExtglob) {
+            state.output = state.output.slice(0, -prev.output.length);
+            prev.type = "star";
+            prev.value = "*";
+            prev.output = star;
+            state.output += prev.output;
+          }
+        }
+        if (extglobs.length && tok.type !== "paren") {
+          extglobs[extglobs.length - 1].inner += tok.value;
+        }
+        if (tok.value || tok.output) append(tok);
+        if (prev && prev.type === "text" && tok.type === "text") {
+          prev.output = (prev.output || prev.value) + tok.value;
+          prev.value += tok.value;
+          return;
+        }
+        tok.prev = prev;
+        tokens.push(tok);
+        prev = tok;
+      };
+      const extglobOpen = (type, value2) => {
+        const token = { ...EXTGLOB_CHARS[value2], conditions: 1, inner: "" };
+        token.prev = prev;
+        token.parens = state.parens;
+        token.output = state.output;
+        token.startIndex = state.index;
+        token.tokensIndex = tokens.length;
+        const output2 = (opts.capture ? "(" : "") + token.open;
+        increment("parens");
+        push({ type, value: value2, output: state.output ? "" : ONE_CHAR });
+        push({ type: "paren", extglob: true, value: advance(), output: output2 });
+        extglobs.push(token);
+      };
+      const extglobClose = (token) => {
+        const literal2 = input2.slice(token.startIndex, state.index + 1);
+        const body = input2.slice(token.startIndex + 2, state.index);
+        const analysis = analyzeRepeatedExtglob(body, opts);
+        if ((token.type === "plus" || token.type === "star") && analysis.risky) {
+          const safeOutput = analysis.safeOutput ? (token.output ? "" : ONE_CHAR) + (opts.capture ? `(${analysis.safeOutput})` : analysis.safeOutput) : void 0;
+          const open5 = tokens[token.tokensIndex];
+          open5.type = "text";
+          open5.value = literal2;
+          open5.output = safeOutput || utils.escapeRegex(literal2);
+          for (let i = token.tokensIndex + 1; i < tokens.length; i++) {
+            tokens[i].value = "";
+            tokens[i].output = "";
+            delete tokens[i].suffix;
+          }
+          state.output = token.output + open5.output;
+          state.backtrack = true;
+          push({ type: "paren", extglob: true, value, output: "" });
+          decrement("parens");
+          return;
+        }
+        let output2 = token.close + (opts.capture ? ")" : "");
+        let rest;
+        if (token.type === "negate") {
+          let extglobStar = star;
+          if (token.inner && token.inner.length > 1 && token.inner.includes("/")) {
+            extglobStar = globstar(opts);
+          }
+          if (extglobStar !== star || eos() || /^\)+$/.test(remaining())) {
+            output2 = token.close = `)$))${extglobStar}`;
+          }
+          if (token.inner.includes("*") && (rest = remaining()) && /^\.[^\\/.]+$/.test(rest)) {
+            const expression = parse5(rest, { ...options, fastpaths: false }).output;
+            output2 = token.close = `)${expression})${extglobStar})`;
+          }
+          if (token.prev.type === "bos") {
+            state.negatedExtglob = true;
+          }
+        }
+        push({ type: "paren", extglob: true, value, output: output2 });
+        decrement("parens");
+      };
+      if (opts.fastpaths !== false && !/(^[*!]|[/()[\]{}"])/.test(input2)) {
+        let backslashes = false;
+        let output2 = input2.replace(REGEX_SPECIAL_CHARS_BACKREF, (m, esc2, chars, first, rest, index) => {
+          if (first === "\\") {
+            backslashes = true;
+            return m;
+          }
+          if (first === "?") {
+            if (esc2) {
+              return esc2 + first + (rest ? QMARK.repeat(rest.length) : "");
+            }
+            if (index === 0) {
+              return qmarkNoDot + (rest ? QMARK.repeat(rest.length) : "");
+            }
+            return QMARK.repeat(chars.length);
+          }
+          if (first === ".") {
+            return DOT_LITERAL.repeat(chars.length);
+          }
+          if (first === "*") {
+            if (esc2) {
+              return esc2 + first + (rest ? star : "");
+            }
+            return star;
+          }
+          return esc2 ? m : `\\${m}`;
+        });
+        if (backslashes === true) {
+          if (opts.unescape === true) {
+            output2 = output2.replace(/\\/g, "");
+          } else {
+            output2 = output2.replace(/\\+/g, (m) => {
+              return m.length % 2 === 0 ? "\\\\" : m ? "\\" : "";
+            });
+          }
+        }
+        if (output2 === input2 && opts.contains === true) {
+          state.output = input2;
+          return state;
+        }
+        state.output = utils.wrapOutput(output2, state, options);
+        return state;
+      }
+      while (!eos()) {
+        value = advance();
+        if (value === "\0") {
+          continue;
+        }
+        if (value === "\\") {
+          const next = peek();
+          if (next === "/" && opts.bash !== true) {
+            continue;
+          }
+          if (next === "." || next === ";") {
+            continue;
+          }
+          if (!next) {
+            value += "\\";
+            push({ type: "text", value });
+            continue;
+          }
+          const match = /^\\+/.exec(remaining());
+          let slashes = 0;
+          if (match && match[0].length > 2) {
+            slashes = match[0].length;
+            state.index += slashes;
+            if (slashes % 2 !== 0) {
+              value += "\\";
+            }
+          }
+          if (opts.unescape === true) {
+            value = advance();
+          } else {
+            value += advance();
+          }
+          if (state.brackets === 0) {
+            push({ type: "text", value });
+            continue;
+          }
+        }
+        if (state.brackets > 0 && (value !== "]" || prev.value === "[" || prev.value === "[^")) {
+          if (opts.posix !== false && value === ":") {
+            const inner = prev.value.slice(1);
+            if (inner.includes("[")) {
+              prev.posix = true;
+              if (inner.includes(":")) {
+                const idx = prev.value.lastIndexOf("[");
+                const pre = prev.value.slice(0, idx);
+                const rest2 = prev.value.slice(idx + 2);
+                const posix = POSIX_REGEX_SOURCE[rest2];
+                if (posix) {
+                  prev.value = pre + posix;
+                  state.backtrack = true;
+                  advance();
+                  if (!bos.output && tokens.indexOf(prev) === 1) {
+                    bos.output = ONE_CHAR;
+                  }
+                  continue;
+                }
+              }
+            }
+          }
+          if (value === "[" && peek() !== ":" || value === "-" && peek() === "]") {
+            value = `\\${value}`;
+          }
+          if (value === "]" && (prev.value === "[" || prev.value === "[^")) {
+            value = `\\${value}`;
+          }
+          if (opts.posix === true && value === "!" && prev.value === "[") {
+            value = "^";
+          }
+          prev.value += value;
+          append({ value });
+          continue;
+        }
+        if (state.quotes === 1 && value !== '"') {
+          value = utils.escapeRegex(value);
+          prev.value += value;
+          append({ value });
+          continue;
+        }
+        if (value === '"') {
+          state.quotes = state.quotes === 1 ? 0 : 1;
+          if (opts.keepQuotes === true) {
+            push({ type: "text", value });
+          }
+          continue;
+        }
+        if (value === "(") {
+          increment("parens");
+          push({ type: "paren", value });
+          continue;
+        }
+        if (value === ")") {
+          if (state.parens === 0 && opts.strictBrackets === true) {
+            throw new SyntaxError(syntaxError("opening", "("));
+          }
+          const extglob = extglobs[extglobs.length - 1];
+          if (extglob && state.parens === extglob.parens + 1) {
+            extglobClose(extglobs.pop());
+            continue;
+          }
+          push({ type: "paren", value, output: state.parens ? ")" : "\\)" });
+          decrement("parens");
+          continue;
+        }
+        if (value === "[") {
+          if (opts.nobracket === true || !remaining().includes("]")) {
+            if (opts.nobracket !== true && opts.strictBrackets === true) {
+              throw new SyntaxError(syntaxError("closing", "]"));
+            }
+            value = `\\${value}`;
+          } else {
+            increment("brackets");
+          }
+          push({ type: "bracket", value });
+          continue;
+        }
+        if (value === "]") {
+          if (opts.nobracket === true || prev && prev.type === "bracket" && prev.value.length === 1) {
+            push({ type: "text", value, output: `\\${value}` });
+            continue;
+          }
+          if (state.brackets === 0) {
+            if (opts.strictBrackets === true) {
+              throw new SyntaxError(syntaxError("opening", "["));
+            }
+            push({ type: "text", value, output: `\\${value}` });
+            continue;
+          }
+          decrement("brackets");
+          const prevValue = prev.value.slice(1);
+          if (prev.posix !== true && prevValue[0] === "^" && !prevValue.includes("/")) {
+            value = `/${value}`;
+          }
+          prev.value += value;
+          append({ value });
+          if (opts.literalBrackets === false || utils.hasRegexChars(prevValue)) {
+            continue;
+          }
+          const escaped = utils.escapeRegex(prev.value);
+          state.output = state.output.slice(0, -prev.value.length);
+          if (opts.literalBrackets === true) {
+            state.output += escaped;
+            prev.value = escaped;
+            continue;
+          }
+          prev.value = `(${capture}${escaped}|${prev.value})`;
+          state.output += prev.value;
+          continue;
+        }
+        if (value === "{" && opts.nobrace !== true) {
+          increment("braces");
+          const open5 = {
+            type: "brace",
+            value,
+            output: "(",
+            outputIndex: state.output.length,
+            tokensIndex: state.tokens.length
+          };
+          braces.push(open5);
+          push(open5);
+          continue;
+        }
+        if (value === "}") {
+          const brace = braces[braces.length - 1];
+          if (opts.nobrace === true || !brace) {
+            push({ type: "text", value, output: value });
+            continue;
+          }
+          let output2 = ")";
+          if (brace.dots === true) {
+            const arr = tokens.slice();
+            const range = [];
+            for (let i = arr.length - 1; i >= 0; i--) {
+              tokens.pop();
+              if (arr[i].type === "brace") {
+                break;
+              }
+              if (arr[i].type !== "dots") {
+                range.unshift(arr[i].value);
+              }
+            }
+            output2 = expandRange(range, opts);
+            state.backtrack = true;
+          }
+          if (brace.comma !== true && brace.dots !== true) {
+            const out = state.output.slice(0, brace.outputIndex);
+            const toks = state.tokens.slice(brace.tokensIndex);
+            brace.value = brace.output = "\\{";
+            value = output2 = "\\}";
+            state.output = out;
+            for (const t of toks) {
+              state.output += t.output || t.value;
+            }
+          }
+          push({ type: "brace", value, output: output2 });
+          decrement("braces");
+          braces.pop();
+          continue;
+        }
+        if (value === "|") {
+          if (extglobs.length > 0) {
+            extglobs[extglobs.length - 1].conditions++;
+          }
+          push({ type: "text", value });
+          continue;
+        }
+        if (value === ",") {
+          let output2 = value;
+          const brace = braces[braces.length - 1];
+          if (brace && stack[stack.length - 1] === "braces") {
+            brace.comma = true;
+            output2 = "|";
+          }
+          push({ type: "comma", value, output: output2 });
+          continue;
+        }
+        if (value === "/") {
+          if (prev.type === "dot" && state.index === state.start + 1) {
+            state.start = state.index + 1;
+            state.consumed = "";
+            state.output = "";
+            tokens.pop();
+            prev = bos;
+            continue;
+          }
+          push({ type: "slash", value, output: SLASH_LITERAL });
+          continue;
+        }
+        if (value === ".") {
+          if (state.braces > 0 && prev.type === "dot") {
+            if (prev.value === ".") prev.output = DOT_LITERAL;
+            const brace = braces[braces.length - 1];
+            prev.type = "dots";
+            prev.output += value;
+            prev.value += value;
+            brace.dots = true;
+            continue;
+          }
+          if (state.braces + state.parens === 0 && prev.type !== "bos" && prev.type !== "slash") {
+            push({ type: "text", value, output: DOT_LITERAL });
+            continue;
+          }
+          push({ type: "dot", value, output: DOT_LITERAL });
+          continue;
+        }
+        if (value === "?") {
+          const isGroup = prev && prev.value === "(";
+          if (!isGroup && opts.noextglob !== true && peek() === "(" && peek(2) !== "?") {
+            extglobOpen("qmark", value);
+            continue;
+          }
+          if (prev && prev.type === "paren") {
+            const next = peek();
+            let output2 = value;
+            if (prev.value === "(" && !/[!=<:]/.test(next) || next === "<" && !/<([!=]|\w+>)/.test(remaining())) {
+              output2 = `\\${value}`;
+            }
+            push({ type: "text", value, output: output2 });
+            continue;
+          }
+          if (opts.dot !== true && (prev.type === "slash" || prev.type === "bos")) {
+            push({ type: "qmark", value, output: QMARK_NO_DOT });
+            continue;
+          }
+          push({ type: "qmark", value, output: QMARK });
+          continue;
+        }
+        if (value === "!") {
+          if (opts.noextglob !== true && peek() === "(") {
+            if (peek(2) !== "?" || !/[!=<:]/.test(peek(3))) {
+              extglobOpen("negate", value);
+              continue;
+            }
+          }
+          if (opts.nonegate !== true && state.index === 0) {
+            negate();
+            continue;
+          }
+        }
+        if (value === "+") {
+          if (opts.noextglob !== true && peek() === "(" && peek(2) !== "?") {
+            extglobOpen("plus", value);
+            continue;
+          }
+          if (prev && prev.value === "(" || opts.regex === false) {
+            push({ type: "plus", value, output: PLUS_LITERAL });
+            continue;
+          }
+          if (prev && (prev.type === "bracket" || prev.type === "paren" || prev.type === "brace") || state.parens > 0) {
+            push({ type: "plus", value });
+            continue;
+          }
+          push({ type: "plus", value: PLUS_LITERAL });
+          continue;
+        }
+        if (value === "@") {
+          if (opts.noextglob !== true && peek() === "(" && peek(2) !== "?") {
+            push({ type: "at", extglob: true, value, output: "" });
+            continue;
+          }
+          push({ type: "text", value });
+          continue;
+        }
+        if (value !== "*") {
+          if (value === "$" || value === "^") {
+            value = `\\${value}`;
+          }
+          const match = REGEX_NON_SPECIAL_CHARS.exec(remaining());
+          if (match) {
+            value += match[0];
+            state.index += match[0].length;
+          }
+          push({ type: "text", value });
+          continue;
+        }
+        if (prev && (prev.type === "globstar" || prev.star === true)) {
+          prev.type = "star";
+          prev.star = true;
+          prev.value += value;
+          prev.output = star;
+          state.backtrack = true;
+          state.globstar = true;
+          consume(value);
+          continue;
+        }
+        let rest = remaining();
+        if (opts.noextglob !== true && /^\([^?]/.test(rest)) {
+          extglobOpen("star", value);
+          continue;
+        }
+        if (prev.type === "star") {
+          if (opts.noglobstar === true) {
+            consume(value);
+            continue;
+          }
+          const prior = prev.prev;
+          const before = prior.prev;
+          const isStart = prior.type === "slash" || prior.type === "bos";
+          const afterStar = before && (before.type === "star" || before.type === "globstar");
+          if (opts.bash === true && (!isStart || rest[0] && rest[0] !== "/")) {
+            push({ type: "star", value, output: "" });
+            continue;
+          }
+          const isBrace = state.braces > 0 && (prior.type === "comma" || prior.type === "brace");
+          const isExtglob = extglobs.length && (prior.type === "pipe" || prior.type === "paren");
+          if (!isStart && prior.type !== "paren" && !isBrace && !isExtglob) {
+            push({ type: "star", value, output: "" });
+            continue;
+          }
+          while (rest.slice(0, 3) === "/**") {
+            const after = input2[state.index + 4];
+            if (after && after !== "/") {
+              break;
+            }
+            rest = rest.slice(3);
+            consume("/**", 3);
+          }
+          const isEnd = eos() || state.parens > 0 && rest === ")".repeat(state.parens) && !extglobs.some((extglob) => extglob.type === "negate");
+          if (prior.type === "bos" && eos()) {
+            prev.type = "globstar";
+            prev.value += value;
+            prev.output = globstar(opts);
+            state.output = prev.output;
+            state.globstar = true;
+            consume(value);
+            continue;
+          }
+          if (prior.type === "slash" && prior.prev.type !== "bos" && !afterStar && isEnd) {
+            state.output = state.output.slice(0, -(prior.output + prev.output).length);
+            prior.output = `(?:${prior.output}`;
+            prev.type = "globstar";
+            prev.output = globstar(opts) + (opts.strictSlashes ? ")" : "|$)");
+            prev.value += value;
+            state.globstar = true;
+            state.output += prior.output + prev.output;
+            consume(value);
+            continue;
+          }
+          if (prior.type === "slash" && prior.prev.type !== "bos" && rest[0] === "/") {
+            const end = rest[1] !== void 0 ? "|$" : "";
+            state.output = state.output.slice(0, -(prior.output + prev.output).length);
+            prior.output = `(?:${prior.output}`;
+            prev.type = "globstar";
+            prev.output = `${globstar(opts)}${SLASH_LITERAL}|${SLASH_LITERAL}${end})`;
+            prev.value += value;
+            state.output += prior.output + prev.output;
+            state.globstar = true;
+            consume(value + advance());
+            push({ type: "slash", value: "/", output: "" });
+            continue;
+          }
+          if (prior.type === "bos" && rest[0] === "/") {
+            prev.type = "globstar";
+            prev.value += value;
+            prev.output = `(?:^|${SLASH_LITERAL}|${globstar(opts)}${SLASH_LITERAL})`;
+            state.output = prev.output;
+            state.globstar = true;
+            consume(value + advance());
+            push({ type: "slash", value: "/", output: "" });
+            continue;
+          }
+          state.output = state.output.slice(0, -prev.output.length);
+          prev.type = "globstar";
+          prev.output = globstar(opts);
+          prev.value += value;
+          state.output += prev.output;
+          state.globstar = true;
+          consume(value);
+          continue;
+        }
+        const token = { type: "star", value, output: star };
+        if (opts.bash === true) {
+          token.output = ".*?";
+          if (prev.type === "bos" || prev.type === "slash") {
+            token.output = nodot + token.output;
+          }
+          push(token);
+          continue;
+        }
+        if (prev && (prev.type === "bracket" || prev.type === "paren") && opts.regex === true) {
+          token.output = value;
+          push(token);
+          continue;
+        }
+        if (state.index === state.start || prev.type === "slash" || prev.type === "dot") {
+          if (prev.type === "dot") {
+            state.output += NO_DOT_SLASH;
+            prev.output += NO_DOT_SLASH;
+          } else if (opts.dot === true) {
+            state.output += NO_DOTS_SLASH;
+            prev.output += NO_DOTS_SLASH;
+          } else {
+            state.output += nodot;
+            prev.output += nodot;
+          }
+          if (peek() !== "*") {
+            state.output += ONE_CHAR;
+            prev.output += ONE_CHAR;
+          }
+        }
+        push(token);
+      }
+      while (state.brackets > 0) {
+        if (opts.strictBrackets === true) throw new SyntaxError(syntaxError("closing", "]"));
+        state.output = utils.escapeLast(state.output, "[");
+        decrement("brackets");
+      }
+      while (state.parens > 0) {
+        if (opts.strictBrackets === true) throw new SyntaxError(syntaxError("closing", ")"));
+        state.output = utils.escapeLast(state.output, "(");
+        decrement("parens");
+      }
+      while (state.braces > 0) {
+        if (opts.strictBrackets === true) throw new SyntaxError(syntaxError("closing", "}"));
+        state.output = utils.escapeLast(state.output, "{");
+        decrement("braces");
+      }
+      if (opts.strictSlashes !== true && (prev.type === "star" || prev.type === "bracket")) {
+        push({ type: "maybe_slash", value: "", output: `${SLASH_LITERAL}?` });
+      }
+      if (state.backtrack === true) {
+        state.output = "";
+        for (const token of state.tokens) {
+          state.output += token.output != null ? token.output : token.value;
+          if (token.suffix) {
+            state.output += token.suffix;
+          }
+        }
+      }
+      return state;
+    };
+    parse5.fastpaths = (input2, options) => {
+      const opts = { ...options };
+      const max = typeof opts.maxLength === "number" ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;
+      const len = input2.length;
+      if (len > max) {
+        throw new SyntaxError(`Input length: ${len}, exceeds maximum allowed length: ${max}`);
+      }
+      input2 = REPLACEMENTS[input2] || input2;
+      const {
+        DOT_LITERAL,
+        SLASH_LITERAL,
+        ONE_CHAR,
+        DOTS_SLASH,
+        NO_DOT,
+        NO_DOTS,
+        NO_DOTS_SLASH,
+        STAR,
+        START_ANCHOR
+      } = constants3.globChars(opts.windows);
+      const nodot = opts.dot ? NO_DOTS : NO_DOT;
+      const slashDot = opts.dot ? NO_DOTS_SLASH : NO_DOT;
+      const capture = opts.capture ? "" : "?:";
+      const state = { negated: false, prefix: "" };
+      let star = opts.bash === true ? ".*?" : STAR;
+      if (opts.capture) {
+        star = `(${star})`;
+      }
+      const globstar = (opts2) => {
+        if (opts2.noglobstar === true) return star;
+        return `(${capture}(?:(?!${START_ANCHOR}${opts2.dot ? DOTS_SLASH : DOT_LITERAL}).)*?)`;
+      };
+      const create = (str) => {
+        switch (str) {
+          case "*":
+            return `${nodot}${ONE_CHAR}${star}`;
+          case ".*":
+            return `${DOT_LITERAL}${ONE_CHAR}${star}`;
+          case "*.*":
+            return `${nodot}${star}${DOT_LITERAL}${ONE_CHAR}${star}`;
+          case "*/*":
+            return `${nodot}${star}${SLASH_LITERAL}${ONE_CHAR}${slashDot}${star}`;
+          case "**":
+            return nodot + globstar(opts);
+          case "**/*":
+            return `(?:${nodot}${globstar(opts)}${SLASH_LITERAL})?${slashDot}${ONE_CHAR}${star}`;
+          case "**/*.*":
+            return `(?:${nodot}${globstar(opts)}${SLASH_LITERAL})?${slashDot}${star}${DOT_LITERAL}${ONE_CHAR}${star}`;
+          case "**/.*":
+            return `(?:${nodot}${globstar(opts)}${SLASH_LITERAL})?${DOT_LITERAL}${ONE_CHAR}${star}`;
+          default: {
+            const match = /^(.*?)\.(\w+)$/.exec(str);
+            if (!match) return;
+            const source2 = create(match[1]);
+            if (!source2) return;
+            return source2 + DOT_LITERAL + match[2];
+          }
+        }
+      };
+      const output2 = utils.removePrefix(input2, state);
+      let source = create(output2);
+      if (source && opts.strictSlashes !== true) {
+        source += `${SLASH_LITERAL}?`;
+      }
+      return source;
+    };
+    module.exports = parse5;
+  }
+});
+
+// ../../node_modules/picomatch/lib/picomatch.js
+var require_picomatch = __commonJS({
+  "../../node_modules/picomatch/lib/picomatch.js"(exports, module) {
+    "use strict";
+    var scan2 = require_scan();
+    var parse5 = require_parse();
+    var utils = require_utils();
+    var constants3 = require_constants();
+    var isObject3 = (val) => val && typeof val === "object" && !Array.isArray(val);
+    var picomatch2 = (glob, options, returnState = false) => {
+      if (Array.isArray(glob)) {
+        const fns = glob.map((input2) => picomatch2(input2, options, returnState));
+        const arrayMatcher = (str) => {
+          for (const isMatch of fns) {
+            const state2 = isMatch(str);
+            if (state2) return state2;
+          }
+          return false;
+        };
+        return arrayMatcher;
+      }
+      const isState = isObject3(glob) && glob.tokens && glob.input;
+      if (glob === "" || typeof glob !== "string" && !isState) {
+        throw new TypeError("Expected pattern to be a non-empty string");
+      }
+      const opts = options || {};
+      const posix = opts.windows;
+      const regex = isState ? picomatch2.compileRe(glob, options) : picomatch2.makeRe(glob, options, false, true);
+      const state = regex.state;
+      delete regex.state;
+      let isIgnored = () => false;
+      if (opts.ignore) {
+        const ignoreOpts = { ...options, ignore: null, onMatch: null, onResult: null };
+        isIgnored = picomatch2(opts.ignore, ignoreOpts, returnState);
+      }
+      const matcher = (input2, returnObject = false) => {
+        const { isMatch, match, output: output2 } = picomatch2.test(input2, regex, options, { glob, posix });
+        const result = { glob, state, regex, posix, input: input2, output: output2, match, isMatch };
+        if (typeof opts.onResult === "function") {
+          opts.onResult(result);
+        }
+        if (isMatch === false) {
+          result.isMatch = false;
+          return returnObject ? result : false;
+        }
+        if (isIgnored(input2)) {
+          if (typeof opts.onIgnore === "function") {
+            opts.onIgnore(result);
+          }
+          result.isMatch = false;
+          return returnObject ? result : false;
+        }
+        if (typeof opts.onMatch === "function") {
+          opts.onMatch(result);
+        }
+        return returnObject ? result : true;
+      };
+      if (returnState) {
+        matcher.state = state;
+      }
+      return matcher;
+    };
+    picomatch2.test = (input2, regex, options, { glob, posix } = {}) => {
+      if (typeof input2 !== "string") {
+        throw new TypeError("Expected input to be a string");
+      }
+      if (input2 === "") {
+        return { isMatch: false, output: "" };
+      }
+      const opts = options || {};
+      const format = opts.format || (posix ? utils.toPosixSlashes : null);
+      let match = input2 === glob;
+      let output2 = match && format ? format(input2) : input2;
+      if (match === false) {
+        output2 = format ? format(input2) : input2;
+        match = output2 === glob;
+      }
+      if (match === false || opts.capture === true) {
+        if (opts.matchBase === true || opts.basename === true) {
+          match = picomatch2.matchBase(input2, regex, options, posix);
+        } else {
+          match = regex.exec(output2);
+        }
+      }
+      return { isMatch: Boolean(match), match, output: output2 };
+    };
+    picomatch2.matchBase = (input2, glob, options, posix = options && options.windows) => {
+      const regex = glob instanceof RegExp ? glob : picomatch2.makeRe(glob, options);
+      return regex.test(utils.basename(input2, { windows: posix }));
+    };
+    picomatch2.isMatch = (str, patterns, options) => picomatch2(patterns, options)(str);
+    picomatch2.parse = (pattern, options) => {
+      if (Array.isArray(pattern)) return pattern.map((p) => picomatch2.parse(p, options));
+      return parse5(pattern, { ...options, fastpaths: false });
+    };
+    picomatch2.scan = (input2, options) => scan2(input2, options);
+    picomatch2.compileRe = (state, options, returnOutput = false, returnState = false) => {
+      if (returnOutput === true) {
+        return state.output;
+      }
+      const opts = options || {};
+      const prepend = opts.contains ? "" : "^";
+      const append = opts.contains ? "" : "$";
+      let source = `${prepend}(?:${state.output})${append}`;
+      if (state && state.negated === true) {
+        source = `^(?!${source}).*$`;
+      }
+      const regex = picomatch2.toRegex(source, options);
+      if (returnState === true) {
+        regex.state = state;
+      }
+      return regex;
+    };
+    picomatch2.makeRe = (input2, options = {}, returnOutput = false, returnState = false) => {
+      if (!input2 || typeof input2 !== "string") {
+        throw new TypeError("Expected a non-empty string");
+      }
+      let parsed = { negated: false, fastpaths: true };
+      if (options.fastpaths !== false && (input2[0] === "." || input2[0] === "*")) {
+        parsed.output = parse5.fastpaths(input2, options);
+      }
+      if (!parsed.output) {
+        parsed = parse5(input2, options);
+      }
+      return picomatch2.compileRe(parsed, options, returnOutput, returnState);
+    };
+    picomatch2.toRegex = (source, options) => {
+      try {
+        const opts = options || {};
+        return new RegExp(source, opts.flags || (opts.nocase ? "i" : ""));
+      } catch (err) {
+        if (options && options.debug === true) throw err;
+        return /$^/;
+      }
+    };
+    picomatch2.constants = constants3;
+    module.exports = picomatch2;
+  }
+});
+
+// ../../node_modules/picomatch/index.js
+var require_picomatch2 = __commonJS({
+  "../../node_modules/picomatch/index.js"(exports, module) {
+    "use strict";
+    var pico = require_picomatch();
+    var utils = require_utils();
+    function picomatch2(glob, options, returnState = false) {
+      if (options && (options.windows === null || options.windows === void 0)) {
+        options = { ...options, windows: utils.isWindows() };
+      }
+      return pico(glob, options, returnState);
+    }
+    Object.assign(picomatch2, pico);
+    module.exports = picomatch2;
+  }
+});
+
 // src/git-hooks.ts
 import { execFile as execFile3 } from "child_process";
 import { existsSync as existsSync5, realpathSync } from "fs";
@@ -1005,9 +2883,9 @@ import { promisify } from "util";
 import { randomBytes } from "crypto";
 import { mkdir, open, readFile, rename, rm, stat } from "fs/promises";
 import { basename, dirname, join } from "path";
-async function isDirectory(path3) {
+async function isDirectory(path2) {
   try {
-    return (await stat(path3)).isDirectory();
+    return (await stat(path2)).isDirectory();
   } catch {
     return false;
   }
@@ -1266,11 +3144,11 @@ function parseChangeSections(stdout) {
     const parts = line.split("	");
     if (parts.length < 3) continue;
     const [added, removed, ...rest] = parts;
-    const path3 = rest.join("	").trim();
-    if (path3 === "") continue;
+    const path2 = rest.join("	").trim();
+    if (path2 === "") continue;
     current.added += Number.parseInt(added ?? "", 10) || 0;
     current.removed += Number.parseInt(removed ?? "", 10) || 0;
-    current.files.push(path3);
+    current.files.push(path2);
   }
   return out;
 }
@@ -1429,9 +3307,9 @@ async function commitBetween(root, from, to, env = process.env) {
 async function gitHooksDir(root) {
   try {
     const { stdout } = await exec("git", ["-C", root, "rev-parse", "--git-path", "hooks"]);
-    const path3 = stdout.trim();
-    if (path3 === "") return void 0;
-    return isAbsolute(path3) ? path3 : join2(root, path3);
+    const path2 = stdout.trim();
+    if (path2 === "") return void 0;
+    return isAbsolute(path2) ? path2 : join2(root, path2);
   } catch {
     return void 0;
   }
@@ -2312,10 +4190,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path3) {
-  if (!path3)
+function getElementAtPath(obj, path2) {
+  if (!path2)
     return obj;
-  return path3.reduce((acc, key) => acc?.[key], obj);
+  return path2.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -2655,11 +4533,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path3, issues) {
+function prefixIssues(path2, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path3);
+    iss.path.unshift(path2);
     return iss;
   });
 }
@@ -3121,16 +4999,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path3 = []) => {
+  const processError = (error63, path2 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path2, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
       } else {
-        const fullpath = [...path3, ...issue2.path];
+        const fullpath = [...path2, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -3169,17 +5047,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path3 = []) => {
+  const processError = (error63, path2 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path2, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
       } else {
-        const fullpath = [...path3, ...issue2.path];
+        const fullpath = [...path2, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -3218,8 +5096,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path3 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path3) {
+  const path2 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path2) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -18704,15 +20582,15 @@ var initializer2 = (inst, issues) => {
   if (_installedErrorProtos.has(proto))
     return;
   _installedErrorProtos.add(proto);
-  _lazyMethod(proto, "format", (self2) => (mapper) => formatError(self2, mapper));
-  _lazyMethod(proto, "flatten", (self2) => (mapper) => flattenError(self2, mapper));
-  _lazyMethod(proto, "addIssue", (self2) => (issue2) => {
-    self2.issues.push(issue2);
-    self2.message = JSON.stringify(self2.issues, jsonStringifyReplacer, 2);
+  _lazyMethod(proto, "format", (self) => (mapper) => formatError(self, mapper));
+  _lazyMethod(proto, "flatten", (self) => (mapper) => flattenError(self, mapper));
+  _lazyMethod(proto, "addIssue", (self) => (issue2) => {
+    self.issues.push(issue2);
+    self.message = JSON.stringify(self.issues, jsonStringifyReplacer, 2);
   });
-  _lazyMethod(proto, "addIssues", (self2) => (issues2) => {
-    self2.issues.push(...issues2);
-    self2.message = JSON.stringify(self2.issues, jsonStringifyReplacer, 2);
+  _lazyMethod(proto, "addIssues", (self) => (issues2) => {
+    self.issues.push(...issues2);
+    self.message = JSON.stringify(self.issues, jsonStringifyReplacer, 2);
   });
   Object.defineProperty(proto, "isEmpty", {
     configurable: true,
@@ -19558,7 +21436,7 @@ var ZodObject = /* @__PURE__ */ $constructor("ZodObject", (inst, def) => {
   $ZodObjectJIT.init(inst, def);
   ZodType.init(inst, def);
   inst._zod.processJSONSchema = (ctx, json2, params) => objectProcessor(inst, ctx, json2, params);
-  util_exports.installLazyProp(inst, "shape", (self2) => self2._zod.def.shape, false);
+  util_exports.installLazyProp(inst, "shape", (self) => self._zod.def.shape, false);
 }, {
   keyof() {
     return _enum2(Object.keys(this._zod.def.shape));
@@ -20357,13 +22235,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path3 = ref.slice(1).split("/").filter(Boolean);
-  if (path3.length === 0) {
+  const path2 = ref.slice(1).split("/").filter(Boolean);
+  if (path2.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path3[0] === defsKey) {
-    const key = path3[1] === void 0 ? void 0 : decodeJSONPointerSegment(path3[1]);
+  if (path2[0] === defsKey) {
+    const key = path2[1] === void 0 ? void 0 : decodeJSONPointerSegment(path2[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -21285,15 +23163,15 @@ function readPs(pid) {
 
 // src/agents/lineage.ts
 function program(args) {
-  const path3 = (args[0] ?? "").replace(/\\/g, "/");
-  return { path: path3, name: basename3(path3).toLowerCase() };
+  const path2 = (args[0] ?? "").replace(/\\/g, "/");
+  return { path: path2, name: basename3(path2).toLowerCase() };
 }
 function nodeRunning(args, script) {
   return /^node(\.exe)?$/.test(program(args).name) && script.test((args[1] ?? "").replace(/\\/g, "/"));
 }
 function isClaudeProcess(args) {
-  const { path: path3, name } = program(args);
-  if (name === "claude" || name === "claude.exe" || path3.includes("/claude/versions/")) return true;
+  const { path: path2, name } = program(args);
+  if (name === "claude" || name === "claude.exe" || path2.includes("/claude/versions/")) return true;
   return nodeRunning(args, /claude-code\/cli\.m?js$/);
 }
 function isCodexProcess(args) {
@@ -22456,7 +24334,7 @@ if (process.platform === "linux") {
 // ../../node_modules/signal-exit/dist/mjs/index.js
 var processOk = (process4) => !!process4 && typeof process4 === "object" && typeof process4.removeListener === "function" && typeof process4.emit === "function" && typeof process4.reallyExit === "function" && typeof process4.listeners === "function" && typeof process4.kill === "function" && typeof process4.pid === "number" && typeof process4.on === "function";
 var kExitEmitter = /* @__PURE__ */ Symbol.for("signal-exit emitter");
-var global2 = globalThis;
+var global = globalThis;
 var ObjectDefineProperty = Object.defineProperty.bind(Object);
 var Emitter = class {
   emitted = {
@@ -22470,10 +24348,10 @@ var Emitter = class {
   count = 0;
   id = Math.random();
   constructor() {
-    if (global2[kExitEmitter]) {
-      return global2[kExitEmitter];
+    if (global[kExitEmitter]) {
+      return global[kExitEmitter];
     }
-    ObjectDefineProperty(global2, kExitEmitter, {
+    ObjectDefineProperty(global, kExitEmitter, {
       value: this,
       writable: false,
       enumerable: false,
@@ -24002,13 +25880,13 @@ function addAssistant(turn, line) {
       turn.replies.push(block.text);
     } else if (block?.type === "tool_use") {
       const input2 = block.input ?? {};
-      const path3 = input2.file_path;
+      const path2 = input2.file_path;
       if (block.name === "Bash") {
         turn.tools.commands += 1;
         if (typeof input2.description === "string" && input2.description.trim() !== "")
           addOnce(turn.tools, "steps", input2.description.trim());
-      } else if (EDIT_TOOLS.has(block.name) && typeof path3 === "string") {
-        if (!turn.tools.files.includes(path3)) turn.tools.files.push(path3);
+      } else if (EDIT_TOOLS.has(block.name) && typeof path2 === "string") {
+        if (!turn.tools.files.includes(path2)) turn.tools.files.push(path2);
       } else {
         turn.tools.other += 1;
         if (block.name === "AskUserQuestion" && Array.isArray(input2.questions))
@@ -24342,9 +26220,9 @@ async function rollouts(dir) {
   }
   const files = [];
   for (const entry of entries) {
-    const path3 = join9(dir, entry.name);
-    if (entry.isDirectory()) files.push(...await rollouts(path3));
-    else if (ROLLOUT.test(entry.name)) files.push(path3);
+    const path2 = join9(dir, entry.name);
+    if (entry.isDirectory()) files.push(...await rollouts(path2));
+    else if (ROLLOUT.test(entry.name)) files.push(path2);
   }
   return files;
 }
@@ -24376,16 +26254,16 @@ async function unreadableTranscripts(env = process.env, zstd = hasZstd()) {
   return (await scan(env, zstd)).unreadable;
 }
 async function* lines(file2) {
-  let path3 = file2;
+  let path2 = file2;
   let input2;
   try {
-    input2 = await opened(path3);
+    input2 = await opened(path2);
   } catch (error62) {
-    if (error62.code !== "ENOENT" || path3.endsWith(".zst")) throw error62;
-    path3 = `${file2}.zst`;
-    input2 = await opened(path3);
+    if (error62.code !== "ENOENT" || path2.endsWith(".zst")) throw error62;
+    path2 = `${file2}.zst`;
+    input2 = await opened(path2);
   }
-  if (path3.endsWith(".zst")) input2 = input2.pipe(zlib.createZstdDecompress());
+  if (path2.endsWith(".zst")) input2 = input2.pipe(zlib.createZstdDecompress());
   const reader = createInterface4({ input: input2, crlfDelay: Number.POSITIVE_INFINITY });
   try {
     yield* reader;
@@ -24394,9 +26272,9 @@ async function* lines(file2) {
     input2.destroy();
   }
 }
-function opened(path3) {
+function opened(path2) {
   return new Promise((resolve6, reject) => {
-    const stream = createReadStream3(path3);
+    const stream = createReadStream3(path2);
     stream.once("open", () => resolve6(stream));
     stream.once("error", reject);
   });
@@ -24475,8 +26353,8 @@ async function readConversation2(file2) {
       current.tools.commands += 1;
     } else if (item.type === "FileChange") {
       const changes = item.changes ?? {};
-      for (const [path3, change] of Object.entries(changes))
-        for (const name of [path3, change?.move_path])
+      for (const [path2, change] of Object.entries(changes))
+        for (const name of [path2, change?.move_path])
           if (typeof name === "string" && !current.tools.files.includes(name))
             current.tools.files.push(name);
     } else if (OTHER_TOOLS.has(String(item.type))) {
@@ -25610,25 +27488,25 @@ async function pluginContentHash(root) {
   hash2.update("codex-plugin-bundle-v1");
   const pending = [root];
   while (pending.length > 0) {
-    const path3 = pending.pop();
-    const rel = relative3(root, path3);
-    const name = rel === "" ? "" : basename6(path3);
+    const path2 = pending.pop();
+    const rel = relative3(root, path2);
+    const name = rel === "" ? "" : basename6(path2);
     if (name === "__pycache__" || name === ".venv" || name.endsWith(".pyc") || name.endsWith(".egg-info"))
       continue;
     updateBytes(hash2, Buffer.from(rel));
-    const info = await lstat(path3);
+    const info = await lstat(path2);
     if (info.isDirectory()) {
       hash2.update("directory");
-      const names = (await readdir4(path3)).sort(
+      const names = (await readdir4(path2)).sort(
         (a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b))
       );
-      for (const entry of names.reverse()) pending.push(join11(path3, entry));
+      for (const entry of names.reverse()) pending.push(join11(path2, entry));
     } else if (info.isFile()) {
       hash2.update("file");
       hash2.update(u64(info.size));
-      hash2.update(await readFile6(path3));
+      hash2.update(await readFile6(path2));
     } else {
-      throw new Error(`unsupported plugin entry: ${path3}`);
+      throw new Error(`unsupported plugin entry: ${path2}`);
     }
   }
   return `sha256:${hash2.digest("hex")}`;
@@ -25812,8 +27690,8 @@ function renameGitignoreLines(text) {
     return line.replace(/^(\s*)\/\.codelineage(?=\/|$)/, "$1/.cogit");
   }).join("\n");
 }
-async function isDirectory2(path3) {
-  return stat8(path3).then(
+async function isDirectory2(path2) {
+  return stat8(path2).then(
     (info) => info.isDirectory(),
     () => false
   );
@@ -25847,7 +27725,7 @@ async function migrateProject(root) {
     const next = renameGitignoreLines(text);
     if (next !== text) await atomicWrite(gitignore, next).catch(() => void 0);
   }
-  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-WMXYPTL6.js");
+  const { installGitHooks: installGitHooks2 } = await import("./git-hooks-H3VTD5S7.js");
   await installGitHooks2(dir).catch(() => void 0);
   return true;
 }
@@ -26511,6 +28389,234 @@ import { appendFile as appendFile3, mkdir as mkdir6, readFile as readFile10 } fr
 import { dirname as dirname9 } from "path";
 import { constants as constants2, gunzipSync, gzipSync } from "zlib";
 
+// ../../node_modules/@secretlint/core/module/helper/keyword-guard.js
+var ASCII_SIZE = 128;
+var MAX_GUARD_MIN = 255;
+var isAscii = (text) => {
+  for (let i = 0; i < text.length; i++) {
+    if (text.charCodeAt(i) >= ASCII_SIZE) {
+      return false;
+    }
+  }
+  return true;
+};
+var SHORT_CLASSES = {
+  d: "0-9",
+  w: "A-Za-z0-9_"
+};
+var parseSet = (after) => {
+  if (after[0] !== "[") {
+    throw new Error("It should start with a set of characters, such as `[A-Za-z0-9]`.");
+  }
+  if (after[1] === "^") {
+    throw new Error("A set with `^` is not supported. Write the characters that follow the keyword.");
+  }
+  const items = [];
+  let index = 1;
+  for (; ; index++) {
+    const char = after[index];
+    if (char === void 0) {
+      throw new Error("The set has no `]`.");
+    }
+    if (char === "]") {
+      break;
+    }
+    if (char === "\\") {
+      const escaped = after[index + 1];
+      if (escaped === "\\" || escaped === "]") {
+        items.push(`\\${escaped}`);
+        index++;
+        continue;
+      }
+      const shortClass = escaped === void 0 ? void 0 : SHORT_CLASSES[escaped];
+      if (shortClass !== void 0) {
+        throw new Error(`\`\\${escaped}\` is not supported. Write \`${shortClass}\`.`);
+      }
+      if (escaped === "-") {
+        throw new Error("`\\-` is not supported. Write `-` as the last item of the set.");
+      }
+      throw new Error(`\`\\${escaped ?? ""}\` is not supported. In a set, \`\\\` is written only before \`\\\` and \`]\`.`);
+    }
+    items.push(char);
+  }
+  const end = index + 1;
+  const codes = [];
+  const add = (code) => {
+    if (codes.includes(code)) {
+      throw new Error(`The set has ${JSON.stringify(String.fromCharCode(code))} twice.`);
+    }
+    codes.push(code);
+  };
+  const codeOf = (item) => item.charCodeAt(item.length - 1);
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item === "-") {
+      if (i !== items.length - 1) {
+        throw new Error("A `-` that is a character of the set should be the last item, such as `[A-Za-z0-9_-]`.");
+      }
+      add(codeOf(item));
+      continue;
+    }
+    const next = items[i + 1];
+    const last = items[i + 2];
+    if (next === "-" && last !== void 0) {
+      if (last === "-") {
+        throw new Error("A range can not end with `-`.");
+      }
+      const from = codeOf(item);
+      const to = codeOf(last);
+      if (from >= to) {
+        throw new Error(`The range \`${item}-${last}\` is not in order.`);
+      }
+      for (let code = from; code <= to; code++) {
+        add(code);
+      }
+      i += 2;
+      continue;
+    }
+    add(codeOf(item));
+  }
+  if (codes.length === 0) {
+    throw new Error("The set is empty.");
+  }
+  codes.sort((a, b) => a - b);
+  return { chars: String.fromCharCode(...codes), end };
+};
+var parseCount = (count2) => {
+  const setExample = "[...]";
+  if (count2 === "+") {
+    throw new Error(`\`+\` is not supported. Write \`${setExample}{1,}\`.`);
+  }
+  const alwaysTrue = () => {
+    throw new Error(`\`${count2}\` makes the guard always true. The count should be \`{n,}\`, and n is 1 or more.`);
+  };
+  if (count2 === "*" || count2 === "?") {
+    return alwaysTrue();
+  }
+  const matched = /^\{(\d+)(,(\d*))?\}$/.exec(count2);
+  if (!matched) {
+    if (count2 === "") {
+      throw new Error("The set should be followed by a count, such as `{40,}`.");
+    }
+    throw new Error(`\`${count2}\` is not supported. After the set, only a count such as \`{40,}\` is supported.`);
+  }
+  const least = matched[1];
+  if (Number(least) === 0) {
+    return alwaysTrue();
+  }
+  if (matched[2] === void 0) {
+    throw new Error(`\`${count2}\` is not supported, because the guard does not check where the characters end. Write \`{${least},}\`.`);
+  }
+  if (matched[3] !== "") {
+    throw new Error(`\`${count2}\` is not supported, because the guard does not check the most count. Write \`{${least},}\`.`);
+  }
+  if (least.startsWith("0")) {
+    throw new Error(`\`${count2}\` is not supported. Write the count without \`0\` at its start.`);
+  }
+  const min = Number(least);
+  if (min > MAX_GUARD_MIN) {
+    throw new Error(`The count should be ${MAX_GUARD_MIN} or less.`);
+  }
+  return min;
+};
+var parseKeywordGuard = (after) => {
+  if (!isAscii(after)) {
+    throw new Error("It should have only ASCII characters.");
+  }
+  const { chars, end } = parseSet(after);
+  return { chars, min: parseCount(after.slice(end)) };
+};
+var KEYWORD_OBJECT_PROPERTIES = /* @__PURE__ */ new Set(["keyword", "after"]);
+var parseKeywordObject = (item) => {
+  const describe3 = () => {
+    try {
+      return JSON.stringify(item) ?? String(item);
+    } catch {
+      return String(item);
+    }
+  };
+  const fail = (reason, cause) => {
+    throw new Error(`The keyword ${describe3()} is not supported. ${reason}
+A keyword with a guard is written as { keyword: "00", after: "[A-Za-z0-9_-]{40,}" }.`, cause === void 0 ? void 0 : { cause });
+  };
+  const unknownProperties = Object.keys(item).filter((property) => !KEYWORD_OBJECT_PROPERTIES.has(property));
+  if (unknownProperties.length > 0) {
+    return fail(`It has unknown properties: ${unknownProperties.join(", ")}. If they are properties of a newer secretlint, please update secretlint.`);
+  }
+  const { keyword, after } = item;
+  if (typeof keyword !== "string" || keyword.length === 0 || !isAscii(keyword)) {
+    return fail("`keyword` should be a non-empty ASCII string.");
+  }
+  if (after === void 0) {
+    return fail(`\`after\` is required. A keyword without a guard is written as the string ${JSON.stringify(keyword)}.`);
+  }
+  if (typeof after !== "string") {
+    return fail("`after` should be a string.");
+  }
+  try {
+    return { keyword, after, guard: parseKeywordGuard(after) };
+  } catch (error62) {
+    return fail(`\`after\`: ${error62 instanceof Error ? error62.message : String(error62)}`, error62);
+  }
+};
+var createGuardTable = (guard) => {
+  const table = new Uint8Array(256);
+  for (let i = 0; i < guard.chars.length; i++) {
+    table[guard.chars.charCodeAt(i)] = 1;
+  }
+  return table;
+};
+var isGuardMetInBytes = (bytes, start, table, min) => {
+  const end = start + min;
+  if (end > bytes.length) {
+    return false;
+  }
+  for (let i = start; i < end; i++) {
+    if (table[bytes[i]] !== 1) {
+      return false;
+    }
+  }
+  return true;
+};
+var isGuardMetInText = (text, start, table, min) => {
+  const end = start + min;
+  if (end > text.length) {
+    return false;
+  }
+  for (let i = start; i < end; i++) {
+    if (table[text.charCodeAt(i)] !== 1) {
+      return false;
+    }
+  }
+  return true;
+};
+var formatGuardedKeyword = (keyword, guard) => {
+  const codes = Array.from(guard.chars, (char) => char.charCodeAt(0)).filter((code) => code !== 45);
+  const write = (code) => {
+    const char = String.fromCharCode(code);
+    return char === "\\" || char === "]" ? `\\${char}` : char;
+  };
+  let set2 = "";
+  for (let i = 0; i < codes.length; ) {
+    let end = i;
+    while (end + 1 < codes.length && codes[end + 1] === codes[end] + 1) {
+      end++;
+    }
+    if (end - i >= 2) {
+      set2 += `${write(codes[i])}-${write(codes[end])}`;
+    } else {
+      for (let j = i; j <= end; j++) {
+        set2 += write(codes[j]);
+      }
+    }
+    i = end + 1;
+  }
+  return `${keyword} [${set2}${guard.chars.includes("-") ? "-" : ""}]{${guard.min},}`;
+};
+var keywordGuardKey = (guard) => {
+  return guard === void 0 ? "" : `${guard.min}:${guard.chars}`;
+};
+
 // ../../node_modules/@secretlint/core/module/SecretLintSourceCodeImpl.js
 var import_structured_source = __toESM(require_structured_source(), 1);
 
@@ -26522,22 +28628,53 @@ function invariant(condition, message) {
 
 // ../../node_modules/@secretlint/core/module/SecretLintSourceCodeImpl.js
 var SecretLintSourceCodeImpl = class {
-  hasBOM;
-  content;
   filePath;
   physicalFilePath;
   contentType;
   ext;
-  structuredSource;
-  constructor({ content = "", ext, filePath, physicalFilePath, contentType }) {
+  contentBytes;
+  _getRawContent;
+  _rawContent;
+  _content;
+  _structuredSource;
+  constructor({ content = "", ext, filePath, physicalFilePath, contentType, contentBytes }) {
     invariant(ext || filePath, "should be set either of fileExt or filePath.");
-    this.hasBOM = content.charCodeAt(0) === 65279;
-    this.content = this.hasBOM ? content.slice(1) : content;
-    this.structuredSource = new import_structured_source.StructuredSource(this.content);
+    if (typeof content === "function") {
+      this._getRawContent = content;
+    } else {
+      this._rawContent = content;
+    }
     this.filePath = filePath;
     this.physicalFilePath = physicalFilePath;
     this.contentType = contentType;
     this.ext = ext;
+    this.contentBytes = contentBytes;
+  }
+  get rawContent() {
+    if (this._rawContent === void 0) {
+      this._rawContent = this._getRawContent?.() ?? "";
+      this._getRawContent = void 0;
+    }
+    return this._rawContent;
+  }
+  get hasBOM() {
+    return this.rawContent.charCodeAt(0) === 65279;
+  }
+  get content() {
+    if (this._content === void 0) {
+      this._content = this.hasBOM ? this.rawContent.slice(1) : this.rawContent;
+    }
+    return this._content;
+  }
+  /**
+   * StructuredSource builds the line index of the content.
+   * It is created lazily because most files do not have any report and do not need location info.
+   */
+  get structuredSource() {
+    if (this._structuredSource === void 0) {
+      this._structuredSource = new import_structured_source.StructuredSource(this.content);
+    }
+    return this._structuredSource;
   }
   /**
    * get file path
@@ -26605,65 +28742,6 @@ var SecretLintSourceCodeImpl = class {
   }
 };
 
-// ../../node_modules/@secretlint/core/module/helper/promise-event-emitter.js
-var EventEmitter = class {
-  #listeners = /* @__PURE__ */ new Map();
-  on(type, listener) {
-    const prevSet = this.#listeners.get(type);
-    const listenerSet = prevSet ?? /* @__PURE__ */ new Set();
-    listenerSet?.add(listener);
-    this.#listeners.set(type, listenerSet);
-  }
-  emit(type, ...args) {
-    const listenerSet = this.#listeners.get(type);
-    if (!listenerSet) {
-      return;
-    }
-    for (const listenerSetElement of listenerSet) {
-      listenerSetElement(...args);
-    }
-  }
-  off(type, listener) {
-    const listenerSet = this.#listeners.get(type);
-    if (!listenerSet) {
-      return;
-    }
-    for (const listenerSetElement of listenerSet) {
-      if (listenerSetElement === listener) {
-        listenerSet.delete(listener);
-      }
-    }
-  }
-  removeAllListeners() {
-    this.#listeners.clear();
-  }
-  listenerCount(type) {
-    return this.#listeners.get(type)?.size ?? 0;
-  }
-  listeners(type) {
-    return Array.from(this.#listeners.get(type) ?? []);
-  }
-};
-var PromiseEventEmitter = class {
-  events;
-  constructor() {
-    this.events = new EventEmitter();
-  }
-  listenerCount(type) {
-    return this.events.listenerCount(type);
-  }
-  on(event, listener) {
-    return this.events.on(event, listener);
-  }
-  emit(event, ...args) {
-    const promises = [];
-    this.events.listeners(event).forEach((listener) => {
-      promises.push(listener(...args));
-    });
-    return Promise.all(promises);
-  }
-};
-
 // ../../node_modules/@secretlint/core/module/helper/SecretLintRuleMessageTranslator.js
 var DEFAULT_LOCAL = "en";
 var formatMessage = (messageHandler, props) => {
@@ -26692,9 +28770,9 @@ var getMatchedLocaleMessage = (locale, locales) => {
   }
   return DEFAULT_LOCAL;
 };
-var createTranslator = (messages2, options) => {
+var createTranslator = (messages31, options) => {
   return (messageId, props) => {
-    const messageHandler = messages2[messageId];
+    const messageHandler = messages31[messageId];
     if (!messageHandler) {
       throw new Error(`messages:${String(messageId)} is missing in messages.`);
     }
@@ -26729,42 +28807,11 @@ var createTranslator = (messages2, options) => {
 };
 
 // ../../node_modules/@secretlint/core/module/RuleContext.js
-var createContextEvents = () => {
-  const contextEvents = new EventEmitter();
-  const REPORT_SYMBOL = /* @__PURE__ */ Symbol("report");
-  const IGNORE_SYMBOL = /* @__PURE__ */ Symbol("ignore");
-  return {
-    report(descriptor) {
-      contextEvents.emit(REPORT_SYMBOL, descriptor);
-    },
-    onReport(handler) {
-      const listener = (descriptor) => {
-        handler(descriptor);
-      };
-      contextEvents.on(REPORT_SYMBOL, listener);
-      return () => {
-        contextEvents.off(REPORT_SYMBOL, listener);
-      };
-    },
-    ignore(descriptor) {
-      contextEvents.emit(IGNORE_SYMBOL, descriptor);
-    },
-    onIgnore(handler) {
-      const listener = (descriptor) => {
-        handler(descriptor);
-      };
-      contextEvents.on(IGNORE_SYMBOL, listener);
-      return () => {
-        contextEvents.off(IGNORE_SYMBOL, listener);
-      };
-    }
-  };
-};
 var createRuleContext = ({ ruleId, ruleParentId, meta: meta3, severity, sourceCode, contextEvents, sharedOptions, locale }) => {
   return {
     sharedOptions,
-    createTranslator: (messages2) => {
-      return createTranslator(messages2, {
+    createTranslator: (messages31) => {
+      return createTranslator(messages31, {
         defaultLocale: locale
       });
     },
@@ -26813,78 +28860,29 @@ var createRuleContext = ({ ruleId, ruleParentId, meta: meta3, severity, sourceCo
   };
 };
 
-// ../../node_modules/@secretlint/core/module/SecretLintRuleImpl.js
-var SecretLintRule = class {
-  ruleReportHandle;
-  ruleCreator;
-  descriptorRule;
-  constructor({ descriptorRule, context }) {
-    this.descriptorRule = descriptorRule;
-    this.ruleCreator = descriptorRule.rule;
-    const ruleCreatorOptions = descriptorRule.options || {};
-    this.ruleReportHandle = this.ruleCreator.create(context, ruleCreatorOptions);
-  }
-  allowMessageIds() {
-    if (!this.descriptorRule.allowMessageIds) {
-      return [];
-    }
-    const ruleId = this.ruleCreator.meta.id;
-    return this.descriptorRule.allowMessageIds.map((allowMessageId) => {
-      return {
-        messageId: allowMessageId,
-        ruleId
-      };
-    });
-  }
-  supportSourceCode(sourceCode) {
-    const contentType = sourceCode.contentType;
-    if (contentType === "unknown") {
-      return true;
-    }
-    if (this.ruleCreator.meta.supportedContentTypes.includes("all")) {
-      return true;
-    }
-    return this.ruleCreator.meta.supportedContentTypes.includes(contentType);
-  }
-  async file(source) {
-    const file2 = this.ruleReportHandle.file;
-    if (!file2) {
-      return;
-    }
-    return file2(source);
-  }
-};
-
 // ../../node_modules/@secretlint/profiler/module/index.js
+var NO_ID = "";
 var SecretLintProfiler = class {
-  perf;
-  PerformanceObserver;
-  observer;
-  /**
-   * Profiling costs performance.
-   * `performance.mark()` and `PerformanceObserver` callback are called for each rule and each file.
-   * So, the profiler should be disabled if the user does not need the profiling result.
-   * https://github.com/secretlint/secretlint/issues/1633
-   */
+  nowFn;
   enabled;
-  entries = [];
-  measures = [];
   /**
-   * Set of mark names that have already been marked as `{mark}::start`
+   * type -> id -> total. The id of a type without a target is ""
    */
-  startMarkNames = /* @__PURE__ */ new Set();
-  executionPromises = [];
+  stats = /* @__PURE__ */ new Map();
+  /**
+   * The start time of the spans that are started by `mark()` and not ended yet
+   */
+  startTimes = /* @__PURE__ */ new Map();
   constructor(options) {
-    this.perf = options.perf;
-    this.PerformanceObserver = options.PerformanceObserver;
-    this.enabled = options.enabled ?? true;
+    this.nowFn = options.now;
+    this.enabled = options.enabled ?? false;
   }
   get isEnabled() {
     return this.enabled;
   }
   /**
    * Enable or Disable the profiler.
-   * If the profiler is disabled, `mark()` does nothing and collected entries are cleared.
+   * If the profiler is disabled, it records nothing and the collected totals are cleared.
    * @param enabled
    */
   setEnabled(enabled) {
@@ -26893,196 +28891,117 @@ var SecretLintProfiler = class {
     }
     this.enabled = enabled;
     if (!enabled) {
-      this.stopObserving();
+      this.stats.clear();
+      this.startTimes.clear();
     }
   }
-  startObserving() {
-    const pattern = /(.*?)::end(\|\|.*)?/;
-    const observer = new this.PerformanceObserver((items) => {
-      if (!this.enabled) {
-        return;
-      }
-      const entries = items.getEntries();
-      entries.forEach((entry) => {
-        if (entry.entryType === "mark") {
-          const match = entry.name.match(pattern);
-          const endIdentifier = match ? match[1] : void 0;
-          const suffix = match && match[2] ? match[2] : "";
-          if (endIdentifier) {
-            const startMarkName = `${endIdentifier}::start${suffix}`;
-            if (this.startMarkNames.has(startMarkName)) {
-              this.executionPromises.push(Promise.resolve().then(() => {
-                this.perf.measure(endIdentifier + suffix, startMarkName, entry.name);
-              }));
-            }
-          } else {
-            this.startMarkNames.add(entry.name);
-          }
-          this.entries.push(entry);
-        } else if (entry.entryType === "measure") {
-          this.measures.push(entry);
-        }
-      });
-    });
-    observer.observe({ entryTypes: ["mark", "measure"] });
-    this.observer = observer;
+  statOf(type, id) {
+    let statsOfType = this.stats.get(type);
+    if (!statsOfType) {
+      statsOfType = /* @__PURE__ */ new Map();
+      this.stats.set(type, statsOfType);
+    }
+    const key = id ?? NO_ID;
+    let stat13 = statsOfType.get(key);
+    if (!stat13) {
+      stat13 = { count: 0, duration: 0, maxDuration: 0 };
+      statsOfType.set(key, stat13);
+    }
+    return stat13;
   }
-  stopObserving() {
-    this.observer?.disconnect();
-    this.observer = void 0;
-    this.entries.length = 0;
-    this.measures.length = 0;
-    this.executionPromises.length = 0;
-    this.startMarkNames.clear();
-  }
+  /**
+   * Mark the start or the end of a span: `{span}::start` and `{span}::end`.
+   * The time between the start and the end is recorded for the span and the id.
+   * `::end` without `::start` is ignored.
+   * A span is found by its type and id, so the spans of the same type and id should not overlap.
+   * Use `now()` and `record()` for the code that can run again before it ends.
+   */
   mark(marker) {
     if (!this.enabled) {
       return;
     }
-    if (!this.observer) {
-      this.startObserving();
+    const now = this.nowFn();
+    const id = "id" in marker ? marker.id : void 0;
+    const isStart = marker.type.endsWith("::start");
+    const span = marker.type.slice(0, isStart ? -"::start".length : -"::end".length);
+    const name = id === void 0 ? span : `${span}||${id}`;
+    if (isStart) {
+      this.startTimes.set(name, now);
+      return;
     }
-    if ("id" in marker) {
-      this.perf.mark(`${marker.type}||${marker.id}`);
-    } else {
-      this.perf.mark(marker.type);
+    const startTime = this.startTimes.get(name);
+    if (startTime === void 0) {
+      return;
+    }
+    this.startTimes.delete(name);
+    this.add(span, id, now - startTime);
+  }
+  /**
+   * Return the current time for `record()`. It is 0 if the profiler is disabled.
+   */
+  now() {
+    return this.enabled ? this.nowFn() : 0;
+  }
+  /**
+   * Record the time from `startTime` to now. `startTime` is the result of `now()`.
+   * It is for code that runs many times: check `isEnabled` first, and call `now()` and `record()` only if it is true.
+   */
+  record(type, id, startTime) {
+    if (!this.enabled) {
+      return;
+    }
+    this.add(type, id, this.nowFn() - startTime);
+  }
+  /**
+   * Add a total that was measured somewhere else, such as in a worker thread
+   */
+  addTotal(type, id, total) {
+    if (!this.enabled) {
+      return;
+    }
+    const stat13 = this.statOf(type, id);
+    stat13.count += total.count;
+    stat13.duration += total.duration;
+    if (total.duration > stat13.maxDuration) {
+      stat13.maxDuration = total.duration;
     }
   }
-  waifForExecutionPromises = () => {
-    return Promise.all(this.executionPromises).finally(() => {
-      this.executionPromises.length = 0;
-    });
-  };
-  async getEntries() {
-    await this.waifForExecutionPromises();
-    return this.entries;
+  /**
+   * Count something that has no duration
+   */
+  count(type, id, count2 = 1) {
+    if (!this.enabled) {
+      return;
+    }
+    this.statOf(type, id).count += count2;
   }
-  async getMeasures() {
-    await this.waifForExecutionPromises();
-    return this.measures;
+  add(type, id, duration3) {
+    const stat13 = this.statOf(type, id);
+    stat13.count++;
+    stat13.duration += duration3;
+    if (duration3 > stat13.maxDuration) {
+      stat13.maxDuration = duration3;
+    }
+  }
+  /**
+   * Return the totals for each type and id, in the order of the first record
+   */
+  getStats() {
+    const results = [];
+    for (const [type, statsOfType] of this.stats) {
+      for (const [id, stat13] of statsOfType) {
+        results.push({ type, id: id === NO_ID ? void 0 : id, ...stat13 });
+      }
+    }
+    return results;
   }
 };
 
 // ../../node_modules/@secretlint/profiler/module/node.js
 import perf_hooks from "perf_hooks";
-var NullPerformanceObserver = class {
-  disconnect() {
-  }
-  observe(_options) {
-  }
-};
 var secretLintProfiler = new SecretLintProfiler({
-  perf: perf_hooks.performance,
-  PerformanceObserver: perf_hooks.PerformanceObserver ? perf_hooks.PerformanceObserver : NullPerformanceObserver
+  now: () => perf_hooks.performance.now()
 });
-
-// ../../node_modules/@secretlint/core/module/RunningEvents.js
-var createRunningEvents = () => {
-  const contextEvents = new PromiseEventEmitter();
-  const registerSet = /* @__PURE__ */ new Set();
-  const LINT_HANDLE = /* @__PURE__ */ Symbol("lint:start");
-  const rules2 = [];
-  return {
-    collectAllowMessageIds() {
-      const allowMessageIds = [];
-      rules2.forEach((rule) => {
-        allowMessageIds.push(...rule.allowMessageIds());
-      });
-      return allowMessageIds;
-    },
-    /**
-     * Start to run linting
-     * @param options
-     */
-    runLint(options) {
-      return contextEvents.emit(LINT_HANDLE, options);
-    },
-    registerRule({ descriptorRule, context }) {
-      if (registerSet.has(descriptorRule.id)) {
-        throw new Error(`rule.id:${descriptorRule.id} is already registered.
-                
-Duplicated rule.id is something wrong in .secretlintrc.                
-`);
-      }
-      registerSet.add(descriptorRule.id);
-      const rule = new SecretLintRule({
-        descriptorRule,
-        context
-      });
-      rules2.push(rule);
-      contextEvents.on(LINT_HANDLE, async ({ sourceCode }) => {
-        secretLintProfiler.mark({
-          type: "@core>rule-handler::start",
-          id: descriptorRule.rule.meta.id
-        });
-        if (rule.supportSourceCode(sourceCode)) {
-          await rule.file(sourceCode);
-        }
-        secretLintProfiler.mark({
-          type: "@core>rule-handler::end",
-          id: descriptorRule.rule.meta.id
-        });
-      });
-    },
-    registerRulePreset({ descriptorRulePreset, context }) {
-      const rulePresetCreatorOptions = descriptorRulePreset.options || [];
-      descriptorRulePreset.rule.create(context, rulePresetCreatorOptions);
-    },
-    isRegistered(ruleId) {
-      return registerSet.has(ruleId);
-    }
-  };
-};
-
-// ../../node_modules/@secretlint/core/module/RulePresetContext.js
-var createRulePresetContext = ({ configRulePreset, sourceCode, runningEvents, contextEvents, sharedOptions, locale }) => {
-  const presetRules = configRulePreset.rules || [];
-  if (!Array.isArray(presetRules)) {
-    console.error(`${configRulePreset.id}:PresetRules is invalid format`, presetRules);
-    throw new Error("preset's rules should be an array of rule definitions");
-  }
-  return {
-    sharedOptions,
-    registerRule(rule, defaultValue) {
-      const descriptorRule = presetRules.find((descriptorRule2) => {
-        return descriptorRule2.id === rule.meta.id;
-      });
-      const descriptorRuleOptions = descriptorRule ? descriptorRule.options : void 0;
-      const descriptorRuleDisabled = descriptorRule ? descriptorRule.disabled : void 0;
-      const descriptorRuleSeverity = descriptorRule ? descriptorRule.severity : void 0;
-      const descriptorAllowMessageIds = descriptorRule ? descriptorRule.allowMessageIds : void 0;
-      const context = createRuleContext({
-        // rule id is a single rule in a preset
-        ruleId: rule.meta.id,
-        // parent rule id is rule preset id
-        ruleParentId: configRulePreset.id,
-        meta: rule.meta,
-        severity: descriptorRuleSeverity,
-        sourceCode,
-        contextEvents,
-        sharedOptions,
-        locale
-      });
-      const defaultValueOfPreset = defaultValue ? defaultValue : {};
-      runningEvents.registerRule({
-        descriptorRule: {
-          // options and disabled ...
-          ...defaultValueOfPreset,
-          // Prefer to use user setting
-          // User can override preset setting
-          ...descriptorRule,
-          id: rule.meta.id,
-          options: descriptorRuleOptions,
-          rule,
-          disabled: descriptorRuleDisabled,
-          allowMessageIds: descriptorAllowMessageIds,
-          severity: descriptorRuleSeverity
-        },
-        context
-      });
-    }
-  };
-};
 
 // ../../node_modules/@secretlint/core/module/messages/filter-ignored-process.js
 var isContainedRange = (index, range) => {
@@ -27112,13 +29031,13 @@ var createMessageProcessor = (processors) => {
     /**
      * process `messages` with registered processes
      */
-    process(messages2) {
-      const originalMessages = messages2;
+    process(messages31) {
+      const originalMessages = messages31;
       if (processors.length === 0) {
         throw new Error("processors should be > 0");
       }
-      return processors.reduce((messages3, filter) => {
-        return filter(messages3);
+      return processors.reduce((messages32, filter) => {
+        return filter(messages32);
       }, originalMessages);
     }
   };
@@ -27128,9 +29047,9 @@ var createMessageProcessor = (processors) => {
 var isEqualMessage = (aMessage, bMessage) => {
   return aMessage.range[0] === bMessage.range[0] && aMessage.range[1] === bMessage.range[1] && "severity" in aMessage && "severity" in bMessage && aMessage.severity === bMessage.severity && aMessage.message === bMessage.message;
 };
-function filterDuplicatedMessages(messages2 = []) {
-  return messages2.filter((message, index) => {
-    const restMessages = messages2.slice(index + 1);
+function filterDuplicatedMessages(messages31 = []) {
+  return messages31.filter((message, index) => {
+    const restMessages = messages31.slice(index + 1);
     return !restMessages.some((restMessage) => {
       return isEqualMessage(message, restMessage);
     });
@@ -27138,8 +29057,8 @@ function filterDuplicatedMessages(messages2 = []) {
 }
 
 // ../../node_modules/@secretlint/core/module/messages/sort-messages-process.js
-function sortMessagesByLocation(messages2) {
-  return messages2.sort(function(a, b) {
+function sortMessagesByLocation(messages31) {
+  return messages31.sort(function(a, b) {
     const startIndexDiff = a.range[0] - b.range[0];
     if (startIndexDiff === 0) {
       return a.range[1] - b.range[1];
@@ -27150,11 +29069,11 @@ function sortMessagesByLocation(messages2) {
 }
 
 // ../../node_modules/@secretlint/core/module/messages/filter-message-id.js
-var filterByAllowMessageIds = (messages2, allowMessageIds) => {
+var filterByAllowMessageIds = (messages31, allowMessageIds) => {
   const disabledSet = new Set(allowMessageIds.map((allowMessage) => {
     return `${allowMessage.ruleId}--${allowMessage.messageId}`;
   }));
-  return messages2.filter((message) => {
+  return messages31.filter((message) => {
     return !disabledSet.has(`${message.ruleId}--${message.messageId}`);
   });
 };
@@ -27180,8 +29099,8 @@ var maskWithValues = (str, maskedValues) => {
   }
   return result;
 };
-var filterMaskSecretsData = (messages2 = []) => {
-  return messages2.map((message) => {
+var filterMaskSecretsData = (messages31 = []) => {
+  return messages31.map((message) => {
     if (message.type !== "message") {
       return message;
     }
@@ -27211,1815 +29130,1471 @@ var cleanupMessages = (options) => {
   return sortMessagesByLocation(filterProcess.process(reportedMessagesWithoutAllowMessageIds));
 };
 
-// ../../node_modules/@secretlint/core/module/index.js
+// ../../node_modules/@secretlint/core/module/LintPlan.js
 var import_debug = __toESM(require_src(), 1);
-var debug = (0, import_debug.default)("@secretlint/core");
-var lintSource = ({ source, options }) => {
-  secretLintProfiler.mark({
-    type: "@core>lint::start",
-    id: source.filePath
+
+// ../../node_modules/@secretlint/core/module/helper/keyword-matcher.js
+var ASCII_SIZE2 = 128;
+var BYTE_SIZE = 256;
+var INITIAL_POSITIONS_SIZE = 64;
+var normalizeKeyword = (keyword) => {
+  if (typeof keyword !== "string" || keyword.length === 0) {
+    return void 0;
+  }
+  for (let i = 0; i < keyword.length; i++) {
+    if (keyword.charCodeAt(i) >= ASCII_SIZE2) {
+      return void 0;
+    }
+  }
+  return keyword.toLowerCase();
+};
+var createKeywordMatcher = (keywords, guards = [], options = {}) => {
+  const trieKeywords = keywords.map((keyword) => keyword.toLowerCase());
+  const charClass = new Uint8Array(BYTE_SIZE);
+  let classCount = 1;
+  for (const keyword of trieKeywords) {
+    for (let i = 0; i < keyword.length; i++) {
+      const code = keyword.charCodeAt(i);
+      if (charClass[code] === 0) {
+        charClass[code] = classCount++;
+      }
+    }
+  }
+  for (let code = 65; code <= 90; code++) {
+    charClass[code] = charClass[code + 32] ?? 0;
+  }
+  const children = [new Int32Array(classCount).fill(-1)];
+  const trieOutputs = [[]];
+  trieKeywords.forEach((keyword, keywordIndex) => {
+    let state = 0;
+    for (let i = 0; i < keyword.length; i++) {
+      const cls = charClass[keyword.charCodeAt(i)] ?? 0;
+      const stateChildren = children[state];
+      let next = stateChildren[cls] ?? -1;
+      if (next < 0) {
+        next = children.length;
+        stateChildren[cls] = next;
+        children.push(new Int32Array(classCount).fill(-1));
+        trieOutputs.push([]);
+      }
+      state = next;
+    }
+    trieOutputs[state].push(keywordIndex);
   });
-  debug(`source filePath: %O`, source.filePath);
-  debug(`options: %O`, options);
-  const rules2 = options.config.rules;
-  const locale = options.locale ?? "en";
-  const maskSecrets = options.maskSecrets ?? false;
-  const contextEvents = createContextEvents();
-  const runningEvents = createRunningEvents();
-  const reportedMessages = [];
-  const ignoredMessages = [];
-  contextEvents.onReport((message) => {
-    reportedMessages.push(message);
+  const stateCount = children.length;
+  const trieTransitions = new Int32Array(stateCount * classCount);
+  const failure2 = new Int32Array(stateCount);
+  const queue = [];
+  const rootChildren = children[0];
+  for (let cls = 0; cls < classCount; cls++) {
+    const next = rootChildren[cls] ?? -1;
+    if (next > 0) {
+      trieTransitions[cls] = next;
+      queue.push(next);
+    }
+  }
+  for (let head = 0; head < queue.length; head++) {
+    const state = queue[head];
+    const fail = failure2[state] ?? 0;
+    trieOutputs[state] = trieOutputs[state].concat(trieOutputs[fail]);
+    const stateChildren = children[state];
+    for (let cls = 0; cls < classCount; cls++) {
+      const next = stateChildren[cls] ?? -1;
+      const failTransition = trieTransitions[fail * classCount + cls] ?? 0;
+      if (next >= 0) {
+        failure2[next] = failTransition;
+        trieTransitions[state * classCount + cls] = next;
+        queue.push(next);
+      } else {
+        trieTransitions[state * classCount + cls] = failTransition;
+      }
+    }
+  }
+  const order = [];
+  for (let state = 0; state < stateCount; state++) {
+    if (trieOutputs[state].length === 0) {
+      order.push(state);
+    }
+  }
+  const firstOutputState = order.length;
+  for (let state = 0; state < stateCount; state++) {
+    if (trieOutputs[state].length > 0) {
+      order.push(state);
+    }
+  }
+  const newState = new Int32Array(stateCount);
+  order.forEach((oldState, state) => {
+    newState[oldState] = state;
   });
-  contextEvents.onIgnore((message) => {
-    ignoredMessages.push(message);
+  const tableSize = stateCount * classCount;
+  const transitions = tableSize <= 65535 ? new Uint16Array(tableSize) : new Int32Array(tableSize);
+  const outputs = [];
+  order.forEach((oldState, state) => {
+    for (let cls = 0; cls < classCount; cls++) {
+      transitions[state * classCount + cls] = newState[trieTransitions[oldState * classCount + cls]] * classCount;
+    }
+    outputs.push(trieOutputs[oldState]);
   });
-  const sourceCode = new SecretLintSourceCodeImpl({
-    content: source.content,
-    filePath: source.filePath,
-    physicalFilePath: options.noPhysicFilePath ? void 0 : source.filePath,
-    ext: source.ext || "",
-    contentType: source.contentType
+  const firstOutputOffset = firstOutputState * classCount;
+  const guardTables = keywords.map((_, index) => {
+    const guard = guards[index];
+    return guard === void 0 ? void 0 : createGuardTable(guard);
   });
-  secretLintProfiler.mark({
-    type: "@core>setup-rules::start"
+  const guardMins = keywords.map((_, index) => guards[index]?.min ?? 0);
+  const hasGuards = guardTables.some((table) => table !== void 0);
+  const needsCheck = new Uint8Array(stateCount);
+  outputs.forEach((output2, state) => {
+    if (output2.some((keywordIndex) => guardTables[keywordIndex] !== void 0)) {
+      needsCheck[state] = 1;
+    }
   });
-  rules2.forEach((rule) => {
-    secretLintProfiler.mark({
-      type: "@core>setup-rule::start",
-      id: rule.rule.meta.id
+  let guardCounts = options.countGuards ? new Float64Array(keywords.length * 2) : void 0;
+  const subsetIds = /* @__PURE__ */ new Map();
+  const checkGuards = (input2, state, lastIndex) => {
+    const output2 = outputs[state];
+    const isText = typeof input2 === "string";
+    let metCount = 0;
+    for (let i = 0; i < output2.length; i++) {
+      const keywordIndex = output2[i];
+      const table = guardTables[keywordIndex];
+      if (table === void 0) {
+        metCount++;
+        continue;
+      }
+      const min = guardMins[keywordIndex];
+      const met = isText ? isGuardMetInText(input2, lastIndex + 1, table, min) : isGuardMetInBytes(input2, lastIndex + 1, table, min);
+      if (guardCounts) {
+        guardCounts[keywordIndex * 2]++;
+        if (met) {
+          guardCounts[keywordIndex * 2 + 1]++;
+        }
+      }
+      if (met) {
+        metCount++;
+      }
+    }
+    if (metCount === output2.length) {
+      return state;
+    }
+    if (metCount === 0) {
+      return -1;
+    }
+    const matched = output2.filter((keywordIndex) => {
+      const table = guardTables[keywordIndex];
+      if (table === void 0) {
+        return true;
+      }
+      const min = guardMins[keywordIndex];
+      return isText ? isGuardMetInText(input2, lastIndex + 1, table, min) : isGuardMetInBytes(input2, lastIndex + 1, table, min);
     });
-    registerRule({
-      sourceCode,
-      config: options.config,
-      descriptorRule: rule,
-      contextEvents,
-      runningEvents,
-      locale
-    });
-    secretLintProfiler.mark({
-      type: "@core>setup-rule::end",
-      id: rule.rule.meta.id
-    });
+    const key = `${state}:${matched.join(",")}`;
+    const knownId = subsetIds.get(key);
+    if (knownId !== void 0) {
+      return knownId;
+    }
+    const id = outputs.length;
+    outputs.push(matched);
+    subsetIds.set(key, id);
+    return id;
+  };
+  let buffer = new Int32Array(INITIAL_POSITIONS_SIZE);
+  const growBuffer = () => {
+    const grown = new Int32Array(buffer.length * 2);
+    grown.set(buffer);
+    buffer = grown;
+  };
+  const scanBytes = (bytes, start) => {
+    let offset = 0;
+    let written = 0;
+    for (let i = start, length = bytes.length; i < length; i++) {
+      offset = transitions[offset + charClass[bytes[i]]];
+      if (offset >= firstOutputOffset) {
+        let id = offset / classCount;
+        if (hasGuards && needsCheck[id] === 1) {
+          id = checkGuards(bytes, id, i);
+          if (id < 0) {
+            continue;
+          }
+        }
+        if (written >= buffer.length) {
+          growBuffer();
+        }
+        buffer[written] = id;
+        buffer[written + 1] = i;
+        written += 2;
+      }
+    }
+    return written;
+  };
+  const scanText = (text, start) => {
+    let offset = 0;
+    let written = 0;
+    for (let i = start, length = text.length; i < length; i++) {
+      const code = text.charCodeAt(i);
+      offset = transitions[offset + (code < ASCII_SIZE2 ? charClass[code] : 0)];
+      if (offset >= firstOutputOffset) {
+        let id = offset / classCount;
+        if (hasGuards && needsCheck[id] === 1) {
+          id = checkGuards(text, id, i);
+          if (id < 0) {
+            continue;
+          }
+        }
+        if (written >= buffer.length) {
+          growBuffer();
+        }
+        buffer[written] = id;
+        buffer[written + 1] = i;
+        written += 2;
+      }
+    }
+    return written;
+  };
+  const noHits = {
+    found: new Uint8Array(keywords.length),
+    positions: new Int32Array(0),
+    count: 0
+  };
+  const scan2 = (input2, start = 0) => {
+    if (keywords.length === 0) {
+      return noHits;
+    }
+    const length = typeof input2 === "string" ? scanText(input2, start) : scanBytes(input2, start);
+    if (length === 0) {
+      return noHits;
+    }
+    const positions = buffer.slice(0, length);
+    const found = new Uint8Array(keywords.length);
+    for (let i = 0; i < length; i += 2) {
+      const output2 = outputs[positions[i]];
+      for (let j = 0; j < output2.length; j++) {
+        found[output2[j]] = 1;
+      }
+    }
+    return { found, positions, count: length / 2 };
+  };
+  return {
+    keywords,
+    guards: keywords.map((_, index) => guards[index]),
+    setGuardCounting(enabled) {
+      if (enabled === (guardCounts !== void 0)) {
+        return;
+      }
+      guardCounts = enabled && hasGuards ? new Float64Array(keywords.length * 2) : void 0;
+    },
+    takeGuardCounts() {
+      if (!guardCounts) {
+        return [];
+      }
+      const counts = [];
+      for (let keywordIndex = 0; keywordIndex < keywords.length; keywordIndex++) {
+        const found = guardCounts[keywordIndex * 2];
+        if (found > 0) {
+          counts.push({ keywordIndex, found, met: guardCounts[keywordIndex * 2 + 1] });
+        }
+      }
+      guardCounts.fill(0);
+      return counts;
+    },
+    match(text) {
+      return scan2(text).found;
+    },
+    scan: scan2,
+    keywordsOfState(state) {
+      return outputs[state] ?? [];
+    }
+  };
+};
+var MAX_CACHE_SIZE = 32;
+var matcherCache = /* @__PURE__ */ new Map();
+var getKeywordMatcher = (keywords, guards = []) => {
+  const key = JSON.stringify([keywords, keywords.map((_, index) => keywordGuardKey(guards[index]))]);
+  const cached2 = matcherCache.get(key);
+  if (cached2) {
+    return cached2;
+  }
+  if (matcherCache.size >= MAX_CACHE_SIZE) {
+    matcherCache.clear();
+  }
+  const matcher = createKeywordMatcher(keywords, guards);
+  matcherCache.set(key, matcher);
+  return matcher;
+};
+
+// ../../node_modules/@secretlint/core/module/helper/line-check.js
+var LINE_FEED = 10;
+var textDecoder = new TextDecoder("utf-8", { ignoreBOM: true });
+var decodeBytes = (bytes, start, end) => {
+  const utf8Slice = bytes.utf8Slice;
+  if (typeof utf8Slice === "function") {
+    return utf8Slice.call(bytes, start, end);
+  }
+  return textDecoder.decode(bytes.subarray(start, end));
+};
+var isKeywordFound = (keywordIndexes, found) => {
+  return keywordIndexes.some((keywordIndex) => found[keywordIndex] === 1);
+};
+var someKeywordLine = (view, hits, lineStartOf, lineEndOf, visit2) => {
+  const { matcher, linePatternsOfKeyword } = view;
+  if (!matcher) {
+    return false;
+  }
+  const positions = hits.positions;
+  const end = hits.count * 2;
+  const addLinePatterns = (patterns, state) => {
+    const keywordIndexes = matcher.keywordsOfState(state);
+    for (let i = 0; i < keywordIndexes.length; i++) {
+      const linePatterns = linePatternsOfKeyword[keywordIndexes[i]];
+      for (let j = 0; j < linePatterns.length; j++) {
+        const pattern = linePatterns[j];
+        if (!patterns.includes(pattern)) {
+          patterns.push(pattern);
+        }
+      }
+    }
+  };
+  for (let cursor = 0; cursor < end; ) {
+    const patterns = [];
+    addLinePatterns(patterns, positions[cursor]);
+    if (patterns.length === 0) {
+      cursor += 2;
+      continue;
+    }
+    const index = positions[cursor + 1];
+    const lineStart = lineStartOf(index);
+    const lineEnd = lineEndOf(index);
+    cursor += 2;
+    for (; cursor < end && positions[cursor + 1] < lineEnd; cursor += 2) {
+      addLinePatterns(patterns, positions[cursor]);
+    }
+    if (visit2(lineStart, lineEnd, patterns)) {
+      return true;
+    }
+  }
+  return false;
+};
+var hasLineMatchInBytes = (view, hits, bytes, contentStart, test = (pattern, line) => pattern.tester.test(line)) => {
+  return someKeywordLine(view, hits, (index) => Math.max((index === 0 ? -1 : bytes.lastIndexOf(LINE_FEED, index - 1)) + 1, contentStart), (index) => {
+    const nextLineFeed = bytes.indexOf(LINE_FEED, index);
+    return nextLineFeed < 0 ? bytes.length : nextLineFeed + 1;
+  }, (lineStart, lineEnd, patterns) => {
+    const line = decodeBytes(bytes, lineStart, lineEnd);
+    return patterns.some((pattern) => test(pattern, line));
   });
-  secretLintProfiler.mark({
-    type: "@core>setup-rules::end"
+};
+
+// ../../node_modules/@secretlint/core/module/keyword-scan.js
+var createKeywordScanPlan = ({ keywords, guards, requiresKeyword, ruleCheck }) => {
+  const planGuards = keywords.map((_, index) => {
+    const guard = guards[index];
+    return guard ? { chars: guard.chars, min: guard.min } : void 0;
   });
-  return runningEvents.runLint({
-    sourceCode
-  }).then(() => {
-    return {
-      filePath: source.filePath,
-      // binary content should be skipped
-      sourceContent: source.contentType === "text" ? source.content : void 0,
-      sourceContentType: source.contentType,
-      messages: cleanupMessages({
-        reportedMessages,
-        ignoredMessages,
-        allowMessageIds: runningEvents.collectAllowMessageIds(),
-        maskSecrets
-      })
-    };
-  }).finally(() => {
-    secretLintProfiler.mark({
-      type: "@core>lint::end",
-      id: source.filePath
+  return {
+    id: JSON.stringify([keywords, planGuards, ruleCheck]),
+    keywords: [...keywords],
+    guards: planGuards,
+    requiresKeyword,
+    ruleCheck
+  };
+};
+var hasUtf8BOM = (bytes) => {
+  return bytes.length >= 3 && bytes[0] === 239 && bytes[1] === 187 && bytes[2] === 191;
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/pattern/user-patterns.js
+var import_regexp_string_matcher = __toESM(require_regexp_string_matcher(), 1);
+var import_picomatch = __toESM(require_picomatch2(), 1);
+
+// ../../node_modules/@secretlint/core/module/builtin/path-util.js
+var basename7 = (filePath) => {
+  let end = filePath.length;
+  while (end > 0 && (filePath[end - 1] === "/" || filePath[end - 1] === "\\")) {
+    end--;
+  }
+  const trimmed = filePath.slice(0, end);
+  const index = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  return index === -1 ? trimmed : trimmed.slice(index + 1);
+};
+
+// ../../node_modules/@secretlint/core/module/helper/extract-keywords.js
+var MIN_KEYWORD_LENGTH = 3;
+var UnsupportedSyntax = class extends Error {
+};
+var scoreOf = (set2) => {
+  let min = Infinity;
+  for (const keyword of set2) {
+    min = Math.min(min, keyword.length);
+  }
+  return min;
+};
+var bestSet = (sets) => {
+  let best;
+  for (const set2 of sets) {
+    if (scoreOf(set2) < MIN_KEYWORD_LENGTH) {
+      continue;
+    }
+    if (best === void 0 || scoreOf(set2) > scoreOf(best)) {
+      best = set2;
+    }
+  }
+  return best;
+};
+var unionOfAlternatives = (alternatives) => {
+  const union2 = /* @__PURE__ */ new Set();
+  for (const sets of alternatives) {
+    const best = bestSet(sets);
+    if (best === void 0) {
+      return void 0;
+    }
+    best.forEach((keyword) => union2.add(keyword));
+  }
+  return [...union2];
+};
+var parseAlternatives = (parser) => {
+  const alternatives = [parseSequence(parser)];
+  while (parser.source[parser.index] === "|") {
+    parser.index++;
+    alternatives.push(parseSequence(parser));
+  }
+  return alternatives;
+};
+var indexAfter = (parser, char, from) => {
+  const index = parser.source.indexOf(char, from);
+  if (index < 0) {
+    throw new UnsupportedSyntax();
+  }
+  return index + 1;
+};
+var parseEscape = (parser) => {
+  const { source } = parser;
+  const start = parser.index;
+  const escaped = source[start + 1];
+  if (escaped === void 0) {
+    throw new UnsupportedSyntax();
+  }
+  if (!/[0-9A-Za-z]/.test(escaped)) {
+    parser.index = start + 2;
+    return { kind: "char", char: escaped };
+  }
+  switch (escaped) {
+    case "x":
+      parser.index = start + 4;
+      break;
+    case "u":
+      parser.index = source[start + 2] === "{" ? indexAfter(parser, "}", start) : start + 6;
+      break;
+    case "c":
+      parser.index = start + 3;
+      break;
+    case "p":
+    case "P":
+      parser.index = indexAfter(parser, "}", start);
+      break;
+    case "k":
+      parser.index = indexAfter(parser, ">", start);
+      break;
+    default: {
+      let next = start + 2;
+      if (/[0-9]/.test(escaped)) {
+        while (/[0-9]/.test(source[next] ?? "")) {
+          next++;
+        }
+      }
+      parser.index = next;
+    }
+  }
+  return { kind: "other" };
+};
+var skipClass = (parser) => {
+  const { source } = parser;
+  let index = parser.index + 1;
+  while (index < source.length && source[index] !== "]") {
+    index += source[index] === "\\" ? 2 : 1;
+  }
+  if (index >= source.length) {
+    throw new UnsupportedSyntax();
+  }
+  parser.index = index + 1;
+  return { kind: "other" };
+};
+var parseGroup = (parser) => {
+  const { source } = parser;
+  let index = parser.index + 1;
+  let negative = false;
+  if (source[index] === "?") {
+    const next = source[index + 1];
+    const afterNext = source[index + 2];
+    if (next === ":" || next === "=") {
+      index += 2;
+    } else if (next === "!") {
+      negative = true;
+      index += 2;
+    } else if (next === "<" && afterNext === "=") {
+      index += 3;
+    } else if (next === "<" && afterNext === "!") {
+      negative = true;
+      index += 3;
+    } else if (next === "<") {
+      index = indexAfter(parser, ">", index);
+    } else {
+      throw new UnsupportedSyntax();
+    }
+  }
+  parser.index = index;
+  const alternatives = parseAlternatives(parser);
+  if (source[parser.index] !== ")") {
+    throw new UnsupportedSyntax();
+  }
+  parser.index++;
+  return negative ? { kind: "other" } : { kind: "group", alternatives };
+};
+var parseQuantifier = (parser) => {
+  const { source } = parser;
+  const char = source[parser.index];
+  let min;
+  if (char === "?" || char === "*") {
+    min = 0;
+    parser.index++;
+  } else if (char === "+") {
+    min = 1;
+    parser.index++;
+  } else if (char === "{") {
+    const matched = /^\{(\d+)(?:,\d*)?\}/.exec(source.slice(parser.index));
+    if (!matched) {
+      throw new UnsupportedSyntax();
+    }
+    min = Number(matched[1]);
+    parser.index += matched[0].length;
+  }
+  if (min !== void 0 && source[parser.index] === "?") {
+    parser.index++;
+  }
+  return min;
+};
+var parseSequence = (parser) => {
+  const { source, ignoreCase } = parser;
+  const sets = [];
+  let run3 = "";
+  const endRun = () => {
+    if (run3.length > 0) {
+      sets.push([run3]);
+    }
+    run3 = "";
+  };
+  while (parser.index < source.length && source[parser.index] !== "|" && source[parser.index] !== ")") {
+    const char = source[parser.index];
+    let atom;
+    if (char === "\\") {
+      atom = parseEscape(parser);
+    } else if (char === "[") {
+      atom = skipClass(parser);
+    } else if (char === "(") {
+      atom = parseGroup(parser);
+    } else if (char === "." || char === "^" || char === "$") {
+      parser.index++;
+      atom = { kind: "other" };
+    } else if (char === "?" || char === "*" || char === "+" || char === "{" || char === "}" || char === "]") {
+      throw new UnsupportedSyntax();
+    } else {
+      parser.index++;
+      atom = { kind: "char", char };
+    }
+    const min = parseQuantifier(parser);
+    if (atom.kind === "char") {
+      if (atom.char.charCodeAt(0) >= 128 || min === 0) {
+        endRun();
+      } else {
+        run3 += ignoreCase ? atom.char.toLowerCase() : atom.char;
+        if (min !== void 0) {
+          endRun();
+        }
+      }
+    } else if (atom.kind === "group") {
+      endRun();
+      if (min === void 0 || min >= 1) {
+        const union2 = unionOfAlternatives(atom.alternatives);
+        if (union2 !== void 0) {
+          sets.push(union2);
+        }
+      }
+    } else {
+      endRun();
+    }
+  }
+  endRun();
+  return sets;
+};
+var extractKeywords = (regex) => {
+  if (regex.flags.includes("v")) {
+    return void 0;
+  }
+  const parser = { source: regex.source, ignoreCase: regex.flags.includes("i"), index: 0 };
+  try {
+    const alternatives = parseAlternatives(parser);
+    if (parser.index !== regex.source.length) {
+      return void 0;
+    }
+    return unionOfAlternatives(alternatives);
+  } catch (error62) {
+    if (error62 instanceof UnsupportedSyntax) {
+      return void 0;
+    }
+    throw error62;
+  }
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/pattern/user-patterns.js
+var matchFilePathGlobs = (filePath, globs) => {
+  let kept = false;
+  let omitted = false;
+  let negatives = 0;
+  for (const glob of globs) {
+    const isMatch = (0, import_picomatch.default)(glob, { dot: true }, true);
+    const negated = Boolean(isMatch.state?.negated || isMatch.state?.negatedExtglob);
+    if (negated) {
+      negatives++;
+    }
+    const matched = isMatch(filePath);
+    const match = negated ? !matched : matched;
+    if (!match) {
+      continue;
+    }
+    if (negated) {
+      omitted = true;
+    } else {
+      omitted = false;
+      kept = true;
+    }
+  }
+  return (negatives === globs.length || kept) && !omitted;
+};
+var messages = {
+  PATTERN: {
+    en: (props) => `found matching ${props.PATTERN_NAME}: ${props.CREDENTIAL}`,
+    ja: (props) => `${props.PATTERN_NAME}\u306B\u30DE\u30C3\u30C1\u3059\u308B\u30D1\u30BF\u30FC\u30F3\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.CREDENTIAL}`
+  }
+};
+var collectPatternStrings = (entry) => {
+  if (entry.patterns && entry.patterns.length > 0) {
+    return entry.patterns;
+  }
+  if (entry.pattern) {
+    return [entry.pattern];
+  }
+  return [];
+};
+var keywordsOfEntry = (entry) => {
+  const keywords = entry.keywords;
+  if (keywords === void 0) {
+    return void 0;
+  }
+  if (!Array.isArray(keywords)) {
+    throw new Error(`Pattern "${entry.name}" has "keywords" that is not an array.`);
+  }
+  return keywords.map((keyword) => {
+    if (typeof keyword === "object" && keyword !== null) {
+      try {
+        const guarded = parseKeywordObject(keyword);
+        return { keyword: guarded.keyword, after: guarded.after };
+      } catch (error62) {
+        throw new Error(`Pattern "${entry.name}" has a keyword that is not supported.
+${error62 instanceof Error ? error62.message : String(error62)}`, { cause: error62 });
+      }
+    }
+    if (normalizeKeyword(keyword) === void 0) {
+      throw new Error(`Pattern "${entry.name}" has a keyword that is not a non-empty ASCII string or a keyword with a guard: ${JSON.stringify(keyword)}`);
+    }
+    return keyword;
+  });
+};
+var assertEntry = (entry) => {
+  if (entry.patterns && entry.patterns.length > 0 && entry.pattern) {
+    throw new Error(`Pattern "${entry.name}" cannot have both "patterns" and "pattern" specified. Use "patterns" array instead.`);
+  }
+  const hasPatterns = entry.patterns && entry.patterns.length > 0 || entry.pattern;
+  const hasFilePathGlobs = entry.filePathGlobs && entry.filePathGlobs.length > 0;
+  if (!hasPatterns && !hasFilePathGlobs) {
+    throw new Error(`Pattern "${entry.name}" must have either "patterns", "pattern" (deprecated), or "filePathGlobs" specified`);
+  }
+};
+var compileUserPatterns = (options) => {
+  const globalAllows = options.allows ?? [];
+  const entries = options.patterns ?? [];
+  return entries.flatMap((entry) => {
+    assertEntry(entry);
+    const entryKeywords = keywordsOfEntry(entry);
+    const filePathGlobs = entry.filePathGlobs && entry.filePathGlobs.length > 0 ? entry.filePathGlobs : void 0;
+    const filePathFilter = filePathGlobs ? (filePath) => !filePath || matchFilePathGlobs(filePath, filePathGlobs) : void 0;
+    const patternStrings = collectPatternStrings(entry);
+    if (patternStrings.length === 0) {
+      return [
+        {
+          name: entry.name,
+          filePathFilter,
+          pathOnly: true,
+          pattern: {
+            pattern: /(?:)/,
+            report(_match, context) {
+              const t = context.createTranslator(messages);
+              context.report({
+                message: t("PATTERN", {
+                  PATTERN_NAME: entry.name,
+                  CREDENTIAL: basename7(context.source.filePath || "")
+                }),
+                range: [0, context.source.content.length]
+              });
+            }
+          }
+        }
+      ];
+    }
+    const allows = [...globalAllows, ...entry.allows ?? []];
+    return patternStrings.map((patternString) => {
+      const regex = (0, import_regexp_string_matcher.createRegExp)(patternString);
+      const keywords = entryKeywords ?? extractKeywords(regex);
+      return {
+        name: entry.name,
+        filePathFilter,
+        pathOnly: false,
+        pattern: {
+          pattern: regex,
+          // `[]` disables the pre-filter, so the pattern runs on every file
+          ...keywords && keywords.length > 0 ? { keywords } : {},
+          scope: "file",
+          report(match, context) {
+            if (allows.length > 0 && (0, import_regexp_string_matcher.matchPatterns)(match.text, allows).length > 0) {
+              return;
+            }
+            const t = context.createTranslator(messages);
+            context.report({
+              message: t("PATTERN", { PATTERN_NAME: entry.name, CREDENTIAL: match.text }),
+              range: match.range
+            });
+          }
+        }
+      };
     });
   });
 };
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/pattern/index.js
+var creator = {
+  messages,
+  meta: {
+    id: "@secretlint/secretlint-rule-pattern",
+    recommended: false,
+    type: "scanner",
+    supportedContentTypes: ["text"]
+  },
+  patterns: []
+};
+
+// ../../node_modules/@secretlint/core/module/LintPlan.js
+var debug = (0, import_debug.default)("@secretlint/core");
 var isRulePreset = (ruleDescriptor) => {
   return ruleDescriptor.rule.meta.type === "preset";
 };
 var isRule = (ruleDescriptor) => {
   return ruleDescriptor.rule.meta.type === "scanner";
 };
-var registerRule = ({ sourceCode, config: config2, descriptorRule, contextEvents, runningEvents, locale }) => {
-  const ruleId = descriptorRule.id;
-  if (descriptorRule.disabled) {
-    debug("Skip registerRule %s, because it is disabled", ruleId);
-    return;
+var normalizeKeywords = (keywords) => {
+  if (!Array.isArray(keywords) || keywords.length === 0) {
+    return void 0;
   }
-  debug("registerRule %s", ruleId);
-  const sharedOptionsWithDefault = config2.sharedOptions ?? {};
-  if (isRulePreset(descriptorRule)) {
-    const context = createRulePresetContext({
-      configRulePreset: descriptorRule,
-      sourceCode,
-      contextEvents,
-      runningEvents,
-      sharedOptions: sharedOptionsWithDefault,
-      locale
+  const normalized = [];
+  for (const keyword of keywords) {
+    const normalizedKeyword = normalizeKeyword(keyword);
+    if (normalizedKeyword === void 0) {
+      return void 0;
+    }
+    normalized.push(normalizedKeyword);
+  }
+  return normalized;
+};
+var normalizePatternKeywords = (ruleId, keywords) => {
+  if (!Array.isArray(keywords) || keywords.length === 0) {
+    return void 0;
+  }
+  const normalized = keywords.map((item) => {
+    if (typeof item === "object" && item !== null) {
+      try {
+        const guarded = parseKeywordObject(item);
+        return { keyword: guarded.keyword.toLowerCase(), guard: guarded.guard, after: guarded.after };
+      } catch (error62) {
+        throw new Error(`The rule "${ruleId}" has a pattern with a keyword that is not supported.
+${error62 instanceof Error ? error62.message : String(error62)}`, { cause: error62 });
+      }
+    }
+    const keyword = normalizeKeyword(item);
+    return keyword === void 0 ? void 0 : { keyword, guard: void 0, after: void 0 };
+  });
+  if (normalized.includes(void 0)) {
+    return void 0;
+  }
+  return normalized;
+};
+var toGlobalRegExp = (pattern) => {
+  return new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
+};
+var toStatelessRegExp = (pattern) => {
+  return new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ""));
+};
+var KNOWN_PATTERN_PROPERTIES = /* @__PURE__ */ new Set([
+  "pattern",
+  "keywords",
+  "scope",
+  "when",
+  "report"
+]);
+var assertKnownPatternProperties = (rule, pattern) => {
+  const unknownProperties = Object.keys(pattern).filter((property) => !KNOWN_PATTERN_PROPERTIES.has(property));
+  if (unknownProperties.length > 0) {
+    throw new Error(`The rule "${rule.meta.id}" has a pattern with unknown properties: ${unknownProperties.join(", ")}
+This version of secretlint does not support the properties. Please update secretlint.`);
+  }
+  const scope = pattern.scope;
+  if (scope !== void 0 && scope !== "line" && scope !== "file") {
+    throw new Error(`The rule "${rule.meta.id}" has a pattern with unknown scope: ${JSON.stringify(scope)}
+The scope should be "line" or "file". If it is a scope of a newer secretlint, please update secretlint.`);
+  }
+};
+var WHEN_PATTERN = /^(!?)options\.([A-Za-z_$][A-Za-z0-9_$]*)$/;
+var isEnabledPattern = (rule, pattern, options) => {
+  const when = pattern.when;
+  if (when === void 0) {
+    return true;
+  }
+  const matched = typeof when === "string" ? WHEN_PATTERN.exec(when) : null;
+  if (!matched) {
+    throw new Error(`The rule "${rule.meta.id}" has a pattern whose \`when\` is not supported: ${JSON.stringify(when) ?? typeof when}
+\`when\` should be "options.<name>" or "!options.<name>", where <name> is a boolean option of the rule.
+If it is a \`when\` of a newer secretlint, please update secretlint.`);
+  }
+  const isNegated = matched[1] === "!";
+  const optionName = matched[2];
+  const value = Object.hasOwn(options, optionName) ? options[optionName] : void 0;
+  if (value !== void 0 && typeof value !== "boolean") {
+    throw new Error(`The option "${optionName}" of the rule "${rule.meta.id}" should be a boolean, but it is ${value === null ? "null" : typeof value}.`);
+  }
+  const optionValue = value === true;
+  return isNegated ? !optionValue : optionValue;
+};
+var compilePattern = (ruleId, pattern) => {
+  const keywords = normalizePatternKeywords(ruleId, pattern.keywords);
+  const canUseLineScope = pattern.scope === "line" && keywords !== void 0 && keywords.every((keyword) => !keyword.keyword.includes("\n"));
+  return {
+    source: pattern,
+    regex: toGlobalRegExp(pattern.pattern),
+    tester: toStatelessRegExp(pattern.pattern),
+    scope: canUseLineScope ? "line" : "file",
+    keywords,
+    name: void 0,
+    filePathFilter: void 0,
+    pathOnly: false
+  };
+};
+var compilePatterns = (rule, options) => {
+  if (rule === creator) {
+    return compileUserPatterns(options).map((userPattern) => {
+      return {
+        ...compilePattern(rule.meta.id, userPattern.pattern),
+        name: userPattern.name,
+        filePathFilter: userPattern.filePathFilter,
+        pathOnly: userPattern.pathOnly
+      };
     });
-    runningEvents.registerRulePreset({
-      descriptorRulePreset: descriptorRule,
-      context
+  }
+  const patterns = rule.patterns;
+  if (!Array.isArray(patterns)) {
+    return void 0;
+  }
+  patterns.forEach((pattern) => assertKnownPatternProperties(rule, pattern));
+  return patterns.filter((pattern) => isEnabledPattern(rule, pattern, options)).map((pattern) => compilePattern(rule.meta.id, pattern));
+};
+var createConfigSnapshot = (config2) => {
+  const snapshot = [config2.sharedOptions, config2.rules, config2.rules.length];
+  for (const descriptor of config2.rules) {
+    snapshot.push(descriptor, descriptor.id, descriptor.rule, descriptor.options, descriptor.disabled);
+    if (isRulePreset(descriptor)) {
+      const presetRules = descriptor.rules;
+      snapshot.push(presetRules);
+      if (Array.isArray(presetRules)) {
+        snapshot.push(presetRules.length);
+        for (const presetRule of presetRules) {
+          snapshot.push(presetRule, presetRule.id, presetRule.options, presetRule.disabled, presetRule.severity, presetRule.allowMessageIds);
+        }
+      }
+    } else {
+      const rule = descriptor;
+      snapshot.push(rule.severity, rule.allowMessageIds);
+    }
+  }
+  return snapshot;
+};
+var isFreshPlan = (plan, config2) => {
+  const rules = plan.rules;
+  for (let i = 0; i < rules.length; i++) {
+    const planRule = rules[i];
+    const creator31 = planRule.descriptorRule.rule;
+    if (creator31.meta.keywords !== planRule.metaKeywords || creator31.patterns !== planRule.metaPatterns) {
+      return false;
+    }
+  }
+  const snapshot = plan.snapshot;
+  const current = createConfigSnapshot(config2);
+  if (snapshot.length !== current.length) {
+    return false;
+  }
+  for (let i = 0; i < snapshot.length; i++) {
+    if (snapshot[i] !== current[i]) {
+      return false;
+    }
+  }
+  return true;
+};
+var createLintPlan = (config2, locale) => {
+  const registered = /* @__PURE__ */ new Set();
+  const rules = [];
+  const sharedOptions = config2.sharedOptions ?? {};
+  const registerRule = (descriptorRule, ruleParentId) => {
+    if (registered.has(descriptorRule.id)) {
+      throw new Error(`rule.id:${descriptorRule.id} is already registered.
+
+Duplicated rule.id is something wrong in .secretlintrc.
+`);
+    }
+    registered.add(descriptorRule.id);
+    rules.push({
+      descriptorRule,
+      ruleParentId,
+      keywords: normalizeKeywords(descriptorRule.rule.meta.keywords),
+      // If option is not defined Options is {} by default
+      patterns: compilePatterns(descriptorRule.rule, descriptorRule.options || {}),
+      metaKeywords: descriptorRule.rule.meta.keywords,
+      metaPatterns: descriptorRule.rule.patterns
     });
-    return;
-  } else if (isRule(descriptorRule)) {
-    const context = createRuleContext({
-      ruleId,
+  };
+  secretLintProfiler.mark({
+    type: "@core>setup-rules::start"
+  });
+  for (const descriptor of config2.rules) {
+    const ruleId = descriptor.id;
+    if (descriptor.disabled) {
+      debug("Skip registerRule %s, because it is disabled", ruleId);
+      continue;
+    }
+    debug("registerRule %s", ruleId);
+    secretLintProfiler.mark({
+      type: "@core>setup-rule::start",
+      id: descriptor.rule.meta.id
+    });
+    if (isRulePreset(descriptor)) {
+      const presetRules = descriptor.rules || [];
+      if (!Array.isArray(presetRules)) {
+        console.error(`${descriptor.id}:PresetRules is invalid format`, presetRules);
+        throw new Error("preset's rules should be an array of rule definitions");
+      }
+      const context = {
+        sharedOptions,
+        registerRule(rule, defaultValue) {
+          const descriptorRule = presetRules.find((descriptorRule2) => {
+            return descriptorRule2.id === rule.meta.id;
+          });
+          if (descriptorRule?.disabled) {
+            debug("Skip registerRule %s in %s, because it is disabled", rule.meta.id, descriptor.id);
+            return;
+          }
+          registerRule(
+            {
+              // options and disabled ...
+              ...defaultValue ?? {},
+              // Prefer to use user setting
+              // User can override preset setting
+              ...descriptorRule,
+              id: rule.meta.id,
+              // Use undefined instead of {}
+              options: descriptorRule ? descriptorRule.options : void 0,
+              rule,
+              disabled: descriptorRule ? descriptorRule.disabled : void 0,
+              allowMessageIds: descriptorRule ? descriptorRule.allowMessageIds : void 0,
+              severity: descriptorRule ? descriptorRule.severity : void 0
+            },
+            // parent rule id is rule preset id
+            descriptor.id
+          );
+        }
+      };
+      descriptor.rule.create(context, descriptor.options || []);
+    } else if (isRule(descriptor)) {
+      registerRule(descriptor, void 0);
+    } else {
+      throw new Error(`Unknown descriptor type: ${descriptor}`);
+    }
+    secretLintProfiler.mark({
+      type: "@core>setup-rule::end",
+      id: descriptor.rule.meta.id
+    });
+  }
+  secretLintProfiler.mark({
+    type: "@core>setup-rules::end"
+  });
+  const allowMessageIds = [];
+  for (const { descriptorRule } of rules) {
+    const ruleId = descriptorRule.rule.meta.id;
+    descriptorRule.allowMessageIds?.forEach((messageId) => {
+      allowMessageIds.push({ messageId, ruleId });
+    });
+  }
+  return {
+    config: config2,
+    locale,
+    rules,
+    allowMessageIds,
+    views: /* @__PURE__ */ new Map(),
+    snapshot: createConfigSnapshot(config2)
+  };
+};
+var supportContentType = (rule, contentType) => {
+  if (contentType === "unknown") {
+    return true;
+  }
+  const supportedContentTypes = rule.descriptorRule.rule.meta.supportedContentTypes;
+  return supportedContentTypes.includes("all") || supportedContentTypes.includes(contentType);
+};
+var createView = (plan, contentType) => {
+  const targets = plan.rules.filter((rule) => supportContentType(rule, contentType));
+  const keywordsOfRule = (rule) => {
+    return contentType === "text" ? rule.keywords : void 0;
+  };
+  const keywordKey = (keyword) => JSON.stringify([keyword.keyword, keywordGuardKey(keyword.guard)]);
+  const withoutGuard = (keywords) => {
+    return keywords?.map((keyword) => ({ keyword, guard: void 0, after: void 0 }));
+  };
+  const allKeywords = /* @__PURE__ */ new Map();
+  const addKeywords = (keywords) => {
+    keywords?.forEach((keyword) => {
+      allKeywords.set(keywordKey(keyword), keyword);
+    });
+  };
+  for (const rule of targets) {
+    if (rule.patterns) {
+      rule.patterns.forEach((pattern) => addKeywords(pattern.keywords));
+    } else {
+      addKeywords(withoutGuard(keywordsOfRule(rule)));
+    }
+  }
+  const sortedKeys = [...allKeywords.keys()].sort();
+  const matcherKeywords = sortedKeys.map((key) => allKeywords.get(key).keyword);
+  const matcherGuards = sortedKeys.map((key) => allKeywords.get(key).guard);
+  const matcher = sortedKeys.length > 0 ? getKeywordMatcher(matcherKeywords, matcherGuards) : void 0;
+  const indexOf = new Map(sortedKeys.map((key, index) => [key, index]));
+  const toIndexes = (keywords) => {
+    return keywords?.map((keyword) => indexOf.get(keywordKey(keyword)));
+  };
+  const patternIndexes = new Map(targets.flatMap((rule) => rule.patterns ?? []).filter((pattern) => pattern.keywords !== void 0).map((pattern, index) => [pattern, index]));
+  const rules = targets.map((rule) => {
+    if (!rule.patterns) {
+      return { rule, keywordIndexes: toIndexes(withoutGuard(keywordsOfRule(rule))), patterns: void 0 };
+    }
+    const patterns = rule.patterns.map((pattern, patternNumber) => {
+      const patternLabel = pattern.name === void 0 ? String(pattern.source.pattern) : `${pattern.name}${pattern.keywords === void 0 && !pattern.pathOnly ? " (no keywords)" : ""}`;
+      return {
+        // the id of the rule itself: the id of the config can be a short id such as "@secretlint/aws"
+        profileId: `${rule.descriptorRule.rule.meta.id}#${patternNumber} ${patternLabel}`,
+        index: patternIndexes.get(pattern) ?? -1,
+        regex: pattern.regex,
+        tester: pattern.tester,
+        scope: pattern.scope,
+        keywordIndexes: toIndexes(pattern.keywords),
+        report: pattern.source.report,
+        filePathFilter: pattern.filePathFilter,
+        pathOnly: pattern.pathOnly
+      };
+    });
+    return { rule, keywordIndexes: void 0, patterns };
+  });
+  const allPatterns = rules.flatMap((rule) => rule.patterns ?? []).filter((pattern) => !pattern.pathOnly);
+  const keywordPatterns = allPatterns.filter((pattern) => pattern.keywordIndexes !== void 0);
+  const linePatternsOfKeyword = (matcher?.keywords ?? []).map((_, keywordIndex) => {
+    return keywordPatterns.filter((pattern) => {
+      return pattern.scope === "line" && pattern.keywordIndexes.includes(keywordIndex);
+    });
+  });
+  const hasAlwaysPattern = allPatterns.some((pattern) => pattern.keywordIndexes === void 0);
+  const hasAlwaysRule = rules.some((rule) => rule.patterns === void 0 && rule.keywordIndexes === void 0);
+  const pathPatterns = rules.flatMap((rule) => rule.patterns ?? []).filter((pattern) => pattern.pathOnly);
+  return {
+    rules,
+    matcher,
+    // The scanner of the plan uses the same matcher: the matcher is cached by its keywords and guards
+    keywordScanPlan: matcher !== void 0 ? createKeywordScanPlan({
+      keywords: matcherKeywords,
+      guards: matcherGuards,
+      // A path pattern runs by the file path, which the scan does not check
+      requiresKeyword: !hasAlwaysPattern && !hasAlwaysRule && pathPatterns.length === 0,
+      ruleCheck: {
+        contentKeywordIndexes: [
+          ...rules.flatMap((rule) => rule.patterns === void 0 ? rule.keywordIndexes ?? [] : []),
+          ...keywordPatterns.flatMap((pattern) => {
+            return pattern.scope === "file" ? pattern.keywordIndexes : [];
+          })
+        ],
+        linePatterns: keywordPatterns.filter((pattern) => pattern.scope === "line").map((pattern) => ({
+          source: pattern.tester.source,
+          flags: pattern.tester.flags,
+          keywordIndexes: pattern.keywordIndexes,
+          profileId: pattern.profileId
+        }))
+      }
+    }) : void 0,
+    keywordPatterns,
+    linePatternsOfKeyword,
+    hasAlwaysPattern,
+    hasAlwaysRule,
+    hasFilePattern: keywordPatterns.some((pattern) => pattern.scope === "file"),
+    pathPatterns
+  };
+};
+var getPlanView = (plan, contentType) => {
+  const cached2 = plan.views.get(contentType);
+  if (cached2) {
+    return cached2;
+  }
+  const view = createView(plan, contentType);
+  plan.views.set(contentType, view);
+  return view;
+};
+var planCache = /* @__PURE__ */ new WeakMap();
+var getLintPlan = (config2, locale) => {
+  const plans = planCache.get(config2);
+  const cached2 = plans?.get(locale);
+  if (cached2 && isFreshPlan(cached2, config2)) {
+    return cached2;
+  }
+  const plan = createLintPlan(config2, locale);
+  if (plans) {
+    plans.set(locale, plan);
+  } else {
+    planCache.set(config2, /* @__PURE__ */ new Map([[locale, plan]]));
+  }
+  return plan;
+};
+
+// ../../node_modules/@secretlint/core/module/index.js
+var import_debug2 = __toESM(require_src(), 1);
+var debug2 = (0, import_debug2.default)("@secretlint/core");
+var NO_KEYWORD_LINES = [];
+var collectKeywordLines = (view, hits, text) => {
+  const lines2 = view.keywordPatterns.map(() => []);
+  someKeywordLine(view, hits, (index) => index === 0 ? 0 : text.lastIndexOf("\n", index - 1) + 1, (index) => {
+    const nextLineFeed = text.indexOf("\n", index);
+    return nextLineFeed < 0 ? text.length : nextLineFeed + 1;
+  }, (lineStart, lineEnd, patterns) => {
+    patterns.forEach((pattern) => lines2[pattern.index].push(lineStart, lineEnd));
+    return false;
+  });
+  return lines2;
+};
+var runPattern = (pattern, text, offset, context) => {
+  const profiling = secretLintProfiler.isEnabled;
+  const startTime = profiling ? secretLintProfiler.now() : 0;
+  let matchCount = 0;
+  for (const match of text.matchAll(pattern.regex)) {
+    matchCount++;
+    const matchedText = match[0];
+    const startIndex = offset + match.index;
+    pattern.report({
+      text: matchedText,
+      range: [startIndex, startIndex + matchedText.length],
+      captures: match,
+      groups: match.groups
+    }, context);
+  }
+  if (profiling) {
+    secretLintProfiler.record("@core>pattern", pattern.profileId, startTime);
+    if (matchCount > 0) {
+      secretLintProfiler.count("@core>pattern-match", pattern.profileId, matchCount);
+    }
+  }
+};
+var reportPath = (pattern, content, context) => {
+  const startTime = secretLintProfiler.isEnabled ? secretLintProfiler.now() : 0;
+  pattern.report({
+    text: content,
+    range: [0, content.length],
+    captures: [content],
+    groups: void 0
+  }, context);
+  secretLintProfiler.record("@core>pattern", pattern.profileId, startTime);
+};
+var recordGuardCounts = (matcher) => {
+  for (const { keywordIndex, found, met } of matcher.takeGuardCounts()) {
+    const id = formatGuardedKeyword(matcher.keywords[keywordIndex], matcher.guards[keywordIndex]);
+    secretLintProfiler.count("@core>keyword-guard", id, found);
+    secretLintProfiler.count("@core>keyword-guard-met", id, met);
+  }
+};
+var checkBytes = (view, bytes, keywordScanResult) => {
+  const matcher = view.matcher;
+  if (!matcher) {
+    return void 0;
+  }
+  const profiling = secretLintProfiler.isEnabled;
+  const found = (keywordIndexes) => {
+    return () => {
+      return view.keywordPatterns.some((pattern) => {
+        return pattern.scope === "file" && isKeywordFound(pattern.keywordIndexes, keywordIndexes);
+      });
+    };
+  };
+  if (keywordScanResult !== void 0 && keywordScanResult.planId === view.keywordScanPlan?.id) {
+    const hasFilePatternKeyword2 = found(keywordScanResult.found);
+    return {
+      found: keywordScanResult.found,
+      hasKeyword: keywordScanResult.hasKeyword,
+      runsPatterns: view.hasAlwaysPattern || keywordScanResult.hasKeyword && (view.hasFilePattern && hasFilePatternKeyword2() || keywordScanResult.lineMatched)
+    };
+  }
+  const contentStart = hasUtf8BOM(bytes) ? 3 : 0;
+  const scanStartTime = profiling ? secretLintProfiler.now() : 0;
+  matcher.setGuardCounting(profiling);
+  const hits = matcher.scan(bytes, contentStart);
+  if (profiling) {
+    secretLintProfiler.record("@core>keyword-scan", void 0, scanStartTime);
+    recordGuardCounts(matcher);
+  }
+  const hasKeyword = hits.count > 0;
+  const hasFilePatternKeyword = found(hits.found);
+  const hasLineMatch = () => {
+    if (!profiling) {
+      return hasLineMatchInBytes(view, hits, bytes, contentStart);
+    }
+    const startTime = secretLintProfiler.now();
+    const matched = hasLineMatchInBytes(view, hits, bytes, contentStart, (pattern, line) => {
+      const testStartTime = secretLintProfiler.now();
+      const lineMatched = pattern.tester.test(line);
+      secretLintProfiler.record("@core>pattern-line-test", pattern.profileId, testStartTime);
+      return lineMatched;
+    });
+    secretLintProfiler.record("@core>line-check", void 0, startTime);
+    return matched;
+  };
+  const runsPatterns = view.hasAlwaysPattern || hasKeyword && (view.hasFilePattern && hasFilePatternKeyword() || hasLineMatch());
+  return { found: hits.found, hasKeyword, runsPatterns };
+};
+var createResult = (source, messages31) => {
+  return {
+    filePath: source.filePath,
+    sourceContentType: source.contentType,
+    messages: messages31
+  };
+};
+var createHandler = (descriptorRule, context) => {
+  const create = descriptorRule.rule.create;
+  if (typeof create !== "function") {
+    throw new Error(`The rule should have \`create\` function or \`patterns\`: ${descriptorRule.id}`);
+  }
+  return create.call(descriptorRule.rule, context, descriptorRule.options || {});
+};
+var lintWithPlan = (plan, source, options, keywordScanResult) => {
+  const contentType = source.contentType;
+  const view = getPlanView(plan, contentType);
+  const matcher = view.matcher;
+  const bytes = source.contentBytes;
+  const bytesCheck = bytes === void 0 ? void 0 : checkBytes(view, bytes, keywordScanResult);
+  const isPathPatternTarget = (pattern) => {
+    return pattern.filePathFilter === void 0 || pattern.filePathFilter(source.filePath);
+  };
+  const hasPathMatch = view.pathPatterns.some(isPathPatternTarget);
+  if (bytes !== void 0 && !bytesCheck?.hasKeyword && !view.hasAlwaysPattern && !view.hasAlwaysRule && !hasPathMatch) {
+    return Promise.resolve(createResult(source, []));
+  }
+  const sourceCode = new SecretLintSourceCodeImpl({
+    content: () => source.content,
+    filePath: source.filePath,
+    physicalFilePath: options.noPhysicFilePath ? void 0 : source.filePath,
+    ext: source.ext || "",
+    contentType,
+    contentBytes: bytes
+  });
+  const needsTextHits = bytes === void 0 || bytesCheck?.runsPatterns === true || view.hasAlwaysPattern;
+  const scanText = () => {
+    if (matcher === void 0 || !needsTextHits) {
+      return void 0;
+    }
+    matcher.setGuardCounting(secretLintProfiler.isEnabled);
+    if (!secretLintProfiler.isEnabled) {
+      return matcher.scan(sourceCode.content);
+    }
+    const content = sourceCode.content;
+    const startTime = secretLintProfiler.now();
+    const hits = matcher.scan(content);
+    secretLintProfiler.record("@core>keyword-scan", void 0, startTime);
+    if (bytes === void 0) {
+      recordGuardCounts(matcher);
+    } else {
+      matcher.takeGuardCounts();
+    }
+    return hits;
+  };
+  const textHits = scanText();
+  const found = textHits?.found ?? bytesCheck?.found;
+  const runsContentPatterns = view.hasAlwaysPattern || (bytes === void 0 ? textHits !== void 0 && textHits.count > 0 : bytesCheck?.runsPatterns === true);
+  const runsPatterns = runsContentPatterns || hasPathMatch;
+  const keywordLines = runsContentPatterns && textHits !== void 0 ? collectKeywordLines(view, textHits, sourceCode.content) : NO_KEYWORD_LINES;
+  const reportedMessages = [];
+  const ignoredMessages = [];
+  const contextEvents = {
+    report(message) {
+      reportedMessages.push(message);
+    },
+    ignore(message) {
+      ignoredMessages.push(message);
+    }
+  };
+  const sharedOptions = plan.config.sharedOptions ?? {};
+  const createContext = (viewRule) => {
+    const { descriptorRule, ruleParentId } = viewRule.rule;
+    return createRuleContext({
+      ruleId: descriptorRule.id,
+      ruleParentId,
       severity: descriptorRule.severity,
       meta: descriptorRule.rule.meta,
       sourceCode,
       contextEvents,
-      sharedOptions: sharedOptionsWithDefault,
-      locale
+      sharedOptions,
+      locale: plan.locale
     });
-    runningEvents.registerRule({
-      descriptorRule,
-      context
-    });
-    return;
+  };
+  const isKeywordInContent = (keywordIndexes) => {
+    return found !== void 0 && isKeywordFound(keywordIndexes, found);
+  };
+  const rulesToRun = view.rules.filter((viewRule) => {
+    if (viewRule.patterns) {
+      return runsPatterns;
+    }
+    return viewRule.keywordIndexes === void 0 || isKeywordInContent(viewRule.keywordIndexes);
+  }).map((viewRule) => {
+    if (viewRule.patterns) {
+      return { type: "patterns", viewRule, patterns: viewRule.patterns };
+    }
+    const descriptorRule = viewRule.rule.descriptorRule;
+    return {
+      type: "handler",
+      viewRule,
+      // If option is not defined Options is {} by default
+      handler: createHandler(descriptorRule, createContext(viewRule))
+    };
+  });
+  if (rulesToRun.length === 0) {
+    return Promise.resolve(createResult(source, []));
   }
-  throw new Error(`Unknown descriptor type: ${descriptorRule}`);
+  const targetsOfPattern = (pattern) => {
+    if (pattern.filePathFilter !== void 0 && !pattern.filePathFilter(source.filePath)) {
+      return [];
+    }
+    if (pattern.pathOnly) {
+      return "path";
+    }
+    if (!runsContentPatterns) {
+      return [];
+    }
+    if (pattern.keywordIndexes === void 0) {
+      return "content";
+    }
+    if (pattern.scope === "file") {
+      return isKeywordInContent(pattern.keywordIndexes) ? "content" : [];
+    }
+    return keywordLines[pattern.index] ?? [];
+  };
+  const promises = [];
+  try {
+    for (const ruleToRun of rulesToRun) {
+      const viewRule = ruleToRun.viewRule;
+      const ruleId = viewRule.rule.descriptorRule.rule.meta.id;
+      const ruleStartTime = secretLintProfiler.isEnabled ? secretLintProfiler.now() : 0;
+      if (ruleToRun.type === "patterns") {
+        const targets = ruleToRun.patterns.map((pattern) => ({ pattern, target: targetsOfPattern(pattern) })).filter(({ target }) => target.length > 0);
+        if (targets.length > 0) {
+          const content = sourceCode.content;
+          const context = {
+            ...createContext(viewRule),
+            options: viewRule.rule.descriptorRule.options || {},
+            source: sourceCode
+          };
+          for (const { pattern, target } of targets) {
+            if (target === "path") {
+              reportPath(pattern, content, context);
+              continue;
+            }
+            if (target === "content") {
+              runPattern(pattern, content, 0, context);
+              continue;
+            }
+            for (let i = 0; i < target.length; i += 2) {
+              const lineStart = target[i];
+              runPattern(pattern, content.slice(lineStart, target[i + 1]), lineStart, context);
+            }
+          }
+        }
+        secretLintProfiler.record("@core>rule-handler", ruleId, ruleStartTime);
+      } else {
+        const file2 = ruleToRun.handler.file;
+        const returned = file2 ? file2(sourceCode) : void 0;
+        if (returned !== void 0 && typeof returned.then === "function") {
+          promises.push(Promise.resolve(returned).then(() => {
+            secretLintProfiler.record("@core>rule-handler", ruleId, ruleStartTime);
+          }));
+        } else {
+          secretLintProfiler.record("@core>rule-handler", ruleId, ruleStartTime);
+        }
+      }
+    }
+  } catch (error62) {
+    return Promise.allSettled(promises).then(() => {
+      throw error62;
+    });
+  }
+  const finish = () => {
+    if (reportedMessages.length === 0) {
+      return createResult(source, []);
+    }
+    return createResult(source, cleanupMessages({
+      reportedMessages,
+      ignoredMessages,
+      allowMessageIds: plan.allowMessageIds,
+      maskSecrets: options.maskSecrets
+    }));
+  };
+  if (promises.length === 0) {
+    return Promise.resolve(finish());
+  }
+  return Promise.all(promises).then(finish);
+};
+var lintSource = ({ source, options, keywordScanResult }) => {
+  const startTime = secretLintProfiler.isEnabled ? secretLintProfiler.now() : 0;
+  debug2(`source filePath: %O`, source.filePath);
+  debug2(`options: %O`, options);
+  const plan = getLintPlan(options.config, options.locale ?? "en");
+  const promise2 = lintWithPlan(plan, source, {
+    maskSecrets: options.maskSecrets ?? false,
+    noPhysicFilePath: options.noPhysicFilePath ?? false
+  }, keywordScanResult);
+  if (!secretLintProfiler.isEnabled) {
+    return promise2;
+  }
+  return promise2.finally(() => {
+    secretLintProfiler.record("@core>lint", source.filePath, startTime);
+  });
 };
 
-// ../../node_modules/@secretlint/secretlint-rule-preset-recommend/module/index.js
-import path2 from "path";
-var commonjsGlobal = typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : {};
-var regexpStringMatcher = {};
-var lodash_uniq;
-var hasRequiredLodash_uniq;
-function requireLodash_uniq() {
-  if (hasRequiredLodash_uniq) return lodash_uniq;
-  hasRequiredLodash_uniq = 1;
-  var LARGE_ARRAY_SIZE = 200;
-  var HASH_UNDEFINED = "__lodash_hash_undefined__";
-  var INFINITY = 1 / 0;
-  var funcTag = "[object Function]", genTag = "[object GeneratorFunction]";
-  var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
-  var reIsHostCtor = /^\[object .+?Constructor\]$/;
-  var freeGlobal = typeof commonjsGlobal == "object" && commonjsGlobal && commonjsGlobal.Object === Object && commonjsGlobal;
-  var freeSelf = typeof self == "object" && self && self.Object === Object && self;
-  var root = freeGlobal || freeSelf || Function("return this")();
-  function arrayIncludes(array2, value) {
-    var length = array2 ? array2.length : 0;
-    return !!length && baseIndexOf(array2, value, 0) > -1;
-  }
-  function baseFindIndex(array2, predicate, fromIndex, fromRight) {
-    var length = array2.length, index = fromIndex + -1;
-    while (++index < length) {
-      if (predicate(array2[index], index, array2)) {
-        return index;
-      }
-    }
-    return -1;
-  }
-  function baseIndexOf(array2, value, fromIndex) {
-    if (value !== value) {
-      return baseFindIndex(array2, baseIsNaN, fromIndex);
-    }
-    var index = fromIndex - 1, length = array2.length;
-    while (++index < length) {
-      if (array2[index] === value) {
-        return index;
-      }
-    }
-    return -1;
-  }
-  function baseIsNaN(value) {
-    return value !== value;
-  }
-  function cacheHas(cache, key) {
-    return cache.has(key);
-  }
-  function getValue(object2, key) {
-    return object2 == null ? void 0 : object2[key];
-  }
-  function isHostObject(value) {
-    var result = false;
-    if (value != null && typeof value.toString != "function") {
-      try {
-        result = !!(value + "");
-      } catch (e) {
-      }
-    }
-    return result;
-  }
-  function setToArray(set2) {
-    var index = -1, result = Array(set2.size);
-    set2.forEach(function(value) {
-      result[++index] = value;
-    });
-    return result;
-  }
-  var arrayProto = Array.prototype, funcProto = Function.prototype, objectProto = Object.prototype;
-  var coreJsData = root["__core-js_shared__"];
-  var maskSrcKey = (function() {
-    var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || "");
-    return uid ? "Symbol(src)_1." + uid : "";
-  })();
-  var funcToString = funcProto.toString;
-  var hasOwnProperty = objectProto.hasOwnProperty;
-  var objectToString = objectProto.toString;
-  var reIsNative = RegExp(
-    "^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
-  );
-  var splice = arrayProto.splice;
-  var Map2 = getNative(root, "Map"), Set2 = getNative(root, "Set"), nativeCreate = getNative(Object, "create");
-  function Hash(entries) {
-    var index = -1, length = entries ? entries.length : 0;
-    this.clear();
-    while (++index < length) {
-      var entry = entries[index];
-      this.set(entry[0], entry[1]);
-    }
-  }
-  function hashClear() {
-    this.__data__ = nativeCreate ? nativeCreate(null) : {};
-  }
-  function hashDelete(key) {
-    return this.has(key) && delete this.__data__[key];
-  }
-  function hashGet(key) {
-    var data = this.__data__;
-    if (nativeCreate) {
-      var result = data[key];
-      return result === HASH_UNDEFINED ? void 0 : result;
-    }
-    return hasOwnProperty.call(data, key) ? data[key] : void 0;
-  }
-  function hashHas(key) {
-    var data = this.__data__;
-    return nativeCreate ? data[key] !== void 0 : hasOwnProperty.call(data, key);
-  }
-  function hashSet(key, value) {
-    var data = this.__data__;
-    data[key] = nativeCreate && value === void 0 ? HASH_UNDEFINED : value;
-    return this;
-  }
-  Hash.prototype.clear = hashClear;
-  Hash.prototype["delete"] = hashDelete;
-  Hash.prototype.get = hashGet;
-  Hash.prototype.has = hashHas;
-  Hash.prototype.set = hashSet;
-  function ListCache(entries) {
-    var index = -1, length = entries ? entries.length : 0;
-    this.clear();
-    while (++index < length) {
-      var entry = entries[index];
-      this.set(entry[0], entry[1]);
-    }
-  }
-  function listCacheClear() {
-    this.__data__ = [];
-  }
-  function listCacheDelete(key) {
-    var data = this.__data__, index = assocIndexOf(data, key);
-    if (index < 0) {
-      return false;
-    }
-    var lastIndex = data.length - 1;
-    if (index == lastIndex) {
-      data.pop();
-    } else {
-      splice.call(data, index, 1);
-    }
-    return true;
-  }
-  function listCacheGet(key) {
-    var data = this.__data__, index = assocIndexOf(data, key);
-    return index < 0 ? void 0 : data[index][1];
-  }
-  function listCacheHas(key) {
-    return assocIndexOf(this.__data__, key) > -1;
-  }
-  function listCacheSet(key, value) {
-    var data = this.__data__, index = assocIndexOf(data, key);
-    if (index < 0) {
-      data.push([key, value]);
-    } else {
-      data[index][1] = value;
-    }
-    return this;
-  }
-  ListCache.prototype.clear = listCacheClear;
-  ListCache.prototype["delete"] = listCacheDelete;
-  ListCache.prototype.get = listCacheGet;
-  ListCache.prototype.has = listCacheHas;
-  ListCache.prototype.set = listCacheSet;
-  function MapCache(entries) {
-    var index = -1, length = entries ? entries.length : 0;
-    this.clear();
-    while (++index < length) {
-      var entry = entries[index];
-      this.set(entry[0], entry[1]);
-    }
-  }
-  function mapCacheClear() {
-    this.__data__ = {
-      "hash": new Hash(),
-      "map": new (Map2 || ListCache)(),
-      "string": new Hash()
-    };
-  }
-  function mapCacheDelete(key) {
-    return getMapData(this, key)["delete"](key);
-  }
-  function mapCacheGet(key) {
-    return getMapData(this, key).get(key);
-  }
-  function mapCacheHas(key) {
-    return getMapData(this, key).has(key);
-  }
-  function mapCacheSet(key, value) {
-    getMapData(this, key).set(key, value);
-    return this;
-  }
-  MapCache.prototype.clear = mapCacheClear;
-  MapCache.prototype["delete"] = mapCacheDelete;
-  MapCache.prototype.get = mapCacheGet;
-  MapCache.prototype.has = mapCacheHas;
-  MapCache.prototype.set = mapCacheSet;
-  function SetCache(values) {
-    var index = -1, length = values ? values.length : 0;
-    this.__data__ = new MapCache();
-    while (++index < length) {
-      this.add(values[index]);
-    }
-  }
-  function setCacheAdd(value) {
-    this.__data__.set(value, HASH_UNDEFINED);
-    return this;
-  }
-  function setCacheHas(value) {
-    return this.__data__.has(value);
-  }
-  SetCache.prototype.add = SetCache.prototype.push = setCacheAdd;
-  SetCache.prototype.has = setCacheHas;
-  function assocIndexOf(array2, key) {
-    var length = array2.length;
-    while (length--) {
-      if (eq(array2[length][0], key)) {
-        return length;
-      }
-    }
-    return -1;
-  }
-  function baseIsNative(value) {
-    if (!isObject3(value) || isMasked(value)) {
-      return false;
-    }
-    var pattern = isFunction(value) || isHostObject(value) ? reIsNative : reIsHostCtor;
-    return pattern.test(toSource(value));
-  }
-  function baseUniq(array2, iteratee, comparator) {
-    var index = -1, includes = arrayIncludes, length = array2.length, isCommon = true, result = [], seen = result;
-    if (length >= LARGE_ARRAY_SIZE) {
-      var set2 = createSet(array2);
-      if (set2) {
-        return setToArray(set2);
-      }
-      isCommon = false;
-      includes = cacheHas;
-      seen = new SetCache();
-    } else {
-      seen = result;
-    }
-    outer:
-      while (++index < length) {
-        var value = array2[index], computed = value;
-        value = value !== 0 ? value : 0;
-        if (isCommon && computed === computed) {
-          var seenIndex = seen.length;
-          while (seenIndex--) {
-            if (seen[seenIndex] === computed) {
-              continue outer;
-            }
-          }
-          result.push(value);
-        } else if (!includes(seen, computed, comparator)) {
-          if (seen !== result) {
-            seen.push(computed);
-          }
-          result.push(value);
-        }
-      }
-    return result;
-  }
-  var createSet = !(Set2 && 1 / setToArray(new Set2([, -0]))[1] == INFINITY) ? noop : function(values) {
-    return new Set2(values);
-  };
-  function getMapData(map2, key) {
-    var data = map2.__data__;
-    return isKeyable(key) ? data[typeof key == "string" ? "string" : "hash"] : data.map;
-  }
-  function getNative(object2, key) {
-    var value = getValue(object2, key);
-    return baseIsNative(value) ? value : void 0;
-  }
-  function isKeyable(value) {
-    var type = typeof value;
-    return type == "string" || type == "number" || type == "symbol" || type == "boolean" ? value !== "__proto__" : value === null;
-  }
-  function isMasked(func) {
-    return !!maskSrcKey && maskSrcKey in func;
-  }
-  function toSource(func) {
-    if (func != null) {
-      try {
-        return funcToString.call(func);
-      } catch (e) {
-      }
-      try {
-        return func + "";
-      } catch (e) {
-      }
-    }
-    return "";
-  }
-  function uniq(array2) {
-    return array2 && array2.length ? baseUniq(array2) : [];
-  }
-  function eq(value, other) {
-    return value === other || value !== value && other !== other;
-  }
-  function isFunction(value) {
-    var tag = isObject3(value) ? objectToString.call(value) : "";
-    return tag == funcTag || tag == genTag;
-  }
-  function isObject3(value) {
-    var type = typeof value;
-    return !!value && (type == "object" || type == "function");
-  }
-  function noop() {
-  }
-  lodash_uniq = uniq;
-  return lodash_uniq;
-}
-var lodash_uniqwith;
-var hasRequiredLodash_uniqwith;
-function requireLodash_uniqwith() {
-  if (hasRequiredLodash_uniqwith) return lodash_uniqwith;
-  hasRequiredLodash_uniqwith = 1;
-  var LARGE_ARRAY_SIZE = 200;
-  var HASH_UNDEFINED = "__lodash_hash_undefined__";
-  var INFINITY = 1 / 0;
-  var funcTag = "[object Function]", genTag = "[object GeneratorFunction]";
-  var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
-  var reIsHostCtor = /^\[object .+?Constructor\]$/;
-  var freeGlobal = typeof commonjsGlobal == "object" && commonjsGlobal && commonjsGlobal.Object === Object && commonjsGlobal;
-  var freeSelf = typeof self == "object" && self && self.Object === Object && self;
-  var root = freeGlobal || freeSelf || Function("return this")();
-  function arrayIncludes(array2, value) {
-    var length = array2 ? array2.length : 0;
-    return !!length && baseIndexOf(array2, value, 0) > -1;
-  }
-  function arrayIncludesWith(array2, value, comparator) {
-    var index = -1, length = array2 ? array2.length : 0;
-    while (++index < length) {
-      if (comparator(value, array2[index])) {
-        return true;
-      }
-    }
-    return false;
-  }
-  function baseFindIndex(array2, predicate, fromIndex, fromRight) {
-    var length = array2.length, index = fromIndex + -1;
-    while (++index < length) {
-      if (predicate(array2[index], index, array2)) {
-        return index;
-      }
-    }
-    return -1;
-  }
-  function baseIndexOf(array2, value, fromIndex) {
-    if (value !== value) {
-      return baseFindIndex(array2, baseIsNaN, fromIndex);
-    }
-    var index = fromIndex - 1, length = array2.length;
-    while (++index < length) {
-      if (array2[index] === value) {
-        return index;
-      }
-    }
-    return -1;
-  }
-  function baseIsNaN(value) {
-    return value !== value;
-  }
-  function cacheHas(cache, key) {
-    return cache.has(key);
-  }
-  function getValue(object2, key) {
-    return object2 == null ? void 0 : object2[key];
-  }
-  function isHostObject(value) {
-    var result = false;
-    if (value != null && typeof value.toString != "function") {
-      try {
-        result = !!(value + "");
-      } catch (e) {
-      }
-    }
-    return result;
-  }
-  function setToArray(set2) {
-    var index = -1, result = Array(set2.size);
-    set2.forEach(function(value) {
-      result[++index] = value;
-    });
-    return result;
-  }
-  var arrayProto = Array.prototype, funcProto = Function.prototype, objectProto = Object.prototype;
-  var coreJsData = root["__core-js_shared__"];
-  var maskSrcKey = (function() {
-    var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || "");
-    return uid ? "Symbol(src)_1." + uid : "";
-  })();
-  var funcToString = funcProto.toString;
-  var hasOwnProperty = objectProto.hasOwnProperty;
-  var objectToString = objectProto.toString;
-  var reIsNative = RegExp(
-    "^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
-  );
-  var splice = arrayProto.splice;
-  var Map2 = getNative(root, "Map"), Set2 = getNative(root, "Set"), nativeCreate = getNative(Object, "create");
-  function Hash(entries) {
-    var index = -1, length = entries ? entries.length : 0;
-    this.clear();
-    while (++index < length) {
-      var entry = entries[index];
-      this.set(entry[0], entry[1]);
-    }
-  }
-  function hashClear() {
-    this.__data__ = nativeCreate ? nativeCreate(null) : {};
-  }
-  function hashDelete(key) {
-    return this.has(key) && delete this.__data__[key];
-  }
-  function hashGet(key) {
-    var data = this.__data__;
-    if (nativeCreate) {
-      var result = data[key];
-      return result === HASH_UNDEFINED ? void 0 : result;
-    }
-    return hasOwnProperty.call(data, key) ? data[key] : void 0;
-  }
-  function hashHas(key) {
-    var data = this.__data__;
-    return nativeCreate ? data[key] !== void 0 : hasOwnProperty.call(data, key);
-  }
-  function hashSet(key, value) {
-    var data = this.__data__;
-    data[key] = nativeCreate && value === void 0 ? HASH_UNDEFINED : value;
-    return this;
-  }
-  Hash.prototype.clear = hashClear;
-  Hash.prototype["delete"] = hashDelete;
-  Hash.prototype.get = hashGet;
-  Hash.prototype.has = hashHas;
-  Hash.prototype.set = hashSet;
-  function ListCache(entries) {
-    var index = -1, length = entries ? entries.length : 0;
-    this.clear();
-    while (++index < length) {
-      var entry = entries[index];
-      this.set(entry[0], entry[1]);
-    }
-  }
-  function listCacheClear() {
-    this.__data__ = [];
-  }
-  function listCacheDelete(key) {
-    var data = this.__data__, index = assocIndexOf(data, key);
-    if (index < 0) {
-      return false;
-    }
-    var lastIndex = data.length - 1;
-    if (index == lastIndex) {
-      data.pop();
-    } else {
-      splice.call(data, index, 1);
-    }
-    return true;
-  }
-  function listCacheGet(key) {
-    var data = this.__data__, index = assocIndexOf(data, key);
-    return index < 0 ? void 0 : data[index][1];
-  }
-  function listCacheHas(key) {
-    return assocIndexOf(this.__data__, key) > -1;
-  }
-  function listCacheSet(key, value) {
-    var data = this.__data__, index = assocIndexOf(data, key);
-    if (index < 0) {
-      data.push([key, value]);
-    } else {
-      data[index][1] = value;
-    }
-    return this;
-  }
-  ListCache.prototype.clear = listCacheClear;
-  ListCache.prototype["delete"] = listCacheDelete;
-  ListCache.prototype.get = listCacheGet;
-  ListCache.prototype.has = listCacheHas;
-  ListCache.prototype.set = listCacheSet;
-  function MapCache(entries) {
-    var index = -1, length = entries ? entries.length : 0;
-    this.clear();
-    while (++index < length) {
-      var entry = entries[index];
-      this.set(entry[0], entry[1]);
-    }
-  }
-  function mapCacheClear() {
-    this.__data__ = {
-      "hash": new Hash(),
-      "map": new (Map2 || ListCache)(),
-      "string": new Hash()
-    };
-  }
-  function mapCacheDelete(key) {
-    return getMapData(this, key)["delete"](key);
-  }
-  function mapCacheGet(key) {
-    return getMapData(this, key).get(key);
-  }
-  function mapCacheHas(key) {
-    return getMapData(this, key).has(key);
-  }
-  function mapCacheSet(key, value) {
-    getMapData(this, key).set(key, value);
-    return this;
-  }
-  MapCache.prototype.clear = mapCacheClear;
-  MapCache.prototype["delete"] = mapCacheDelete;
-  MapCache.prototype.get = mapCacheGet;
-  MapCache.prototype.has = mapCacheHas;
-  MapCache.prototype.set = mapCacheSet;
-  function SetCache(values) {
-    var index = -1, length = values ? values.length : 0;
-    this.__data__ = new MapCache();
-    while (++index < length) {
-      this.add(values[index]);
-    }
-  }
-  function setCacheAdd(value) {
-    this.__data__.set(value, HASH_UNDEFINED);
-    return this;
-  }
-  function setCacheHas(value) {
-    return this.__data__.has(value);
-  }
-  SetCache.prototype.add = SetCache.prototype.push = setCacheAdd;
-  SetCache.prototype.has = setCacheHas;
-  function assocIndexOf(array2, key) {
-    var length = array2.length;
-    while (length--) {
-      if (eq(array2[length][0], key)) {
-        return length;
-      }
-    }
-    return -1;
-  }
-  function baseIsNative(value) {
-    if (!isObject3(value) || isMasked(value)) {
-      return false;
-    }
-    var pattern = isFunction(value) || isHostObject(value) ? reIsNative : reIsHostCtor;
-    return pattern.test(toSource(value));
-  }
-  function baseUniq(array2, iteratee, comparator) {
-    var index = -1, includes = arrayIncludes, length = array2.length, isCommon = true, result = [], seen = result;
-    if (comparator) {
-      isCommon = false;
-      includes = arrayIncludesWith;
-    } else if (length >= LARGE_ARRAY_SIZE) {
-      var set2 = createSet(array2);
-      if (set2) {
-        return setToArray(set2);
-      }
-      isCommon = false;
-      includes = cacheHas;
-      seen = new SetCache();
-    } else {
-      seen = result;
-    }
-    outer:
-      while (++index < length) {
-        var value = array2[index], computed = value;
-        value = comparator || value !== 0 ? value : 0;
-        if (isCommon && computed === computed) {
-          var seenIndex = seen.length;
-          while (seenIndex--) {
-            if (seen[seenIndex] === computed) {
-              continue outer;
-            }
-          }
-          result.push(value);
-        } else if (!includes(seen, computed, comparator)) {
-          if (seen !== result) {
-            seen.push(computed);
-          }
-          result.push(value);
-        }
-      }
-    return result;
-  }
-  var createSet = !(Set2 && 1 / setToArray(new Set2([, -0]))[1] == INFINITY) ? noop : function(values) {
-    return new Set2(values);
-  };
-  function getMapData(map2, key) {
-    var data = map2.__data__;
-    return isKeyable(key) ? data[typeof key == "string" ? "string" : "hash"] : data.map;
-  }
-  function getNative(object2, key) {
-    var value = getValue(object2, key);
-    return baseIsNative(value) ? value : void 0;
-  }
-  function isKeyable(value) {
-    var type = typeof value;
-    return type == "string" || type == "number" || type == "symbol" || type == "boolean" ? value !== "__proto__" : value === null;
-  }
-  function isMasked(func) {
-    return !!maskSrcKey && maskSrcKey in func;
-  }
-  function toSource(func) {
-    if (func != null) {
-      try {
-        return funcToString.call(func);
-      } catch (e) {
-      }
-      try {
-        return func + "";
-      } catch (e) {
-      }
-    }
-    return "";
-  }
-  function uniqWith(array2, comparator) {
-    return array2 && array2.length ? baseUniq(array2, void 0, comparator) : [];
-  }
-  function eq(value, other) {
-    return value === other || value !== value && other !== other;
-  }
-  function isFunction(value) {
-    var tag = isObject3(value) ? objectToString.call(value) : "";
-    return tag == funcTag || tag == genTag;
-  }
-  function isObject3(value) {
-    var type = typeof value;
-    return !!value && (type == "object" || type == "function");
-  }
-  function noop() {
-  }
-  lodash_uniqwith = uniqWith;
-  return lodash_uniqwith;
-}
-var lodash_sortby = { exports: {} };
-lodash_sortby.exports;
-var hasRequiredLodash_sortby;
-function requireLodash_sortby() {
-  if (hasRequiredLodash_sortby) return lodash_sortby.exports;
-  hasRequiredLodash_sortby = 1;
-  (function(module, exports) {
-    var LARGE_ARRAY_SIZE = 200;
-    var FUNC_ERROR_TEXT = "Expected a function";
-    var HASH_UNDEFINED = "__lodash_hash_undefined__";
-    var UNORDERED_COMPARE_FLAG = 1, PARTIAL_COMPARE_FLAG = 2;
-    var MAX_SAFE_INTEGER = 9007199254740991;
-    var argsTag = "[object Arguments]", arrayTag = "[object Array]", boolTag = "[object Boolean]", dateTag = "[object Date]", errorTag = "[object Error]", funcTag = "[object Function]", genTag = "[object GeneratorFunction]", mapTag = "[object Map]", numberTag = "[object Number]", objectTag = "[object Object]", promiseTag = "[object Promise]", regexpTag = "[object RegExp]", setTag = "[object Set]", stringTag = "[object String]", symbolTag = "[object Symbol]", weakMapTag = "[object WeakMap]";
-    var arrayBufferTag = "[object ArrayBuffer]", dataViewTag = "[object DataView]", float32Tag = "[object Float32Array]", float64Tag = "[object Float64Array]", int8Tag = "[object Int8Array]", int16Tag = "[object Int16Array]", int32Tag = "[object Int32Array]", uint8Tag = "[object Uint8Array]", uint8ClampedTag = "[object Uint8ClampedArray]", uint16Tag = "[object Uint16Array]", uint32Tag = "[object Uint32Array]";
-    var reIsDeepProp = /\.|\[(?:[^[\]]*|(["'])(?:(?!\1)[^\\]|\\.)*?\1)\]/, reIsPlainProp = /^\w*$/, reLeadingDot = /^\./, rePropName = /[^.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|$))/g;
-    var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
-    var reEscapeChar = /\\(\\)?/g;
-    var reIsHostCtor = /^\[object .+?Constructor\]$/;
-    var reIsUint = /^(?:0|[1-9]\d*)$/;
-    var typedArrayTags = {};
-    typedArrayTags[float32Tag] = typedArrayTags[float64Tag] = typedArrayTags[int8Tag] = typedArrayTags[int16Tag] = typedArrayTags[int32Tag] = typedArrayTags[uint8Tag] = typedArrayTags[uint8ClampedTag] = typedArrayTags[uint16Tag] = typedArrayTags[uint32Tag] = true;
-    typedArrayTags[argsTag] = typedArrayTags[arrayTag] = typedArrayTags[arrayBufferTag] = typedArrayTags[boolTag] = typedArrayTags[dataViewTag] = typedArrayTags[dateTag] = typedArrayTags[errorTag] = typedArrayTags[funcTag] = typedArrayTags[mapTag] = typedArrayTags[numberTag] = typedArrayTags[objectTag] = typedArrayTags[regexpTag] = typedArrayTags[setTag] = typedArrayTags[stringTag] = typedArrayTags[weakMapTag] = false;
-    var freeGlobal = typeof commonjsGlobal == "object" && commonjsGlobal && commonjsGlobal.Object === Object && commonjsGlobal;
-    var freeSelf = typeof self == "object" && self && self.Object === Object && self;
-    var root = freeGlobal || freeSelf || Function("return this")();
-    var freeExports = exports && !exports.nodeType && exports;
-    var freeModule = freeExports && true && module && !module.nodeType && module;
-    var moduleExports = freeModule && freeModule.exports === freeExports;
-    var freeProcess = moduleExports && freeGlobal.process;
-    var nodeUtil = (function() {
-      try {
-        return freeProcess && freeProcess.binding("util");
-      } catch (e) {
-      }
-    })();
-    var nodeIsTypedArray = nodeUtil && nodeUtil.isTypedArray;
-    function apply(func, thisArg, args) {
-      switch (args.length) {
-        case 0:
-          return func.call(thisArg);
-        case 1:
-          return func.call(thisArg, args[0]);
-        case 2:
-          return func.call(thisArg, args[0], args[1]);
-        case 3:
-          return func.call(thisArg, args[0], args[1], args[2]);
-      }
-      return func.apply(thisArg, args);
-    }
-    function arrayMap(array2, iteratee) {
-      var index = -1, length = array2 ? array2.length : 0, result = Array(length);
-      while (++index < length) {
-        result[index] = iteratee(array2[index], index, array2);
-      }
-      return result;
-    }
-    function arrayPush(array2, values) {
-      var index = -1, length = values.length, offset = array2.length;
-      while (++index < length) {
-        array2[offset + index] = values[index];
-      }
-      return array2;
-    }
-    function arraySome(array2, predicate) {
-      var index = -1, length = array2 ? array2.length : 0;
-      while (++index < length) {
-        if (predicate(array2[index], index, array2)) {
-          return true;
-        }
-      }
-      return false;
-    }
-    function baseProperty(key) {
-      return function(object2) {
-        return object2 == null ? void 0 : object2[key];
-      };
-    }
-    function baseSortBy(array2, comparer) {
-      var length = array2.length;
-      array2.sort(comparer);
-      while (length--) {
-        array2[length] = array2[length].value;
-      }
-      return array2;
-    }
-    function baseTimes(n, iteratee) {
-      var index = -1, result = Array(n);
-      while (++index < n) {
-        result[index] = iteratee(index);
-      }
-      return result;
-    }
-    function baseUnary(func) {
-      return function(value) {
-        return func(value);
-      };
-    }
-    function getValue(object2, key) {
-      return object2 == null ? void 0 : object2[key];
-    }
-    function isHostObject(value) {
-      var result = false;
-      if (value != null && typeof value.toString != "function") {
-        try {
-          result = !!(value + "");
-        } catch (e) {
-        }
-      }
-      return result;
-    }
-    function mapToArray(map2) {
-      var index = -1, result = Array(map2.size);
-      map2.forEach(function(value, key) {
-        result[++index] = [key, value];
-      });
-      return result;
-    }
-    function overArg(func, transform2) {
-      return function(arg) {
-        return func(transform2(arg));
-      };
-    }
-    function setToArray(set2) {
-      var index = -1, result = Array(set2.size);
-      set2.forEach(function(value) {
-        result[++index] = value;
-      });
-      return result;
-    }
-    var arrayProto = Array.prototype, funcProto = Function.prototype, objectProto = Object.prototype;
-    var coreJsData = root["__core-js_shared__"];
-    var maskSrcKey = (function() {
-      var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || "");
-      return uid ? "Symbol(src)_1." + uid : "";
-    })();
-    var funcToString = funcProto.toString;
-    var hasOwnProperty = objectProto.hasOwnProperty;
-    var objectToString = objectProto.toString;
-    var reIsNative = RegExp(
-      "^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
-    );
-    var Symbol2 = root.Symbol, Uint8Array2 = root.Uint8Array, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, spreadableSymbol = Symbol2 ? Symbol2.isConcatSpreadable : void 0;
-    var nativeKeys = overArg(Object.keys, Object), nativeMax = Math.max;
-    var DataView = getNative(root, "DataView"), Map2 = getNative(root, "Map"), Promise2 = getNative(root, "Promise"), Set2 = getNative(root, "Set"), WeakMap2 = getNative(root, "WeakMap"), nativeCreate = getNative(Object, "create");
-    var dataViewCtorString = toSource(DataView), mapCtorString = toSource(Map2), promiseCtorString = toSource(Promise2), setCtorString = toSource(Set2), weakMapCtorString = toSource(WeakMap2);
-    var symbolProto = Symbol2 ? Symbol2.prototype : void 0, symbolValueOf = symbolProto ? symbolProto.valueOf : void 0, symbolToString = symbolProto ? symbolProto.toString : void 0;
-    function Hash(entries) {
-      var index = -1, length = entries ? entries.length : 0;
-      this.clear();
-      while (++index < length) {
-        var entry = entries[index];
-        this.set(entry[0], entry[1]);
-      }
-    }
-    function hashClear() {
-      this.__data__ = nativeCreate ? nativeCreate(null) : {};
-    }
-    function hashDelete(key) {
-      return this.has(key) && delete this.__data__[key];
-    }
-    function hashGet(key) {
-      var data = this.__data__;
-      if (nativeCreate) {
-        var result = data[key];
-        return result === HASH_UNDEFINED ? void 0 : result;
-      }
-      return hasOwnProperty.call(data, key) ? data[key] : void 0;
-    }
-    function hashHas(key) {
-      var data = this.__data__;
-      return nativeCreate ? data[key] !== void 0 : hasOwnProperty.call(data, key);
-    }
-    function hashSet(key, value) {
-      var data = this.__data__;
-      data[key] = nativeCreate && value === void 0 ? HASH_UNDEFINED : value;
-      return this;
-    }
-    Hash.prototype.clear = hashClear;
-    Hash.prototype["delete"] = hashDelete;
-    Hash.prototype.get = hashGet;
-    Hash.prototype.has = hashHas;
-    Hash.prototype.set = hashSet;
-    function ListCache(entries) {
-      var index = -1, length = entries ? entries.length : 0;
-      this.clear();
-      while (++index < length) {
-        var entry = entries[index];
-        this.set(entry[0], entry[1]);
-      }
-    }
-    function listCacheClear() {
-      this.__data__ = [];
-    }
-    function listCacheDelete(key) {
-      var data = this.__data__, index = assocIndexOf(data, key);
-      if (index < 0) {
-        return false;
-      }
-      var lastIndex = data.length - 1;
-      if (index == lastIndex) {
-        data.pop();
-      } else {
-        splice.call(data, index, 1);
-      }
-      return true;
-    }
-    function listCacheGet(key) {
-      var data = this.__data__, index = assocIndexOf(data, key);
-      return index < 0 ? void 0 : data[index][1];
-    }
-    function listCacheHas(key) {
-      return assocIndexOf(this.__data__, key) > -1;
-    }
-    function listCacheSet(key, value) {
-      var data = this.__data__, index = assocIndexOf(data, key);
-      if (index < 0) {
-        data.push([key, value]);
-      } else {
-        data[index][1] = value;
-      }
-      return this;
-    }
-    ListCache.prototype.clear = listCacheClear;
-    ListCache.prototype["delete"] = listCacheDelete;
-    ListCache.prototype.get = listCacheGet;
-    ListCache.prototype.has = listCacheHas;
-    ListCache.prototype.set = listCacheSet;
-    function MapCache(entries) {
-      var index = -1, length = entries ? entries.length : 0;
-      this.clear();
-      while (++index < length) {
-        var entry = entries[index];
-        this.set(entry[0], entry[1]);
-      }
-    }
-    function mapCacheClear() {
-      this.__data__ = {
-        "hash": new Hash(),
-        "map": new (Map2 || ListCache)(),
-        "string": new Hash()
-      };
-    }
-    function mapCacheDelete(key) {
-      return getMapData(this, key)["delete"](key);
-    }
-    function mapCacheGet(key) {
-      return getMapData(this, key).get(key);
-    }
-    function mapCacheHas(key) {
-      return getMapData(this, key).has(key);
-    }
-    function mapCacheSet(key, value) {
-      getMapData(this, key).set(key, value);
-      return this;
-    }
-    MapCache.prototype.clear = mapCacheClear;
-    MapCache.prototype["delete"] = mapCacheDelete;
-    MapCache.prototype.get = mapCacheGet;
-    MapCache.prototype.has = mapCacheHas;
-    MapCache.prototype.set = mapCacheSet;
-    function SetCache(values) {
-      var index = -1, length = values ? values.length : 0;
-      this.__data__ = new MapCache();
-      while (++index < length) {
-        this.add(values[index]);
-      }
-    }
-    function setCacheAdd(value) {
-      this.__data__.set(value, HASH_UNDEFINED);
-      return this;
-    }
-    function setCacheHas(value) {
-      return this.__data__.has(value);
-    }
-    SetCache.prototype.add = SetCache.prototype.push = setCacheAdd;
-    SetCache.prototype.has = setCacheHas;
-    function Stack(entries) {
-      this.__data__ = new ListCache(entries);
-    }
-    function stackClear() {
-      this.__data__ = new ListCache();
-    }
-    function stackDelete(key) {
-      return this.__data__["delete"](key);
-    }
-    function stackGet(key) {
-      return this.__data__.get(key);
-    }
-    function stackHas(key) {
-      return this.__data__.has(key);
-    }
-    function stackSet(key, value) {
-      var cache = this.__data__;
-      if (cache instanceof ListCache) {
-        var pairs = cache.__data__;
-        if (!Map2 || pairs.length < LARGE_ARRAY_SIZE - 1) {
-          pairs.push([key, value]);
-          return this;
-        }
-        cache = this.__data__ = new MapCache(pairs);
-      }
-      cache.set(key, value);
-      return this;
-    }
-    Stack.prototype.clear = stackClear;
-    Stack.prototype["delete"] = stackDelete;
-    Stack.prototype.get = stackGet;
-    Stack.prototype.has = stackHas;
-    Stack.prototype.set = stackSet;
-    function arrayLikeKeys(value, inherited) {
-      var result = isArray(value) || isArguments(value) ? baseTimes(value.length, String) : [];
-      var length = result.length, skipIndexes = !!length;
-      for (var key in value) {
-        if (hasOwnProperty.call(value, key) && !(skipIndexes && (key == "length" || isIndex(key, length)))) {
-          result.push(key);
-        }
-      }
-      return result;
-    }
-    function assocIndexOf(array2, key) {
-      var length = array2.length;
-      while (length--) {
-        if (eq(array2[length][0], key)) {
-          return length;
-        }
-      }
-      return -1;
-    }
-    var baseEach = createBaseEach(baseForOwn);
-    function baseFlatten(array2, depth, predicate, isStrict, result) {
-      var index = -1, length = array2.length;
-      predicate || (predicate = isFlattenable);
-      result || (result = []);
-      while (++index < length) {
-        var value = array2[index];
-        if (predicate(value)) {
-          {
-            arrayPush(result, value);
-          }
-        } else {
-          result[result.length] = value;
-        }
-      }
-      return result;
-    }
-    var baseFor = createBaseFor();
-    function baseForOwn(object2, iteratee) {
-      return object2 && baseFor(object2, iteratee, keys);
-    }
-    function baseGet(object2, path3) {
-      path3 = isKey(path3, object2) ? [path3] : castPath(path3);
-      var index = 0, length = path3.length;
-      while (object2 != null && index < length) {
-        object2 = object2[toKey(path3[index++])];
-      }
-      return index && index == length ? object2 : void 0;
-    }
-    function baseGetTag(value) {
-      return objectToString.call(value);
-    }
-    function baseHasIn(object2, key) {
-      return object2 != null && key in Object(object2);
-    }
-    function baseIsEqual(value, other, customizer, bitmask, stack) {
-      if (value === other) {
-        return true;
-      }
-      if (value == null || other == null || !isObject3(value) && !isObjectLike(other)) {
-        return value !== value && other !== other;
-      }
-      return baseIsEqualDeep(value, other, baseIsEqual, customizer, bitmask, stack);
-    }
-    function baseIsEqualDeep(object2, other, equalFunc, customizer, bitmask, stack) {
-      var objIsArr = isArray(object2), othIsArr = isArray(other), objTag = arrayTag, othTag = arrayTag;
-      if (!objIsArr) {
-        objTag = getTag(object2);
-        objTag = objTag == argsTag ? objectTag : objTag;
-      }
-      if (!othIsArr) {
-        othTag = getTag(other);
-        othTag = othTag == argsTag ? objectTag : othTag;
-      }
-      var objIsObj = objTag == objectTag && !isHostObject(object2), othIsObj = othTag == objectTag && !isHostObject(other), isSameTag = objTag == othTag;
-      if (isSameTag && !objIsObj) {
-        stack || (stack = new Stack());
-        return objIsArr || isTypedArray(object2) ? equalArrays(object2, other, equalFunc, customizer, bitmask, stack) : equalByTag(object2, other, objTag, equalFunc, customizer, bitmask, stack);
-      }
-      if (!(bitmask & PARTIAL_COMPARE_FLAG)) {
-        var objIsWrapped = objIsObj && hasOwnProperty.call(object2, "__wrapped__"), othIsWrapped = othIsObj && hasOwnProperty.call(other, "__wrapped__");
-        if (objIsWrapped || othIsWrapped) {
-          var objUnwrapped = objIsWrapped ? object2.value() : object2, othUnwrapped = othIsWrapped ? other.value() : other;
-          stack || (stack = new Stack());
-          return equalFunc(objUnwrapped, othUnwrapped, customizer, bitmask, stack);
-        }
-      }
-      if (!isSameTag) {
-        return false;
-      }
-      stack || (stack = new Stack());
-      return equalObjects(object2, other, equalFunc, customizer, bitmask, stack);
-    }
-    function baseIsMatch(object2, source, matchData, customizer) {
-      var index = matchData.length, length = index;
-      if (object2 == null) {
-        return !length;
-      }
-      object2 = Object(object2);
-      while (index--) {
-        var data = matchData[index];
-        if (data[2] ? data[1] !== object2[data[0]] : !(data[0] in object2)) {
-          return false;
-        }
-      }
-      while (++index < length) {
-        data = matchData[index];
-        var key = data[0], objValue = object2[key], srcValue = data[1];
-        if (data[2]) {
-          if (objValue === void 0 && !(key in object2)) {
-            return false;
-          }
-        } else {
-          var stack = new Stack();
-          var result;
-          if (!(result === void 0 ? baseIsEqual(srcValue, objValue, customizer, UNORDERED_COMPARE_FLAG | PARTIAL_COMPARE_FLAG, stack) : result)) {
-            return false;
-          }
-        }
-      }
-      return true;
-    }
-    function baseIsNative(value) {
-      if (!isObject3(value) || isMasked(value)) {
-        return false;
-      }
-      var pattern = isFunction(value) || isHostObject(value) ? reIsNative : reIsHostCtor;
-      return pattern.test(toSource(value));
-    }
-    function baseIsTypedArray(value) {
-      return isObjectLike(value) && isLength(value.length) && !!typedArrayTags[objectToString.call(value)];
-    }
-    function baseIteratee(value) {
-      if (typeof value == "function") {
-        return value;
-      }
-      if (value == null) {
-        return identity;
-      }
-      if (typeof value == "object") {
-        return isArray(value) ? baseMatchesProperty(value[0], value[1]) : baseMatches(value);
-      }
-      return property(value);
-    }
-    function baseKeys(object2) {
-      if (!isPrototype(object2)) {
-        return nativeKeys(object2);
-      }
-      var result = [];
-      for (var key in Object(object2)) {
-        if (hasOwnProperty.call(object2, key) && key != "constructor") {
-          result.push(key);
-        }
-      }
-      return result;
-    }
-    function baseMap(collection, iteratee) {
-      var index = -1, result = isArrayLike(collection) ? Array(collection.length) : [];
-      baseEach(collection, function(value, key, collection2) {
-        result[++index] = iteratee(value, key, collection2);
-      });
-      return result;
-    }
-    function baseMatches(source) {
-      var matchData = getMatchData(source);
-      if (matchData.length == 1 && matchData[0][2]) {
-        return matchesStrictComparable(matchData[0][0], matchData[0][1]);
-      }
-      return function(object2) {
-        return object2 === source || baseIsMatch(object2, source, matchData);
-      };
-    }
-    function baseMatchesProperty(path3, srcValue) {
-      if (isKey(path3) && isStrictComparable(srcValue)) {
-        return matchesStrictComparable(toKey(path3), srcValue);
-      }
-      return function(object2) {
-        var objValue = get(object2, path3);
-        return objValue === void 0 && objValue === srcValue ? hasIn(object2, path3) : baseIsEqual(srcValue, objValue, void 0, UNORDERED_COMPARE_FLAG | PARTIAL_COMPARE_FLAG);
-      };
-    }
-    function baseOrderBy(collection, iteratees, orders) {
-      var index = -1;
-      iteratees = arrayMap(iteratees.length ? iteratees : [identity], baseUnary(baseIteratee));
-      var result = baseMap(collection, function(value, key, collection2) {
-        var criteria = arrayMap(iteratees, function(iteratee) {
-          return iteratee(value);
-        });
-        return { "criteria": criteria, "index": ++index, "value": value };
-      });
-      return baseSortBy(result, function(object2, other) {
-        return compareMultiple(object2, other, orders);
-      });
-    }
-    function basePropertyDeep(path3) {
-      return function(object2) {
-        return baseGet(object2, path3);
-      };
-    }
-    function baseRest(func, start) {
-      start = nativeMax(start === void 0 ? func.length - 1 : start, 0);
-      return function() {
-        var args = arguments, index = -1, length = nativeMax(args.length - start, 0), array2 = Array(length);
-        while (++index < length) {
-          array2[index] = args[start + index];
-        }
-        index = -1;
-        var otherArgs = Array(start + 1);
-        while (++index < start) {
-          otherArgs[index] = args[index];
-        }
-        otherArgs[start] = array2;
-        return apply(func, this, otherArgs);
-      };
-    }
-    function baseToString(value) {
-      if (typeof value == "string") {
-        return value;
-      }
-      if (isSymbol(value)) {
-        return symbolToString ? symbolToString.call(value) : "";
-      }
-      var result = value + "";
-      return result == "0" && 1 / value == -Infinity ? "-0" : result;
-    }
-    function castPath(value) {
-      return isArray(value) ? value : stringToPath(value);
-    }
-    function compareAscending(value, other) {
-      if (value !== other) {
-        var valIsDefined = value !== void 0, valIsNull = value === null, valIsReflexive = value === value, valIsSymbol = isSymbol(value);
-        var othIsDefined = other !== void 0, othIsNull = other === null, othIsReflexive = other === other, othIsSymbol = isSymbol(other);
-        if (!othIsNull && !othIsSymbol && !valIsSymbol && value > other || valIsSymbol && othIsDefined && othIsReflexive && !othIsNull && !othIsSymbol || valIsNull && othIsDefined && othIsReflexive || !valIsDefined && othIsReflexive || !valIsReflexive) {
-          return 1;
-        }
-        if (!valIsNull && !valIsSymbol && !othIsSymbol && value < other || othIsSymbol && valIsDefined && valIsReflexive && !valIsNull && !valIsSymbol || othIsNull && valIsDefined && valIsReflexive || !othIsDefined && valIsReflexive || !othIsReflexive) {
-          return -1;
-        }
-      }
-      return 0;
-    }
-    function compareMultiple(object2, other, orders) {
-      var index = -1, objCriteria = object2.criteria, othCriteria = other.criteria, length = objCriteria.length, ordersLength = orders.length;
-      while (++index < length) {
-        var result = compareAscending(objCriteria[index], othCriteria[index]);
-        if (result) {
-          if (index >= ordersLength) {
-            return result;
-          }
-          var order = orders[index];
-          return result * (order == "desc" ? -1 : 1);
-        }
-      }
-      return object2.index - other.index;
-    }
-    function createBaseEach(eachFunc, fromRight) {
-      return function(collection, iteratee) {
-        if (collection == null) {
-          return collection;
-        }
-        if (!isArrayLike(collection)) {
-          return eachFunc(collection, iteratee);
-        }
-        var length = collection.length, index = -1, iterable = Object(collection);
-        while (++index < length) {
-          if (iteratee(iterable[index], index, iterable) === false) {
-            break;
-          }
-        }
-        return collection;
-      };
-    }
-    function createBaseFor(fromRight) {
-      return function(object2, iteratee, keysFunc) {
-        var index = -1, iterable = Object(object2), props = keysFunc(object2), length = props.length;
-        while (length--) {
-          var key = props[++index];
-          if (iteratee(iterable[key], key, iterable) === false) {
-            break;
-          }
-        }
-        return object2;
-      };
-    }
-    function equalArrays(array2, other, equalFunc, customizer, bitmask, stack) {
-      var isPartial = bitmask & PARTIAL_COMPARE_FLAG, arrLength = array2.length, othLength = other.length;
-      if (arrLength != othLength && !(isPartial && othLength > arrLength)) {
-        return false;
-      }
-      var stacked = stack.get(array2);
-      if (stacked && stack.get(other)) {
-        return stacked == other;
-      }
-      var index = -1, result = true, seen = bitmask & UNORDERED_COMPARE_FLAG ? new SetCache() : void 0;
-      stack.set(array2, other);
-      stack.set(other, array2);
-      while (++index < arrLength) {
-        var arrValue = array2[index], othValue = other[index];
-        if (customizer) {
-          var compared = isPartial ? customizer(othValue, arrValue, index, other, array2, stack) : customizer(arrValue, othValue, index, array2, other, stack);
-        }
-        if (compared !== void 0) {
-          if (compared) {
-            continue;
-          }
-          result = false;
-          break;
-        }
-        if (seen) {
-          if (!arraySome(other, function(othValue2, othIndex) {
-            if (!seen.has(othIndex) && (arrValue === othValue2 || equalFunc(arrValue, othValue2, customizer, bitmask, stack))) {
-              return seen.add(othIndex);
-            }
-          })) {
-            result = false;
-            break;
-          }
-        } else if (!(arrValue === othValue || equalFunc(arrValue, othValue, customizer, bitmask, stack))) {
-          result = false;
-          break;
-        }
-      }
-      stack["delete"](array2);
-      stack["delete"](other);
-      return result;
-    }
-    function equalByTag(object2, other, tag, equalFunc, customizer, bitmask, stack) {
-      switch (tag) {
-        case dataViewTag:
-          if (object2.byteLength != other.byteLength || object2.byteOffset != other.byteOffset) {
-            return false;
-          }
-          object2 = object2.buffer;
-          other = other.buffer;
-        case arrayBufferTag:
-          if (object2.byteLength != other.byteLength || !equalFunc(new Uint8Array2(object2), new Uint8Array2(other))) {
-            return false;
-          }
-          return true;
-        case boolTag:
-        case dateTag:
-        case numberTag:
-          return eq(+object2, +other);
-        case errorTag:
-          return object2.name == other.name && object2.message == other.message;
-        case regexpTag:
-        case stringTag:
-          return object2 == other + "";
-        case mapTag:
-          var convert = mapToArray;
-        case setTag:
-          var isPartial = bitmask & PARTIAL_COMPARE_FLAG;
-          convert || (convert = setToArray);
-          if (object2.size != other.size && !isPartial) {
-            return false;
-          }
-          var stacked = stack.get(object2);
-          if (stacked) {
-            return stacked == other;
-          }
-          bitmask |= UNORDERED_COMPARE_FLAG;
-          stack.set(object2, other);
-          var result = equalArrays(convert(object2), convert(other), equalFunc, customizer, bitmask, stack);
-          stack["delete"](object2);
-          return result;
-        case symbolTag:
-          if (symbolValueOf) {
-            return symbolValueOf.call(object2) == symbolValueOf.call(other);
-          }
-      }
-      return false;
-    }
-    function equalObjects(object2, other, equalFunc, customizer, bitmask, stack) {
-      var isPartial = bitmask & PARTIAL_COMPARE_FLAG, objProps = keys(object2), objLength = objProps.length, othProps = keys(other), othLength = othProps.length;
-      if (objLength != othLength && !isPartial) {
-        return false;
-      }
-      var index = objLength;
-      while (index--) {
-        var key = objProps[index];
-        if (!(isPartial ? key in other : hasOwnProperty.call(other, key))) {
-          return false;
-        }
-      }
-      var stacked = stack.get(object2);
-      if (stacked && stack.get(other)) {
-        return stacked == other;
-      }
-      var result = true;
-      stack.set(object2, other);
-      stack.set(other, object2);
-      var skipCtor = isPartial;
-      while (++index < objLength) {
-        key = objProps[index];
-        var objValue = object2[key], othValue = other[key];
-        if (customizer) {
-          var compared = isPartial ? customizer(othValue, objValue, key, other, object2, stack) : customizer(objValue, othValue, key, object2, other, stack);
-        }
-        if (!(compared === void 0 ? objValue === othValue || equalFunc(objValue, othValue, customizer, bitmask, stack) : compared)) {
-          result = false;
-          break;
-        }
-        skipCtor || (skipCtor = key == "constructor");
-      }
-      if (result && !skipCtor) {
-        var objCtor = object2.constructor, othCtor = other.constructor;
-        if (objCtor != othCtor && ("constructor" in object2 && "constructor" in other) && !(typeof objCtor == "function" && objCtor instanceof objCtor && typeof othCtor == "function" && othCtor instanceof othCtor)) {
-          result = false;
-        }
-      }
-      stack["delete"](object2);
-      stack["delete"](other);
-      return result;
-    }
-    function getMapData(map2, key) {
-      var data = map2.__data__;
-      return isKeyable(key) ? data[typeof key == "string" ? "string" : "hash"] : data.map;
-    }
-    function getMatchData(object2) {
-      var result = keys(object2), length = result.length;
-      while (length--) {
-        var key = result[length], value = object2[key];
-        result[length] = [key, value, isStrictComparable(value)];
-      }
-      return result;
-    }
-    function getNative(object2, key) {
-      var value = getValue(object2, key);
-      return baseIsNative(value) ? value : void 0;
-    }
-    var getTag = baseGetTag;
-    if (DataView && getTag(new DataView(new ArrayBuffer(1))) != dataViewTag || Map2 && getTag(new Map2()) != mapTag || Promise2 && getTag(Promise2.resolve()) != promiseTag || Set2 && getTag(new Set2()) != setTag || WeakMap2 && getTag(new WeakMap2()) != weakMapTag) {
-      getTag = function(value) {
-        var result = objectToString.call(value), Ctor = result == objectTag ? value.constructor : void 0, ctorString = Ctor ? toSource(Ctor) : void 0;
-        if (ctorString) {
-          switch (ctorString) {
-            case dataViewCtorString:
-              return dataViewTag;
-            case mapCtorString:
-              return mapTag;
-            case promiseCtorString:
-              return promiseTag;
-            case setCtorString:
-              return setTag;
-            case weakMapCtorString:
-              return weakMapTag;
-          }
-        }
-        return result;
-      };
-    }
-    function hasPath(object2, path3, hasFunc) {
-      path3 = isKey(path3, object2) ? [path3] : castPath(path3);
-      var result, index = -1, length = path3.length;
-      while (++index < length) {
-        var key = toKey(path3[index]);
-        if (!(result = object2 != null && hasFunc(object2, key))) {
-          break;
-        }
-        object2 = object2[key];
-      }
-      if (result) {
-        return result;
-      }
-      var length = object2 ? object2.length : 0;
-      return !!length && isLength(length) && isIndex(key, length) && (isArray(object2) || isArguments(object2));
-    }
-    function isFlattenable(value) {
-      return isArray(value) || isArguments(value) || !!(spreadableSymbol && value && value[spreadableSymbol]);
-    }
-    function isIndex(value, length) {
-      length = length == null ? MAX_SAFE_INTEGER : length;
-      return !!length && (typeof value == "number" || reIsUint.test(value)) && (value > -1 && value % 1 == 0 && value < length);
-    }
-    function isIterateeCall(value, index, object2) {
-      if (!isObject3(object2)) {
-        return false;
-      }
-      var type = typeof index;
-      if (type == "number" ? isArrayLike(object2) && isIndex(index, object2.length) : type == "string" && index in object2) {
-        return eq(object2[index], value);
-      }
-      return false;
-    }
-    function isKey(value, object2) {
-      if (isArray(value)) {
-        return false;
-      }
-      var type = typeof value;
-      if (type == "number" || type == "symbol" || type == "boolean" || value == null || isSymbol(value)) {
-        return true;
-      }
-      return reIsPlainProp.test(value) || !reIsDeepProp.test(value) || object2 != null && value in Object(object2);
-    }
-    function isKeyable(value) {
-      var type = typeof value;
-      return type == "string" || type == "number" || type == "symbol" || type == "boolean" ? value !== "__proto__" : value === null;
-    }
-    function isMasked(func) {
-      return !!maskSrcKey && maskSrcKey in func;
-    }
-    function isPrototype(value) {
-      var Ctor = value && value.constructor, proto = typeof Ctor == "function" && Ctor.prototype || objectProto;
-      return value === proto;
-    }
-    function isStrictComparable(value) {
-      return value === value && !isObject3(value);
-    }
-    function matchesStrictComparable(key, srcValue) {
-      return function(object2) {
-        if (object2 == null) {
-          return false;
-        }
-        return object2[key] === srcValue && (srcValue !== void 0 || key in Object(object2));
-      };
-    }
-    var stringToPath = memoize(function(string4) {
-      string4 = toString(string4);
-      var result = [];
-      if (reLeadingDot.test(string4)) {
-        result.push("");
-      }
-      string4.replace(rePropName, function(match, number5, quote, string5) {
-        result.push(quote ? string5.replace(reEscapeChar, "$1") : number5 || match);
-      });
-      return result;
-    });
-    function toKey(value) {
-      if (typeof value == "string" || isSymbol(value)) {
-        return value;
-      }
-      var result = value + "";
-      return result == "0" && 1 / value == -Infinity ? "-0" : result;
-    }
-    function toSource(func) {
-      if (func != null) {
-        try {
-          return funcToString.call(func);
-        } catch (e) {
-        }
-        try {
-          return func + "";
-        } catch (e) {
-        }
-      }
-      return "";
-    }
-    var sortBy = baseRest(function(collection, iteratees) {
-      if (collection == null) {
-        return [];
-      }
-      var length = iteratees.length;
-      if (length > 1 && isIterateeCall(collection, iteratees[0], iteratees[1])) {
-        iteratees = [];
-      } else if (length > 2 && isIterateeCall(iteratees[0], iteratees[1], iteratees[2])) {
-        iteratees = [iteratees[0]];
-      }
-      return baseOrderBy(collection, baseFlatten(iteratees), []);
-    });
-    function memoize(func, resolver) {
-      if (typeof func != "function" || resolver && typeof resolver != "function") {
-        throw new TypeError(FUNC_ERROR_TEXT);
-      }
-      var memoized = function() {
-        var args = arguments, key = resolver ? resolver.apply(this, args) : args[0], cache = memoized.cache;
-        if (cache.has(key)) {
-          return cache.get(key);
-        }
-        var result = func.apply(this, args);
-        memoized.cache = cache.set(key, result);
-        return result;
-      };
-      memoized.cache = new (memoize.Cache || MapCache)();
-      return memoized;
-    }
-    memoize.Cache = MapCache;
-    function eq(value, other) {
-      return value === other || value !== value && other !== other;
-    }
-    function isArguments(value) {
-      return isArrayLikeObject(value) && hasOwnProperty.call(value, "callee") && (!propertyIsEnumerable.call(value, "callee") || objectToString.call(value) == argsTag);
-    }
-    var isArray = Array.isArray;
-    function isArrayLike(value) {
-      return value != null && isLength(value.length) && !isFunction(value);
-    }
-    function isArrayLikeObject(value) {
-      return isObjectLike(value) && isArrayLike(value);
-    }
-    function isFunction(value) {
-      var tag = isObject3(value) ? objectToString.call(value) : "";
-      return tag == funcTag || tag == genTag;
-    }
-    function isLength(value) {
-      return typeof value == "number" && value > -1 && value % 1 == 0 && value <= MAX_SAFE_INTEGER;
-    }
-    function isObject3(value) {
-      var type = typeof value;
-      return !!value && (type == "object" || type == "function");
-    }
-    function isObjectLike(value) {
-      return !!value && typeof value == "object";
-    }
-    function isSymbol(value) {
-      return typeof value == "symbol" || isObjectLike(value) && objectToString.call(value) == symbolTag;
-    }
-    var isTypedArray = nodeIsTypedArray ? baseUnary(nodeIsTypedArray) : baseIsTypedArray;
-    function toString(value) {
-      return value == null ? "" : baseToString(value);
-    }
-    function get(object2, path3, defaultValue) {
-      var result = object2 == null ? void 0 : baseGet(object2, path3);
-      return result === void 0 ? defaultValue : result;
-    }
-    function hasIn(object2, path3) {
-      return object2 != null && hasPath(object2, path3, baseHasIn);
-    }
-    function keys(object2) {
-      return isArrayLike(object2) ? arrayLikeKeys(object2) : baseKeys(object2);
-    }
-    function identity(value) {
-      return value;
-    }
-    function property(path3) {
-      return isKey(path3) ? baseProperty(toKey(path3)) : basePropertyDeep(path3);
-    }
-    module.exports = sortBy;
-  })(lodash_sortby, lodash_sortby.exports);
-  return lodash_sortby.exports;
-}
-var escapeStringRegexp;
-var hasRequiredEscapeStringRegexp;
-function requireEscapeStringRegexp() {
-  if (hasRequiredEscapeStringRegexp) return escapeStringRegexp;
-  hasRequiredEscapeStringRegexp = 1;
-  escapeStringRegexp = (string4) => {
-    if (typeof string4 !== "string") {
-      throw new TypeError("Expected a string");
-    }
-    return string4.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&").replace(/-/g, "\\x2d");
-  };
-  return escapeStringRegexp;
-}
-var regexpParse = {};
-var hasRequiredRegexpParse;
-function requireRegexpParse() {
-  if (hasRequiredRegexpParse) return regexpParse;
-  hasRequiredRegexpParse = 1;
-  Object.defineProperty(regexpParse, "__esModule", { value: true });
-  regexpParse.isRegExpString = regexpParse.parseRegExpString = void 0;
-  var REGEXP_LITERAL_PATTERN = /^\/(.+)\/([guimysd]*)$/;
-  var parseRegExpString = function(str) {
-    var result = str.match(REGEXP_LITERAL_PATTERN);
-    if (!result) {
-      return null;
-    }
-    return {
-      source: result[1],
-      flagString: result[2]
-    };
-  };
-  regexpParse.parseRegExpString = parseRegExpString;
-  var isRegExpString = function(str) {
-    return REGEXP_LITERAL_PATTERN.test(str);
-  };
-  regexpParse.isRegExpString = isRegExpString;
-  return regexpParse;
-}
-var hasRequiredRegexpStringMatcher;
-function requireRegexpStringMatcher() {
-  if (hasRequiredRegexpStringMatcher) return regexpStringMatcher;
-  hasRequiredRegexpStringMatcher = 1;
-  (function(exports) {
-    var __importDefault = regexpStringMatcher && regexpStringMatcher.__importDefault || function(mod) {
-      return mod && mod.__esModule ? mod : { "default": mod };
-    };
-    Object.defineProperty(exports, "__esModule", { value: true });
-    exports.matchPatterns = exports.createRegExp = void 0;
-    var lodash_uniq_1 = __importDefault(requireLodash_uniq());
-    var lodash_uniqwith_1 = __importDefault(requireLodash_uniqwith());
-    var lodash_sortby_1 = __importDefault(requireLodash_sortby());
-    var escape_string_regexp_1 = __importDefault(requireEscapeStringRegexp());
-    var regexp_parse_1 = requireRegexpParse();
-    var DEFAULT_FLAGS = "ug";
-    var defaultFlags = function(flagsString) {
-      if (flagsString.length === 0) {
-        return DEFAULT_FLAGS;
-      }
-      return (0, lodash_uniq_1.default)((flagsString + DEFAULT_FLAGS).split("")).join("");
-    };
-    var createRegExp = function(patternString, defaultFlag) {
-      if (defaultFlag === void 0) {
-        defaultFlag = DEFAULT_FLAGS;
-      }
-      if (patternString.length === 0) {
-        throw new Error("Empty string can not handled");
-      }
-      if ((0, regexp_parse_1.isRegExpString)(patternString)) {
-        var regExpStructure = (0, regexp_parse_1.parseRegExpString)(patternString);
-        if (regExpStructure) {
-          return new RegExp(regExpStructure.source, defaultFlags(regExpStructure.flagString));
-        }
-        throw new Error('"'.concat(patternString, '" can not parse as RegExp.'));
-      } else {
-        return new RegExp((0, escape_string_regexp_1.default)(patternString), defaultFlag);
-      }
-    };
-    exports.createRegExp = createRegExp;
-    var isEqualMatchPatternResult = function(a, b) {
-      return a.startIndex === b.startIndex && a.endIndex === b.endIndex && a.match === b.match;
-    };
-    var matchPatterns = function(text, regExpLikeStrings) {
-      var matchPatternResults = [];
-      regExpLikeStrings.map(function(patternString) {
-        return (0, exports.createRegExp)(patternString);
-      }).forEach(function(regExp) {
-        var results = text.matchAll(regExp);
-        Array.from(results).forEach(function(result) {
-          if (result.index === void 0) {
-            return;
-          }
-          var match = result[0];
-          var index = result.index;
-          matchPatternResults.push({
-            match,
-            captures: result.slice(1),
-            startIndex: index,
-            endIndex: index + match.length
-          });
-        });
-      });
-      var uniqResults = (0, lodash_uniqwith_1.default)(matchPatternResults, isEqualMatchPatternResult);
-      return (0, lodash_sortby_1.default)(uniqResults, ["startIndex", "endIndex"]);
-    };
-    exports.matchPatterns = matchPatterns;
-  })(regexpStringMatcher);
-  return regexpStringMatcher;
-}
-var regexpStringMatcherExports = requireRegexpStringMatcher();
+// ../../node_modules/@secretlint/core/module/builtin/rules/aws/index.js
+var import_regexp_string_matcher2 = __toESM(require_regexp_string_matcher(), 1);
 var BUILTIN_IGNORED = {
   AWSAccountID: ["AKIAIOSFODNN7EXAMPLE"],
   AWSSecretAccessKey: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 };
-var messages$r = {
+var messages2 = {
   AWSAccountID: {
     en: (props) => `found AWS Account ID: ${props.ID}`,
     ja: (props) => `AWS Account ID: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
@@ -29033,103 +30608,117 @@ var messages$r = {
     ja: (props) => `AWS Access Key Id: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
   }
 };
-var reportAWSAccessKey = ({ t, source, context, options }) => {
-  const AWSAccessKeyIDPattern = /\b(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\b/g;
-  const results = source.content.matchAll(AWSAccessKeyIDPattern);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    const range = [index, index + match.length];
-    if (BUILTIN_IGNORED.AWSAccountID.includes(match)) {
-      continue;
-    }
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("AWSAccessKeyID", {
-        ID: match
-      }),
-      range
-    });
-  }
-};
-var reportAWSSecretAccessKey = ({ t, source, context, options }) => {
+var AWSAccessKeyIDPattern = /\b(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\b/g;
+var AWSSecretAccessKeyPattern = (() => {
   const AWS = "(?:AWS|aws|Aws)?_?";
-  const QUOTE = `["']?`;
-  const CONNECT = "\\s*(?::|=>|=)\\s*";
-  const AWSSecretPatten = new RegExp(String.raw`${QUOTE}${AWS}(?:SECRET|secret|Secret)_?(?:ACCESS|access|Access)_?(?:KEY|key|Key)${QUOTE}${CONNECT}${QUOTE}([A-Za-z0-9/\+=]{40})${QUOTE}\b`, "g");
-  const results = source.content.matchAll(AWSSecretPatten);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[1] || "";
-    const range = [index, index + match.length];
-    if (BUILTIN_IGNORED.AWSSecretAccessKey.includes(match)) {
-      continue;
-    }
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("AWSSecretAccessKey", {
-        KEY: match
-      }),
-      range
-    });
-  }
-};
-var reportAWSAccountID = ({ t, source, context, options }) => {
+  const QUOTE2 = `["']?`;
+  const CONNECT2 = "\\s*(?::|=>|=)\\s*";
+  return new RegExp(String.raw`${QUOTE2}${AWS}(?:SECRET|secret|Secret)_?(?:ACCESS|access|Access)_?(?:KEY|key|Key)${QUOTE2}${CONNECT2}${QUOTE2}([A-Za-z0-9/\+=]{40})${QUOTE2}\b`, "g");
+})();
+var AWSAccountIDPattern = (() => {
   const AWS = "(AWS|aws|Aws)?_?";
-  const QUOTE = `("|')?`;
-  const CONNECT = "\\s*(:|=>|=)\\s*";
-  const AWSSecretPatten = new RegExp(String.raw`${QUOTE}${AWS}(ACCOUNT|account|Account)_?(ID|id|Id)?${QUOTE}${CONNECT}${QUOTE}[0-9]{4}\-?[0-9]{4}\-?[0-9]{4}${QUOTE}\b`, "g");
-  const results = source.content.matchAll(AWSSecretPatten);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("AWSAccountID", {
-        ID: match
-      }),
-      range
-    });
-  }
-};
-var creator$s = {
-  messages: messages$r,
+  const QUOTE2 = `("|')?`;
+  const CONNECT2 = "\\s*(:|=>|=)\\s*";
+  return new RegExp(String.raw`${QUOTE2}${AWS}(ACCOUNT|account|Account)_?(ID|id|Id)?${QUOTE2}${CONNECT2}${QUOTE2}[0-9]{4}\-?[0-9]{4}\-?[0-9]{4}${QUOTE2}\b`, "g");
+})();
+var creator2 = {
+  messages: messages2,
   meta: {
     id: "@secretlint/secretlint-rule-aws",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-aws/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/aws.md"
     }
   },
-  create(context, options) {
-    const normalizedOptions = {
-      allows: options.allows || [],
-      enableIDScanRule: options.enableIDScanRule ?? false
-    };
-    const t = context.createTranslator(messages$r);
-    return {
-      file(source) {
-        if (normalizedOptions.enableIDScanRule) {
-          reportAWSAccessKey({ t, source, context, options: normalizedOptions });
-          reportAWSAccountID({ t, source, context, options: normalizedOptions });
+  patterns: [
+    {
+      pattern: AWSAccessKeyIDPattern,
+      // "asia" and "aida" appear often as words, so each prefix has a guard:
+      // the upper case letters and digits that follow it in the ID
+      keywords: [
+        { keyword: "A3T", after: "[A-Z0-9]{17,}" },
+        ...["AKIA", "AGPA", "AIDA", "AROA", "AIPA", "ANPA", "ANVA", "ASIA"].map((keyword) => {
+          return { keyword, after: "[A-Z0-9]{16,}" };
+        })
+      ],
+      scope: "line",
+      // "AKIA..." is an ID, not a secret, so it is reported only if the option is set
+      when: "options.enableIDScanRule",
+      report(match, context) {
+        if (BUILTIN_IGNORED.AWSAccountID.includes(match.text)) {
+          return;
         }
-        reportAWSSecretAccessKey({ t, source, context, options: normalizedOptions });
+        const allowedResults = (0, import_regexp_string_matcher2.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages2);
+        context.report({
+          message: t("AWSAccessKeyID", {
+            ID: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    },
+    {
+      // The connector between the name and the value may include line breaks, so the scope is "file"
+      pattern: AWSAccountIDPattern,
+      keywords: ["account"],
+      scope: "file",
+      // The keywords are common words, so the pattern should not run unless the option is set
+      when: "options.enableIDScanRule",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher2.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages2);
+        context.report({
+          message: t("AWSAccountID", {
+            ID: match.text
+          }),
+          range: match.range
+        });
+      }
+    },
+    {
+      // The connector between the name and the value may include line breaks, so the scope is "file"
+      pattern: AWSSecretAccessKeyPattern,
+      // SECRET_?ACCESS of the pattern
+      keywords: ["secret_access", "secretaccess"],
+      scope: "file",
+      report(match, context) {
+        const key = match.captures[1] || "";
+        if (BUILTIN_IGNORED.AWSSecretAccessKey.includes(key)) {
+          return;
+        }
+        const allowedResults = (0, import_regexp_string_matcher2.matchPatterns)(key, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages2);
+        const startIndex = match.range[0] + match.text.lastIndexOf(key);
+        context.report({
+          message: t("AWSSecretAccessKey", {
+            KEY: key
+          }),
+          range: [startIndex, startIndex + key.length]
+        });
+      }
+    }
+  ]
 };
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/gcp/index.js
+var import_regexp_string_matcher4 = __toESM(require_regexp_string_matcher(), 1);
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/gcp/reportIfFoundPrivateKeyP12Format.js
+var import_regexp_string_matcher3 = __toESM(require_regexp_string_matcher(), 1);
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/gcp/pkcs12Mac.js
 var TAG_INTEGER = 2;
 var TAG_OCTET_STRING = 4;
 var TAG_NULL = 5;
@@ -29338,19 +30927,19 @@ async function verifyPkcs12Mac(pfxBytes, password) {
     return false;
   }
 }
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/gcp/reportIfFoundPrivateKeyP12Format.js
 var GCP_SERVICE_ACCOUNT_P12_PASSWORD = "notasecret";
 async function reportIfFoundPrivateKeyP12Format({ source, options, context, t }) {
-  if (!source.filePath) {
+  const pfxBytes = source.contentBytes;
+  if (pfxBytes === void 0) {
+    return;
+  }
+  const fileName = source.filePath ? basename7(source.filePath) : "";
+  if ((0, import_regexp_string_matcher3.matchPatterns)(fileName, options.allows).length > 0) {
     return;
   }
   try {
-    const fs = await import("fs");
-    const path3 = await import("path");
-    const fileName = path3.basename(source.filePath);
-    if (regexpStringMatcherExports.matchPatterns(fileName, options.allows).length > 0) {
-      return;
-    }
-    const pfxBytes = new Uint8Array(fs.readFileSync(source.filePath));
     const isGcpServiceAccountP12 = await verifyPkcs12Mac(pfxBytes, GCP_SERVICE_ACCOUNT_P12_PASSWORD);
     if (!isGcpServiceAccountP12) {
       return;
@@ -29364,7 +30953,9 @@ async function reportIfFoundPrivateKeyP12Format({ source, options, context, t })
   } catch {
   }
 }
-var messages$q = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/gcp/index.js
+var messages3 = {
   PrivateKeyP12: {
     en: (props) => `found GCP Service Account's private key(p12): ${props.FILE_NAME}`,
     ja: (props) => `GCP\u30B5\u30FC\u30D3\u30B9\u30A2\u30AB\u30A6\u30F3\u30C8\u306E\u79D8\u5BC6\u9375(p12) ${props.FILE_NAME} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
@@ -29375,6 +30966,9 @@ var messages$q = {
   }
 };
 function reportIfFoundPrivateKeyJSONFormat({ source, options, context, t }) {
+  if (!source.content.includes("private_key_id")) {
+    return;
+  }
   try {
     const credentialObject = JSON.parse(source.content);
     const PRIVATE_KEY_PATTERN = /-----BEGIN\s?(DSA|RSA|EC|PGP|OPENSSH)?\s?PRIVATE KEY/gm;
@@ -29383,31 +30977,34 @@ function reportIfFoundPrivateKeyJSONFormat({ source, options, context, t }) {
       return;
     }
     const allowCandidates = [credentialObject["private_key_id"], credentialObject["private_key"]].filter((value) => typeof value === "string");
-    if (allowCandidates.some((value) => regexpStringMatcherExports.matchPatterns(value, options.allows).length > 0)) {
+    if (allowCandidates.some((value) => (0, import_regexp_string_matcher4.matchPatterns)(value, options.allows).length > 0)) {
       return;
     }
     context.report({
       message: t("PrivateKeyJSON", {
-        FILE_NAME: source.filePath ? path2.basename(source.filePath) : ""
+        FILE_NAME: source.filePath ? basename7(source.filePath) : ""
       }),
       range: [0, source.content.length]
     });
   } catch {
   }
 }
-var creator$r = {
-  messages: messages$q,
+var creator3 = {
+  messages: messages3,
   meta: {
     id: "@secretlint/secretlint-rule-gcp",
     recommended: true,
     type: "scanner",
-    supportedContentTypes: ["all"],
+    supportedContentTypes: ["text", "binary"],
+    // For text content: a service account key JSON has "private_key_id".
+    // Keywords are not checked for binary content, so the rule always runs for a binary file.
+    keywords: ["private_key_id"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-gcp/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/gcp.md"
     }
   },
   create(context, options) {
-    const t = context.createTranslator(messages$q);
+    const t = context.createTranslator(messages3);
     const normalizedOptions = {
       allows: options?.allows ?? []
     };
@@ -29422,573 +31019,10 @@ var creator$r = {
     };
   }
 };
-var messages$p = {
-  PackageJSON_xOauthToken: {
-    en: (props) => `found GitHub Token: ${props.TOKEN}`,
-    ja: (props) => `GitHub Token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
-  },
-  Npmrc_authToken: {
-    en: (props) => `found npmrc authToken: ${props.TOKEN}`,
-    ja: (props) => `npmrc authToken: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
-  },
-  NPM_ACCESS_TOKEN: {
-    en: (props) => `found npm access token: ${props.TOKEN}`,
-    ja: (props) => `npm access token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
-  }
-};
-function reportIfFoundXOauthGitHubToken({ source, options, context, t }) {
-  const XOAuthPattern = /https?:\/\/(.{1,256}):x-oauth-basic@github.com\//g;
-  const results = source.content.matchAll(XOAuthPattern);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[1] || "";
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("PackageJSON_xOauthToken", {
-        TOKEN: match
-      }),
-      range
-    });
-  }
-}
-function reportIfFound_AuthTokenInNpmrc({ source, options, context, t }) {
-  const AuthTokenPattern = /_authToken=([^$].*)/g;
-  const results = source.content.matchAll(AuthTokenPattern);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[1] || "";
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("Npmrc_authToken", {
-        TOKEN: match
-      }),
-      range
-    });
-  }
-}
-function reportIfFound_NPM_ACCESS_TOKEN({ source, options, context, t }) {
-  const NPM_ACCESS_TOKEN_PATTERN = new RegExp("(?<!\\p{L})npm_[A-Za-z0-9_]{36}(?![A-Za-z0-9_])", "gu");
-  const results = source.content.matchAll(NPM_ACCESS_TOKEN_PATTERN);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("NPM_ACCESS_TOKEN", {
-        TOKEN: match
-      }),
-      range
-    });
-  }
-}
-var isPackageFile = (filePath) => {
-  if (!filePath) {
-    return true;
-  }
-  return filePath.endsWith("package.json") || filePath.endsWith("package-lock.json");
-};
-var isNpmrc = (filePath) => {
-  if (!filePath) {
-    return true;
-  }
-  return filePath.endsWith(".npmrc");
-};
-var creator$q = {
-  messages: messages$p,
-  meta: {
-    id: "@secretlint/secretlint-rule-npm",
-    recommended: true,
-    type: "scanner",
-    supportedContentTypes: ["text"],
-    docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-npm/README.md"
-    }
-  },
-  create(context, options) {
-    const t = context.createTranslator(messages$p);
-    const normalizedOptions = {
-      allows: options.allows || []
-    };
-    return {
-      file(source) {
-        if (isPackageFile(source.filePath)) {
-          reportIfFoundXOauthGitHubToken({ source, options: normalizedOptions, context, t });
-        } else if (isNpmrc(source.filePath)) {
-          reportIfFound_AuthTokenInNpmrc({ source, options: normalizedOptions, context, t });
-        }
-        reportIfFound_NPM_ACCESS_TOKEN({ source, options: normalizedOptions, context, t });
-      }
-    };
-  }
-};
-var messages$o = {
-  SLACK_TOKEN: {
-    en: (props) => `found slack token: ${props.TOKEN}`,
-    ja: (props) => `Slack\u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
-  },
-  IncomingWebhook: {
-    en: (props) => `found Slack Incoming Webhook: ${props.URL}`,
-    ja: (props) => `Slack\u306EIncoming Webhooks: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
-  }
-};
-function reportIfFoundRawPrivateKey$1({ source, options, context, t }) {
-  const SLACK_TOKEN_PATTERN = /\b(?:xoxb|xoxp|xapp|xoxa|xoxo|xoxr)-(?:\d-)?(?:[a-zA-Z0-9]{1,40}-)+[a-zA-Z0-9]{1,40}\b/g;
-  const results = source.content.matchAll(SLACK_TOKEN_PATTERN);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("SLACK_TOKEN", {
-        TOKEN: match
-      }),
-      range
-    });
-  }
-}
-function reportIfFoundIncomingWebhook({ source, options, context, t }) {
-  const IncomingWebhooksPattern = /https:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9]{1,40}\/B[a-zA-Z0-9]{1,40}\/[a-zA-Z0-9]{1,40}/gi;
-  const results = source.content.matchAll(IncomingWebhooksPattern);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("IncomingWebhook", {
-        URL: match
-      }),
-      range
-    });
-  }
-}
-var creator$p = {
-  messages: messages$o,
-  meta: {
-    id: "@secretlint/secretlint-rule-slack",
-    recommended: true,
-    type: "scanner",
-    supportedContentTypes: ["text"],
-    docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-slack/README.md"
-    }
-  },
-  create(context, options) {
-    const t = context.createTranslator(messages$o);
-    const normalizedOptions = {
-      allows: options.allows || []
-    };
-    return {
-      file(source) {
-        reportIfFoundRawPrivateKey$1({ source, options: normalizedOptions, context, t });
-        reportIfFoundIncomingWebhook({ source, options: normalizedOptions, context, t });
-      }
-    };
-  }
-};
-var messages$n = {
-  BasicAuth: {
-    en: (props) => `found basic auth credential: ${props.CREDENTIAL}`,
-    ja: (props) => `\u30D9\u30FC\u30B7\u30C3\u30AF\u8A8D\u8A3C\u60C5\u5831: ${props.CREDENTIAL} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
-  }
-};
-var BUILTIN_IGNORED_PATTERNS$1 = [
-  "localhost",
-  "127.0.0.1",
-  "password",
-  "mypassword",
-  "myusername",
-  "{password}",
-  "${password}",
-  "{{password}}",
-  "{username}",
-  "${username}",
-  "{{username}}",
-  "YOUR_PASSWORD",
-  "YOUR_USERNAME",
-  "REPLACE_WITH_PASSWORD",
-  "REPLACE_WITH_USERNAME"
-];
-function isVariableLikeString$1(str) {
-  const variablePatterns = [
-    /\$\{[^}]{1,50}\}/,
-    // ${var}
-    /\{\{[^}]{1,50}\}\}/,
-    // {{var}}
-    /\{[^}]{1,50}\}/,
-    // {var}
-    /%[A-Z_]{1,30}%/,
-    // %VAR%
-    /\$[A-Z_]{1,30}/
-    // $VAR
-  ];
-  return variablePatterns.some((pattern) => pattern.test(str));
-}
-function isLikelyRealUsername(username) {
-  if (username.length < 2)
-    return false;
-  if (isVariableLikeString$1(username))
-    return false;
-  if (BUILTIN_IGNORED_PATTERNS$1.some((pattern) => username.toLowerCase().includes(pattern.toLowerCase()))) {
-    return false;
-  }
-  return true;
-}
-function isLikelyRealPassword(password) {
-  if (password.length < 4)
-    return false;
-  if (isVariableLikeString$1(password))
-    return false;
-  if (BUILTIN_IGNORED_PATTERNS$1.some((pattern) => password.toLowerCase().includes(pattern.toLowerCase()))) {
-    return false;
-  }
-  if (/^(.)\1{3,}$/.test(password))
-    return false;
-  return true;
-}
-function reportIfFoundBasicAuth({ source, options, context, t }) {
-  const URL_PATTERN = /(?<protocol>(?:https?|ftp|ftps)):\/\/(?<user>[-a-zA-Z0-9_]{1,256}):(?<password>[-a-zA-Z0-9_]{1,256})@[-a-zA-Z0-9%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b/g;
-  const results = source.content.matchAll(URL_PATTERN);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    const username = result.groups?.user;
-    const password = result.groups?.password;
-    if (!username || !password)
-      continue;
-    if (!isLikelyRealUsername(username))
-      continue;
-    if (!isLikelyRealPassword(password))
-      continue;
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("BasicAuth", {
-        CREDENTIAL: match
-      }),
-      range
-    });
-  }
-}
-var creator$o = {
-  messages: messages$n,
-  meta: {
-    id: "@secretlint/secretlint-rule-basicauth",
-    recommended: true,
-    type: "scanner",
-    supportedContentTypes: ["text"],
-    docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-basicauth/README.md"
-    }
-  },
-  create(context, options) {
-    const t = context.createTranslator(messages$n);
-    const normalizedOptions = {
-      allows: options.allows || []
-    };
-    return {
-      file(source) {
-        reportIfFoundBasicAuth({ source, options: normalizedOptions, context, t });
-      }
-    };
-  }
-};
-var messages$m = {
-  OPENAI_TOKEN: {
-    en: (props) => `found OpenAI API token: ${props.TOKEN}`,
-    ja: (props) => `OpenAI API \u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
-  }
-};
-var creator$n = {
-  messages: messages$m,
-  meta: {
-    id: "@secretlint/secretlint-rule-openai",
-    recommended: true,
-    type: "scanner",
-    supportedContentTypes: ["text"],
-    docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-openai/README.md"
-    }
-  },
-  create(context, options) {
-    const t = context.createTranslator(messages$m);
-    const normalizedOptions = {
-      allows: options?.allows ?? []
-    };
-    return {
-      file(source) {
-        const pattern = /sk-(?:proj|svcacct|admin)-(?:[A-Za-z0-9_-]{74}|[A-Za-z0-9_-]{58})T3BlbkFJ(?:[A-Za-z0-9_-]{74}|[A-Za-z0-9_-]{58})\b|sk-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20}/g;
-        const matches2 = source.content.matchAll(pattern);
-        for (const match of matches2) {
-          const index = match.index ?? 0;
-          const matchString = match[0] ?? "";
-          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
-          if (allowedResults.length > 0) {
-            continue;
-          }
-          const range = [index, index + matchString.length];
-          context.report({
-            message: t("OPENAI_TOKEN", {
-              TOKEN: matchString
-            }),
-            range
-          });
-        }
-      }
-    };
-  }
-};
-var messages$l = {
-  ANTHROPIC_API_KEY: {
-    en: (props) => `found Anthropic Claude API key: ${props.KEY}`,
-    ja: (props) => `Anthropic Claude API \u30AD\u30FC: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
-  }
-};
-var creator$m = {
-  messages: messages$l,
-  meta: {
-    id: "@secretlint/secretlint-rule-anthropic",
-    recommended: true,
-    type: "scanner",
-    supportedContentTypes: ["text"],
-    docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-anthropic/README.md"
-    }
-  },
-  create(context, options) {
-    const t = context.createTranslator(messages$l);
-    const normalizedOptions = {
-      allows: options?.allows ?? []
-    };
-    return {
-      file(source) {
-        const pattern = new RegExp("(?<!\\p{L})sk-ant-api0\\d-[A-Za-z0-9_-]{90,128}AA(?![A-Za-z0-9_-])", "gu");
-        const matches2 = source.content.matchAll(pattern);
-        for (const match of matches2) {
-          const index = match.index ?? 0;
-          const matchString = match[0] ?? "";
-          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
-          if (allowedResults.length > 0) {
-            continue;
-          }
-          const range = [index, index + matchString.length];
-          context.report({
-            message: t("ANTHROPIC_API_KEY", {
-              KEY: matchString
-            }),
-            range
-          });
-        }
-      }
-    };
-  }
-};
-var messages$k = {
-  GROQ_API_KEY: {
-    en: (props) => `found Groq API key: ${props.KEY}`,
-    ja: (props) => `Groq API \u30AD\u30FC: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
-  }
-};
-var creator$l = {
-  messages: messages$k,
-  meta: {
-    id: "@secretlint/secretlint-rule-groq",
-    recommended: true,
-    type: "scanner",
-    supportedContentTypes: ["text"],
-    docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-groq/README.md"
-    }
-  },
-  create(context, options) {
-    const t = context.createTranslator(messages$k);
-    const normalizedOptions = {
-      allows: options?.allows ?? []
-    };
-    return {
-      file(source) {
-        const pattern = new RegExp("(?<!\\p{L})gsk_[a-zA-Z0-9]{52}(?![a-zA-Z0-9])", "gu");
-        const matches2 = source.content.matchAll(pattern);
-        for (const match of matches2) {
-          const index = match.index ?? 0;
-          const matchString = match[0] ?? "";
-          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
-          if (allowedResults.length > 0) {
-            continue;
-          }
-          const range = [index, index + matchString.length];
-          context.report({
-            message: t("GROQ_API_KEY", {
-              KEY: matchString
-            }),
-            range
-          });
-        }
-      }
-    };
-  }
-};
-var messages$j = {
-  HUGGINGFACE_USER_ACCESS_TOKEN: {
-    en: (props) => `found Hugging Face User Access Token: ${props.TOKEN}`,
-    ja: (props) => `Hugging Face User Access Token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
-  }
-};
-var creator$k = {
-  messages: messages$j,
-  meta: {
-    id: "@secretlint/secretlint-rule-huggingface",
-    recommended: true,
-    type: "scanner",
-    supportedContentTypes: ["text"],
-    docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-huggingface/README.md"
-    }
-  },
-  create(context, options) {
-    const t = context.createTranslator(messages$j);
-    const normalizedOptions = {
-      allows: options?.allows ?? []
-    };
-    return {
-      file(source) {
-        const pattern = new RegExp("(?<!\\p{L})hf_[a-zA-Z]{34}(?![a-zA-Z])", "gu");
-        const matches2 = source.content.matchAll(pattern);
-        for (const match of matches2) {
-          const index = match.index ?? 0;
-          const matchString = match[0] ?? "";
-          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
-          if (allowedResults.length > 0) {
-            continue;
-          }
-          const range = [index, index + matchString.length];
-          context.report({
-            message: t("HUGGINGFACE_USER_ACCESS_TOKEN", {
-              TOKEN: matchString
-            }),
-            range
-          });
-        }
-      }
-    };
-  }
-};
-var messages$i = {
-  LINEAR_API_TOKEN: {
-    en: (props) => `found linear api token: ${props.ID}`,
-    ja: (props) => `linear api token: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
-  }
-};
-var creator$j = {
-  messages: messages$i,
-  meta: {
-    id: "@secretlint/secretlint-rule-linear",
-    recommended: true,
-    type: "scanner",
-    supportedContentTypes: ["text"],
-    docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-linear/README.md"
-    }
-  },
-  create(context, options) {
-    const t = context.createTranslator(messages$i);
-    const normalizedOptions = {
-      allows: options?.allows ?? []
-    };
-    return {
-      file(source) {
-        const pattern = new RegExp("(?<!\\p{L})lin_api_[a-zA-Z0-9_]{32,128}(?![a-zA-Z0-9_])", "gu");
-        const matches2 = source.content.matchAll(pattern);
-        for (const match of matches2) {
-          const index = match.index ?? 0;
-          const matchString = match[0] ?? "";
-          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
-          if (allowedResults.length > 0) {
-            continue;
-          }
-          const range = [index, index + matchString.length];
-          context.report({
-            message: t("LINEAR_API_TOKEN", {
-              ID: matchString
-            }),
-            range
-          });
-        }
-      }
-    };
-  }
-};
-var messages$h = {
-  NOTION_INTEGRATION_TOKEN: {
-    en: (props) => `found Notion integration token: ${props.TOKEN}`,
-    ja: (props) => `Notion integration \u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
-  }
-};
-function reportIfFoundToken({ source, options, context, t }) {
-  const NOTION_INTEGRATION_TOKEN_PATTERN = new RegExp("(?<!\\p{L})ntn_[0-9]{11}[A-Za-z0-9]{35}(?![A-Za-z0-9])", "gu");
-  const results = source.content.matchAll(NOTION_INTEGRATION_TOKEN_PATTERN);
-  for (const result of results) {
-    const index = result.index ?? 0;
-    const match = result[0] ?? "";
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("NOTION_INTEGRATION_TOKEN", {
-        TOKEN: match
-      }),
-      range
-    });
-  }
-}
-var creator$i = {
-  messages: messages$h,
-  meta: {
-    id: "@secretlint/secretlint-rule-notion",
-    recommended: true,
-    type: "scanner",
-    supportedContentTypes: ["text"],
-    docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-notion/README.md"
-    }
-  },
-  create(context, options) {
-    const t = context.createTranslator(messages$h);
-    const normalizedOptions = {
-      allows: options.allows ?? []
-    };
-    return {
-      file(source) {
-        reportIfFoundToken({ source, options: normalizedOptions, context, t });
-      }
-    };
-  }
-};
-var messages$g = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/privatekey/index.js
+var import_regexp_string_matcher5 = __toESM(require_regexp_string_matcher(), 1);
+var messages4 = {
   PrivateKey: {
     en: (props) => `found private key: ${props.KEY}`,
     ja: (props) => `\u79D8\u5BC6\u9375: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
@@ -30008,152 +31042,468 @@ function validateBase64KeyContent(base64Content) {
   }
   return true;
 }
-function reportIfFoundRawPrivateKey({ source, options, context, t }) {
-  const results = source.content.matchAll(PEM_CONTENT_PATTERN);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    const base64Raw = result[1] || "";
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    const base64Content = base64Raw.replace(/\s|\\n/g, "");
-    if (!validateBase64KeyContent(base64Content)) {
-      continue;
-    }
-    context.report({
-      message: t("PrivateKey", {
-        KEY: match
-      }),
-      range
-    });
-  }
-}
-var creator$h = {
-  messages: messages$g,
+var creator4 = {
+  messages: messages4,
   meta: {
     id: "@secretlint/secretlint-rule-privatekey",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-privatekey/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/privatekey.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$g);
-    const normalizedOptions = {
-      allows: options.allows || []
-    };
-    return {
-      file(source) {
-        reportIfFoundRawPrivateKey({ source, options: normalizedOptions, context, t });
+  patterns: [
+    {
+      // A private key has multiple lines, so the scope is "file"
+      pattern: PEM_CONTENT_PATTERN,
+      keywords: ["PRIVATE KEY"],
+      scope: "file",
+      report(match, context) {
+        const base64Raw = match.captures[1] || "";
+        const allowedResults = (0, import_regexp_string_matcher5.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const base64Content = base64Raw.replace(/\s|\\n/g, "");
+        if (!validateBase64KeyContent(base64Content)) {
+          return;
+        }
+        const t = context.createTranslator(messages4);
+        context.report({
+          message: t("PrivateKey", {
+            KEY: match.text
+          }),
+          range: match.range
+        });
       }
-    };
+    }
+  ]
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/npm/index.js
+var import_regexp_string_matcher6 = __toESM(require_regexp_string_matcher(), 1);
+var messages5 = {
+  PackageJSON_xOauthToken: {
+    en: (props) => `found GitHub Token: ${props.TOKEN}`,
+    ja: (props) => `GitHub Token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  Npmrc_authToken: {
+    en: (props) => `found npmrc authToken: ${props.TOKEN}`,
+    ja: (props) => `npmrc authToken: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  NPM_ACCESS_TOKEN: {
+    en: (props) => `found npm access token: ${props.TOKEN}`,
+    ja: (props) => `npm access token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
   }
 };
-var messages$f = {
+function validChecksum(_token) {
+  return true;
+}
+var isPackageFile = (filePath) => {
+  if (!filePath) {
+    return true;
+  }
+  return filePath.endsWith("package.json") || filePath.endsWith("package-lock.json");
+};
+var isNpmrc = (filePath) => {
+  if (!filePath) {
+    return true;
+  }
+  return filePath.endsWith(".npmrc");
+};
+var creator5 = {
+  messages: messages5,
+  meta: {
+    id: "@secretlint/secretlint-rule-npm",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/npm.md"
+    }
+  },
+  patterns: [
+    {
+      // https://github.blog/2012-09-21-easier-builds-and-deployments-using-git-over-https-and-oauth/
+      // https://stackoverflow.com/questions/14402407/maximum-length-of-a-domain-name-without-the-http-www-com-parts
+      pattern: /https?:\/\/(.{1,256}):x-oauth-basic@github.com\//g,
+      keywords: [":x-oauth-basic@github"],
+      scope: "line",
+      report(match, context) {
+        if (!isPackageFile(context.source.filePath)) {
+          return;
+        }
+        const token = match.captures[1] || "";
+        const allowedResults = (0, import_regexp_string_matcher6.matchPatterns)(token, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages5);
+        const startIndex = match.range[0] + match.text.indexOf("://") + "://".length;
+        context.report({
+          message: t("PackageJSON_xOauthToken", {
+            TOKEN: token
+          }),
+          range: [startIndex, startIndex + token.length]
+        });
+      }
+    },
+    {
+      // https://blog.npmjs.org/post/118393368555/deploying-with-npm-private-modules
+      // allow _authToken=${NPM_TOKEN}
+      // https://github.com/secretlint/secretlint/issues/302
+      // `[^$]` may match a line break, so the scope is "file"
+      pattern: /_authToken=([^$].*)/g,
+      keywords: ["_authToken="],
+      scope: "file",
+      report(match, context) {
+        const filePath = context.source.filePath;
+        if (isPackageFile(filePath) || !isNpmrc(filePath)) {
+          return;
+        }
+        const token = match.captures[1] || "";
+        const allowedResults = (0, import_regexp_string_matcher6.matchPatterns)(token, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages5);
+        const startIndex = match.range[0] + "_authToken=".length;
+        context.report({
+          message: t("Npmrc_authToken", {
+            TOKEN: token
+          }),
+          range: [startIndex, startIndex + token.length]
+        });
+      }
+    },
+    {
+      // https://github.blog/2021-09-23-announcing-npms-new-access-token-format/
+      // https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
+      // token length should be 40
+      pattern: new RegExp("(?<!\\p{L})npm_[A-Za-z0-9_]{36}(?![A-Za-z0-9_])", "gu"),
+      keywords: ["npm_"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher6.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        if (!validChecksum(match.text)) {
+          return;
+        }
+        const t = context.createTranslator(messages5);
+        context.report({
+          message: t("NPM_ACCESS_TOKEN", {
+            TOKEN: match.text
+          }),
+          range: match.range
+        });
+      }
+    }
+  ]
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/basicauth/index.js
+var import_regexp_string_matcher7 = __toESM(require_regexp_string_matcher(), 1);
+var messages6 = {
+  BasicAuth: {
+    en: (props) => `found basic auth credential: ${props.CREDENTIAL}`,
+    ja: (props) => `\u30D9\u30FC\u30B7\u30C3\u30AF\u8A8D\u8A3C\u60C5\u5831: ${props.CREDENTIAL} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var BUILTIN_IGNORED_PATTERNS = [
+  "localhost",
+  "127.0.0.1",
+  "password",
+  "mypassword",
+  "myusername",
+  "{password}",
+  "${password}",
+  "{{password}}",
+  "{username}",
+  "${username}",
+  "{{username}}",
+  "YOUR_PASSWORD",
+  "YOUR_USERNAME",
+  "REPLACE_WITH_PASSWORD",
+  "REPLACE_WITH_USERNAME"
+];
+function isVariableLikeString(str) {
+  const variablePatterns = [
+    /\$\{[^}]{1,50}\}/,
+    // ${var}
+    /\{\{[^}]{1,50}\}\}/,
+    // {{var}}
+    /\{[^}]{1,50}\}/,
+    // {var}
+    /%[A-Z_]{1,30}%/,
+    // %VAR%
+    /\$[A-Z_]{1,30}/
+    // $VAR
+  ];
+  return variablePatterns.some((pattern) => pattern.test(str));
+}
+function isLikelyRealUsername(username) {
+  if (username.length < 2)
+    return false;
+  if (isVariableLikeString(username))
+    return false;
+  if (BUILTIN_IGNORED_PATTERNS.some((pattern) => username.toLowerCase().includes(pattern.toLowerCase()))) {
+    return false;
+  }
+  return true;
+}
+function isLikelyRealPassword(password) {
+  if (password.length < 4)
+    return false;
+  if (isVariableLikeString(password))
+    return false;
+  if (BUILTIN_IGNORED_PATTERNS.some((pattern) => password.toLowerCase().includes(pattern.toLowerCase()))) {
+    return false;
+  }
+  if (/^(.)\1{3,}$/.test(password))
+    return false;
+  return true;
+}
+var creator6 = {
+  messages: messages6,
+  meta: {
+    id: "@secretlint/secretlint-rule-basicauth",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/basicauth.md"
+    }
+  },
+  patterns: [
+    {
+      // https://developer.mozilla.org/docs/Web/HTTP/Authentication
+      // https://ihateregex.io/expr/url
+      // Using possessive quantifiers to prevent ReDoS
+      pattern: /(?<protocol>(?:https?|ftp|ftps)):\/\/(?<user>[-a-zA-Z0-9_]{1,256}):(?<password>[-a-zA-Z0-9_]{1,256})@[-a-zA-Z0-9%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b/g,
+      // every match starts with one of the protocols
+      keywords: ["http://", "https://", "ftp://", "ftps://"],
+      scope: "line",
+      report(match, context) {
+        const username = match.groups?.user;
+        const password = match.groups?.password;
+        if (!username || !password)
+          return;
+        if (!isLikelyRealUsername(username))
+          return;
+        if (!isLikelyRealPassword(password))
+          return;
+        const allowedResults = (0, import_regexp_string_matcher7.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages6);
+        context.report({
+          message: t("BasicAuth", {
+            CREDENTIAL: match.text
+          }),
+          range: match.range
+        });
+      }
+    }
+  ]
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/slack/index.js
+var import_regexp_string_matcher8 = __toESM(require_regexp_string_matcher(), 1);
+var messages7 = {
+  SLACK_TOKEN: {
+    en: (props) => `found slack token: ${props.TOKEN}`,
+    ja: (props) => `Slack\u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  },
+  IncomingWebhook: {
+    en: (props) => `found Slack Incoming Webhook: ${props.URL}`,
+    ja: (props) => `Slack\u306EIncoming Webhooks: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator7 = {
+  messages: messages7,
+  meta: {
+    id: "@secretlint/secretlint-rule-slack",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/slack.md"
+    }
+  },
+  patterns: [
+    {
+      // Based on https://docs.cribl.io/docs/regexesyml
+      // https://docs.slack.dev/authentication/tokens/
+      // Bot user token strings begin with xoxb-
+      // User token strings begin with xoxp-
+      // App token strings begin with xapp-
+      // Workspace access token strings begin with xoxa-2
+      // Workspace refresh token strings begin with xoxr
+      // A token is divided into sections separated by "-", and the final section is the secret.
+      // The secret has 6, 10, or 32 or more characters.
+      // The sections before the secret include an ID made of digits (a team ID, a user ID, and so on).
+      // e.g. xoxb-{team id}-{bot id}-{secret}, xapp-{version}-{app id}-{id}-{secret}
+      // Pattern: {prefix}-({version}-)?({section with a letter}-){0,2}{digits}-({section}-){0,4}{secret}
+      // The digit section and the secret length keep words such as "xapp-le-kernel" out.
+      // The sections before the digit section must contain a letter,
+      // so that a section can be read in only one way.
+      // The number and length of the sections are bounded,
+      // so that each match attempt reads a bounded part of the line,
+      // even on a line that repeats a prefix many times.
+      pattern: /\b(?:xoxb|xoxp|xapp|xoxa|xoxo|xoxr)-(?:\d-)?(?:\d{0,39}[a-zA-Z][a-zA-Z0-9]{0,39}-){0,2}\d{2,40}-(?:[a-zA-Z0-9]{1,40}-){0,4}[a-zA-Z0-9]{6,}\b/g,
+      keywords: ["xoxb-", "xoxp-", "xapp-", "xoxa-", "xoxo-", "xoxr-"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher8.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages7);
+        context.report({
+          message: t("SLACK_TOKEN", {
+            TOKEN: match.text
+          }),
+          range: match.range
+        });
+      }
+    },
+    {
+      // Incoming Webhooks
+      // Based on https://hooks.slack.com/TXXXXX/BXXXXX/XXXXXXXXXX
+      // https://api.slack.com/messaging/webhooks
+      pattern: /https:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9]{1,40}\/B[a-zA-Z0-9]{1,40}\/[a-zA-Z0-9]{1,40}/gi,
+      keywords: ["hooks.slack.com/services/"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher8.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages7);
+        context.report({
+          message: t("IncomingWebhook", {
+            URL: match.text
+          }),
+          range: match.range
+        });
+      }
+    }
+  ]
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/sendgrid/index.js
+var import_regexp_string_matcher9 = __toESM(require_regexp_string_matcher(), 1);
+var messages8 = {
   SENDGRID_KEY: {
     en: (props) => `found Sendgrid api key: ${props.KEY}`,
     ja: (props) => `Sendgrid API\u30AD\u30FC\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F\uFF1A ${props.KEY}`
   }
 };
-function reportIfFoundKey$3({ source, options, context, t }) {
-  const SENDGRID_KEY_PATTERN = new RegExp("(?<!\\p{L})SG\\.\\w{1,128}\\.\\w{1,128}([-_]?)\\w{1,128}(?!\\w)", "gu");
-  const results = source.content.matchAll(SENDGRID_KEY_PATTERN);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    if (match.length !== 69) {
-      continue;
-    }
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("SENDGRID_KEY", {
-        KEY: match
-      }),
-      range
-    });
-  }
-}
-var creator$g = {
-  messages: messages$f,
+var creator8 = {
+  messages: messages8,
   meta: {
     id: "@secretlint/secretlint-rule-sendgrid",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-sendgrid/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/sendgrid.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$f);
-    const normalizedOptions = {
-      allows: options.allows || []
-    };
-    return {
-      file(source) {
-        reportIfFoundKey$3({ source, options: normalizedOptions, context, t });
+  patterns: [
+    {
+      pattern: new RegExp("(?<!\\p{L})SG\\.\\w{1,128}\\.\\w{1,128}([-_]?)\\w{1,128}(?!\\w)", "gu"),
+      keywords: ["SG."],
+      // Keywords are case-insensitive, so the pattern also runs for the lines that have "msg.".
+      // A guard can not drop them, because the regular expression allows one character after "SG."
+      scope: "line",
+      report(match, context) {
+        if (match.text.length !== 69) {
+          return;
+        }
+        const allowedResults = (0, import_regexp_string_matcher9.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages8);
+        context.report({
+          message: t("SENDGRID_KEY", {
+            KEY: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    }
+  ]
 };
-var messages$e = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/shopify/index.js
+var import_regexp_string_matcher10 = __toESM(require_regexp_string_matcher(), 1);
+var messages9 = {
   SHOPIFY_KEY: {
     en: (props) => `found Shopify api key: ${props.KEY}`,
     ja: (props) => `Shopify API\u30AD\u30FC\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F\uFF1A ${props.KEY}`
   }
 };
-function reportIfFoundKey$2({ source, options, context, t }) {
-  const SHOPIFY_KEY_PATTERN = new RegExp("(?<!\\p{L})(shppa|shpca|shpat|shpss)_[a-zA-Z0-9]{32,64}(?![a-zA-Z0-9])", "gu");
-  const results = source.content.matchAll(SHOPIFY_KEY_PATTERN);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("SHOPIFY_KEY", {
-        KEY: match
-      }),
-      range
-    });
-  }
-}
-var creator$f = {
-  messages: messages$e,
+var creator9 = {
+  messages: messages9,
   meta: {
     id: "@secretlint/secretlint-rule-shopify",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-shopify/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/shopify.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$e);
-    const normalizedOptions = {
-      allows: options.allows || []
-    };
-    return {
-      file(source) {
-        reportIfFoundKey$2({ source, options: normalizedOptions, context, t });
+  patterns: [
+    {
+      /**
+       * Source: https://shopify.dev/changelog/app-secret-key-length-has-increased
+       * for app secret keys
+       * shpss_[a-zA-Z0-9]{32,64}
+       * e.g.) shpss_QlRSJy5AXX1cILNjVatTsEIhFxuPF5ex
+       *
+       * Source: https://shopify.dev/changelog/length-of-the-shopify-access-token-is-increasing
+       * for public apps
+       * shpat_[a-zA-Z0-9]{32,64}
+       * e.g.) shpat_r8TRc9ZXAvcVvcrmtr7qoVw69WeeY1ex
+       *
+       * for custom apps
+       * shpca_[a-zA-Z0-9]{32,64}
+       * e.g.) shpca_7jqbg9cupMkZRxJKXWz3v8BvS8QBa7hMdJfAex
+       *
+       * for legacy private apps
+       * shppa_[a-zA-Z0-9]{32,64}
+       * e.g.) shppa_7jqbg9cupMkZRxJKXWz3v8BvS8QBa7hMdJfAex
+       */
+      pattern: new RegExp("(?<!\\p{L})(shppa|shpca|shpat|shpss)_[a-zA-Z0-9]{32,64}(?![a-zA-Z0-9])", "gu"),
+      keywords: ["shppa_", "shpca_", "shpat_", "shpss_"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher10.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages9);
+        context.report({
+          message: t("SHOPIFY_KEY", {
+            KEY: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    }
+  ]
 };
-var messages$d = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/stripe/index.js
+var import_regexp_string_matcher11 = __toESM(require_regexp_string_matcher(), 1);
+var messages10 = {
   STRIPE_SECRET_KEY_LIVE: {
     en: (props) => `found Stripe Live Secret Key: ${props.KEY}`,
     ja: (props) => `Stripe Live Secret Key\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.KEY}`
@@ -30171,59 +31521,53 @@ var messages$d = {
     ja: (props) => `Stripe Test Restricted Key\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.KEY}`
   }
 };
-var messageIdMap$1 = {
+var messageIdMap = {
   sk_live: "STRIPE_SECRET_KEY_LIVE",
   sk_test: "STRIPE_SECRET_KEY_TEST",
   rk_live: "STRIPE_RESTRICTED_KEY_LIVE",
   rk_test: "STRIPE_RESTRICTED_KEY_TEST"
 };
 var STRIPE_KEY_PATTERN = new RegExp("(?<!\\p{L})(?<prefix>sk_live|sk_test|rk_live|rk_test)_[a-zA-Z0-9]{24,99}(?![a-zA-Z0-9])", "gu");
-function reportIfFound$2({ source, options, context, t }) {
-  const results = source.content.matchAll(STRIPE_KEY_PATTERN);
-  for (const result of results) {
-    const index = result.index ?? 0;
-    const match = result[0] ?? "";
-    const prefix = result.groups?.["prefix"];
-    if (!prefix) {
-      continue;
-    }
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t(messageIdMap$1[prefix], {
-        KEY: match
-      }),
-      range
-    });
-  }
-}
-var creator$e = {
-  messages: messages$d,
+var creator10 = {
+  messages: messages10,
   meta: {
     id: "@secretlint/secretlint-rule-stripe",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-stripe/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/stripe.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$d);
-    const normalizedOptions = {
-      allows: options.allows ?? []
-    };
-    return {
-      file(source) {
-        reportIfFound$2({ source, options: normalizedOptions, context, t });
+  patterns: [
+    {
+      pattern: STRIPE_KEY_PATTERN,
+      keywords: ["sk_live_", "sk_test_", "rk_live_", "rk_test_"],
+      scope: "line",
+      report(match, context) {
+        const prefix = match.groups?.["prefix"];
+        if (!prefix) {
+          return;
+        }
+        const allowedResults = (0, import_regexp_string_matcher11.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages10);
+        context.report({
+          message: t(messageIdMap[prefix], {
+            KEY: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    }
+  ]
 };
-var messages$c = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/github/index.js
+var import_regexp_string_matcher12 = __toESM(require_regexp_string_matcher(), 1);
+var messages11 = {
   GITHUB_TOKEN: {
     en: (props) => `found GitHub Token(${props.typeName}): ${props.KEY}`,
     ja: (props) => `GitHub Token(${props.typeName})\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F\uFF1A ${props.KEY}`
@@ -30237,115 +31581,119 @@ var typeMap = /* @__PURE__ */ new Map([
   ["ghr", "refresh tokens"],
   ["github_pat", "fine-grained personal access tokens"]
 ]);
-function reportIfFoundKey$1({ pattern, source, options, context, t }) {
-  const results = source.content.matchAll(pattern);
-  for (const result of results) {
-    const index = result.index || 0;
-    const type = result.groups?.type;
-    const typeName = typeMap.get(type);
-    if (!typeName) {
-      throw new Error("Unknown type:" + typeName);
-    }
-    const match = result[0] || "";
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("GITHUB_TOKEN", {
-        KEY: match,
-        typeName
-      }),
-      range
-    });
+var validChecksum2 = (_token) => {
+  return true;
+};
+var reportGitHubToken = (match, context) => {
+  const type = match.groups?.type;
+  const typeName = typeMap.get(type);
+  if (!typeName) {
+    throw new Error("Unknown type:" + typeName);
   }
-}
-var creator$d = {
-  messages: messages$c,
+  if (!validChecksum2(match.text)) {
+    return;
+  }
+  const allowedResults = (0, import_regexp_string_matcher12.matchPatterns)(match.text, context.options.allows ?? []);
+  if (allowedResults.length > 0) {
+    return;
+  }
+  const t = context.createTranslator(messages11);
+  context.report({
+    message: t("GITHUB_TOKEN", {
+      KEY: match.text,
+      typeName
+    }),
+    range: match.range
+  });
+};
+var creator11 = {
+  messages: messages11,
   meta: {
     id: "@secretlint/secretlint-rule-github",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-github/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/github.md"
     }
   },
-  create(context, options) {
-    const CLASSIC_GITHUB_TOKEN_PATTERN = new RegExp("(?<!\\p{L})(?<type>ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36}(?![A-Za-z0-9_])", "gu");
-    const FINE_GRAINED_GITHUB_TOKEN_PATTERN = new RegExp("(?<!\\p{L})(?<type>github_pat)_[A-Za-z0-9_]{82}(?![A-Za-z0-9_])", "gu");
-    const GITHUB_APP_INSTALLATION_TOKEN_PATTERN = new RegExp("(?<!\\p{L})(?<type>ghs)_[0-9]{1,20}_[A-Za-z0-9_-]{1,1000}\\.[A-Za-z0-9_-]{1,10000}\\.[A-Za-z0-9_-]{1,1000}(?![A-Za-z0-9_-])", "gu");
-    const patterns = [
-      CLASSIC_GITHUB_TOKEN_PATTERN,
-      FINE_GRAINED_GITHUB_TOKEN_PATTERN,
-      GITHUB_APP_INSTALLATION_TOKEN_PATTERN
-    ];
-    const t = context.createTranslator(messages$c);
-    const normalizedOptions = {
-      allows: options.allows || []
-    };
-    return {
-      file(source) {
-        for (const pattern of patterns) {
-          reportIfFoundKey$1({ pattern, source, options: normalizedOptions, context, t });
-        }
-      }
-    };
-  }
+  patterns: [
+    {
+      // token length should be 40
+      // https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats/
+      pattern: new RegExp("(?<!\\p{L})(?<type>ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36}(?![A-Za-z0-9_])", "gu"),
+      keywords: ["ghp_", "gho_", "ghu_", "ghs_", "ghr_"],
+      scope: "line",
+      report: reportGitHubToken
+    },
+    {
+      // fine-grained personal access tokens. FIXME: Format of the token is unclear
+      // https://github.com/community/community/discussions/36441#discussioncomment-4014190
+      pattern: new RegExp("(?<!\\p{L})(?<type>github_pat)_[A-Za-z0-9_]{82}(?![A-Za-z0-9_])", "gu"),
+      keywords: ["github_pat_"],
+      scope: "line",
+      report: reportGitHubToken
+    },
+    {
+      // new format: ghs_<AppID>_<JWT> (~520 chars, JWT contains three base64url segments separated by dots)
+      // https://github.blog/changelog/2026-04-24-notice-about-upcoming-new-format-for-github-app-installation-tokens/
+      pattern: new RegExp("(?<!\\p{L})(?<type>ghs)_[0-9]{1,20}_[A-Za-z0-9_-]{1,1000}\\.[A-Za-z0-9_-]{1,10000}\\.[A-Za-z0-9_-]{1,1000}(?![A-Za-z0-9_-])", "gu"),
+      keywords: ["ghs_"],
+      scope: "line",
+      report: reportGitHubToken
+    }
+  ]
 };
-var messages$b = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/gitlab/index.js
+var import_regexp_string_matcher13 = __toESM(require_regexp_string_matcher(), 1);
+var messages12 = {
   GITLAB_PERSONAL_ACCESS_TOKEN: {
     en: (props) => `found GitLab Personal Access Token: ${props.KEY}`,
     ja: (props) => `GitLab Personal Access Token\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.KEY}`
   }
 };
-function reportIfFoundKey({ pattern, source, options, context, t }) {
-  const results = source.content.matchAll(pattern);
-  for (const result of results) {
-    const index = result.index ?? 0;
-    const match = result[0] ?? "";
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("GITLAB_PERSONAL_ACCESS_TOKEN", {
-        KEY: match
-      }),
-      range
-    });
-  }
-}
-var creator$c = {
-  messages: messages$b,
+var creator12 = {
+  messages: messages12,
   meta: {
     id: "@secretlint/secretlint-rule-gitlab",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-gitlab/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/gitlab.md"
     }
   },
-  create(context, options) {
-    const GITLAB_PERSONAL_ACCESS_TOKEN_PATTERN = new RegExp("(?<!\\p{L})glpat-[A-Za-z0-9_-]{20,128}(?![A-Za-z0-9_-])", "gu");
-    const patterns = [GITLAB_PERSONAL_ACCESS_TOKEN_PATTERN];
-    const t = context.createTranslator(messages$b);
-    const normalizedOptions = {
-      allows: options.allows ?? []
-    };
-    return {
-      file(source) {
-        for (const pattern of patterns) {
-          reportIfFoundKey({ pattern, source, options: normalizedOptions, context, t });
+  patterns: [
+    {
+      // GitLab Personal Access Token
+      // Prefix `glpat-` followed by 20–128 characters.
+      // Standard PATs are a fixed 20 characters. Routable tokens extend up to ~38 characters with a dot-suffix.
+      // - https://docs.gitlab.com/security/tokens/
+      // - https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+      pattern: new RegExp("(?<!\\p{L})glpat-[A-Za-z0-9_-]{20,128}(?![A-Za-z0-9_-])", "gu"),
+      keywords: ["glpat-"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher13.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
         }
+        const t = context.createTranslator(messages12);
+        context.report({
+          message: t("GITLAB_PERSONAL_ACCESS_TOKEN", {
+            KEY: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    }
+  ]
 };
-var messages$a = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/grafana/index.js
+var import_regexp_string_matcher14 = __toESM(require_regexp_string_matcher(), 1);
+var messages13 = {
   GRAFANA_CLOUD_API_TOKEN: {
     en: (props) => `found Grafana Cloud API token: ${props.TOKEN}`,
     ja: (props) => `Grafana Cloud API \u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
@@ -30355,65 +31703,350 @@ var messages$a = {
     ja: (props) => `Grafana Service Account \u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
   }
 };
-function reportIfFound$1({ pattern, messageId, source, options, context, t }) {
-  const results = source.content.matchAll(pattern);
-  for (const result of results) {
-    const index = result.index ?? 0;
-    const match = result[0] ?? "";
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    const range = [index, index + match.length];
-    context.report({
-      message: t(messageId, {
-        TOKEN: match
-      }),
-      range
-    });
-  }
-}
-var creator$b = {
-  messages: messages$a,
+var creator13 = {
+  messages: messages13,
   meta: {
     id: "@secretlint/secretlint-rule-grafana",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-grafana/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/grafana.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$a);
-    const normalizedOptions = {
-      allows: options?.allows ?? []
-    };
-    const GRAFANA_CLOUD_API_TOKEN_PATTERN = new RegExp("(?<!\\p{L})glc_[A-Za-z0-9+/]{32,400}={0,2}(?![A-Za-z0-9+/=])", "gu");
-    const GRAFANA_SERVICE_ACCOUNT_TOKEN_PATTERN = new RegExp("(?<!\\p{L})glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}(?![A-Fa-f0-9])", "gu");
-    return {
-      file(source) {
-        reportIfFound$1({
-          pattern: GRAFANA_CLOUD_API_TOKEN_PATTERN,
-          messageId: "GRAFANA_CLOUD_API_TOKEN",
-          source,
-          options: normalizedOptions,
-          context,
-          t
-        });
-        reportIfFound$1({
-          pattern: GRAFANA_SERVICE_ACCOUNT_TOKEN_PATTERN,
-          messageId: "GRAFANA_SERVICE_ACCOUNT_TOKEN",
-          source,
-          options: normalizedOptions,
-          context,
-          t
+  patterns: [
+    {
+      // Grafana Cloud API token
+      // Prefix: `glc_`, followed by base64-encoded JWT content.
+      // Real tokens start with `glc_eyJ` (the base64 prefix of `{"`).
+      // https://grafana.com/docs/grafana-cloud/account-management/authentication-and-permissions/api-keys/
+      pattern: new RegExp("(?<!\\p{L})glc_[A-Za-z0-9+/]{32,400}={0,2}(?![A-Za-z0-9+/=])", "gu"),
+      keywords: ["glc_"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher14.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages13);
+        context.report({
+          message: t("GRAFANA_CLOUD_API_TOKEN", {
+            TOKEN: match.text
+          }),
+          range: match.range
         });
       }
-    };
+    },
+    {
+      // Grafana Service Account token
+      // Prefix: `glsa_`, followed by 32 alphanumeric characters, an
+      // underscore, and an 8-character hex checksum.
+      // https://grafana.com/docs/grafana/latest/administration/service-accounts/
+      pattern: new RegExp("(?<!\\p{L})glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}(?![A-Fa-f0-9])", "gu"),
+      keywords: ["glsa_"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher14.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages13);
+        context.report({
+          message: t("GRAFANA_SERVICE_ACCOUNT_TOKEN", {
+            TOKEN: match.text
+          }),
+          range: match.range
+        });
+      }
+    }
+  ]
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/openai/index.js
+var import_regexp_string_matcher15 = __toESM(require_regexp_string_matcher(), 1);
+var messages14 = {
+  OPENAI_TOKEN: {
+    en: (props) => `found OpenAI API token: ${props.TOKEN}`,
+    ja: (props) => `OpenAI API \u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
   }
 };
-var messages$9 = {
+var creator14 = {
+  messages: messages14,
+  meta: {
+    id: "@secretlint/secretlint-rule-openai",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/openai.md"
+    }
+  },
+  patterns: [
+    {
+      pattern: /sk-(?:proj|svcacct|admin)-(?:[A-Za-z0-9_-]{74}|[A-Za-z0-9_-]{58})T3BlbkFJ(?:[A-Za-z0-9_-]{74}|[A-Za-z0-9_-]{58})\b|sk-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20}/g,
+      keywords: ["T3BlbkFJ"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher15.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages14);
+        context.report({
+          message: t("OPENAI_TOKEN", {
+            TOKEN: match.text
+          }),
+          range: match.range
+        });
+      }
+    }
+  ]
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/anthropic/index.js
+var import_regexp_string_matcher16 = __toESM(require_regexp_string_matcher(), 1);
+var messages15 = {
+  ANTHROPIC_API_KEY: {
+    en: (props) => `found Anthropic Claude API key: ${props.KEY}`,
+    ja: (props) => `Anthropic Claude API \u30AD\u30FC: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator15 = {
+  messages: messages15,
+  meta: {
+    id: "@secretlint/secretlint-rule-anthropic",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/anthropic.md"
+    }
+  },
+  patterns: [
+    {
+      // Anthropic Claude API keys patterns:
+      // - sk-ant-api03-... (original format) - 13 chars prefix
+      // - sk-ant-api04-... (newer format) - 13 chars prefix
+      // Example format: sk-ant-api03-<93 base64url chars>AA (108 chars total)
+      // Breakdown: prefix(13) + middle(93) + suffix(2) = 108 chars
+      // Pattern: sk-ant-api0[3-4]- + base64-like characters (exactly 93 chars) + ending with AA
+      // https://docs.anthropic.com/en/api/overview
+      // https://docs.anthropic.com/en/api/admin-api/apikeys/get-api-key
+      // https://docs.gitguardian.com/secrets-detection/secrets-detection-engine/detectors/specifics/claude_api_key
+      pattern: new RegExp("(?<!\\p{L})sk-ant-api0\\d-[A-Za-z0-9_-]{90,128}AA(?![A-Za-z0-9_-])", "gu"),
+      keywords: ["sk-ant-api0"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher16.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages15);
+        context.report({
+          message: t("ANTHROPIC_API_KEY", {
+            KEY: match.text
+          }),
+          range: match.range
+        });
+      }
+    }
+  ]
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/groq/index.js
+var import_regexp_string_matcher17 = __toESM(require_regexp_string_matcher(), 1);
+var messages16 = {
+  GROQ_API_KEY: {
+    en: (props) => `found Groq API key: ${props.KEY}`,
+    ja: (props) => `Groq API \u30AD\u30FC: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator16 = {
+  messages: messages16,
+  meta: {
+    id: "@secretlint/secretlint-rule-groq",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/groq.md"
+    }
+  },
+  patterns: [
+    {
+      // Groq API keys format:
+      // - Prefix "gsk_" followed by exactly 52 alphanumeric characters
+      // References:
+      // - https://console.groq.com/docs/quickstart
+      // - https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+      // - https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/groq/groq.go
+      pattern: new RegExp("(?<!\\p{L})gsk_[a-zA-Z0-9]{52}(?![a-zA-Z0-9])", "gu"),
+      keywords: ["gsk_"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher17.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages16);
+        context.report({
+          message: t("GROQ_API_KEY", {
+            KEY: match.text
+          }),
+          range: match.range
+        });
+      }
+    }
+  ]
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/huggingface/index.js
+var import_regexp_string_matcher18 = __toESM(require_regexp_string_matcher(), 1);
+var messages17 = {
+  HUGGINGFACE_USER_ACCESS_TOKEN: {
+    en: (props) => `found Hugging Face User Access Token: ${props.TOKEN}`,
+    ja: (props) => `Hugging Face User Access Token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator17 = {
+  messages: messages17,
+  meta: {
+    id: "@secretlint/secretlint-rule-huggingface",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/huggingface.md"
+    }
+  },
+  patterns: [
+    {
+      // Hugging Face User Access Token format:
+      // - Prefix: `hf_`
+      // - Body: exactly 34 alphabetic characters (a-z, A-Z)
+      // References:
+      // - https://huggingface.co/docs/hub/security-tokens
+      // - https://github.com/gitleaks/gitleaks
+      pattern: new RegExp("(?<!\\p{L})hf_[a-zA-Z]{34}(?![a-zA-Z])", "gu"),
+      keywords: ["hf_"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher18.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages17);
+        context.report({
+          message: t("HUGGINGFACE_USER_ACCESS_TOKEN", {
+            TOKEN: match.text
+          }),
+          range: match.range
+        });
+      }
+    }
+  ]
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/linear/index.js
+var import_regexp_string_matcher19 = __toESM(require_regexp_string_matcher(), 1);
+var messages18 = {
+  LINEAR_API_TOKEN: {
+    en: (props) => `found linear api token: ${props.ID}`,
+    ja: (props) => `linear api token: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator18 = {
+  messages: messages18,
+  meta: {
+    id: "@secretlint/secretlint-rule-linear",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/linear.md"
+    }
+  },
+  patterns: [
+    {
+      pattern: new RegExp("(?<!\\p{L})lin_api_[a-zA-Z0-9_]{32,128}(?![a-zA-Z0-9_])", "gu"),
+      keywords: ["lin_api_"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher19.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages18);
+        context.report({
+          message: t("LINEAR_API_TOKEN", {
+            ID: match.text
+          }),
+          range: match.range
+        });
+      }
+    }
+  ]
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/notion/index.js
+var import_regexp_string_matcher20 = __toESM(require_regexp_string_matcher(), 1);
+var messages19 = {
+  NOTION_INTEGRATION_TOKEN: {
+    en: (props) => `found Notion integration token: ${props.TOKEN}`,
+    ja: (props) => `Notion integration \u30C8\u30FC\u30AF\u30F3: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
+  }
+};
+var creator19 = {
+  messages: messages19,
+  meta: {
+    id: "@secretlint/secretlint-rule-notion",
+    recommended: true,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/notion.md"
+    }
+  },
+  patterns: [
+    {
+      /**
+       * Notion Integration Token (new format introduced September 2024).
+       *
+       * Structure: `ntn_` prefix + 11 digits + 35 alphanumeric characters (46 chars after prefix).
+       * The legacy `secret_` prefix is intentionally NOT detected here because it is too
+       * generic and prone to false positives.
+       *
+       * References:
+       * - https://developers.notion.com/changelog (API token prefix transition)
+       * - https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+       * - https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml (notion-api-token)
+       *
+       * Note: Notion warns that the token format may change, so this pattern may need
+       * to be revisited if a future format is introduced.
+       */
+      pattern: new RegExp("(?<!\\p{L})ntn_[0-9]{11}[A-Za-z0-9]{35}(?![A-Za-z0-9])", "gu"),
+      keywords: ["ntn_"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher20.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages19);
+        context.report({
+          message: t("NOTION_INTEGRATION_TOKEN", {
+            TOKEN: match.text
+          }),
+          range: match.range
+        });
+      }
+    }
+  ]
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/1password/index.js
+var import_regexp_string_matcher21 = __toESM(require_regexp_string_matcher(), 1);
+var messages20 = {
   OPS_TOKEN: {
     en: (props) => `found 1Password Service Account token: ${props.TOKEN}`,
     ja: (props) => `1Password Service Account: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
@@ -30428,50 +32061,50 @@ var is1PasswordServiceAccountToken = (base64String) => {
     return false;
   }
 };
-var creator$a = {
-  messages: messages$9,
+var creator20 = {
+  messages: messages20,
   meta: {
     id: "@secretlint/secretlint-rule-1password",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-1password/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/1password.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$9);
-    const normalizedOptions = {
-      allows: options?.allows ?? []
-    };
-    return {
-      file(source) {
-        const pattern = new RegExp("(?<!\\p{L})ops_(ey[A-Za-z0-9+/=]{100,1280}fQ={0,2})(?![A-Za-z0-9+/=])", "gu");
-        const matches2 = source.content.matchAll(pattern);
-        for (const match of matches2) {
-          const index = match.index ?? 0;
-          const matchString = match[0] ?? "";
-          const base64String = match[1] ?? "";
-          if (!is1PasswordServiceAccountToken(base64String)) {
-            continue;
-          }
-          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
-          if (allowedResults.length > 0) {
-            continue;
-          }
-          const range = [index, index + matchString.length];
-          context.report({
-            message: t("OPS_TOKEN", {
-              TOKEN: matchString
-            }),
-            range
-          });
+  patterns: [
+    {
+      // 1Password Service Account format is `ops_<base64>`
+      // https://developer.1password.com/docs/service-accounts/security/
+      // It will be like ops_{"email":"ejwe64qmlxhri@1passwordserviceaccounts.lcl","muk":{"alg":"A256GCM","ext":true,"k":"M8VPfIc8VEfThcMXLaKCKF8sMh5JMZsPAtu92fQNb-o","key_ops":["encrypt","decrypt"],"kty":"oct","kid":"mp"},"secretKey":"A3-C4ZJMN-PQTZTL-HGL84-G64M7-KVZRN-4ZVP6","srpX":"870d67a9e626625d9e368507804c9c32e661c57e7e558778291bf29d5a279ae1","signInAddress":"gotham.b5local.com:4000","userAuth":{"method":"SRPg-4096","alg":"PBES2g-HS256","iterations":100000,"salt":"FMRUPiyrN4Xf_8Hoh6YRXQ"}}
+      // This regexp match `ops_{...}` pattern
+      pattern: new RegExp("(?<!\\p{L})ops_(ey[A-Za-z0-9+/=]{100,1280}fQ={0,2})(?![A-Za-z0-9+/=])", "gu"),
+      keywords: ["ops_"],
+      scope: "line",
+      report(match, context) {
+        const base64String = match.captures[1] ?? "";
+        if (!is1PasswordServiceAccountToken(base64String)) {
+          return;
         }
+        const allowedResults = (0, import_regexp_string_matcher21.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages20);
+        context.report({
+          message: t("OPS_TOKEN", {
+            TOKEN: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    }
+  ]
 };
-var messages$8 = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/database-connection-string/index.js
+var import_regexp_string_matcher22 = __toESM(require_regexp_string_matcher(), 1);
+var messages21 = {
   MongoDBConnection: {
     en: (props) => `found MongoDB connection string: ${props.URI}`,
     ja: (props) => `MongoDB\u63A5\u7D9A\u6587\u5B57\u5217: ${props.URI} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
@@ -30485,7 +32118,7 @@ var messages$8 = {
     ja: (props) => `PostgreSQL\u63A5\u7D9A\u6587\u5B57\u5217: ${props.URI} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
   }
 };
-var BUILTIN_IGNORED_PATTERNS = [
+var BUILTIN_IGNORED_PATTERNS2 = [
   "localhost",
   "127.0.0.1",
   "example.com",
@@ -30510,7 +32143,7 @@ var BUILTIN_IGNORED_PATTERNS = [
   "YOUR_USERNAME",
   "REPLACE_WITH_PASSWORD"
 ];
-function isVariableLikeString(str) {
+function isVariableLikeString2(str) {
   const variablePatterns = [
     /\$\{[^}]{1,50}\}/,
     // ${var}
@@ -30532,117 +32165,80 @@ function isLikelyRealCredential(username, password) {
     return false;
   if (password.length < 4)
     return false;
-  if (isVariableLikeString(password))
+  if (isVariableLikeString2(password))
     return false;
   const passwordLower = password.toLowerCase();
-  if (BUILTIN_IGNORED_PATTERNS.some((pattern) => passwordLower === pattern.toLowerCase())) {
+  if (BUILTIN_IGNORED_PATTERNS2.some((pattern) => passwordLower === pattern.toLowerCase())) {
     return false;
   }
   if (/^(.)\1{3,}$/.test(password))
     return false;
   return true;
 }
-function reportMongoDBConnectionString({ source, options, context, t }) {
-  const MONGODB_PATTERN = /mongodb(?:\+srv)?:\/\/(?:(?<username>[^:\/\s]{1,100}):(?<password>[^@\/\s]{1,200})@)?(?<host>[^\/\s?]{1,100})(?:\/(?<database>[^?\s]{0,100}))?(?:\?(?<options>[^\s]{0,500}))?/gi;
-  const results = source.content.matchAll(MONGODB_PATTERN);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    const username = result.groups?.username;
-    const password = result.groups?.password;
+var createReport = (messageId) => {
+  return (match, context) => {
+    const username = match.groups?.username;
+    const password = match.groups?.password;
     if (!username || !password)
-      continue;
+      return;
     if (!isLikelyRealCredential(username, password))
-      continue;
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
+      return;
+    const allowedResults = (0, import_regexp_string_matcher22.matchPatterns)(match.text, context.options.allows ?? []);
     if (allowedResults.length > 0) {
-      continue;
+      return;
     }
+    const t = context.createTranslator(messages21);
     context.report({
-      message: t("MongoDBConnection", {
-        URI: match
+      message: t(messageId, {
+        URI: match.text
       }),
-      range
+      range: match.range
     });
-  }
-}
-function reportMySQLConnectionString({ source, options, context, t }) {
-  const MYSQL_URI_PATTERN = /(?:jdbc:)?mysql(?:x)?:\/\/(?:(?<username>[^:\/\s]{1,100}):(?<password>[^@\/\s]{1,200})@)?(?<host>[^\/\s?]{1,100})(?:\/(?<database>[^?\s]{0,100}))?(?:\?(?<options>[^\s]{0,500}))?/gi;
-  const results = source.content.matchAll(MYSQL_URI_PATTERN);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    const username = result.groups?.username;
-    const password = result.groups?.password;
-    if (!username || !password)
-      continue;
-    if (!isLikelyRealCredential(username, password))
-      continue;
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("MySQLConnection", {
-        URI: match
-      }),
-      range
-    });
-  }
-}
-function reportPostgreSQLConnectionString({ source, options, context, t }) {
-  const POSTGRESQL_URI_PATTERN = /postgres(?:ql)?:\/\/(?:(?<username>[^:\/\s]{1,100}):(?<password>[^@\/\s]{1,200})@)?(?<host>[^\/\s?]{1,100})(?:\/(?<database>[^?\s]{0,100}))?(?:\?(?<options>[^\s]{0,500}))?/gi;
-  const results = source.content.matchAll(POSTGRESQL_URI_PATTERN);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    const username = result.groups?.username;
-    const password = result.groups?.password;
-    if (!username || !password)
-      continue;
-    if (!isLikelyRealCredential(username, password))
-      continue;
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("PostgreSQLConnection", {
-        URI: match
-      }),
-      range
-    });
-  }
-}
-var creator$9 = {
-  messages: messages$8,
+  };
+};
+var creator21 = {
+  messages: messages21,
   meta: {
     id: "@secretlint/secretlint-rule-database-connection-string",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-database-connection-string/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/database-connection-string.md"
     }
   },
-  create(context, options) {
-    const normalizedOptions = {
-      allows: options.allows || []
-    };
-    const t = context.createTranslator(messages$8);
-    return {
-      file(source) {
-        reportMongoDBConnectionString({ source, options: normalizedOptions, context, t });
-        reportMySQLConnectionString({ source, options: normalizedOptions, context, t });
-        reportPostgreSQLConnectionString({ source, options: normalizedOptions, context, t });
-      }
-    };
-  }
+  patterns: [
+    {
+      // MongoDB URI patterns: mongodb:// and mongodb+srv://
+      // Captures: mongodb://[username:password@]host[:port][/database][?options]
+      // Using possessive quantifiers to prevent ReDoS
+      pattern: /mongodb(?:\+srv)?:\/\/(?:(?<username>[^:\/\s]{1,100}):(?<password>[^@\/\s]{1,200})@)?(?<host>[^\/\s?]{1,100})(?:\/(?<database>[^?\s]{0,100}))?(?:\?(?<options>[^\s]{0,500}))?/gi,
+      keywords: ["mongodb://", "mongodb+srv://"],
+      scope: "line",
+      report: createReport("MongoDBConnection")
+    },
+    {
+      // MySQL URI patterns: jdbc:mysql://, mysql://, mysqlx://
+      // Using possessive quantifiers to prevent ReDoS
+      pattern: /(?:jdbc:)?mysql(?:x)?:\/\/(?:(?<username>[^:\/\s]{1,100}):(?<password>[^@\/\s]{1,200})@)?(?<host>[^\/\s?]{1,100})(?:\/(?<database>[^?\s]{0,100}))?(?:\?(?<options>[^\s]{0,500}))?/gi,
+      keywords: ["mysql://", "mysqlx://"],
+      scope: "line",
+      report: createReport("MySQLConnection")
+    },
+    {
+      // PostgreSQL URI patterns: postgresql://, postgres://
+      // Using possessive quantifiers to prevent ReDoS
+      pattern: /postgres(?:ql)?:\/\/(?:(?<username>[^:\/\s]{1,100}):(?<password>[^@\/\s]{1,200})@)?(?<host>[^\/\s?]{1,100})(?:\/(?<database>[^?\s]{0,100}))?(?:\?(?<options>[^\s]{0,500}))?/gi,
+      keywords: ["postgres://", "postgresql://"],
+      scope: "line",
+      report: createReport("PostgreSQLConnection")
+    }
+  ]
 };
-var messages$7 = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/hashicorp-vault/index.js
+var import_regexp_string_matcher23 = __toESM(require_regexp_string_matcher(), 1);
+var messages22 = {
   HASHICORP_VAULT_SERVICE_TOKEN: {
     en: (props) => `found HashiCorp Vault service token: ${props.TOKEN}`,
     ja: (props) => `HashiCorp Vault service token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
@@ -30659,50 +32255,78 @@ var messages$7 = {
 var serviceTokenPattern = new RegExp("(?<!\\p{L})hvs\\.[A-Za-z0-9_-]{90,120}(?![A-Za-z0-9_-])", "gu");
 var batchTokenPattern = new RegExp("(?<!\\p{L})hvb\\.[A-Za-z0-9_-]{138,300}(?![A-Za-z0-9_-])", "gu");
 var recoveryTokenPattern = new RegExp("(?<!\\p{L})hvr\\.[A-Za-z0-9_-]{90,120}(?![A-Za-z0-9_-])", "gu");
-var creator$8 = {
-  messages: messages$7,
+var creator22 = {
+  messages: messages22,
   meta: {
     id: "@secretlint/secretlint-rule-hashicorp-vault",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-hashicorp-vault/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/hashicorp-vault.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$7);
-    const normalizedOptions = {
-      allows: options?.allows ?? []
-    };
-    const reportMatches = (source, pattern, messageId) => {
-      const matches2 = source.content.matchAll(pattern);
-      for (const match of matches2) {
-        const index = match.index ?? 0;
-        const matchString = match[0] ?? "";
-        const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
+  patterns: [
+    {
+      pattern: serviceTokenPattern,
+      keywords: ["hvs."],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher23.matchPatterns)(match.text, context.options.allows ?? []);
         if (allowedResults.length > 0) {
-          continue;
+          return;
         }
-        const range = [index, index + matchString.length];
+        const t = context.createTranslator(messages22);
         context.report({
-          message: t(messageId, {
-            TOKEN: matchString
+          message: t("HASHICORP_VAULT_SERVICE_TOKEN", {
+            TOKEN: match.text
           }),
-          range
+          range: match.range
         });
       }
-    };
-    return {
-      file(source) {
-        reportMatches(source, serviceTokenPattern, "HASHICORP_VAULT_SERVICE_TOKEN");
-        reportMatches(source, batchTokenPattern, "HASHICORP_VAULT_BATCH_TOKEN");
-        reportMatches(source, recoveryTokenPattern, "HASHICORP_VAULT_RECOVERY_TOKEN");
+    },
+    {
+      pattern: batchTokenPattern,
+      keywords: ["hvb."],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher23.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages22);
+        context.report({
+          message: t("HASHICORP_VAULT_BATCH_TOKEN", {
+            TOKEN: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    },
+    {
+      pattern: recoveryTokenPattern,
+      keywords: ["hvr."],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher23.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages22);
+        context.report({
+          message: t("HASHICORP_VAULT_RECOVERY_TOKEN", {
+            TOKEN: match.text
+          }),
+          range: match.range
+        });
+      }
+    }
+  ]
 };
-var messages$6 = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/vercel/index.js
+var import_regexp_string_matcher24 = __toESM(require_regexp_string_matcher(), 1);
+var messages23 = {
   VERCEL_PERSONAL_ACCESS_TOKEN: {
     en: (props) => `found Vercel personal access token: ${props.ID}`,
     ja: (props) => `Vercel personal access token: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
@@ -30731,186 +32355,182 @@ var prefixToMessageId = {
   vcr: "VERCEL_APP_REFRESH_TOKEN",
   vck: "VERCEL_AI_GATEWAY_API_KEY"
 };
-var creator$7 = {
-  messages: messages$6,
+var creator23 = {
+  messages: messages23,
   meta: {
     id: "@secretlint/secretlint-rule-vercel",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-vercel/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/vercel.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$6);
-    const normalizedOptions = {
-      allows: options?.allows ?? []
-    };
-    return {
-      file(source) {
-        const pattern = new RegExp("(?<!\\p{L})(?<prefix>vcp|vci|vca|vcr|vck)_[A-Za-z0-9]{20,60}(?![A-Za-z0-9])", "gu");
-        const matches2 = source.content.matchAll(pattern);
-        for (const match of matches2) {
-          const index = match.index ?? 0;
-          const matchString = match[0] ?? "";
-          const prefix = match.groups?.prefix;
-          const messageId = prefixToMessageId[prefix];
-          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
-          if (allowedResults.length > 0) {
-            continue;
-          }
-          const range = [index, index + matchString.length];
-          context.report({
-            message: t(messageId, {
-              ID: matchString
-            }),
-            range
-          });
+  patterns: [
+    {
+      pattern: new RegExp("(?<!\\p{L})(?<prefix>vcp|vci|vca|vcr|vck)_[A-Za-z0-9]{20,60}(?![A-Za-z0-9])", "gu"),
+      keywords: ["vcp_", "vci_", "vca_", "vcr_", "vck_"],
+      scope: "line",
+      report(match, context) {
+        const prefix = match.groups?.prefix;
+        const messageId = prefixToMessageId[prefix];
+        const allowedResults = (0, import_regexp_string_matcher24.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
         }
+        const t = context.createTranslator(messages23);
+        context.report({
+          message: t(messageId, {
+            ID: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    }
+  ]
 };
-var messages$5 = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/databricks/index.js
+var import_regexp_string_matcher25 = __toESM(require_regexp_string_matcher(), 1);
+var messages24 = {
   DATABRICKS_PERSONAL_ACCESS_TOKEN: {
     en: (props) => `found Databricks personal access token: ${props.ID}`,
     ja: (props) => `Databricks personal access token: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
   }
 };
-var creator$6 = {
-  messages: messages$5,
+var creator24 = {
+  messages: messages24,
   meta: {
     id: "@secretlint/secretlint-rule-databricks",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-databricks/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/databricks.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$5);
-    const normalizedOptions = {
-      allows: options?.allows ?? []
-    };
-    return {
-      file(source) {
-        const pattern = new RegExp("(?<!\\p{L})dapi[A-Fa-f0-9]{32}(?:-[0-9])?(?![A-Fa-f0-9])", "gu");
-        const matches2 = source.content.matchAll(pattern);
-        for (const match of matches2) {
-          const index = match.index ?? 0;
-          const matchString = match[0] ?? "";
-          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
-          if (allowedResults.length > 0) {
-            continue;
-          }
-          const range = [index, index + matchString.length];
-          context.report({
-            message: t("DATABRICKS_PERSONAL_ACCESS_TOKEN", {
-              ID: matchString
-            }),
-            range
-          });
+  patterns: [
+    {
+      // Databricks personal access tokens:
+      // - Prefix: `dapi`
+      // - Body: 32 hexadecimal characters (Databricks issues lowercase,
+      //   but match case-insensitively to be lenient)
+      // - Optional suffix: `-<single digit>`
+      // Reference:
+      // - https://docs.databricks.com/aws/en/dev-tools/auth/pat
+      // - https://docs.github.com/en/code-security/secret-scanning/secret-scanning-patterns
+      pattern: new RegExp("(?<!\\p{L})dapi[A-Fa-f0-9]{32}(?:-[0-9])?(?![A-Fa-f0-9])", "gu"),
+      keywords: ["dapi"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher25.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
         }
+        const t = context.createTranslator(messages24);
+        context.report({
+          message: t("DATABRICKS_PERSONAL_ACCESS_TOKEN", {
+            ID: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    }
+  ]
 };
-var messages$4 = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/docker/index.js
+var import_regexp_string_matcher26 = __toESM(require_regexp_string_matcher(), 1);
+var messages25 = {
   DOCKER_PERSONAL_ACCESS_TOKEN: {
     en: (props) => `found Docker Personal Access Token: ${props.TOKEN}`,
     ja: (props) => `Docker Personal Access Token: ${props.TOKEN} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
   }
 };
-function reportIfFoundDockerPAT({ source, options, context, t }) {
-  const DOCKER_PAT_PATTERN = new RegExp("(?<!\\p{L})dckr_pat_[a-zA-Z0-9_-]{27}(?![a-zA-Z0-9_-])", "gu");
-  const results = source.content.matchAll(DOCKER_PAT_PATTERN);
-  for (const result of results) {
-    const index = result.index || 0;
-    const match = result[0] || "";
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t("DOCKER_PERSONAL_ACCESS_TOKEN", {
-        TOKEN: match
-      }),
-      range
-    });
-  }
-}
-var creator$5 = {
-  messages: messages$4,
+var creator25 = {
+  messages: messages25,
   meta: {
     id: "@secretlint/secretlint-rule-docker",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-docker/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/docker.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$4);
-    const normalizedOptions = {
-      allows: options.allows || []
-    };
-    return {
-      file(source) {
-        reportIfFoundDockerPAT({ source, options: normalizedOptions, context, t });
+  patterns: [
+    {
+      // Docker Personal Access Token
+      // Prefix: dckr_pat_ followed by exactly 27 alphanumeric, underscore, or hyphen characters
+      // Reference: https://docs.docker.com/security/access-tokens/
+      // Reference: https://github.com/trufflesecurity/trufflehog/blob/main/pkg/detectors/dockerhub/v2/dockerhub.go
+      pattern: new RegExp("(?<!\\p{L})dckr_pat_[a-zA-Z0-9_-]{27}(?![a-zA-Z0-9_-])", "gu"),
+      keywords: ["dckr_pat_"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher26.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages25);
+        context.report({
+          message: t("DOCKER_PERSONAL_ACCESS_TOKEN", {
+            TOKEN: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    }
+  ]
 };
-var messages$3 = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/figma/index.js
+var import_regexp_string_matcher27 = __toESM(require_regexp_string_matcher(), 1);
+var messages26 = {
   FIGMA_PERSONAL_ACCESS_TOKEN: {
     en: (props) => `found Figma Personal Access Token: ${props.ID}`,
     ja: (props) => `Figma Personal Access Token: ${props.ID} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
   }
 };
-var creator$4 = {
-  messages: messages$3,
+var creator26 = {
+  messages: messages26,
   meta: {
     id: "@secretlint/secretlint-rule-figma",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-figma/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/figma.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$3);
-    const normalizedOptions = {
-      allows: options?.allows ?? []
-    };
-    return {
-      file(source) {
-        const pattern = new RegExp("(?<!\\p{L})figd_[A-Za-z0-9_-]{40,200}(?![A-Za-z0-9_-])", "gu");
-        const matches2 = source.content.matchAll(pattern);
-        for (const match of matches2) {
-          const index = match.index ?? 0;
-          const matchString = match[0] ?? "";
-          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
-          if (allowedResults.length > 0) {
-            continue;
-          }
-          const range = [index, index + matchString.length];
-          context.report({
-            message: t("FIGMA_PERSONAL_ACCESS_TOKEN", {
-              ID: matchString
-            }),
-            range
-          });
+  patterns: [
+    {
+      // Figma Personal Access Token
+      // Format: `figd_` prefix followed by 40-200 characters of [A-Za-z0-9_-]
+      // Reference: https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+      pattern: new RegExp("(?<!\\p{L})figd_[A-Za-z0-9_-]{40,200}(?![A-Za-z0-9_-])", "gu"),
+      keywords: ["figd_"],
+      scope: "line",
+      report(match, context) {
+        const allowedResults = (0, import_regexp_string_matcher27.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
         }
+        const t = context.createTranslator(messages26);
+        context.report({
+          message: t("FIGMA_PERSONAL_ACCESS_TOKEN", {
+            ID: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    }
+  ]
 };
-var messages$2 = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/cloudflare/index.js
+var import_regexp_string_matcher28 = __toESM(require_regexp_string_matcher(), 1);
+var messages27 = {
   CLOUDFLARE_GLOBAL_API_KEY: {
     en: (props) => `found Cloudflare Global API Key: ${props.TOKEN}`,
     ja: (props) => `Cloudflare Global API Key\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.TOKEN}`
@@ -30924,58 +32544,52 @@ var messages$2 = {
     ja: (props) => `Cloudflare Account API Token\u304C\u898B\u3064\u304B\u308A\u307E\u3057\u305F: ${props.TOKEN}`
   }
 };
-var messageIdMap = {
+var messageIdMap2 = {
   cfk: "CLOUDFLARE_GLOBAL_API_KEY",
   cfut: "CLOUDFLARE_USER_API_TOKEN",
   cfat: "CLOUDFLARE_ACCOUNT_API_TOKEN"
 };
 var CLOUDFLARE_TOKEN_PATTERN = new RegExp("(?<!\\p{L})(?<prefix>cfk|cfut|cfat)_[A-Za-z0-9]{40}[0-9a-f]{8}(?![A-Za-z0-9])", "gu");
-function reportIfFound({ source, options, context, t }) {
-  const results = source.content.matchAll(CLOUDFLARE_TOKEN_PATTERN);
-  for (const result of results) {
-    const index = result.index ?? 0;
-    const match = result[0] ?? "";
-    const prefix = result.groups?.["prefix"];
-    if (!prefix) {
-      continue;
-    }
-    const range = [index, index + match.length];
-    const allowedResults = regexpStringMatcherExports.matchPatterns(match, options.allows);
-    if (allowedResults.length > 0) {
-      continue;
-    }
-    context.report({
-      message: t(messageIdMap[prefix], {
-        TOKEN: match
-      }),
-      range
-    });
-  }
-}
-var creator$3 = {
-  messages: messages$2,
+var creator27 = {
+  messages: messages27,
   meta: {
     id: "@secretlint/secretlint-rule-cloudflare",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-cloudflare/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/cloudflare.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$2);
-    const normalizedOptions = {
-      allows: options.allows ?? []
-    };
-    return {
-      file(source) {
-        reportIfFound({ source, options: normalizedOptions, context, t });
+  patterns: [
+    {
+      pattern: CLOUDFLARE_TOKEN_PATTERN,
+      keywords: ["cfk_", "cfut_", "cfat_"],
+      scope: "line",
+      report(match, context) {
+        const prefix = match.groups?.["prefix"];
+        if (!prefix) {
+          return;
+        }
+        const allowedResults = (0, import_regexp_string_matcher28.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
+        }
+        const t = context.createTranslator(messages27);
+        context.report({
+          message: t(messageIdMap2[prefix], {
+            TOKEN: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    }
+  ]
 };
-var messages$1 = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/tailscale/index.js
+var import_regexp_string_matcher29 = __toESM(require_regexp_string_matcher(), 1);
+var messages28 = {
   TAILSCALE_API_KEY: {
     en: (props) => `found Tailscale API access token: ${props.KEY}`,
     ja: (props) => `Tailscale API \u30A2\u30AF\u30BB\u30B9\u30C8\u30FC\u30AF\u30F3: ${props.KEY} \u304C\u307F\u3064\u304B\u308A\u307E\u3057\u305F`
@@ -31008,47 +32622,47 @@ var messageIdByType = {
   scim: "TAILSCALE_SCIM_KEY",
   webhook: "TAILSCALE_WEBHOOK_KEY"
 };
-var creator$2 = {
-  messages: messages$1,
+var creator28 = {
+  messages: messages28,
   meta: {
     id: "@secretlint/secretlint-rule-tailscale",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-tailscale/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/tailscale.md"
     }
   },
-  create(context, options) {
-    const t = context.createTranslator(messages$1);
-    const normalizedOptions = {
-      allows: options.allows ?? []
-    };
-    return {
-      file(source) {
-        const pattern = new RegExp("(?<!\\p{L})tskey-(?<type>[a-z]{2,20})-[0-9A-Za-z_]{8,40}-[0-9A-Za-z_]{16,60}(?![0-9A-Za-z_])", "gu");
-        const matches2 = source.content.matchAll(pattern);
-        for (const match of matches2) {
-          const index = match.index ?? 0;
-          const matchString = match[0] ?? "";
-          const type = match.groups?.type ?? "";
-          const range = [index, index + matchString.length];
-          const allowedResults = regexpStringMatcherExports.matchPatterns(matchString, normalizedOptions.allows);
-          if (allowedResults.length > 0) {
-            continue;
-          }
-          const messageId = messageIdByType[type] ?? "TAILSCALE_KEY";
-          context.report({
-            message: t(messageId, {
-              KEY: matchString
-            }),
-            range
-          });
+  patterns: [
+    {
+      // Tailscale keys: tskey-{type}-{identifier}-{secret}
+      // Documented types: api, auth, client, scim, webhook
+      // https://tailscale.com/docs/reference/key-prefixes
+      // GitHub Secret Scanning supports these as Push Protection targets.
+      // TruffleHog uses the equivalent pattern: \btskey-[a-z]+-[0-9A-Za-z_]+-[0-9A-Za-z_]+\b
+      pattern: new RegExp("(?<!\\p{L})tskey-(?<type>[a-z]{2,20})-[0-9A-Za-z_]{8,40}-[0-9A-Za-z_]{16,60}(?![0-9A-Za-z_])", "gu"),
+      keywords: ["tskey-"],
+      scope: "line",
+      report(match, context) {
+        const type = match.groups?.type ?? "";
+        const allowedResults = (0, import_regexp_string_matcher29.matchPatterns)(match.text, context.options.allows ?? []);
+        if (allowedResults.length > 0) {
+          return;
         }
+        const messageId = messageIdByType[type] ?? "TAILSCALE_KEY";
+        const t = context.createTranslator(messages28);
+        context.report({
+          message: t(messageId, {
+            KEY: match.text
+          }),
+          range: match.range
+        });
       }
-    };
-  }
+    }
+  ]
 };
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/filter-comments/parse-comment.js
 var HTML_COMMENT_REGEXP = /(?<type>secretlint-(?:disable-next-line|disable-line|disable|enable))(?<options>.*)/g;
 var parseComments = (source) => {
   const matches2 = source.content.matchAll(HTML_COMMENT_REGEXP);
@@ -31084,6 +32698,8 @@ function parseComment(options) {
   const ruleIdString = commentStart === -1 ? options : options.slice(0, commentStart);
   return ruleIdString.split(/,/).map((arg) => arg.trim()).filter((arg) => arg !== "") ?? [];
 }
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/filter-comments/CommentState.js
 var CommentState = class {
   source;
   reportingConfig;
@@ -31179,24 +32795,27 @@ var CommentState = class {
     }
   }
 };
-var messages = {
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/filter-comments/index.js
+var messages29 = {
   IGNORE_MESSAGE: {
     en: () => `disable by secretlint-disable comment`
   }
 };
-var creator$1 = {
-  messages,
+var creator29 = {
+  messages: messages29,
   meta: {
     id: "@secretlint/secretlint-rule-filter-comments",
     recommended: true,
     type: "scanner",
     supportedContentTypes: ["text"],
+    keywords: ["secretlint-"],
     docs: {
-      url: "https://github.com/secretlint/secretlint/blob/master/packages/%40secretlint/secretlint-rule-filter-comments/README.md"
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/filter-comments.md"
     }
   },
   create(context) {
-    const t = context.createTranslator(messages);
+    const t = context.createTranslator(messages29);
     return {
       file(source) {
         const state = new CommentState(source);
@@ -31223,49 +32842,191 @@ var creator$1 = {
     };
   }
 };
-var rules = [
-  creator$s,
-  creator$r,
-  creator$h,
-  creator$q,
-  creator$o,
-  creator$p,
-  creator$g,
-  creator$f,
-  creator$e,
-  creator$d,
-  creator$c,
-  creator$b,
-  creator$n,
-  creator$m,
-  creator$l,
-  creator$k,
-  creator$j,
-  creator$i,
-  creator$a,
-  creator$9,
-  creator$8,
-  creator$7,
-  creator$6,
-  creator$5,
-  creator$4,
-  creator$3,
-  creator$2,
-  creator$1
-];
-var creator = {
-  meta: {
-    id: "@secretlint/secretlint-rule-preset-recommend",
-    recommended: true,
-    type: "preset"
+
+// ../../node_modules/@secretlint/core/module/builtin/rules/azure/index.js
+var import_regexp_string_matcher30 = __toESM(require_regexp_string_matcher(), 1);
+var messages30 = {
+  AzureTenantId: {
+    en: (props) => `found Azure AD tenant ID: ${props.ID}`
   },
-  rules,
-  create(context, _options) {
-    rules.forEach((rule) => {
-      context.registerRule(rule);
+  AzureClientId: {
+    en: (props) => `found Azure Client ID: ${props.ID}`
+  },
+  AzureClientSecret: {
+    en: (props) => `found Azure Client Secret: ${props.SECRET}`
+  }
+};
+var QUOTE = `["']?`;
+var CONNECT = "\\s*(?::|=>|=|:=)\\s*";
+var GUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+var SECRET = "[-_.~a-z0-9]{40}";
+var reportAzureTenantId = ({ t, source, context, options }) => {
+  const pattern = new RegExp(String.raw`${QUOTE}(?:azure|ad)_?tenant_?id${QUOTE}${CONNECT}${QUOTE}(${GUID})${QUOTE}\b`, "gi");
+  const results = source.content.matchAll(pattern);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[1] || "";
+    const range = [index, index + match.length];
+    const allowedResults = (0, import_regexp_string_matcher30.matchPatterns)(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("AzureTenantId", {
+        ID: match
+      }),
+      range
     });
   }
 };
+var reportAzureClientId = ({ t, source, context, options }) => {
+  const pattern = new RegExp(String.raw`${QUOTE}(?:azure)?_?client_?id${QUOTE}${CONNECT}${QUOTE}(${GUID})${QUOTE}\b`, "gi");
+  const results = source.content.matchAll(pattern);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[1] || "";
+    const range = [index, index + match.length];
+    const allowedResults = (0, import_regexp_string_matcher30.matchPatterns)(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("AzureClientId", {
+        ID: match
+      }),
+      range
+    });
+  }
+};
+var reportAzureClientSecret = ({ t, source, context, options }) => {
+  const pattern = new RegExp(String.raw`${QUOTE}(?:azure)?_?client_?secret${QUOTE}${CONNECT}${QUOTE}(${SECRET})${QUOTE}\b`, "gi");
+  const results = source.content.matchAll(pattern);
+  for (const result of results) {
+    const index = result.index || 0;
+    const match = result[1] || "";
+    const range = [index, index + match.length];
+    const allowedResults = (0, import_regexp_string_matcher30.matchPatterns)(match, options.allows);
+    if (allowedResults.length > 0) {
+      continue;
+    }
+    context.report({
+      message: t("AzureClientSecret", {
+        SECRET: match
+      }),
+      range
+    });
+  }
+};
+var creator30 = {
+  messages: messages30,
+  meta: {
+    id: "@secretlint/secretlint-rule-azure",
+    recommended: false,
+    type: "scanner",
+    supportedContentTypes: ["text"],
+    keywords: ["tenant", "client"],
+    docs: {
+      url: "https://github.com/secretlint/secretlint/blob/HEAD/docs/rules/azure.md"
+    }
+  },
+  create(context, options) {
+    const normalizedOptions = {
+      allows: options.allows || []
+    };
+    const t = context.createTranslator(messages30);
+    return {
+      file(source) {
+        reportAzureTenantId({ t, source, context, options: normalizedOptions });
+        reportAzureClientId({ t, source, context, options: normalizedOptions });
+        reportAzureClientSecret({ t, source, context, options: normalizedOptions });
+      }
+    };
+  }
+};
+
+// ../../node_modules/@secretlint/core/module/builtin/index.js
+var builtinRules = [
+  creator2,
+  creator3,
+  creator4,
+  creator5,
+  creator6,
+  creator7,
+  creator8,
+  creator9,
+  creator10,
+  creator11,
+  creator12,
+  creator13,
+  creator14,
+  creator15,
+  creator16,
+  creator17,
+  creator18,
+  creator19,
+  creator20,
+  creator21,
+  creator22,
+  creator23,
+  creator24,
+  creator25,
+  creator26,
+  creator27,
+  creator28,
+  creator29,
+  creator30,
+  creator
+];
+var recommendedRules = [
+  creator2,
+  creator3,
+  creator4,
+  creator5,
+  creator6,
+  creator7,
+  creator8,
+  creator9,
+  creator10,
+  creator11,
+  creator12,
+  creator13,
+  creator14,
+  creator15,
+  creator16,
+  creator17,
+  creator18,
+  creator19,
+  creator20,
+  creator21,
+  creator22,
+  creator23,
+  creator24,
+  creator25,
+  creator26,
+  creator27,
+  creator28,
+  creator29
+];
+var canaryRules = [...recommendedRules];
+var createPreset = (id, rules) => {
+  return {
+    meta: {
+      id,
+      recommended: true,
+      type: "preset"
+    },
+    rules: [...rules],
+    create(context) {
+      rules.forEach((rule) => {
+        context.registerRule(rule);
+      });
+    }
+  };
+};
+var presetRecommend = createPreset("@secretlint/secretlint-rule-preset-recommend", recommendedRules);
+var presetCanary = createPreset("@secretlint/secretlint-rule-preset-canary", canaryRules);
+var builtinTable = new Map([...builtinRules, presetRecommend, presetCanary].map((creator31) => [creator31.meta.id, creator31]));
+var builtinRuleIds = [...builtinTable.keys()];
 
 // src/redact.ts
 var MASK = "[REDACTED]";
@@ -31345,7 +33106,7 @@ function mapStrings(value, f) {
   return value;
 }
 var SECRETLINT = {
-  rules: [{ id: "@secretlint/secretlint-rule-preset-recommend", rule: creator }]
+  rules: [{ id: "@secretlint/secretlint-rule-preset-recommend", rule: presetRecommend }]
 };
 var OURS = /* @__PURE__ */ new Set([
   "@secretlint/secretlint-rule-basicauth",
@@ -31538,17 +33299,17 @@ function storedMessages(sessionId, stored) {
 function isRecorded(recorded, message) {
   return recorded.has(message.hash) || recorded.has(message.label);
 }
-function messageOrder(messages2) {
-  return new Map((messages2 ?? []).map((message, index) => [message.hash, index]));
+function messageOrder(messages31) {
+  return new Map((messages31 ?? []).map((message, index) => [message.hash, index]));
 }
-function labelsToHashes(messages2) {
-  return new Map((messages2 ?? []).map((message) => [message.label, message.hash]));
+function labelsToHashes(messages31) {
+  return new Map((messages31 ?? []).map((message) => [message.label, message.hash]));
 }
-function hashesToLabels(messages2) {
-  return new Map((messages2 ?? []).map((message) => [message.hash, message.label]));
+function hashesToLabels(messages31) {
+  return new Map((messages31 ?? []).map((message) => [message.hash, message.label]));
 }
-function upgradeSessionIds(session, messages2) {
-  const byLabel = labelsToHashes(messages2);
+function upgradeSessionIds(session, messages31) {
+  const byLabel = labelsToHashes(messages31);
   const rename4 = (id) => byLabel.get(id) ?? id;
   const byId = /* @__PURE__ */ new Map();
   const stable = /* @__PURE__ */ new Set();
@@ -31655,8 +33416,8 @@ async function onSessionEnd(ctx) {
   if (!ctx.initialized) return void 0;
   const config2 = await loadConfig(ctx.env);
   if (!config2.sessionEndCatchUp) return void 0;
-  const messages2 = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
-  if (!messages2 || messages2.length === 0) return void 0;
+  const messages31 = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
+  if (!messages31 || messages31.length === 0) return void 0;
   const state = await loadState(ctx.root, ctx.sessionId);
   if (state.found && state.ok && state.data.closedAt && !state.data.closePending) return void 0;
   const review = config2.recorder === "mixed" ? ["--review"] : [];
@@ -31668,7 +33429,7 @@ async function onSessionEnd(ctx) {
 // package.json
 var package_default = {
   name: "@cogit/cli",
-  version: "1.5.2",
+  version: "1.5.3",
   description: "Git for the intent behind agent-written code.",
   license: "MIT",
   keywords: [
@@ -31714,8 +33475,7 @@ var package_default = {
   },
   devDependencies: {
     "@inquirer/prompts": "^8.8.0",
-    "@secretlint/core": "^13.1.0",
-    "@secretlint/secretlint-rule-preset-recommend": "^13.1.0",
+    "@secretlint/core": "^14.0.1",
     commander: "^15.1.0",
     mermaid: "^11.17.2",
     "smol-toml": "^1.9.1",
@@ -31858,8 +33618,8 @@ var FULL_HASH = /^[0-9a-f]{40}$/;
 var THOUGHT_LINE = new RegExp(`^[ \\t]*${THOUGHT_TRAILER}:[ \\t]*(h[0-9a-f]{12})[ \\t]*$`, "gim");
 var COMMIT_MARK = "";
 var LOG_MAX_BUFFER = 256 * 1024 * 1024;
-async function readable(path3) {
-  return access3(path3).then(
+async function readable(path2) {
+  return access3(path2).then(
     () => true,
     () => false
   );
@@ -31878,8 +33638,8 @@ async function sessionRunsIn(agent, transcript, dir) {
   }
   return false;
 }
-async function realOrSame(path3) {
-  return realpath2(path3).catch(() => resolve4(path3));
+async function realOrSame(path2) {
+  return realpath2(path2).catch(() => resolve4(path2));
 }
 async function newestThought(agent, transcript, sessionId) {
   const turns = await agent.readConversation(transcript);
@@ -32074,16 +33834,16 @@ function buildFileHistory(sessions, commitFiles = /* @__PURE__ */ new Map()) {
       const commits = message.commits ?? [];
       const fromCommits = /* @__PURE__ */ new Map();
       for (const hash2 of commits) {
-        for (const path3 of commitFiles.get(hash2) ?? []) {
-          const list = fromCommits.get(path3) ?? [];
+        for (const path2 of commitFiles.get(hash2) ?? []) {
+          const list = fromCommits.get(path2) ?? [];
           list.push(hash2);
-          fromCommits.set(path3, list);
+          fromCommits.set(path2, list);
         }
       }
       const paths = /* @__PURE__ */ new Set([...message.files ?? [], ...fromCommits.keys()]);
       const unknown3 = commits.filter((hash2) => !commitFiles.has(hash2));
-      for (const path3 of paths) {
-        const touching = [...fromCommits.get(path3) ?? [], ...unknown3];
+      for (const path2 of paths) {
+        const touching = [...fromCommits.get(path2) ?? [], ...unknown3];
         const hit = {
           sessionId: session.sessionId,
           sessionTitle: sessionTitle2,
@@ -32094,17 +33854,17 @@ function buildFileHistory(sessions, commitFiles = /* @__PURE__ */ new Map()) {
           ...branchTitle === void 0 ? {} : { branch: branchTitle },
           commits: [...new Set(touching)]
         };
-        const list = byPath.get(path3) ?? [];
+        const list = byPath.get(path2) ?? [];
         list.push(hit);
-        byPath.set(path3, list);
+        byPath.set(path2, list);
       }
     }
   }
-  const files = [...byPath].map(([path3, hits]) => {
+  const files = [...byPath].map(([path2, hits]) => {
     hits.sort(byNewest);
     const newest = hits[0];
     return {
-      path: path3,
+      path: path2,
       hits,
       count: hits.length,
       ...newest?.at === void 0 ? {} : { lastAt: newest.at }
@@ -32483,14 +34243,14 @@ function shortHash(id) {
 function oneLine2(text) {
   return text.replace(/\s+/g, " ").trim();
 }
-function branchesOf(sessionId, messages2) {
-  const starts = messages2.flatMap(
+function branchesOf(sessionId, messages31) {
+  const starts = messages31.flatMap(
     (message, index) => message.branch === void 0 ? [] : [{ index, branch: message.branch }]
   );
   return starts.map(({ index, branch }, position) => {
-    const end = (starts[position + 1]?.index ?? messages2.length) - 1;
-    const first = messages2[index];
-    const last = messages2[end];
+    const end = (starts[position + 1]?.index ?? messages31.length) - 1;
+    const first = messages31[index];
+    const last = messages31[end];
     return {
       sessionId,
       title: branch.title,
@@ -32504,9 +34264,9 @@ function branchesOf(sessionId, messages2) {
   });
 }
 function toLogSession(effective) {
-  const { session, messages: messages2 } = effective;
-  const labels = new Map(messages2.map((message) => [message.id, message.label ?? message.id]));
-  const logMessages = [...messages2].reverse().map((message) => {
+  const { session, messages: messages31 } = effective;
+  const labels = new Map(messages31.map((message) => [message.id, message.label ?? message.id]));
+  const logMessages = [...messages31].reverse().map((message) => {
     const parentLabel = typeof message.parent === "string" ? labels.get(message.parent) : void 0;
     return {
       id: message.id,
@@ -32529,7 +34289,7 @@ function toLogSession(effective) {
     startedAt: session.startedAt,
     updatedAt: session.updatedAt,
     messages: logMessages,
-    branches: branchesOf(session.sessionId, messages2)
+    branches: branchesOf(session.sessionId, messages31)
   };
 }
 function selectSessions(sessions, prefix) {
@@ -32557,9 +34317,9 @@ function buildLog(sessions, opts = {}) {
         left -= branches.length;
         return branches.length === 0 ? [] : [{ ...session, messages: [], branches }];
       }
-      const messages2 = session.messages.slice(0, left);
-      left -= messages2.length;
-      return messages2.length === 0 ? [] : [{ ...session, messages: messages2 }];
+      const messages31 = session.messages.slice(0, left);
+      left -= messages31.length;
+      return messages31.length === 0 ? [] : [{ ...session, messages: messages31 }];
     });
   }
   if (opts.branchesOnly === true) {
@@ -32691,9 +34451,9 @@ function resolveRef2(sessions, ref) {
     };
   return { kind: "ok", hit: { session: entry.session, messages: entry.messages, message } };
 }
-function refOf(sessions, ref, self2) {
+function refOf(sessions, ref, self) {
   const colon = ref.indexOf(":");
-  const sessionId = colon === -1 ? self2 : ref.slice(0, colon);
+  const sessionId = colon === -1 ? self : ref.slice(0, colon);
   const id = colon === -1 ? ref : ref.slice(colon + 1);
   const entry = sessions.find((candidate) => candidate.session.sessionId === sessionId);
   const message = entry?.messages.find((candidate) => candidate.id === id);
@@ -32704,18 +34464,18 @@ function refOf(sessions, ref, self2) {
     ...message?.title === void 0 ? {} : { title: message.title }
   };
 }
-function branchAround(sessionId, messages2, id) {
+function branchAround(sessionId, messages31, id) {
   let start = null;
-  for (const message of messages2) {
+  for (const message of messages31) {
     if (message.branch !== void 0) start = message;
     if (message.id === id) break;
   }
   if (start === null) return null;
-  const branches = branchesOf(sessionId, messages2);
+  const branches = branchesOf(sessionId, messages31);
   return branches.find((branch) => branch.start.id === start?.id) ?? null;
 }
-function conversationTurn(messages2, message) {
-  const turn = messages2?.find(
+function conversationTurn(messages31, message) {
+  const turn = messages31?.find(
     (candidate) => candidate.hash === message.id || candidate.label === message.label
   );
   if (turn === void 0) return null;
@@ -32748,7 +34508,7 @@ async function show(opts) {
       COMMIT_REF.test(opts.ref) ? `commit ${opts.ref} comes from several thoughts; open one by its message hash` : `"${opts.ref}" is ambiguous; use a longer prefix`
     );
   }
-  const { session, messages: messages2, message } = result.hit;
+  const { session, messages: messages31, message } = result.hit;
   const sessionId = session.sessionId;
   const children = [];
   const seen = /* @__PURE__ */ new Set();
@@ -32765,7 +34525,7 @@ async function show(opts) {
     }
   }
   const subjects = message.commits === void 0 || message.commits.length === 0 ? /* @__PURE__ */ new Map() : await readCommitSubjects(root, message.commits);
-  const branch = branchAround(sessionId, messages2, message.id);
+  const branch = branchAround(sessionId, messages31, message.id);
   const turn = opts.chat === false ? null : await readSessionMessages(root, sessionId, opts.io.env);
   return {
     id: message.id,
@@ -32903,10 +34663,10 @@ async function logFile(opts) {
     if (gitRoot !== void 0)
       commitFiles = projectFiles(gitRoot, root, await readCommitFiles(gitRoot, hashes));
   }
-  const sources = sessions.map(({ session, messages: messages2 }) => ({
+  const sources = sessions.map(({ session, messages: messages31 }) => ({
     sessionId: session.sessionId,
     title: session.title,
-    messages: messages2
+    messages: messages31
   }));
   const wanted = normalizeFilePath(opts.file);
   const found = buildFileHistory(sources, commitFiles).find((file2) => file2.path === wanted);
@@ -33057,12 +34817,12 @@ async function sessionFiles(root, id, conversations) {
     [EVENTS_FILE, paths.events(id)],
     ...conversations ? [[CONVERSATION_FILE, paths.conversation(id)]] : []
   ];
-  return all.filter(([, path3]) => existsSync3(path3));
+  return all.filter(([, path2]) => existsSync3(path2));
 }
 async function stampOf(files, conversations) {
   const parts = [conversations ? "c" : "-"];
-  for (const [name, path3] of files) {
-    const info = await stat11(path3);
+  for (const [name, path2] of files) {
+    const info = await stat11(path2);
     parts.push(`${name}:${info.mtimeMs}:${info.size}`);
   }
   return parts.join("|");
@@ -33094,7 +34854,7 @@ async function snapshotRecords(root, env) {
     }
     if (!touched) return state;
     if (changed.length === 0) return { ...state, stamps };
-    const paths = changed.flatMap(({ files }) => files.map(([, path3]) => path3));
+    const paths = changed.flatMap(({ files }) => files.map(([, path2]) => path2));
     const hashed = await runGit(
       root,
       ["hash-object", "-w", "--stdin-paths"],
@@ -33617,16 +35377,16 @@ function additionalContext3(ctx, text) {
 }
 async function compactRequest(ctx) {
   if (!ctx.initialized) return void 0;
-  const messages2 = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
-  if (!messages2) return void 0;
+  const messages31 = await readSessionMessages(ctx.root, ctx.sessionId, ctx.env);
+  if (!messages31) return void 0;
   const record2 = await loadSession(ctx.root, ctx.sessionId);
   let recorded = /* @__PURE__ */ new Set();
   if (record2.found && record2.ok) {
-    const upgraded = upgradeSessionIds(record2.data, messages2);
+    const upgraded = upgradeSessionIds(record2.data, messages31);
     const events = await readEvents(ctx.root, ctx.sessionId);
     recorded = new Set(applyEvents(upgraded.nodes, events).map((node2) => node2.id));
   }
-  if (messages2.every((message) => isRecorded(recorded, message))) return void 0;
+  if (messages31.every((message) => isRecorded(recorded, message))) return void 0;
   return additionalContext3(ctx, compactRequestText(ctx.agent.skill));
 }
 function oneLine3(text) {
@@ -33643,8 +35403,8 @@ async function startupContext(ctx) {
   const previous = mostRecentOtherSession(sessions, ctx.sessionId);
   if (previous === void 0) return header;
   const events = await readEvents(ctx.root, previous.sessionId);
-  const messages2 = buildMessages(applyEvents(previous.nodes, events));
-  return composeStartupContext(header, previous, branchesOf(previous.sessionId, messages2));
+  const messages31 = buildMessages(applyEvents(previous.nodes, events));
+  return composeStartupContext(header, previous, branchesOf(previous.sessionId, messages31));
 }
 function mostRecentOtherSession(sessions, sessionId) {
   return sessions.filter((session) => session.sessionId !== sessionId).sort(
@@ -33857,30 +35617,30 @@ function spawnDetachedProcess(cli2, args, env, log2) {
     if (fd !== void 0) closeSync(fd);
   }
 }
-async function runHook(event, stdin, env, now, debug2, deps = {}) {
+async function runHook(event, stdin, env, now, debug3, deps = {}) {
   try {
     if (captureDisabled(env)) return void 0;
     const handler = HANDLERS[event];
     if (!handler) return void 0;
     const agent = deps.agent === void 0 ? defaultAgent() : AGENTS[deps.agent];
     if (agent === void 0) {
-      debug2(`cogit ${event} hook: unknown agent ${deps.agent}`);
+      debug3(`cogit ${event} hook: unknown agent ${deps.agent}`);
       return void 0;
     }
     const input2 = agent.parseHookInput(stdin);
     if (input2 === void 0) {
-      debug2(`cogit ${event} hook: unreadable hook input`);
+      debug3(`cogit ${event} hook: unreadable hook input`);
       return void 0;
     }
     if (!Slug.safeParse(input2.session_id).success) return void 0;
     if (handler === onSessionStart)
-      await agent.markLive(input2.session_id).catch((err) => debug2(`cogit mark: ${err.message}`));
+      await agent.markLive(input2.session_id).catch((err) => debug3(`cogit mark: ${err.message}`));
     const { recordHeadless } = await loadConfig(env);
     const lineage = deps.sessionLineage ?? (() => rememberedLineage(lineageCacheDir(), input2.session_id, () => agent.sessionLineage()));
     const headless = await agent.isHeadless(env, input2);
     if (headless && !recordsHeadless(recordHeadless, env, lineage)) return void 0;
     if (handler === onSessionStart && recordHeadless)
-      await agent.markChildren(env, lineage()?.own).catch((err) => debug2(`cogit mark: ${err.message}`));
+      await agent.markChildren(env, lineage()?.own).catch((err) => debug3(`cogit mark: ${err.message}`));
     const { root } = await resolveProjectRoot(env[agent.projectDirEnv] ?? input2.cwd ?? ".");
     const initialized = existsSync4(projectPaths(root).project);
     if (!initialized && handler !== onSessionStart) return void 0;
@@ -33900,7 +35660,7 @@ async function runHook(event, stdin, env, now, debug2, deps = {}) {
     });
     return out === void 0 ? void 0 : JSON.stringify(out);
   } catch (err) {
-    debug2(`cogit ${event} hook: ${err.message}`);
+    debug3(`cogit ${event} hook: ${err.message}`);
     return void 0;
   }
 }
