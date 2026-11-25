@@ -408,6 +408,29 @@ describe("cogit pr (Story 10.1)", () => {
     await expect(pr({ dir: root, base: "nope", io })).rejects.toThrow(/unknown base "nope"/);
   });
 
+  it("describes a linked worktree's branch from the main checkout's record", async () => {
+    // The worktree sits outside the project, as runners like start-project's factory place it.
+    const wt = join(dir, "outside", "k1");
+    await git("worktree", "add", "-q", "-b", "factory/k1", wt, "main");
+    await writeFile(join(wt, "wt.txt"), "wt\n");
+    await run("git", ["-C", wt, "add", "wt.txt"], { env });
+    await run(
+      "git",
+      ["-C", wt, "commit", "-q", "-m", "feat: work in the worktree", "-m", `Thought: ${A}`],
+      {
+        env,
+      },
+    );
+    const head = (await run("git", ["-C", wt, "rev-parse", "HEAD"], { env })).stdout.trim();
+
+    const model = await pr({ dir: wt, base: "main", io });
+    expect(model.head).toBe(head);
+    expect(model.thoughts.map((thought) => thought.id)).toEqual([A]);
+    expect(model.thoughts[0]?.commits.map((entry) => entry.subject)).toEqual([
+      "feat: work in the worktree",
+    ]);
+  });
+
   it("says plainly when no base can be found", async () => {
     await git("branch", "-D", "main");
     await git("branch", "-M", "trunk");

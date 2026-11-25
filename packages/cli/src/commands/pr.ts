@@ -1,4 +1,5 @@
 import { execFile, spawn } from "node:child_process";
+import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { cogitIgnored, findGitRoot, gitUserEmail, readCommitFiles } from "../git.js";
 import { CliError, type Io } from "../io.js";
@@ -780,7 +781,9 @@ export function currentPullRequest(root: string, io: Io): Promise<ViewPullReques
 /** `cogit pr [base]`: reads the record and the branch, prints the description. */
 export async function pr(opts: PrOptions): Promise<PrModel> {
   const root = await openProject(opts.dir);
-  const gitRoot = await findGitRoot(root);
+  // From a linked worktree the record lives in the main checkout, but the branch
+  // is the worktree's: git runs where the command did.
+  const gitRoot = await findGitRoot(resolve(opts.dir));
   if (gitRoot === undefined) throw new CliError("not in a git repository");
   const env = opts.io.env;
 

@@ -94,6 +94,23 @@ async function readyToRead(dir: string, io: Io): Promise<void> {
   }
 }
 
+/**
+ * A record that cannot be written, as one line instead of a stack trace. A
+ * sandbox that mounts the main checkout read-only for a worktree session is the
+ * usual cause: the record lives in the main checkout's `.cogit/`.
+ */
+function unwritableRecord(err: unknown): string | undefined {
+  const { code, path } = (err ?? {}) as NodeJS.ErrnoException;
+  if (code !== "EROFS" && code !== "EACCES" && code !== "EPERM") return undefined;
+  if (path === undefined) return undefined;
+  // The last `.cogit` folder on the path; slashes kept as the system wrote them.
+  const match = /^(.*[\\/]\.cogit)(?:[\\/]|$)/.exec(path);
+  if (match === null) return undefined;
+  const store = match[1] as string;
+  const why = code === "EROFS" ? "read-only file system" : "permission denied";
+  return `cannot write the record in ${store} (${why}); a sandbox must mount it writable`;
+}
+
 export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps = {}): Command {
   const program = new Command().name("cogit").description(pkg.description).version(pkg.version);
 
@@ -104,6 +121,8 @@ export function createProgram(makeIo: IoFactory = processIo, deps: ProgramDeps =
       try {
         await fn(...args);
       } catch (err) {
+        const unwritable = unwritableRecord(err);
+        if (unwritable !== undefined) program.error(`error: ${unwritable}`, { exitCode: 1 });
         if (!(err instanceof CliError)) throw err;
         program.error(`error: ${err.message}`, { exitCode: 1 });
       } finally {

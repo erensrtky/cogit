@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildProject } from "../src/commands/build.js";
@@ -7,6 +7,7 @@ import { configSet } from "../src/commands/config.js";
 import { init } from "../src/commands/init.js";
 import { sessionShow, sessionWrite } from "../src/commands/session.js";
 import { runHook } from "../src/hooks/run.js";
+import { createProgram } from "../src/program.js";
 import { projectPaths } from "../src/store/paths.js";
 import { resolveProjectRoot } from "../src/store/root.js";
 import { loadProject, loadSession } from "../src/store/stores.js";
@@ -110,6 +111,31 @@ describe("commands in a worktree", () => {
     const model = await buildProject({ dir: wt, io: fakeIo(env), templateHtml });
     expect(model.sessions[0]?.worktree).toEqual({ path: wt, branch: "feature" });
   });
+
+  // A read-only directory is not read-only to root, and Windows has no mode bits.
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "names the main checkout's record in one line when a sandbox mounts it read-only",
+    async () => {
+      const locks = projectPaths(main).locks;
+      await mkdir(locks, { recursive: true });
+      await chmod(locks, 0o555);
+      try {
+        const io = fakeIo(env);
+        const program = createProgram(() => io);
+        program.exitOverride().configureOutput({ writeErr: () => {}, writeOut: () => {} });
+        const input = join(dir, "s2.json");
+        await writeFile(input, '{"sessionId":"s2","title":"a"}');
+        const write = program.parseAsync(["session", "write", "-C", wt, "--file", input], {
+          from: "user",
+        });
+        await expect(write).rejects.toThrow(
+          `error: cannot write the record in ${join(main, ".cogit")} (permission denied); a sandbox must mount it writable`,
+        );
+      } finally {
+        await chmod(locks, 0o755);
+      }
+    },
+  );
 
   it("shows the main record, the worktree as dir and the inbox under it", async () => {
     const io = fakeIo(env);

@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- `cogit pr` run in a linked git worktree (`claude -w`, `git worktree add`) described the main checkout's branch instead of the worktree's, so the description came out empty. It now reads the worktree's commits, with the record from the main checkout as before.
+- When a session's record cannot be written, for example because a sandbox mounts the main checkout read-only while the agent works in a worktree, cogit says so in one line naming the `.cogit/` folder to make writable, instead of a Node stack trace.
 
 ## [1.5.2] - 2026-11-19
 ### Changed
