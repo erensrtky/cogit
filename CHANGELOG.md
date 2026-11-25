@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.5.3] - 2026-11-25
 ### Changed
 - Secret masking uses secretlint 14, whose recommended rules now come inside its core package; the separate preset package is gone. Same rules, plus secretlint's fix for words like `xapp-le-kernel` being taken for Slack tokens.
 
