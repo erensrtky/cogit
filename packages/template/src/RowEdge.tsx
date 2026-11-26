@@ -1,4 +1,4 @@
-import { useStore } from "@xyflow/react";
+import { useViewportStore } from "@xyflow/react";
 import { type PointerEvent, useState } from "react";
 import { clampRowWidth, type GitLayout, ROW_WIDTH } from "./gitLayout.js";
 
@@ -46,7 +46,7 @@ export function RowEdge({
   onDone: (width: number) => void;
 }) {
   // The canvas may be zoomed: a screen pixel is 1/zoom of a canvas pixel.
-  const zoom = useStore((state) => state.transform[2]) || 1;
+  const zoom = useViewportStore((state) => state.transform[2]) || 1;
   const [start, setStart] = useState<{ x: number; width: number } | null>(null);
   const grab = GRAB / zoom;
   return (
