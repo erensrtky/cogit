@@ -5,9 +5,9 @@ import {
   type NodeTypes,
   ReactFlow,
   ReactFlowProvider,
-  type ReactFlowState,
   useReactFlow,
-  useStore,
+  useViewportStore,
+  type ViewportStore,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -41,7 +41,7 @@ import { usePageWheel } from "./scroll.js";
 import { applySearchHits, storedOpen } from "./searchOpen.js";
 import type { ScopeAnchor } from "./searchScope.js";
 import { layoutSessionGraph, openAtLoad, type SessionGraph } from "./sessionLayout.js";
-import { useTheme } from "./ThemeButton.js";
+import { usePalette } from "./ThemeButton.js";
 import { readViewMemory, rememberView, withLinkedFile } from "./viewMemory.js";
 
 /**
@@ -199,7 +199,7 @@ function ProjectBox({ data }: NodeProps<ProjectFlowNode>) {
 }
 
 /** The viewport's band as a string, so the store re-renders only when it moves a step. */
-function bandKey(state: ReactFlowState): string {
+function bandKey(state: ViewportStore): string {
   const band = visibleBand(state.transform, state.height);
   return band === null ? "all" : band.join(":");
 }
@@ -213,7 +213,7 @@ function OpenSessions({
   highlights,
   activeHit,
 }: Pick<ProjectData, "openings" | "highlights" | "activeHit">) {
-  const key = useStore(bandKey);
+  const key = useViewportStore(bandKey);
   const band = key === "all" ? null : (key.split(":").map(Number) as [number, number]);
   return openings
     .filter((opening) => inBand(opening.top, opening.git.height, band))
@@ -1194,7 +1194,7 @@ function MapCanvas({
   refocus: number;
 }) {
   const { fitView, setViewport } = useReactFlow();
-  const theme = useTheme();
+  const palette = usePalette();
 
   /** Centres the view on a canvas point; does nothing before the canvas exists. */
   function centre(point: MapPoint): void {
@@ -1277,7 +1277,7 @@ function MapCanvas({
       nodesDraggable={false}
       nodesConnectable={false}
       elementsSelectable={false}
-      colorMode={theme}
+      forceColorMode={palette}
     >
       <Controls showInteractive={false} />
     </ReactFlow>

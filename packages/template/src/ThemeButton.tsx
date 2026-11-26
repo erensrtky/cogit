@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { type DiagramTheme, effectiveTheme } from "./diagramTheme.js";
 import {
   getTheme,
   nextTheme,
@@ -11,6 +12,35 @@ import {
 /** The current theme choice, re-rendering when it changes. */
 export function useTheme(): ThemeMode {
   return useSyncExternalStore(subscribeTheme, getTheme, getTheme);
+}
+
+const LIGHT_QUERY = "(prefers-color-scheme: light)";
+
+function lightMedia(): MediaQueryList | undefined {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia(LIGHT_QUERY)
+    : undefined;
+}
+
+export function subscribeSystem(listener: () => void): () => void {
+  const media = lightMedia();
+  media?.addEventListener("change", listener);
+  return () => media?.removeEventListener("change", listener);
+}
+
+/** Like the stylesheet: dark unless the system asks for light. */
+export function systemDark(): boolean {
+  return lightMedia()?.matches !== true;
+}
+
+/**
+ * The palette the page is showing, System resolved through the browser's
+ * preference: React Flow 13 takes only light or dark.
+ */
+export function usePalette(): DiagramTheme {
+  const mode = useTheme();
+  const dark = useSyncExternalStore(subscribeSystem, systemDark, () => true);
+  return effectiveTheme(mode, dark);
 }
 
 const ICON_PROPS = {
